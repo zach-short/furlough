@@ -33,6 +33,7 @@ enum TimeFormat {
 
     static func status(_ status: TargetStatus) -> String {
         switch status {
+        case .bricked: "Bricked"
         case .unconfigured: "Not enforced until you set a schedule"
         case .blockedAllDay: "Blocked all day"
         case .open(let until): "Open until \(minute(until))"
@@ -71,6 +72,8 @@ enum ShieldText {
         }
         let budget = rule.map { TimeFormat.budget($0.dailyBudgetMinutes) } ?? ""
         switch status {
+        case .bricked:
+            return ("\(name) is bricked", "Unbrick it with your tag in Furlough.")
         case .unconfigured:
             return ("Not enforced yet", "Open Furlough and set a schedule for \(name).")
         case .blockedAllDay:

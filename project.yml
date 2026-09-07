@@ -37,12 +37,15 @@ targets:
       path: Furlough/Furlough.entitlements
       properties:
         com.apple.developer.family-controls: true
+        com.apple.developer.nfc.readersession.formats:
+          - TAG
         com.apple.security.application-groups:
           - group.com.zachshort.furlough
     info:
       path: Furlough/Info.plist
       properties:
         CFBundleDisplayName: Furlough
+        NFCReaderUsageDescription: Furlough reads your tag to unbrick your apps.
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: {}

@@ -70,6 +70,7 @@ struct StatusChip: View {
 
     private var symbol: String {
         switch status {
+        case .bricked: "cube.fill"
         case .open: "lock.open.fill"
         case .unconfigured: "exclamationmark.triangle.fill"
         case .exhausted: "hourglass.bottomhalf.filled"
@@ -79,6 +80,7 @@ struct StatusChip: View {
 
     private var text: String? {
         switch status {
+        case .bricked: "Bricked"
         case .open(let until): TimeFormat.minute(until)
         case .closed(let next): TimeFormat.minute(next.minuteOfDay)
         case .exhausted(let next): next.map { TimeFormat.minute($0.minuteOfDay) }
@@ -89,6 +91,7 @@ struct StatusChip: View {
 
     private var color: Color {
         switch status {
+        case .bricked: Ember.ember
         case .open: Ember.moss
         case .unconfigured: Ember.pending
         default: Ember.muted

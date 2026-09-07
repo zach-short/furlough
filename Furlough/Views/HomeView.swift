@@ -24,6 +24,9 @@ struct HomeView: View {
             .navigationDestination(for: UUID.self) { id in
                 RuleEditorView(targetID: id)
             }
+            .navigationDestination(for: BrickRoute.self) { _ in
+                BrickView()
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Settings", systemImage: "gearshape.fill") { showSettings = true }
@@ -84,12 +87,14 @@ struct HomeContent: View {
         let state = model.state
         let config = Policy.effectiveConfig(state, now: now)
         let statuses = Dictionary(uniqueKeysWithValues: config.targets.map { target in
-            (target.id, Policy.status(of: target, runtime: state.runtime, now: now))
+            (target.id, Policy.status(of: target, config: config, runtime: state.runtime, now: now))
         })
         let groups = HomeGroups(targets: config.targets, statuses: statuses, now: now)
 
         VStack(alignment: .leading, spacing: 0) {
             HeroView(groups: groups, now: now)
+            BrickCard(brick: config.brick)
+                .padding(.top, 10)
             ForEach(groups.sections) { section in
                 SectionLabel(text: section.title)
                 VStack(spacing: 0) {
@@ -111,7 +116,8 @@ struct HomeContent: View {
     }
 }
 
-/// The list order from the spec: Open now · Later today · Tomorrow · Always blocked · Needs a schedule.
+/// The list order from the spec: Open now · Later today · Tomorrow · Always blocked · Needs a schedule,
+/// with Bricked first whenever the brick is on.
 struct HomeGroups {
     struct Section: Identifiable {
         let title: String
@@ -119,6 +125,7 @@ struct HomeGroups {
         var id: String { title }
     }
 
+    var bricked: [Target] = []
     var open: [(target: Target, until: Date, untilMinute: Int)] = []
     var laterToday: [(target: Target, at: Date)] = []
     var tomorrow: [(target: Target, at: Date?)] = []
@@ -128,6 +135,8 @@ struct HomeGroups {
     init(targets: [Target], statuses: [UUID: TargetStatus], now: Date) {
         for target in targets {
             switch statuses[target.id] ?? .unconfigured {
+            case .bricked:
+                bricked.append(target)
             case .open(let until):
                 open.append((target, Policy.date(atMinute: until, of: now), until))
             case .closed(let next):
@@ -150,11 +159,13 @@ struct HomeGroups {
     }
 
     var isEmpty: Bool {
-        open.isEmpty && laterToday.isEmpty && tomorrow.isEmpty && alwaysBlocked.isEmpty && unconfigured.isEmpty
+        bricked.isEmpty && open.isEmpty && laterToday.isEmpty && tomorrow.isEmpty && alwaysBlocked.isEmpty
+            && unconfigured.isEmpty
     }
 
     var sections: [Section] {
         [
+            Section(title: "Bricked", targets: bricked),
             Section(title: "Open now", targets: open.map(\.target)),
             Section(title: "Later today", targets: laterToday.map(\.target)),
             Section(title: "Tomorrow", targets: tomorrow.map(\.target)),

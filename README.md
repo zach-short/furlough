@@ -4,7 +4,9 @@ A personal iOS app blocker with no unblock button.
 
 Pick the apps and websites that eat your time. Give each one daily windows (say 8:00–10:00 PM) and a daily minute budget (say 30 minutes). Outside the windows, or once the budget is spent, iOS shields the app. The only way to loosen a rule is to wait: loosening edits take effect 24 hours after you make them, and you can cancel them in the meantime. Tightening edits apply instantly.
 
-Built on Apple's Screen Time API (FamilyControls, ManagedSettings, DeviceActivity). Swift, SwiftUI, no third-party dependencies.
+There is also a Brick: a second set of apps you lock in one tap, from anywhere, and can only unlock by holding your phone to a physical NFC tag you paired. Leave the tag at home and your phone stays bricked until you are back.
+
+Built on Apple's Screen Time API (FamilyControls, ManagedSettings, DeviceActivity) and Core NFC. Swift, SwiftUI, no third-party dependencies.
 
 ## How it works
 
@@ -26,6 +28,15 @@ Rules for each app live in an App Group so all four processes read the same stat
 - Raising the delay is instant. Lowering it waits out the current delay.
 - While anything is shielded, iOS is told to deny deleting apps, so the app cannot be removed as a shortcut.
 
+### The Brick
+
+- The Brick holds its own list of apps, sites, and categories, chosen with the same picker. An app can be in the Brick and have windows too.
+- Tap **Brick** in the app and everything in the list is shielded immediately, no tag needed. Bricking is tightening.
+- **Unbrick** opens the NFC reader; only the tag you paired lifts the brick, instantly. This is the one unblock in Furlough, and it exists only for the Brick. Rule-based targets never get one.
+- While bricked, the list and the paired tag cannot be changed, so nothing can loosen under the lock. Bricking is refused until a tag is paired, so there is always a way back.
+- When the brick is off, each app falls back to its windows and budget, or to nothing if it has no rule. Bricking an app that is already outside its window changes nothing visible.
+- Pairing reads the tag's hardware identifier; nothing is written, so any NTAG sticker or an existing Brick device works.
+
 The one escape that always exists is Apple's own: **Settings > Screen Time > Apps with Screen Time Access > Furlough > off**. That revokes access and iOS clears every shield and the delete-protection flag. Furlough cannot prevent it, and it documents it on purpose.
 
 ## Requirements
@@ -42,9 +53,10 @@ open Furlough.xcodeproj
 ```
 
 1. In Xcode, select the `Furlough` scheme and your iPhone as the run destination.
-2. Signing is automatic under team `X9V4L6HR2R`. Xcode registers the four bundle IDs and enables Family Controls (development), App Groups, and NFC-free capabilities on first build.
+2. Signing is automatic under team `X9V4L6HR2R`. Xcode registers the four bundle IDs and enables Family Controls (development), App Groups, and NFC Tag Reading on first build.
 3. Press Run. On the phone, tap **Allow Screen Time access**, then **Allow** on the iOS prompt.
 4. Tap **+** to pick apps and websites. Open each one and set its windows and budget. Save.
+5. For the Brick, open the Brick card, choose apps, and pair a tag by holding the phone to it. Then **Brick** locks and **Unbrick** asks for the tag.
 
 Or from the command line, with the phone connected:
 

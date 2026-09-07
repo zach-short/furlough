@@ -79,6 +79,11 @@ struct StatusWidgetView: View {
                 detail("\(summary.blockedCount) blocked all day")
             }
             Spacer(minLength: 0)
+            if summary.isBricked {
+                Text("\(summary.brickedCount) bricked")
+                    .emberBody(10.5, .semibold)
+                    .foregroundStyle(Ember.ember)
+            }
             if summary.pendingCount > 0 {
                 Text("\(summary.pendingCount) change\(summary.pendingCount == 1 ? "" : "s") pending")
                     .emberBody(10.5, .semibold)

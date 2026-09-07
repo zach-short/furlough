@@ -28,6 +28,7 @@ final class AppModel {
     var lastError: String?
     var notificationsGranted: Bool?
     let isAppGroupAvailable = SharedStore.isAppGroupAvailable
+    private let scanner = TagScanner()
 
     var isAuthorized: Bool {
         switch authorization {
@@ -221,6 +222,108 @@ final class AppModel {
         SharedStore.save(current)
         enforce(reason: "remove target")
         return result
+    }
+
+    // MARK: Brick
+
+    enum BrickOutcome: Equatable {
+        case bricked, unbricked, paired, wrongTag, cancelled, failed(String)
+    }
+
+    var brickSelection: FamilyActivitySelection {
+        var selection = FamilyActivitySelection(includeEntireCategory: true)
+        for kind in state.config.brick.kinds {
+            switch kind {
+            case .application(let token): selection.applicationTokens.insert(token)
+            case .webDomain(let token): selection.webDomainTokens.insert(token)
+            case .category(let token): selection.categoryTokens.insert(token)
+            }
+        }
+        return selection
+    }
+
+    /// Replaces what the brick holds. Refused while bricked, so nothing loosens under a lock.
+    func setBrickSelection(_ selection: FamilyActivitySelection) {
+        var current = SharedStore.load()
+        guard !current.config.brick.isBricked else { return }
+        var kinds: [TargetKind] = []
+        kinds += selection.applicationTokens.map(TargetKind.application)
+        kinds += selection.webDomainTokens.map(TargetKind.webDomain)
+        kinds += selection.categoryTokens.map(TargetKind.category)
+        guard kinds != current.config.brick.kinds else { return }
+        current.config.brick.kinds = kinds
+        SharedStore.save(current)
+        SharedStore.log("brick: now holds \(kinds.count) item(s)")
+        enforce(reason: "brick edit")
+    }
+
+    /// Bricking is tightening, so it needs no tag. It does need a paired tag to exist, or there
+    /// would be no way back.
+    func brick() -> BrickOutcome {
+        var current = SharedStore.load()
+        guard current.config.brick.canBrick else {
+            return current.config.brick.isBricked ? .bricked : .failed("Choose apps and pair a tag first.")
+        }
+        current.config.brick.isBricked = true
+        current.config.brick.brickedAt = .now
+        SharedStore.save(current)
+        SharedStore.log("bricked \(current.config.brick.count) item(s)")
+        enforce(reason: "brick")
+        return .bricked
+    }
+
+    /// The only unblock in Furlough: scans the paired tag and, if it matches, lifts the brick.
+    func unbrickWithTag() async -> BrickOutcome {
+        let scanned: Data
+        do {
+            scanned = try await scanner.scan(prompt: "Hold your iPhone to the Furlough tag to unbrick.")
+        } catch {
+            return outcome(for: error)
+        }
+        var current = SharedStore.load()
+        guard current.config.brick.isBricked else { return .unbricked }
+        guard let paired = current.config.brick.tagID, paired == scanned else {
+            SharedStore.log("unbrick refused: not the paired tag")
+            return .wrongTag
+        }
+        current.config.brick.isBricked = false
+        current.config.brick.brickedAt = nil
+        SharedStore.save(current)
+        SharedStore.log("unbricked with the paired tag")
+        enforce(reason: "unbrick")
+        return .unbricked
+    }
+
+    /// Pairs (or replaces) the tag. Refused while bricked, or any tag could become the key.
+    func pairTag() async -> BrickOutcome {
+        guard !state.config.brick.isBricked else { return .failed("Unbrick first.") }
+        let scanned: Data
+        do {
+            scanned = try await scanner.scan(prompt: "Hold your iPhone to the tag you want to pair.")
+        } catch {
+            return outcome(for: error)
+        }
+        var current = SharedStore.load()
+        guard !current.config.brick.isBricked else { return .failed("Unbrick first.") }
+        current.config.brick.tagID = scanned
+        SharedStore.save(current)
+        SharedStore.log("paired a brick tag")
+        reload()
+        return .paired
+    }
+
+    func unpairTag() {
+        SharedStore.mutate { state in
+            guard !state.config.brick.isBricked else { return }
+            state.config.brick.tagID = nil
+        }
+        SharedStore.log("forgot the brick tag")
+        reload()
+    }
+
+    private func outcome(for error: any Error) -> BrickOutcome {
+        if let scan = error as? TagScanner.ScanError, scan == .cancelled { return .cancelled }
+        return .failed(error.localizedDescription)
     }
 
     func cancelPending(id: UUID) {

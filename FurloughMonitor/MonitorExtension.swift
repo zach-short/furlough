@@ -79,7 +79,7 @@ final class MonitorExtension: DeviceActivityMonitor {
         let state = SharedStore.load()
         let config = Policy.effectiveConfig(state, now: now)
         let closing = config.targets.filter { target in
-            if case .open(let until) = Policy.status(of: target, runtime: state.runtime, now: now) {
+            if case .open(let until) = Policy.status(of: target, config: config, runtime: state.runtime, now: now) {
                 return until == window.endMinute
             }
             return false

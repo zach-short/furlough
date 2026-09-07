@@ -36,7 +36,11 @@ small codebase he fully understands over a fork. He is interactive: ask when a d
   has allowed windows (same every day) and one daily minute budget. No windows means always
   blocked. Categories are always-blocked containers; apps inside them that have their own
   windows are excepted.
-- There is no unblock action anywhere, and there must never be one, not even for testing.
+- Rule-based targets have no unblock action, and must never get one, not even for testing.
+  The single exception is the Brick profile (`Config.brick`, decided 2026-09-07): a separate
+  set of kinds that "Brick" shields instantly without a tag, and that only scanning the paired
+  NFC tag in the app can unbrick. While bricked, the list and the tag are locked. Bricking is
+  refused until a tag is paired. When the brick is off, apps fall back to their rules.
 - Tightening edits apply instantly. Loosening edits (longer or more windows, bigger budget,
   removing a target, lowering the delay) queue for the loosening delay (24 h default) and can
   be cancelled from the pending list. A target's first rule is always instant because the
@@ -44,7 +48,9 @@ small codebase he fully understands over a fork. He is interactive: ask when a d
 - `denyAppRemoval` is on whenever anything is shielded and cleared otherwise.
 - The only escape is Settings > Screen Time > Apps with Screen Time Access > Furlough off.
   It is documented on purpose in the app and README.
-- No NFC, no emergency unblocks, no schedules beyond the windows. Personal use, Xcode installs.
+- No emergency unblocks, no schedules beyond the windows. NFC exists only for the Brick tag
+  (in-app scan of the tag's hardware identifier; no background tag reading, no writes).
+  Personal use, Xcode installs.
 - Extras that are in scope: "5 minutes left" notification, Live Activity during a window,
   home-screen widget. Websites are supported.
 
@@ -80,9 +86,11 @@ small or clipped), and the glass toolbar items split into gear Â· pending pill Â
 ## Code map
 
 - `Shared/Core` (compiled into all four targets, no SwiftUI):
-  `Models.swift` (TimeWindow, Rule, Target, Config, PendingChange, RuntimeState, SharedState),
-  `Policy.swift` (pure engine: `status(of:)`, `decide`, `applyDuePending`, `classify`
-  tightening/loosening, `summary`, `nextTransition`), `SharedStore.swift` (App Group
+  `Models.swift` (TimeWindow, Rule, Target, BrickProfile, Config with a tolerant
+  `init(from:)`, PendingChange, RuntimeState, SharedState),
+  `Policy.swift` (pure engine: `status(of:config:)` returns `.bricked` first, `decide` adds
+  brick-only kinds to the shields, `applyDuePending`, `classify` tightening/loosening,
+  `summary` with `isBricked`/`brickedCount`, `nextTransition`), `SharedStore.swift` (App Group
   UserDefaults JSON plus a capped activity log), `ShieldReconciler.swift` (idempotent shield
   apply and `denyAppRemoval`), `ActivityNaming.swift`, `TimeFormat.swift` (+ `ShieldText`).
 - `Shared/LiveActivity/FurloughActivityAttributes.swift` (app + widgets).
@@ -90,7 +98,10 @@ small or clipped), and the glass toolbar items split into gear Â· pending pill Â
 - `Furlough/` app: `Model/AppModel.swift` (`@MainActor @Observable`; `enforce()` folds in due
   pending changes, calls `Monitoring.register`, `ShieldReconciler.reconcile`, reloads widgets,
   syncs the Live Activity), `Model/Monitoring.swift` (DeviceActivity registration),
-  `Model/LiveActivityManager.swift`, `Views/`: `Root` (dark scheme, ember tint), `Onboarding`,
+  `Model/LiveActivityManager.swift`, `Model/TagScanner.swift` (Core NFC tag session as one
+  async call; the identifier is read at detection, no connect), `Views/`: `Root` (dark scheme,
+  ember tint), `Onboarding`, `Brick` (`BrickView`, `BrickCard` on Home, `BrickToggleButton`,
+  `BrickGlyph`),
   `Home` (`HomeContent`, `HomeGroups` for the five sections, `HeroView`, `Countdown`,
   `TargetRow`), `Components` (`TokenLabel`, `TokenName`, `TokenTile`, `StatusChip`, `RowCopy`,
   `ProminentButton`, `GhostButton`, `SectionLabel`, `Footnote`, `CardDivider`), `RuleEditor`
@@ -119,10 +130,18 @@ small or clipped), and the glass toolbar items split into gear Â· pending pill Â
 - Exhaustion is keyed by target id and day (`yyyy-MM-dd`), so a missed midnight callback
   still resets.
 - The shield extension only reads. It folds due pending changes in memory for display.
+- `Policy.decide` is the union of rule shields and, while bricked, every kind in the brick.
+  `allowedApps` never contains a bricked app, so category exceptions cannot leak one through.
+  `AppModel.brick()`, `unbrickWithTag()`, `pairTag()`, `setBrickSelection()`, `unpairTag()`
+  are the only writers of `Config.brick`; the last three refuse while bricked.
 
 ## Known API facts and quirks
 
 - Family Controls authorization and NFC do not work in the Simulator; build for the device.
+- NFC: the app entitlement `com.apple.developer.nfc.readersession.formats` = `TAG` and
+  `NFCReaderUsageDescription` are in `project.yml`; automatic signing adds NFC Tag Reading to
+  the App ID. `NFCTagReaderSession` polls ISO 14443 and ISO 15693; `identifier` is read
+  without connecting (unverified on device, see step 2).
   `AuthorizationStatus.approvedWithDataAccess` exists from iOS 26.4; `AppModel.isAuthorized`
   handles it with a default case.
 - ActivityKit's `Activity` is not Sendable; `LiveActivityManager` marks it

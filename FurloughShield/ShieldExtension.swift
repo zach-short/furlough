@@ -31,7 +31,13 @@ final class ShieldExtension: ShieldConfigurationDataSource {
         }
         let nickname = target?.nickname ?? ""
         let name = nickname.isEmpty ? (systemName ?? "This app") : nickname
-        let status = target.map { Policy.status(of: $0, runtime: state.runtime, now: now) }
+        var status = target.map { Policy.status(of: $0, config: config, runtime: state.runtime, now: now) }
+        if status == nil {
+            // Things the brick holds that are not targets, directly or through their category.
+            let brickedDirectly = kind.map(config.brick.blocks) ?? false
+            let brickedByCategory = category?.token.map { config.brick.blocks(.category($0)) } ?? false
+            if brickedDirectly || brickedByCategory { status = .bricked }
+        }
         let text = ShieldText.text(name: name, status: status, rule: target?.rule)
 
         // Ember Glass tokens (design/DESIGN.md): the shield extension cannot see Shared/UI.

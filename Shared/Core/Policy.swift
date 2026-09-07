@@ -2,6 +2,8 @@ import Foundation
 import ManagedSettings
 
 enum TargetStatus: Equatable {
+    /// Locked by the Brick profile. Only its paired tag lifts this.
+    case bricked
     case unconfigured
     case blockedAllDay
     /// Inside a window with budget remaining. `until` is the window's end minute.
@@ -108,7 +110,8 @@ enum Policy {
 
     // MARK: Status
 
-    static func status(of target: Target, runtime: RuntimeState, now: Date) -> TargetStatus {
+    static func status(of target: Target, config: Config, runtime: RuntimeState, now: Date) -> TargetStatus {
+        if config.isBricked(target) { return .bricked }
         guard let rule = target.rule else { return .unconfigured }
         guard rule.isEverAllowed else { return .blockedAllDay }
         let minute = minuteOfDay(now)
@@ -129,7 +132,7 @@ enum Policy {
     static func decide(config: Config, runtime: RuntimeState, now: Date) -> Decision {
         var decision = Decision()
         for target in config.targets {
-            let status = status(of: target, runtime: runtime, now: now)
+            let status = status(of: target, config: config, runtime: runtime, now: now)
             decision.statuses[target.id] = status
             switch target.kind {
             case .application(let token):
@@ -138,6 +141,21 @@ enum Policy {
                 if status.isAllowed { decision.allowedWeb.insert(token) } else { decision.shieldedWeb.insert(token) }
             case .category(let token):
                 decision.categories.insert(token)
+            }
+        }
+        // The brick can hold things that are not targets at all; while bricked they are all shielded.
+        if config.brick.isBricked {
+            for kind in config.brick.kinds {
+                switch kind {
+                case .application(let token):
+                    decision.allowedApps.remove(token)
+                    decision.shieldedApps.insert(token)
+                case .webDomain(let token):
+                    decision.allowedWeb.remove(token)
+                    decision.shieldedWeb.insert(token)
+                case .category(let token):
+                    decision.categories.insert(token)
+                }
             }
         }
         return decision
@@ -174,19 +192,28 @@ enum Policy {
         var exhaustedCount = 0
         var unconfiguredCount = 0
         var pendingCount = 0
+        var isBricked = false
+        /// Everything the brick holds, targets or not, while bricked.
+        var brickedCount = 0
 
-        var isEmpty: Bool { openNames.isEmpty && nextOpenAt == nil && blockedCount == 0 && unconfiguredCount == 0 }
+        var isEmpty: Bool {
+            openNames.isEmpty && nextOpenAt == nil && blockedCount == 0 && unconfiguredCount == 0 && brickedCount == 0
+        }
     }
 
     static func summary(state: SharedState, now: Date) -> Summary {
         let config = effectiveConfig(state, now: now)
         var summary = Summary()
         summary.pendingCount = state.pending.filter { $0.effectiveAt > now }.count
+        summary.isBricked = config.brick.isBricked
+        summary.brickedCount = config.brick.isBricked ? config.brick.count : 0
         var openUntilMinute: Int?
         var soonest: (date: Date, names: [String], budget: Int?)?
 
         for target in config.targets {
-            switch status(of: target, runtime: state.runtime, now: now) {
+            switch status(of: target, config: config, runtime: state.runtime, now: now) {
+            case .bricked:
+                summary.blockedCount += 1
             case .unconfigured:
                 summary.unconfiguredCount += 1
             case .blockedAllDay:
