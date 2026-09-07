@@ -25,5 +25,19 @@
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.widgetkit-extension</string>
 	</dict>
+	<key>UIAppFonts</key>
+	<array>
+		<string>BricolageGrotesque_72pt-Bold.ttf</string>
+		<string>BricolageGrotesque_48pt-SemiBold.ttf</string>
+		<string>BricolageGrotesque_24pt-SemiBold.ttf</string>
+		<string>BricolageGrotesque_24pt-Medium.ttf</string>
+		<string>Onest-Regular.ttf</string>
+		<string>Onest-Medium.ttf</string>
+		<string>Onest-SemiBold.ttf</string>
+		<string>Onest-Bold.ttf</string>
+		<string>GeistMono-Regular.ttf</string>
+		<string>GeistMono-Medium.ttf</string>
+		<string>GeistMono-SemiBold.ttf</string>
+	</array>
 </dict>
 </plist>

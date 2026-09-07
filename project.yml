@@ -32,6 +32,7 @@ targets:
       - path: Furlough
       - path: Shared/Core
       - path: Shared/LiveActivity
+      - path: Shared/UI
     entitlements:
       path: Furlough/Furlough.entitlements
       properties:
@@ -50,6 +51,23 @@ targets:
         NSSupportsLiveActivities: true
         NSSupportsLiveActivitiesFrequentUpdates: false
         ITSAppUsesNonExemptEncryption: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIAppFonts:
+          - BricolageGrotesque_72pt-Bold.ttf
+          - BricolageGrotesque_48pt-SemiBold.ttf
+          - BricolageGrotesque_24pt-SemiBold.ttf
+          - BricolageGrotesque_24pt-Medium.ttf
+          - Onest-Regular.ttf
+          - Onest-Medium.ttf
+          - Onest-SemiBold.ttf
+          - Onest-Bold.ttf
+          - GeistMono-Regular.ttf
+          - GeistMono-Medium.ttf
+          - GeistMono-SemiBold.ttf
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.zachshort.furlough
@@ -118,6 +136,9 @@ targets:
       - path: FurloughWidgets
       - path: Shared/Core
       - path: Shared/LiveActivity
+      - path: Shared/UI
+      - path: Furlough/Fonts
+        buildPhase: resources
     entitlements:
       path: FurloughWidgets/FurloughWidgets.entitlements
       properties:
@@ -129,6 +150,18 @@ targets:
         CFBundleDisplayName: Furlough Widgets
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UIAppFonts:
+          - BricolageGrotesque_72pt-Bold.ttf
+          - BricolageGrotesque_48pt-SemiBold.ttf
+          - BricolageGrotesque_24pt-SemiBold.ttf
+          - BricolageGrotesque_24pt-Medium.ttf
+          - Onest-Regular.ttf
+          - Onest-Medium.ttf
+          - Onest-SemiBold.ttf
+          - Onest-Bold.ttf
+          - GeistMono-Regular.ttf
+          - GeistMono-Medium.ttf
+          - GeistMono-SemiBold.ttf
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:

@@ -1,0 +1,158 @@
+# Handoff: Furlough
+
+You are picking up Furlough, a personal iOS Screen Time blocker for Zach. Read this file,
+then `README.md` and `design/DESIGN.md`, before touching code. Do not re-ask anything under
+"Settled". Zach is a web developer (Next.js, Vercel), comfortable with Xcode, and prefers a
+small codebase he fully understands over a fork. He is interactive: ask when a decision is his.
+
+## Environment
+
+- Repo: `~/Projects/furlough` (git, main). XcodeGen project: edit `project.yml`, then
+  `xcodegen generate`. Never hand-edit the `.xcodeproj` (it is gitignored).
+- Mac: Xcode 26.6 (build 17F113, iOS 26.5 SDK), Swift 6.3, Homebrew, XcodeGen 2.46.
+- Phone: iPhone 17 Pro, iOS 26.6, UDID `00008150-0010050A0247801C`, paired to this Mac.
+  It was not connected during the previous session, so nothing has run on it yet.
+- Apple team `X9V4L6HR2R` (paid). Automatic signing works from the command line; all four
+  bundle IDs are provisioned with Family Controls (development) and App Groups.
+- Build check (use this after every change; the log goes to `build/build.log`):
+  ```bash
+  xcodebuild -project Furlough.xcodeproj -scheme Furlough -configuration Debug \
+    -destination 'generic/platform=iOS' -allowProvisioningUpdates \
+    -derivedDataPath build/DerivedData build > build/build.log 2>&1; \
+    grep -E "error:|warning:|BUILD SUCCEEDED|BUILD FAILED" build/build.log | grep -v appintentsmetadata | sort -u
+  ```
+  Keep the project free of warnings in our own code.
+- Install on the phone once connected: build with `-destination 'platform=iOS,id=<UDID>'`,
+  then `xcrun devicectl device install app --device <UDID> build/DerivedData/Build/Products/Debug-iphoneos/Furlough.app`
+  and `xcrun devicectl device process launch --device <UDID> com.zachshort.furlough`. You cannot
+  see the phone. After each phase, tell Zach exactly what to test and what he should see, then
+  wait for his report.
+- Commit at the end of each phase. Commit messages end with
+  `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
+
+## Settled: what Furlough is
+
+- Apps and websites chosen with `FamilyActivityPicker` are shielded by default. Each target
+  has allowed windows (same every day) and one daily minute budget. No windows means always
+  blocked. Categories are always-blocked containers; apps inside them that have their own
+  windows are excepted.
+- There is no unblock action anywhere, and there must never be one, not even for testing.
+- Tightening edits apply instantly. Loosening edits (longer or more windows, bigger budget,
+  removing a target, lowering the delay) queue for the loosening delay (24 h default) and can
+  be cancelled from the pending list. A target's first rule is always instant because the
+  baseline for a new target is "unrestricted".
+- `denyAppRemoval` is on whenever anything is shielded and cleared otherwise.
+- The only escape is Settings > Screen Time > Apps with Screen Time Access > Furlough off.
+  It is documented on purpose in the app and README.
+- No NFC, no emergency unblocks, no schedules beyond the windows. Personal use, Xcode installs.
+- Extras that are in scope: "5 minutes left" notification, Live Activity during a window,
+  home-screen widget. Websites are supported.
+
+## Settled: the look ("Ember Glass")
+
+`design/DESIGN.md` has the tokens and per-screen specs. Summary: clear iOS 26 Liquid Glass
+over a dark warm room with one ember glow low on the screen; Bricolage Grotesque for names,
+Onest for body, Geist Mono for every countdown; cream text, ember accent, moss for "open",
+amber for pending. The mockups Zach approved are at
+https://claude.ai/code/artifact/15056f39-c30e-4295-addf-4dc8d79108ed (section "Glass").
+
+Zach rejected the first mockups as looking AI-generated. He wants glass buttons, better fonts,
+and a premium feel. Spend the boldness on the hero countdown and the glowing hourglass; keep
+everything else quiet.
+
+Already in place: fonts in `Furlough/Fonts` (static TTFs, OFL licences alongside),
+registered via `UIAppFonts` in the app and widget targets; `Shared/UI/Theme.swift` with the
+palette (`Ember`), font helpers (`EmberFont`, PostScript names such as
+`BricolageGrotesque72pt-Bold`, `Onest-SemiBold`, `GeistMono-Medium`), and `EmberWall`.
+The app icon is done (`Furlough/Assets.xcassets/AppIcon.appiconset/icon-1024.png`).
+
+## Code map
+
+- `Shared/Core` (compiled into all four targets, no SwiftUI):
+  `Models.swift` (TimeWindow, Rule, Target, Config, PendingChange, RuntimeState, SharedState),
+  `Policy.swift` (pure engine: `status(of:)`, `decide`, `applyDuePending`, `classify`
+  tightening/loosening, `summary`, `nextTransition`), `SharedStore.swift` (App Group
+  UserDefaults JSON plus a capped activity log), `ShieldReconciler.swift` (idempotent shield
+  apply and `denyAppRemoval`), `ActivityNaming.swift`, `TimeFormat.swift` (+ `ShieldText`).
+- `Shared/LiveActivity/FurloughActivityAttributes.swift` (app + widgets).
+- `Shared/UI/Theme.swift` (app + widgets).
+- `Furlough/` app: `Model/AppModel.swift` (`@MainActor @Observable`; `enforce()` folds in due
+  pending changes, calls `Monitoring.register`, `ShieldReconciler.reconcile`, reloads widgets,
+  syncs the Live Activity), `Model/Monitoring.swift` (DeviceActivity registration),
+  `Model/LiveActivityManager.swift`, `Views/` (Root, Onboarding, Home + TargetRow + TokenLabel,
+  RuleEditor + WindowRow, PendingChanges, Settings + LogView).
+- `FurloughMonitor/MonitorExtension.swift`: every callback reconciles from shared state.
+- `FurloughShield/ShieldExtension.swift`: reads shared state, writes the copy via `ShieldText`.
+- `FurloughWidgets/`: `StatusWidget.swift`, `WindowLiveActivity.swift`, bundle.
+- `design/`: `DESIGN.md`, `icons/` (candidates), `scripts/make-icon.swift` (old placeholder).
+
+## How enforcement works (do not break these invariants)
+
+- One repeating DeviceActivity "day" (00:00 to 23:59:59, warningTime 5 min) carries one
+  threshold event per target with a rule, named `budget:<uuid>:<minutes>`, with
+  `includesPastActivity: true` so re-registering mid-day does not reset the day's usage.
+  Pending (not yet effective) rules are registered too, so a loosening that lands while the
+  app is closed is still enforced. The monitor ignores a threshold smaller than the currently
+  effective budget.
+- One repeating activity per distinct window, named `window:<start>-<end>` in minutes of day.
+  iOS allows 20 activities total, so at most 19 distinct windows; windows must be at least
+  15 minutes and cannot cross midnight (end is exclusive, 1440 means midnight).
+- Every monitor callback, every app activation, and every edit ends in
+  `ShieldReconciler.reconcile`, which recomputes shields from persisted state. Nothing toggles
+  state incrementally.
+- Exhaustion is keyed by target id and day (`yyyy-MM-dd`), so a missed midnight callback
+  still resets.
+- The shield extension only reads. It folds due pending changes in memory for display.
+
+## Known API facts and quirks
+
+- Family Controls authorization and NFC do not work in the Simulator; build for the device.
+  `AuthorizationStatus.approvedWithDataAccess` exists from iOS 26.4; `AppModel.isAuthorized`
+  handles it with a default case.
+- ActivityKit's `Activity` is not Sendable; `LiveActivityManager` marks it
+  `@retroactive @unchecked Sendable` and does its work in a detached task. Live Activities can
+  only be started by the foreground app, so today one starts only if Zach opens Furlough while a
+  window is open. The iOS 26 `Activity.request(..., start:)` / `startDate:` overloads (see the
+  ActivityKit swiftinterface in the SDK) may allow scheduling the next window's activity ahead
+  of time; untested.
+- Forum reports: threshold callbacks can fire a few minutes late, occasionally twice, and on
+  iOS 26.2 sometimes with zero usage. The idempotent design absorbs the first two; if Zach
+  reports budgets exhausting early, the activity log (Settings > Activity log) shows the raw
+  callbacks.
+- `FamilyActivitySelection(includeEntireCategory: true)` expands a picked category into
+  individual app tokens so each app gets its own rule.
+- The shield is laid out by iOS; we only control the icon image, background blur and color,
+  title, subtitle, and button labels and colors.
+- XcodeGen: the app target picks up `Furlough/Fonts` automatically as resources; the widget
+  target lists the folder explicitly with `buildPhase: resources`.
+
+## Next work, in order
+
+1. **Restyle the app to `design/DESIGN.md`.** Replace the stock `Form`/`List` look:
+   `EmberWall` behind every screen, glass toolbar buttons (`.glassEffect`), the hero with
+   hourglass image, eyebrow, name in `EmberFont.display`, countdown in `EmberFont.numerals`
+   (use `TimelineView` for the ticking countdown to window end or next open), list regrouped
+   as Open now · Later today · Tomorrow · Always blocked · Needs a schedule, rows with status
+   chips. Rule editor per the spec (glass time chips, budget slider 5–240 step 5,
+   `.glassProminent` Save, ghost Remove). Widgets and Live Activity in the same tokens.
+   Keep the onboarding and settings screens on the same wall and type. Build clean, commit.
+2. **Install on the phone and run the first test plan.** Onboarding allow flow, pick apps,
+   set a window starting a few minutes out (at least 15 min long), confirm the shield shows
+   "Opens at …", confirm it lifts by itself at the window start, confirm the "Time's up" flow
+   after the budget, confirm app deletion is denied while blocked. Fix what Zach reports.
+3. **Live Activity at window start** without opening the app (see the quirk above).
+4. **Imagery with the Higgsfield MCP, only with Zach's go-ahead per item, conserving credits**
+   (balance was about 413 after spending about 5). Preflight every call with `get_cost: true`.
+   Reference the icon jobs by id as `image_references`: original `27b1c254-594f-46fe-9b3e-232c38a9e9d2`,
+   toned-down (the one in use) `fd975516-80d9-4941-b0c4-6cd7be8fd92a`. Planned: a
+   transparent-background hourglass for the shield icon and the home hero (Seedream 5.0 Pro
+   with `remove_bg: true`), an onboarding hero and empty-state illustration in the same style,
+   and short README clips via `generate_video` (image-to-video: sand pouring, ember pulse).
+   Recraft V4.1 accepts a `colors` palette and `background_color`; use the Ember hexes.
+5. Keep `README.md` current (install steps, escape path) and commit each phase.
+
+## Style rules
+
+Swift 6 language mode with approachable concurrency, SwiftUI, `@Observable`, async/await, no
+third-party dependencies. Keep it small: one app target plus the three extensions. Shared
+code that the monitor extension uses must not import SwiftUI (memory limits).
