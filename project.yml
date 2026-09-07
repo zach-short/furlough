@@ -47,9 +47,6 @@ targets:
         UILaunchScreen: {}
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
-        UISupportedInterfaceOrientations:
-          - UIInterfaceOrientationPortrait
-        UIRequiresFullScreen: true
         NSSupportsLiveActivities: true
         NSSupportsLiveActivitiesFrequentUpdates: false
         ITSAppUsesNonExemptEncryption: false
