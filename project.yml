@@ -1,0 +1,140 @@
+name: Furlough
+options:
+  bundleIdPrefix: com.zachshort
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+  xcodeVersion: "26.6"
+  defaultConfig: Debug
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: X9V4L6HR2R
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "6.0"
+    SWIFT_APPROACHABLE_CONCURRENCY: YES
+    SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY: YES
+    IPHONEOS_DEPLOYMENT_TARGET: "26.0"
+    TARGETED_DEVICE_FAMILY: "1"
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS: YES
+    SWIFT_TREAT_WARNINGS_AS_ERRORS: NO
+    CLANG_ENABLE_MODULES: YES
+
+targets:
+  Furlough:
+    type: application
+    platform: iOS
+    sources:
+      - path: Furlough
+      - path: Shared/Core
+      - path: Shared/LiveActivity
+    entitlements:
+      path: Furlough/Furlough.entitlements
+      properties:
+        com.apple.developer.family-controls: true
+        com.apple.security.application-groups:
+          - group.com.zachshort.furlough
+    info:
+      path: Furlough/Info.plist
+      properties:
+        CFBundleDisplayName: Furlough
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIRequiresFullScreen: true
+        NSSupportsLiveActivities: true
+        NSSupportsLiveActivitiesFrequentUpdates: false
+        ITSAppUsesNonExemptEncryption: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.zachshort.furlough
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ENABLE_PREVIEWS: YES
+    dependencies:
+      - target: FurloughMonitor
+      - target: FurloughShield
+      - target: FurloughWidgets
+
+  FurloughMonitor:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: FurloughMonitor
+      - path: Shared/Core
+    entitlements:
+      path: FurloughMonitor/FurloughMonitor.entitlements
+      properties:
+        com.apple.developer.family-controls: true
+        com.apple.security.application-groups:
+          - group.com.zachshort.furlough
+    info:
+      path: FurloughMonitor/Info.plist
+      properties:
+        CFBundleDisplayName: Furlough Monitor
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.deviceactivity.monitor-extension
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).MonitorExtension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.zachshort.furlough.monitor
+
+  FurloughShield:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: FurloughShield
+      - path: Shared/Core
+    entitlements:
+      path: FurloughShield/FurloughShield.entitlements
+      properties:
+        com.apple.developer.family-controls: true
+        com.apple.security.application-groups:
+          - group.com.zachshort.furlough
+    info:
+      path: FurloughShield/Info.plist
+      properties:
+        CFBundleDisplayName: Furlough Shield
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.ManagedSettingsUI.shield-configuration-service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShieldExtension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.zachshort.furlough.shield
+
+  FurloughWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: FurloughWidgets
+      - path: Shared/Core
+      - path: Shared/LiveActivity
+    entitlements:
+      path: FurloughWidgets/FurloughWidgets.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.zachshort.furlough
+    info:
+      path: FurloughWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Furlough Widgets
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.zachshort.furlough.widgets
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
