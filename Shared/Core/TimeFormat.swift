@@ -42,6 +42,18 @@ enum TimeFormat {
         }
     }
 
+    /// A ticking countdown: "1:12:08" with hours, "12:08" under an hour. Never negative.
+    static func countdown(from now: Date, to end: Date) -> String {
+        let total = max(0, Int(end.timeIntervalSince(now).rounded(.down)))
+        let hours = total / 3600
+        let minutes = (total % 3600) / 60
+        let seconds = total % 60
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, seconds)
+        }
+        return String(format: "%d:%02d", minutes, seconds)
+    }
+
     static func delay(hours: Int) -> String {
         if hours % 24 == 0 {
             let days = hours / 24

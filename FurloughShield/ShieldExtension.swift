@@ -34,15 +34,23 @@ final class ShieldExtension: ShieldConfigurationDataSource {
         let status = target.map { Policy.status(of: $0, runtime: state.runtime, now: now) }
         let text = ShieldText.text(name: name, status: status, rule: target?.rule)
 
+        // Ember Glass tokens (design/DESIGN.md): the shield extension cannot see Shared/UI.
+        let ember = UIColor(red: 0xE5 / 255, green: 0x56 / 255, blue: 0x3D / 255, alpha: 1)
+        let amber = UIColor(red: 0xF5 / 255, green: 0x9E / 255, blue: 0x4A / 255, alpha: 1)
+        let cream = UIColor(red: 0xF5 / 255, green: 0xEF / 255, blue: 0xE6 / 255, alpha: 1)
+        let muted = UIColor(red: 0xB8 / 255, green: 0xAF / 255, blue: 0xA3 / 255, alpha: 1)
+        let ground = UIColor(red: 0x0F / 255, green: 0x0D / 255, blue: 0x0B / 255, alpha: 1)
         let symbol = UIImage.SymbolConfiguration(pointSize: 72, weight: .medium)
+        let icon = UIImage(systemName: "hourglass", withConfiguration: symbol)?
+            .withTintColor(amber, renderingMode: .alwaysOriginal)
         return ShieldConfiguration(
             backgroundBlurStyle: .systemUltraThinMaterialDark,
-            backgroundColor: UIColor(red: 0.90, green: 0.33, blue: 0.24, alpha: 0.75),
-            icon: UIImage(systemName: "hourglass", withConfiguration: symbol),
-            title: ShieldConfiguration.Label(text: text.title, color: .white),
-            subtitle: ShieldConfiguration.Label(text: text.subtitle, color: UIColor.white.withAlphaComponent(0.85)),
-            primaryButtonLabel: ShieldConfiguration.Label(text: "Close", color: .black),
-            primaryButtonBackgroundColor: .white,
+            backgroundColor: ember.withAlphaComponent(0.22),
+            icon: icon,
+            title: ShieldConfiguration.Label(text: text.title, color: cream),
+            subtitle: ShieldConfiguration.Label(text: text.subtitle, color: muted),
+            primaryButtonLabel: ShieldConfiguration.Label(text: "Close", color: ground),
+            primaryButtonBackgroundColor: cream,
             secondaryButtonLabel: nil
         )
     }

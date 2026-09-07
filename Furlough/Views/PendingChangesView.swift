@@ -5,50 +5,113 @@ struct PendingChangesView: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
+        let pending = model.state.pending.sorted { $0.effectiveAt < $1.effectiveAt }
         NavigationStack {
-            List {
-                ForEach(model.state.pending.sorted { $0.effectiveAt < $1.effectiveAt }) { change in
-                    VStack(alignment: .leading, spacing: 4) {
-                        if let id = change.targetID, let target = model.state.config.target(id: id) {
-                            HStack(spacing: 6) {
-                                TokenLabel(kind: target.kind)
-                                if !target.nickname.isEmpty {
-                                    Text("· \(target.nickname)").foregroundStyle(.secondary)
-                                }
-                            }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 10) {
+                    if pending.isEmpty {
+                        VStack(spacing: 8) {
+                            Image(systemName: "checkmark.circle")
+                                .font(.system(size: 34, weight: .medium))
+                                .foregroundStyle(Ember.moss)
+                            Text("Nothing pending")
+                                .emberDisplay(24)
+                                .foregroundStyle(Ember.cream)
+                            Text("Loosening edits wait here until they take effect.")
+                                .emberBody(13)
+                                .foregroundStyle(Ember.muted)
                         }
-                        Text(describe(change))
-                            .font(.subheadline)
-                        Text("Takes effect \(change.effectiveAt.formatted(date: .abbreviated, time: .shortened)) · \(change.effectiveAt, style: .relative) from now")
-                            .font(.caption)
-                            .foregroundStyle(.orange)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 80)
                     }
-                    .swipeActions {
-                        Button("Cancel change", systemImage: "xmark", role: .destructive) {
-                            model.cancelPending(id: change.id)
+                    ForEach(pending) { change in
+                        PendingCard(change: change, target: change.targetID.flatMap { model.state.config.target(id: $0) }) {
+                            withAnimation(.snappy) { model.cancelPending(id: change.id) }
                         }
                     }
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 48)
             }
-            .overlay {
-                if model.state.pending.isEmpty {
-                    ContentUnavailableView("Nothing pending", systemImage: "checkmark.circle", description: Text("Loosening edits wait here until they take effect."))
-                }
-            }
-            .navigationTitle("Pending changes")
+            .background(EmberWall())
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("Pending")
+                        .emberBody(15, .semibold)
+                        .foregroundStyle(Ember.cream)
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
+                        .tint(Ember.cream)
                 }
             }
         }
+        .presentationBackground(Ember.ground)
+    }
+}
+
+struct PendingCard: View {
+    let change: PendingChange
+    let target: Target?
+    let onCancel: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 10) {
+                if let target {
+                    TokenTile(kind: target.kind, size: 34)
+                    VStack(alignment: .leading, spacing: 1) {
+                        HStack(alignment: .firstTextBaseline, spacing: 4) {
+                            TokenName(kind: target.kind)
+                                .emberDisplaySmall(13.5)
+                                .foregroundStyle(Ember.cream)
+                            if !target.nickname.isEmpty {
+                                Text(target.nickname)
+                                    .emberBody(11.5)
+                                    .foregroundStyle(Ember.muted)
+                            }
+                        }
+                        Text(description)
+                            .emberBody(11.5)
+                            .foregroundStyle(Ember.muted)
+                    }
+                } else {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Ember.pending)
+                        .frame(width: 34, height: 34)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Loosening delay")
+                            .emberDisplaySmall(13.5)
+                            .foregroundStyle(Ember.cream)
+                        Text(description)
+                            .emberBody(11.5)
+                            .foregroundStyle(Ember.muted)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 12)
+            Text("Takes effect \(change.effectiveAt.formatted(date: .abbreviated, time: .shortened)) · \(change.effectiveAt, style: .relative) from now")
+                .emberBody(11, .semibold)
+                .foregroundStyle(Ember.pending)
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
+                .padding(.bottom, 12)
+            CardDivider()
+            GhostButton(title: "Cancel change", action: onCancel)
+        }
+        .emberCard()
     }
 
-    private func describe(_ change: PendingChange) -> String {
+    private var description: String {
         switch change.kind {
         case .setRule(_, let rule): "New rule: \(TimeFormat.rule(rule))"
         case .removeTarget: "Remove from Furlough"
-        case .setDelay(let hours): "Loosening delay becomes \(TimeFormat.delay(hours: hours))"
+        case .setDelay(let hours): "Becomes \(TimeFormat.delay(hours: hours))"
         }
     }
 }

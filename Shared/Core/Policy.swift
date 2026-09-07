@@ -168,6 +168,8 @@ enum Policy {
         var openUntil: Date?
         var nextOpenAt: Date?
         var nextOpenNames: [String] = []
+        /// Budget of the target opening next, for the widget's detail line.
+        var nextOpenBudgetMinutes: Int?
         var blockedCount = 0
         var exhaustedCount = 0
         var unconfiguredCount = 0
@@ -181,7 +183,7 @@ enum Policy {
         var summary = Summary()
         summary.pendingCount = state.pending.filter { $0.effectiveAt > now }.count
         var openUntilMinute: Int?
-        var soonest: (date: Date, names: [String])?
+        var soonest: (date: Date, names: [String], budget: Int?)?
 
         for target in config.targets {
             switch status(of: target, runtime: state.runtime, now: now) {
@@ -195,18 +197,20 @@ enum Policy {
             case .exhausted(let next):
                 summary.exhaustedCount += 1
                 summary.blockedCount += 1
-                if let next { consider(date(at: next, from: now), target.displayName) }
+                if let next { consider(date(at: next, from: now), target) }
             case .closed(let next):
                 summary.blockedCount += 1
-                consider(date(at: next, from: now), target.displayName)
+                consider(date(at: next, from: now), target)
             }
         }
-        func consider(_ date: Date, _ name: String) {
+        func consider(_ date: Date, _ target: Target) {
+            let name = target.displayName
+            let budget = target.rule?.dailyBudgetMinutes
             if let current = soonest {
-                if date < current.date { soonest = (date, [name]) }
+                if date < current.date { soonest = (date, [name], budget) }
                 else if date == current.date { soonest?.names.append(name) }
             } else {
-                soonest = (date, [name])
+                soonest = (date, [name], budget)
             }
         }
         if let openUntilMinute {
@@ -214,6 +218,7 @@ enum Policy {
         }
         summary.nextOpenAt = soonest?.date
         summary.nextOpenNames = soonest?.names ?? []
+        summary.nextOpenBudgetMinutes = soonest?.budget
         return summary
     }
 }

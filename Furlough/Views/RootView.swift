@@ -12,6 +12,8 @@ struct RootView: View {
                 OnboardingView()
             }
         }
+        .preferredColorScheme(.dark)
+        .tint(Ember.ember)
         .alert(
             "Something went wrong",
             isPresented: Binding(

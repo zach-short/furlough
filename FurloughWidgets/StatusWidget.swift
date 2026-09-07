@@ -38,53 +38,100 @@ struct StatusWidgetView: View {
     let entry: StatusEntry
 
     var body: some View {
+        if family == .accessoryRectangular {
+            accessory
+                .containerBackground(.clear, for: .widget)
+        } else {
+            home
+                .containerBackground(for: .widget) { EmberWall() }
+        }
+    }
+
+    /// Home-screen sizes: eyebrow, name in Display, countdown or next time in Geist Mono, detail.
+    private var home: some View {
         let summary = entry.summary
-        VStack(alignment: .leading, spacing: 4) {
-            if family != .accessoryRectangular {
-                Label("Furlough", systemImage: "hourglass")
-                    .font(.caption.bold())
-                    .foregroundStyle(.tint)
-            }
+        return VStack(alignment: .leading, spacing: 0) {
             if let until = summary.openUntil, !summary.openNames.isEmpty, until > entry.date {
-                Text(summary.openNames.joined(separator: ", "))
-                    .font(.headline)
-                    .lineLimit(2)
+                Eyebrow(text: "Open now", color: Ember.amber)
+                name(summary.openNames.joined(separator: ", "))
                 Text(timerInterval: entry.date...until, countsDown: true)
-                    .font(.title2.monospacedDigit().bold())
-                Text("until \(until.formatted(date: .omitted, time: .shortened))")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .emberNumerals(22)
+                    .padding(.top, 4)
+                detail("until \(until.formatted(date: .omitted, time: .shortened))")
             } else if let next = summary.nextOpenAt {
-                Text("All blocked")
-                    .font(.headline)
-                Text(summary.nextOpenNames.joined(separator: ", "))
-                    .font(.caption)
-                    .lineLimit(2)
-                    .foregroundStyle(.secondary)
-                Text("opens \(nextText(next))")
-                    .font(.subheadline.bold())
+                Eyebrow(text: "Next", color: Ember.amber)
+                name(summary.nextOpenNames.joined(separator: ", "))
+                Text(nextText(next))
+                    .emberNumerals(22)
+                    .padding(.top, 4)
+                if let budget = summary.nextOpenBudgetMinutes {
+                    detail("\(TimeFormat.budget(budget)) budget")
+                } else {
+                    detail("\(summary.blockedCount) blocked")
+                }
             } else if summary.isEmpty {
-                Text("Nothing managed")
-                    .font(.headline)
-                Text("Open Furlough to add apps.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Eyebrow(text: "Furlough", color: Ember.amber)
+                name("Nothing managed")
+                detail("Open Furlough to add apps.")
             } else {
-                Text("All blocked")
-                    .font(.headline)
-                Text("\(summary.blockedCount) blocked all day")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Eyebrow(text: "Blocked", color: Ember.muted)
+                name("All blocked")
+                detail("\(summary.blockedCount) blocked all day")
             }
             Spacer(minLength: 0)
             if summary.pendingCount > 0 {
                 Text("\(summary.pendingCount) change\(summary.pendingCount == 1 ? "" : "s") pending")
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
+                    .emberBody(10.5, .semibold)
+                    .foregroundStyle(Ember.pending)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .containerBackground(.fill.tertiary, for: .widget)
+    }
+
+    /// Lock-screen rectangle: the system tints it, so only the type carries the look.
+    private var accessory: some View {
+        let summary = entry.summary
+        return VStack(alignment: .leading, spacing: 1) {
+            if let until = summary.openUntil, !summary.openNames.isEmpty, until > entry.date {
+                Text(summary.openNames.joined(separator: ", "))
+                    .font(EmberFont.displaySmall(14))
+                    .lineLimit(1)
+                Text(timerInterval: entry.date...until, countsDown: true)
+                    .font(EmberFont.numerals(16))
+                    .monospacedDigit()
+                Text("until \(until.formatted(date: .omitted, time: .shortened))")
+                    .font(EmberFont.body(11))
+            } else if let next = summary.nextOpenAt {
+                Text(summary.nextOpenNames.joined(separator: ", "))
+                    .font(EmberFont.displaySmall(14))
+                    .lineLimit(1)
+                Text("opens \(nextText(next))")
+                    .font(EmberFont.numerals(14))
+                    .monospacedDigit()
+            } else {
+                Text("Furlough")
+                    .font(EmberFont.displaySmall(14))
+                Text(summary.isEmpty ? "Nothing managed" : "All blocked")
+                    .font(EmberFont.body(11))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+    }
+
+    private func name(_ text: String) -> some View {
+        Text(text)
+            .emberDisplay(15)
+            .foregroundStyle(Ember.cream)
+            .lineLimit(2)
+            .padding(.top, 3)
+    }
+
+    private func detail(_ text: String) -> some View {
+        Text(text)
+            .emberBody(11)
+            .foregroundStyle(Ember.muted)
+            .lineLimit(1)
+            .padding(.top, 2)
     }
 
     private func nextText(_ date: Date) -> String {
@@ -92,7 +139,7 @@ struct StatusWidgetView: View {
             return date.formatted(date: .omitted, time: .shortened)
         }
         if Calendar.current.isDateInTomorrow(date) {
-            return "tomorrow \(date.formatted(date: .omitted, time: .shortened))"
+            return "tmrw \(date.formatted(date: .omitted, time: .shortened))"
         }
         return date.formatted(.dateTime.weekday(.abbreviated).hour().minute())
     }

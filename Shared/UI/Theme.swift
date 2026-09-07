@@ -10,10 +10,21 @@ enum Ember {
     static let faint = Color(hex: 0x7E766B)
     static let moss = Color(hex: 0x7BC96F)
     static let pending = Color(hex: 0xF2B544)
+    /// Lightest sand grain in the hourglass and the top of the budget slider fill.
+    static let sandLight = Color(hex: 0xFFD59A)
     static let cardFill = Color.white.opacity(0.06)
     static let cardBorder = Color.white.opacity(0.12)
     static let cardRadius: CGFloat = 20
     static let tileRadius: CGFloat = 9
+    static let tileRadiusLarge: CGFloat = 13
+
+    /// Ember to Amber, left to right: the budget slider fill.
+    static let sliderFill = LinearGradient(colors: [ember, amber], startPoint: .leading, endPoint: .trailing)
+    /// Sand, top to bottom.
+    static let sand = LinearGradient(
+        stops: [.init(color: sandLight, location: 0), .init(color: amber, location: 0.55), .init(color: ember, location: 1)],
+        startPoint: .top, endPoint: .bottom
+    )
 }
 
 /// Bundled faces, addressed by PostScript name (see Furlough/Fonts).
@@ -26,7 +37,9 @@ enum EmberFont {
     static func body(_ size: CGFloat, _ weight: BodyWeight = .regular) -> Font { .custom(weight.postScriptName, size: size) }
     /// Geist Mono Medium: every number that counts. Pair with `.monospacedDigit()`.
     static func numerals(_ size: CGFloat) -> Font { .custom("GeistMono-Medium", size: size) }
-    /// Onest Bold, meant for uppercase eyebrows with `.tracking(1.4)`.
+    /// Geist Mono Regular: log lines.
+    static func mono(_ size: CGFloat) -> Font { .custom("GeistMono-Regular", size: size) }
+    /// Onest Bold, meant for uppercase eyebrows with `.tracking(size * 0.14)`.
     static func label(_ size: CGFloat) -> Font { .custom("Onest-Bold", size: size) }
 
     enum BodyWeight {
@@ -42,21 +55,83 @@ enum EmberFont {
     }
 }
 
-/// The background behind every screen: a warm dark ground with one ember glow low on the left.
+extension View {
+    /// Display face with the spec's -0.025 em tracking.
+    func emberDisplay(_ size: CGFloat) -> some View {
+        font(EmberFont.display(size)).tracking(-0.025 * size)
+    }
+
+    /// Small display face for row names.
+    func emberDisplaySmall(_ size: CGFloat) -> some View {
+        font(EmberFont.displaySmall(size)).tracking(-0.01 * size)
+    }
+
+    /// Geist Mono with tabular figures and -0.02 em tracking, in Cream.
+    func emberNumerals(_ size: CGFloat) -> some View {
+        font(EmberFont.numerals(size)).monospacedDigit().tracking(-0.02 * size).foregroundStyle(Ember.cream)
+    }
+
+    /// Onest body text.
+    func emberBody(_ size: CGFloat, _ weight: EmberFont.BodyWeight = .regular) -> some View {
+        font(EmberFont.body(size, weight))
+    }
+
+    /// The card behind rows and form fields: white 6 % fill, white 12 % 1 pt border, radius 20.
+    func emberCard() -> some View {
+        background(Ember.cardFill, in: RoundedRectangle(cornerRadius: Ember.cardRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Ember.cardRadius, style: .continuous)
+                    .strokeBorder(Ember.cardBorder, lineWidth: 1)
+            )
+    }
+}
+
+/// Uppercase Onest Bold label with wide tracking: section headers, "OPEN NOW · UNTIL 10:00 PM", "NEXT".
+struct Eyebrow: View {
+    var text: String
+    var color: Color = Ember.faint
+    var size: CGFloat = 10
+
+    var body: some View {
+        Text(text.uppercased())
+            .font(EmberFont.label(size))
+            .tracking(0.13 * size)
+            .foregroundStyle(color)
+            .lineLimit(1)
+    }
+}
+
+/// The background behind every screen: a warm dark ground, one ember glow low on the left,
+/// a faint amber glow top right, and a light grain to keep the gradients from banding.
 struct EmberWall: View {
     var body: some View {
-        ZStack {
-            Ember.ground
-            RadialGradient(
-                colors: [Ember.ember.opacity(0.6), .clear],
-                center: UnitPoint(x: 0.28, y: 1.04), startRadius: 0, endRadius: 340
-            )
-            RadialGradient(
-                colors: [Ember.amber.opacity(0.14), .clear],
-                center: UnitPoint(x: 0.9, y: -0.04), startRadius: 0, endRadius: 280
-            )
+        GeometryReader { geo in
+            let width = geo.size.width
+            let height = geo.size.height
+            ZStack {
+                Ember.ground
+                glow(color: Ember.ember.opacity(0.6), radiusX: 0.70 * width, radiusY: 0.42 * height, fade: 0.62)
+                    .position(x: 0.28 * width, y: 1.04 * height)
+                glow(color: Ember.amber.opacity(0.14), radiusX: 0.60 * width, radiusY: 0.40 * height, fade: 0.60)
+                    .position(x: 0.90 * width, y: -0.04 * height)
+                Image("Noise")
+                    .resizable(resizingMode: .tile)
+                    .opacity(0.07)
+                    .blendMode(.overlay)
+            }
+            .compositingGroup()
         }
         .ignoresSafeArea()
+    }
+
+    /// An elliptical radial glow that fades to clear at `fade` of its radius.
+    private func glow(color: Color, radiusX: CGFloat, radiusY: CGFloat, fade: CGFloat) -> some View {
+        RadialGradient(
+            stops: [.init(color: color, location: 0), .init(color: .clear, location: fade)],
+            center: .center, startRadius: 0, endRadius: radiusX
+        )
+        .frame(width: 2 * radiusX, height: 2 * radiusX)
+        .scaleEffect(x: 1, y: radiusX > 0 ? radiusY / radiusX : 1)
     }
 }
 
