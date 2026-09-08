@@ -67,6 +67,38 @@ xcodebuild -project Furlough.xcodeproj -scheme Furlough -configuration Debug \
 xcrun devicectl device install app --device <UDID> build/DerivedData/Build/Products/Debug-iphoneos/Furlough.app
 ```
 
+## Installing on another phone
+
+Any iPhone on iOS 26 or later can run Furlough from this Mac. Development signing under the paid team covers it; nothing in the project is tied to one device.
+
+1. On the phone: **Settings > Privacy & Security > Developer Mode**, turn it on, and restart when asked.
+2. Plug the phone into the Mac and unlock it. Tap **Trust** on the phone when it asks about the computer.
+3. Find its identifier:
+   ```bash
+   xcrun devicectl list devices
+   ```
+   The phone should show as `available (paired)`. If it says `unavailable`, unplug and replug it, or unlock it.
+4. Build for that phone. The first build registers its UDID with the team and refreshes the development profile, which is why `-allowProvisioningUpdates` is there:
+   ```bash
+   xcodebuild -project Furlough.xcodeproj -scheme Furlough -configuration Debug \
+     -destination 'platform=iOS,id=<UDID>' -allowProvisioningUpdates \
+     -derivedDataPath build/DerivedData build
+   ```
+   The UDID is the `00008xxx-…` value from `xcrun devicectl device info details --device <identifier>`, not the CoreDevice identifier that `list devices` prints first. Or open the project in Xcode, pick the phone as the run destination, and press Run.
+5. Install and launch:
+   ```bash
+   xcrun devicectl device install app --device <UDID> build/DerivedData/Build/Products/Debug-iphoneos/Furlough.app
+   xcrun devicectl device process launch --device <UDID> com.zachshort.furlough
+   ```
+6. On the phone, go through onboarding and allow Screen Time access. Authorization is per phone and per Apple account, and it has to be an adult account: Furlough asks for individual authorization, not the parent-approved kind.
+
+Limits to know about:
+
+- A paid membership allows 100 iPhones per year. Removing a device does not free its slot until the membership year rolls over.
+- A development build keeps running for a year, then needs reinstalling.
+- Development-signed builds only install over a cable. TestFlight, ad hoc, and the App Store all need the Family Controls distribution entitlement (see below).
+- Whoever gets the app should know there is no unblock button, and that the only escape is Settings > Screen Time > Apps with Screen Time Access > Furlough > off.
+
 ## If a shield gets stuck
 
 1. Open Furlough and tap **Settings > Re-apply enforcement now**. This re-registers every schedule and re-applies shields from saved state.
