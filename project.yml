@@ -39,6 +39,7 @@ targets:
       - path: Shared/Intents
       - path: Shared/LiveActivity
       - path: Shared/UI
+      - path: Shared/Usage
       - path: Shared/PrivacyInfo.xcprivacy
         buildPhase: resources
     entitlements:
@@ -88,6 +89,7 @@ targets:
       - target: FurloughMonitor
       - target: FurloughShield
       - target: FurloughWidgets
+      - target: FurloughReport
 
   FurloughMonitor:
     type: app-extension
@@ -196,6 +198,58 @@ targets:
   # The rules engine on its own. Shared/Core is pure Foundation and already builds for macOS,
   # so the engine can be tested on this Mac with no phone and no host app. ShieldReconciler is
   # left out because it imports ManagedSettings, which does not exist here.
+  # Screen Time's window. iOS hands usage history — per app, per hour, with names — to a report
+  # extension and nowhere else: it runs in a process of its own with no network, App Group
+  # writes that never land, and terms that forbid getting the numbers out. So the cutback
+  # analysis (Shared/Core/UsageAnalysis.swift, pure and tested) runs in here, and its output is
+  # pixels the app hosts through DeviceActivityReport. An ExtensionKit extension, embedded
+  # under Extensions/, which is what DeviceActivityReportExtension is. No App Group on
+  # purpose: there is nothing it could usefully write. Fonts are bundled again because an
+  # extension draws from its own bundle.
+  FurloughReport:
+    type: extensionkit-extension
+    platform: iOS
+    sources:
+      - path: FurloughReport
+      - path: Shared/Core
+      - path: Shared/Usage
+      - path: Shared/UI/Theme.swift
+      - path: Furlough/Fonts
+        type: folder
+        buildPhase: resources
+      - path: Shared/PrivacyInfo.xcprivacy
+        buildPhase: resources
+    entitlements:
+      path: FurloughReport/FurloughReport.entitlements
+      properties:
+        com.apple.developer.family-controls: true
+    info:
+      path: FurloughReport/Info.plist
+      properties:
+        CFBundleDisplayName: Furlough Report
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        EXAppExtensionAttributes:
+          EXExtensionPointIdentifier: com.apple.deviceactivityui.report-extension
+        # The folder above is copied as a folder, so the fonts sit under Fonts/ in the bundle,
+        # unlike the phone app, which takes the Furlough folder file by file.
+        UIAppFonts:
+          - Fonts/BricolageGrotesque_72pt-Bold.ttf
+          - Fonts/BricolageGrotesque_48pt-SemiBold.ttf
+          - Fonts/BricolageGrotesque_24pt-SemiBold.ttf
+          - Fonts/BricolageGrotesque_24pt-Medium.ttf
+          - Fonts/Onest-Regular.ttf
+          - Fonts/Onest-Medium.ttf
+          - Fonts/Onest-SemiBold.ttf
+          - Fonts/Onest-Bold.ttf
+          - Fonts/GeistMono-Regular.ttf
+          - Fonts/GeistMono-Medium.ttf
+          - Fonts/GeistMono-SemiBold.ttf
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.zachshort.furlough.report
+        TARGETED_DEVICE_FAMILY: "1"
+
   FurloughCoreTests:
     type: bundle.unit-test
     platform: macOS
