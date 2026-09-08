@@ -139,6 +139,131 @@ struct AddSiteSheet: View {
     }
 }
 
+/// Offered right after an app or a site is added: the other half of the same thing. Blocking
+/// the YouTube app and leaving youtube.com open is the gap most people find a week later, so
+/// the site is offered while the app is still in hand, one toggle each, all on to start.
+/// Nothing here enforces anything; like any add, each one waits for a schedule.
+struct CompanionSheet: View {
+    /// One thing to offer: what it would be added as, and how the row says it.
+    struct Item: Identifiable, Hashable {
+        let kind: TargetKind
+        let title: String
+        let subtitle: String
+        var id: TargetKind { kind }
+    }
+
+    /// What was just added, and whose other half these are.
+    let added: Target
+    let items: [Item]
+    let onAdd: ([Item]) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var chosen: Set<TargetKind>
+
+    init(added: Target, items: [Item], onAdd: @escaping ([Item]) -> Void) {
+        self.added = added
+        self.items = items
+        self.onAdd = onAdd
+        _chosen = State(initialValue: Set(items.map(\.kind)))
+    }
+
+    /// True when what was added is an app, so the offer is its websites.
+    private var addedIsApp: Bool { if case .macApp = added.kind { return true }; return false }
+    private var selected: [Item] { items.filter { chosen.contains($0.kind) } }
+
+    var body: some View {
+        SheetFrame(title: title, width: 460, height: 236 + CGFloat(min(items.count, 4)) * 54) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(explanation)
+                    .emberBody(13)
+                    .foregroundStyle(Ember.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 4)
+                    .padding(.bottom, 12)
+                ScrollView {
+                    VStack(spacing: 0) {
+                        ForEach(items) { item in
+                            row(item)
+                            if item.id != items.last?.id { CardDivider() }
+                        }
+                    }
+                    .emberCard()
+                }
+                .scrollBounceBehavior(.basedOnSize)
+                Footnote(text: "Nothing is enforced until it has a schedule. Set \(added.displayName)'s, then apply those windows to the rest from its editor so they keep the same hours.")
+                    .padding(.top, 10)
+                ProminentButton(title: buttonTitle) {
+                    onAdd(selected)
+                    dismiss()
+                }
+                .disabled(selected.isEmpty)
+                .keyboardShortcut(.defaultAction)
+                .padding(.top, 12)
+                Button(addedIsApp ? "Just the app" : "Just the site") { dismiss() }
+                    .buttonStyle(.plain)
+                    .emberBody(12.5, .medium)
+                    .foregroundStyle(Ember.muted)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 10)
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 20)
+        }
+    }
+
+    private func row(_ item: Item) -> some View {
+        HStack(spacing: 10) {
+            KindTile(kind: item.kind, size: 30)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(item.title)
+                    .emberBody(13, .medium)
+                    .foregroundStyle(Ember.cream)
+                    .lineLimit(1)
+                Text(item.subtitle)
+                    .emberBody(11)
+                    .foregroundStyle(Ember.muted)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            Toggle(item.title, isOn: Binding(
+                get: { chosen.contains(item.kind) },
+                set: { on in
+                    withAnimation(.snappy(duration: 0.2)) {
+                        if on { chosen.insert(item.kind) } else { chosen.remove(item.kind) }
+                    }
+                }
+            ))
+            .labelsHidden()
+            .toggleStyle(.switch)
+            .tint(Ember.ember)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+    }
+
+    private var title: String {
+        switch (addedIsApp, items.count) {
+        case (true, 1): "Also block \(items[0].title)?"
+        case (true, _): "Also block its websites?"
+        case (false, 1): "Also block the \(items[0].title) app?"
+        case (false, _): "Also block its apps?"
+        }
+    }
+
+    private var explanation: String {
+        addedIsApp
+            ? "\(added.displayName) is in. The site is the same thing in a browser tab; blocked together, there is no back door."
+            : "\(added.displayName) is in. The app is the same thing without the browser; blocked together, there is no back door."
+    }
+
+    private var buttonTitle: String {
+        switch selected.count {
+        case 0: "Add"
+        case 1: "Add it too"
+        case let n: "Add \(n) too"
+        }
+    }
+}
+
 /// Picks the other apps and sites that get this rule, any number at once. Each row shows what
 /// it has now; the line above the button says what applying will do, since each one is judged
 /// on its own: tighter lands now, looser waits out the delay.

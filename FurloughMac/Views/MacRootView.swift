@@ -35,6 +35,10 @@ struct MacHomeView: View {
     @State private var showAddSite = false
     @State private var showPending = false
     @State private var showSettings = false
+    /// The other half of what was just added, held until the add sheet has fully gone: a sheet
+    /// presented over one still leaving is dropped, so the offer waits for `onDismiss`.
+    @State private var pendingCompanion: CompanionPrompt?
+    @State private var companionPrompt: CompanionPrompt?
     /// The window's clock, kept on the model so the sidebar and the detail pane count in step.
     private var now: Date { model.now }
 
@@ -49,17 +53,40 @@ struct MacHomeView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .sheet(isPresented: $showAddApp) {
+        .sheet(isPresented: $showAddApp, onDismiss: offerCompanion) {
             AddAppSheet { app in
+                let isNew = model.state.config.target(bundleID: app.bundleID) == nil
                 let outcome = model.addApp(bundleID: app.bundleID, name: app.name)
                 selection = outcome.added?.id
+                guard isNew, let added = outcome.added else { return }
+                pendingCompanion = CompanionPrompt(added: added, items: companionSites(for: app))
             }
         }
-        .sheet(isPresented: $showAddSite) {
+        .sheet(isPresented: $showAddSite, onDismiss: offerCompanion) {
             AddSiteSheet { raw in
+                let isNew = Hosts.normalize(raw).map { model.state.config.target(host: $0) == nil } ?? false
                 let outcome = model.addHost(raw)
-                if let added = outcome.added { selection = added.id }
+                if let added = outcome.added {
+                    selection = added.id
+                    if isNew, case .host(let host) = added.kind {
+                        pendingCompanion = CompanionPrompt(added: added, items: companionApps(for: host))
+                    }
+                }
                 return outcome
+            }
+        }
+        .sheet(item: $companionPrompt) { prompt in
+            CompanionSheet(added: prompt.added, items: prompt.items) { chosen in
+                var hosts: [String] = []
+                var apps: [(bundleID: String, name: String)] = []
+                for item in chosen {
+                    switch item.kind {
+                    case .host(let host): hosts.append(host)
+                    case .macApp(let bundleID): apps.append((bundleID, item.title))
+                    }
+                }
+                model.addHosts(hosts)
+                model.addApps(apps)
             }
         }
         .sheet(isPresented: $showPending) { PendingSheet() }
@@ -67,6 +94,35 @@ struct MacHomeView: View {
         .onChange(of: model.state.config.targets.map(\.id)) { _, ids in
             if let selection, !ids.contains(selection) { self.selection = nil }
         }
+    }
+
+    /// What was just added and what goes with it.
+    private struct CompanionPrompt: Identifiable {
+        let id = UUID()
+        let added: Target
+        let items: [CompanionSheet.Item]
+    }
+
+    /// Runs once the add sheet is gone. Nothing to offer means no sheet.
+    private func offerCompanion() {
+        defer { pendingCompanion = nil }
+        guard let pending = pendingCompanion, !pending.items.isEmpty else { return }
+        companionPrompt = pending
+    }
+
+    /// The websites `app` is also at that are not in Furlough yet; a host already covered by a
+    /// parent domain counts as in.
+    private func companionSites(for app: InstalledApp) -> [CompanionSheet.Item] {
+        app.companionHosts
+            .filter { model.state.config.target(host: $0) == nil }
+            .map { CompanionSheet.Item(kind: .host($0), title: $0, subtitle: "The site and its subdomains, in every browser") }
+    }
+
+    /// The installed apps `host` is also in that are not in Furlough yet.
+    private func companionApps(for host: String) -> [CompanionSheet.Item] {
+        AppCatalog.apps(for: host)
+            .filter { model.state.config.target(bundleID: $0.bundleID) == nil }
+            .map { CompanionSheet.Item(kind: .macApp(bundleID: $0.bundleID), title: $0.name, subtitle: $0.bundleID) }
     }
 
     // MARK: Sidebar

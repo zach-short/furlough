@@ -210,6 +210,43 @@ final class MacModel {
         return AddOutcome(added: target, message: "Added. Set a schedule; nothing is enforced until you do.")
     }
 
+    /// Adds the websites offered beside an app just added, in one save, skipping any already
+    /// here. Each lands unconfigured like anything else: nothing is enforced until it has a
+    /// schedule. Returns what was added, for the log and the caller's selection.
+    @discardableResult
+    func addHosts(_ hosts: [String]) -> [Target] {
+        var current = SharedStore.load()
+        var added: [Target] = []
+        for raw in hosts {
+            guard let host = Hosts.normalize(raw), current.config.target(host: host) == nil else { continue }
+            let target = Target(kind: .host(host))
+            current.config.targets.append(target)
+            added.append(target)
+        }
+        guard !added.isEmpty else { return [] }
+        SharedStore.save(current)
+        SharedStore.log("added companion site(s) \(added.map(\.displayName).joined(separator: ", "))")
+        enforce(reason: "add companion sites")
+        return added
+    }
+
+    /// `addHosts` the other way round: the apps offered beside a website just added.
+    @discardableResult
+    func addApps(_ apps: [(bundleID: String, name: String)]) -> [Target] {
+        var current = SharedStore.load()
+        var added: [Target] = []
+        for app in apps where current.config.target(bundleID: app.bundleID) == nil {
+            let target = Target(kind: .macApp(bundleID: app.bundleID), systemName: app.name)
+            current.config.targets.append(target)
+            added.append(target)
+        }
+        guard !added.isEmpty else { return [] }
+        SharedStore.save(current)
+        SharedStore.log("added companion app(s) \(added.map(\.displayName).joined(separator: ", "))")
+        enforce(reason: "add companion apps")
+        return added
+    }
+
     func classify(rule: Rule, for id: UUID) -> ChangeClass {
         Policy.classify(newRule: rule, against: state.config.target(id: id))
     }
