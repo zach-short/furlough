@@ -200,17 +200,26 @@ struct RuleEditorView: View {
 
     private var windowsCard: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Text("Same every day")
+            if drafts.isEmpty {
+                Text("No windows. Open all day, up to the budget.")
                     .emberBody(13)
-                    .foregroundStyle(Ember.cream)
-                Spacer()
-                Toggle("Same every day", isOn: sameEveryDay)
-                    .labelsHidden()
-                    .tint(Ember.ember)
+                    .foregroundStyle(Ember.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 11)
+            } else {
+                HStack(spacing: 12) {
+                    Text("Same every day")
+                        .emberBody(13)
+                        .foregroundStyle(Ember.cream)
+                    Spacer()
+                    Toggle("Same every day", isOn: sameEveryDay)
+                        .labelsHidden()
+                        .tint(Ember.ember)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
             CardDivider()
             ForEach($drafts) { $draft in
                 WindowRow(
@@ -262,7 +271,7 @@ struct RuleEditorView: View {
                         .foregroundStyle(Ember.muted)
                 }
                 Spacer()
-                Text("across all windows")
+                Text(drafts.isEmpty ? "for the whole day" : "across all windows")
                     .emberBody(11)
                     .foregroundStyle(Ember.muted)
             }
@@ -277,7 +286,6 @@ struct RuleEditorView: View {
 
     private func effect(for target: Target) -> EffectBanner.Kind {
         if let error = draft.validationError { return .error(error) }
-        if !draft.isEverAllowed { return .blockedAllDay }
         if !hasChanges { return .noChanges }
         if target.rule == draft { return .nicknameOnly }
         if Policy.classify(newRule: draft, against: target) == .tightening { return .tightening }
@@ -301,12 +309,8 @@ struct RuleEditorView: View {
             return nil
         }.first
         let rule = pendingRule ?? target.rule ?? Rule()
-        var windows = rule.sortedWindows
         budget = rule.dailyBudgetMinutes > 0 ? rule.dailyBudgetMinutes : Furlough.defaultBudgetMinutes
-        if windows.isEmpty, target.rule == nil {
-            windows = [TimeWindow(startMinute: 20 * 60, endMinute: 22 * 60)]
-        }
-        drafts = windows.map { DraftWindow(window: $0) }
+        drafts = rule.sortedWindows.map { DraftWindow(window: $0) }
         byDay = !rule.isSameEveryDay
     }
 
@@ -319,12 +323,15 @@ struct RuleEditorView: View {
         }
     }
 
-    /// A new hour after the latest window, or from midnight once the evening is taken, so
-    /// "later on weekends" starts as the early-morning window it has to be.
+    /// The first window is an evening. Each one after that is the hour after the latest, or
+    /// from midnight once the evening is taken, so "later on weekends" starts as the
+    /// early-morning window it has to be.
     private func addWindow() {
-        var start = windows.map(\.endMinute).max() ?? 12 * 60
-        if start > Furlough.minutesPerDay - 60 { start = 0 }
-        let window = TimeWindow(startMinute: start, endMinute: min(start + 60, Furlough.minutesPerDay))
+        var window = TimeWindow(startMinute: 20 * 60, endMinute: 22 * 60)
+        if var start = windows.map(\.endMinute).max() {
+            if start > Furlough.minutesPerDay - 60 { start = 0 }
+            window = TimeWindow(startMinute: start, endMinute: min(start + 60, Furlough.minutesPerDay))
+        }
         withAnimation(.snappy) { drafts.append(DraftWindow(window: window)) }
     }
 
@@ -580,7 +587,6 @@ struct TimePickerSheet: View {
 struct EffectBanner: View {
     enum Kind {
         case error(String)
-        case blockedAllDay
         case noChanges
         case nicknameOnly
         case tightening
@@ -611,7 +617,6 @@ struct EffectBanner: View {
     private var symbol: String {
         switch kind {
         case .error: "exclamationmark.triangle.fill"
-        case .blockedAllDay: "lock.fill"
         case .noChanges, .nicknameOnly: "checkmark"
         case .tightening: "bolt.fill"
         case .loosening: "clock"
@@ -621,7 +626,6 @@ struct EffectBanner: View {
     private var text: String {
         switch kind {
         case .error(let message): message
-        case .blockedAllDay: "No windows · blocked all day, applies immediately"
         case .noChanges: "No changes"
         case .nicknameOnly: "Nickname only · applies immediately"
         case .tightening: "Tighter than now · applies immediately"
@@ -632,7 +636,7 @@ struct EffectBanner: View {
     private var color: Color {
         switch kind {
         case .error: Ember.ember
-        case .blockedAllDay, .nicknameOnly: Ember.muted
+        case .nicknameOnly: Ember.muted
         case .noChanges: Ember.faint
         case .tightening: Ember.moss
         case .loosening: Ember.pending

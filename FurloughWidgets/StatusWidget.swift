@@ -19,8 +19,8 @@ struct StatusProvider: TimelineProvider {
     }
 
     /// One entry per status change over the next day and a half, plus one every three
-    /// minutes while a window is open so the hourglass keeps draining. Entries are free;
-    /// only reloads count against the widget budget.
+    /// minutes while a window or an all-day app is open so the hourglass keeps draining.
+    /// Entries are free; only reloads count against the widget budget.
     func getTimeline(in context: Context, completion: @escaping (Timeline<StatusEntry>) -> Void) {
         let state = SharedStore.load()
         var entries: [StatusEntry] = []
@@ -32,7 +32,8 @@ struct StatusProvider: TimelineProvider {
             let config = Policy.effectiveConfig(state, now: cursor)
             let next = Policy.nextTransition(config: config, after: cursor)
             guard next > cursor else { break }
-            let step = summary.openUntil == nil ? next : min(next, cursor.addingTimeInterval(180))
+            let draining = summary.openUntil != nil || !summary.allDayNames.isEmpty
+            let step = draining ? min(next, cursor.addingTimeInterval(180)) : next
             cursor = step == next ? next.addingTimeInterval(1) : step
         }
         completion(Timeline(entries: entries, policy: .atEnd))
@@ -40,7 +41,8 @@ struct StatusProvider: TimelineProvider {
 }
 
 extension HourglassState {
-    /// The widget's glass: the open target closing soonest, else whatever opens next.
+    /// The widget's glass: the open target closing soonest, else whatever opens next, else an
+    /// all-day app draining towards midnight.
     static func of(_ summary: Policy.Summary, now: Date) -> HourglassState {
         if let until = summary.openUntil, until > now, !summary.openNames.isEmpty {
             let start = summary.openStart ?? now
@@ -54,6 +56,14 @@ extension HourglassState {
                 return .comingSoon(inMinutes: next.timeIntervalSince(now) / 60)
             }
             return .doneForToday
+        }
+        if !summary.allDayNames.isEmpty {
+            let calendar = Calendar.current
+            let start = calendar.startOfDay(for: now)
+            let end = calendar.date(byAdding: .day, value: 1, to: start) ?? now
+            let total = end.timeIntervalSince(start)
+            let level = total > 0 ? min(1, max(0, end.timeIntervalSince(now) / total)) : 0
+            return .open(level: level, warned: summary.allDayWarned)
         }
         if summary.isEmpty { return .unconfigured }
         return summary.isBricked ? .bricked : .alwaysBlocked
@@ -88,8 +98,10 @@ struct StatusWidgetView: View {
 
     private var homeText: some View {
         let summary = entry.summary
+        let windowOpen = summary.openUntil.map { $0 > entry.date && !summary.openNames.isEmpty } ?? false
+        let allDayOnly = !windowOpen && summary.nextOpenAt == nil && !summary.allDayNames.isEmpty
         return VStack(alignment: .leading, spacing: 0) {
-            if let until = summary.openUntil, !summary.openNames.isEmpty, until > entry.date {
+            if windowOpen, let until = summary.openUntil {
                 Eyebrow(text: "Open now", color: Ember.amber)
                 name(summary.openNames.joined(separator: ", "))
                 Text(timerInterval: entry.date...until, countsDown: true)
@@ -107,6 +119,10 @@ struct StatusWidgetView: View {
                 } else {
                     detail("\(summary.blockedCount) blocked")
                 }
+            } else if allDayOnly {
+                Eyebrow(text: "Open all day", color: Ember.moss)
+                name(summary.allDayNames.joined(separator: ", "))
+                detail("budget resets at midnight")
             } else if summary.isEmpty {
                 Eyebrow(text: "Furlough", color: Ember.amber)
                 name("Nothing managed")
@@ -117,6 +133,12 @@ struct StatusWidgetView: View {
                 detail("\(summary.blockedCount) blocked all day")
             }
             Spacer(minLength: 0)
+            if !summary.allDayNames.isEmpty, !allDayOnly {
+                Text("\(summary.allDayNames.joined(separator: ", ")) open all day")
+                    .emberBody(10.5, .semibold)
+                    .foregroundStyle(Ember.moss)
+                    .lineLimit(1)
+            }
             if summary.isBricked {
                 Text("\(summary.brickedCount) bricked")
                     .emberBody(10.5, .semibold)
@@ -151,6 +173,12 @@ struct StatusWidgetView: View {
                 Text("opens \(nextText(next))")
                     .font(EmberFont.numerals(14))
                     .monospacedDigit()
+            } else if !summary.allDayNames.isEmpty {
+                Text(summary.allDayNames.joined(separator: ", "))
+                    .font(EmberFont.displaySmall(14))
+                    .lineLimit(1)
+                Text("open all day")
+                    .font(EmberFont.body(11))
             } else {
                 Text("Furlough")
                     .font(EmberFont.displaySmall(14))

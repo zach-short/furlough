@@ -69,7 +69,9 @@ plus on the right. Hero: one page per managed app, paged horizontally in the lis
 and landing on the first open app (design/HOURGLASS.md, Direction C with header H1). Each
 page: the living hourglass (74 × 98 pt) on the left with its glow beneath it, then the
 eyebrow, the app name in Display, the big line in Geist Mono, and a sub line. Per status:
-"OPEN NOW · UNTIL 10:00 PM" in Moss with the countdown and "30 min budget today"; "OPEN NOW ·
+"OPEN NOW · UNTIL 10:00 PM" in Moss with the countdown and "30 min budget today"; "OPEN ALL
+DAY" in Moss with a countdown to midnight and "30 min budget · resets at midnight" for a rule
+without windows; "OPEN NOW ·
 5 MIN LEFT" in Amber after the budget warning; "NEXT WINDOW" in Amber with a countdown to the
 opening; "USED UP TODAY" in Ember with a countdown to the next opening; "BRICKED · SINCE
 6:12 PM" in Ember counting up; "ALWAYS BLOCKED" in Muted and "NEEDS A SCHEDULE" in Pending
@@ -101,7 +103,8 @@ allows: sand while there is plenty, Amber after the 5-minute warning, Ember once
 Reduce Motion: no pulse, no grains (the stream is a solid line), levels still change.
 
 **Rule editor.** Header: large tile, name in Display, "Nickname shows on the shield and
-widget." Cards: Nickname (text field), Allowed windows (a "Same every day" row with an
+widget." Cards: Nickname (text field), Allowed windows (with no windows, one Muted row "No
+windows. Open all day, up to the budget."; otherwise a "Same every day" row with an
 Ember-tinted toggle; glass time chips with an arrow between, duration on the right; when the
 toggle is off, a strip of seven 26 pt round day toggles under each window, Onest Bold 10 pt
 initials, Amber fill with Ground text when on, white 7% with a card border when off, and the

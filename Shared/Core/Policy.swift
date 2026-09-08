@@ -6,7 +6,8 @@ enum TargetStatus: Equatable {
     case bricked
     case unconfigured
     case blockedAllDay
-    /// Inside a window with budget remaining. `until` is the window's end minute.
+    /// Inside a window with budget remaining. `until` is the window's end minute, midnight
+    /// for a rule without windows.
     case open(until: Int)
     case exhausted(nextOpen: NextOpen?)
     case closed(nextOpen: NextOpen)
@@ -26,6 +27,8 @@ struct NextOpen: Equatable {
 
     var isToday: Bool { daysAhead == 0 }
     var isTomorrow: Bool { daysAhead == 1 }
+    /// 12:00 AM tomorrow: the day rolls over, which is when an all-day rule's budget resets.
+    var isMidnight: Bool { daysAhead == 1 && minuteOfDay == 0 }
 }
 
 enum ChangeClass: Equatable {
@@ -224,6 +227,11 @@ enum Policy {
         var openStart: Date?
         /// That target has had its 5-minute budget warning.
         var openWarned = false
+        /// Open with no windows of their own: usable all day, up to the budget. Kept apart from
+        /// `openNames` so they get no closing countdown and no Live Activity.
+        var allDayNames: [String] = []
+        /// One of those has had its 5-minute budget warning.
+        var allDayWarned = false
         var nextOpenAt: Date?
         var nextOpenNames: [String] = []
         /// Budget of the target opening next, for the widget's detail line.
@@ -239,7 +247,8 @@ enum Policy {
         var brickedCount = 0
 
         var isEmpty: Bool {
-            openNames.isEmpty && nextOpenAt == nil && blockedCount == 0 && unconfiguredCount == 0 && brickedCount == 0
+            openNames.isEmpty && allDayNames.isEmpty && nextOpenAt == nil && blockedCount == 0
+                && unconfiguredCount == 0 && brickedCount == 0
         }
     }
 
@@ -263,10 +272,16 @@ enum Policy {
             case .blockedAllDay:
                 summary.blockedCount += 1
             case .open(let until):
-                summary.openNames.append(target.displayName)
-                if soonestOpen == nil || until < soonestOpen!.until {
-                    let start = target.rule?.window(containing: minute, on: weekday)?.startMinute ?? 0
-                    soonestOpen = (until, start, state.runtime.wasWarned(target.id, dayKey: dayKey(now)))
+                let warned = state.runtime.wasWarned(target.id, dayKey: dayKey(now))
+                if target.rule?.isAllDay ?? false {
+                    summary.allDayNames.append(target.displayName)
+                    summary.allDayWarned = summary.allDayWarned || warned
+                } else {
+                    summary.openNames.append(target.displayName)
+                    if soonestOpen == nil || until < soonestOpen!.until {
+                        let start = target.rule?.window(containing: minute, on: weekday)?.startMinute ?? 0
+                        soonestOpen = (until, start, warned)
+                    }
                 }
             case .exhausted(let next):
                 summary.exhaustedCount += 1

@@ -39,8 +39,12 @@ small codebase he fully understands over a fork. He is interactive: ask when a d
   has allowed windows, each on a set of weekdays (`TimeWindow.days`, every day by default;
   added 2026-09-07 so YouTube can end at midnight on school nights and later on weekends),
   and one daily minute budget. Windows never cross midnight: a late weekend night is an
-  evening window plus an early-morning window on the next day. No windows means always
-  blocked. The rule editor has a "Same every day" toggle that hides or shows a day strip on
+  evening window plus an early-morning window on the next day. No windows means open all
+  day, every day, up to the budget (decided 2026-09-07: a budget alone is the default rule,
+  so the editor no longer pre-fills an 8–10 PM window and says "No windows. Open all day, up
+  to the budget."); once a target has windows, a day none of them covers is blocked.
+  Categories are blocked by their zero budget (`Rule.alwaysBlocked`). The rule editor has a
+  "Same every day" toggle that hides or shows a day strip on
   each window, a "Use windows from another app" sheet that copies another target's
   windows, days and budget into the draft, and a "Visualize windows" sheet
   (`Views/WeekView.swift`): a seven-column 24-hour grid, a per-day editor reached by
@@ -121,8 +125,9 @@ table. Not yet seen on the phone: install, then check the test steps in the last
 
 - `Shared/Core` (compiled into all four targets, no SwiftUI):
   `Models.swift` (Weekdays bit set stored as a bare integer, TimeWindow with `days` and a
-  tolerant `init(from:)` that reads old rules as every day, Rule with per-weekday
-  `windows(on:)`/`allowedMask(on:)` and a 7-day `isTighterOrEqual`, Target, BrickProfile,
+  tolerant `init(from:)` that reads old rules as every day, Rule with `isAllDay` and
+  per-weekday `windows(on:)`/`allowedMask(on:)` that answer `Rule.allDay` when there are no
+  windows, and a 7-day `isTighterOrEqual`, Target, BrickProfile,
   Config with a tolerant `init(from:)`, PendingChange, RuntimeState, SharedState),
   `Policy.swift` (pure engine: `status(of:config:)` returns `.bricked` first and looks at
   today's weekday, `nextOpen(in:afterWeekday:)` searches up to a week ahead, `NextOpen` carries
@@ -173,6 +178,11 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   activities total, so at most 19 distinct spans across all targets and days; windows must
   be at least 15 minutes and cannot cross midnight (end is exclusive, 1440 means midnight).
   Do not register one activity per span per weekday: it would blow the limit fast.
+- A rule without windows registers no window activity: the day activity's midnight callback
+  resets it and its budget event limits it. `Policy.summary` lists such targets in
+  `allDayNames`, not `openNames`, so they get no closing countdown and no Live Activity; the
+  widget shows them as "Open all day" when nothing else is open or coming, else as a line
+  under the card, and drains their glass over the day.
 - Every monitor callback, every app activation, and every edit ends in
   `ShieldReconciler.reconcile`, which recomputes shields from persisted state. Nothing toggles
   state incrementally.

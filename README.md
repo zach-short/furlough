@@ -2,7 +2,7 @@
 
 A personal iOS app blocker with no unblock button.
 
-Pick the apps and websites that eat your time. Give each one allowed windows (say 8:00–10:00 PM), the same every day or different per day of the week (until midnight on school nights, until 2 AM on weekends), and a daily minute budget (say 30 minutes). Outside the windows, or once the budget is spent, iOS shields the app. The only way to loosen a rule is to wait: loosening edits take effect 24 hours after you make them, and you can cancel them in the meantime. Tightening edits apply instantly.
+Pick the apps and websites that eat your time. Give each one a daily minute budget (say 30 minutes) and, if you want, allowed windows (say 8:00–10:00 PM), the same every day or different per day of the week (until midnight on school nights, until 2 AM on weekends). With no windows an app is open all day, up to its budget. Outside the windows, or once the budget is spent, iOS shields the app. The only way to loosen a rule is to wait: loosening edits take effect 24 hours after you make them, and you can cancel them in the meantime. Tightening edits apply instantly.
 
 There is also a Brick: a second set of apps you lock in one tap, from anywhere, and can only unlock by holding your phone to a physical NFC tag you paired. Leave the tag at home and your phone stays bricked until you are back.
 
@@ -26,6 +26,7 @@ Rules for each app live in an App Group so all four processes read the same stat
 
 - Adding an app is instant. Nothing is enforced until you save its first rule, and that first rule is always "tighter than nothing", so it applies instantly too.
 - Shrinking a window, removing a window, taking a day off a window, or lowering a budget applies instantly.
+- An app with no windows is open all day, up to its budget. Giving it a first window applies instantly (it is open less than before); removing its last window reopens the whole day, so that waits out the delay.
 - Extending a window, adding a window, adding a day to a window, raising a budget, or removing an app is queued for the loosening delay (24 hours by default). Pending changes are listed in the app and can be cancelled.
 - Windows never cross midnight. "Until 2 AM on Saturday night" is an evening window plus a 12:00–2:00 AM window on Sunday, and the budget still resets at midnight.
 - When setting up an app, **Use windows from another app** copies another app's windows, days and budget into the editor, so a second app can get the same rule in two taps.
@@ -61,7 +62,7 @@ open Furlough.xcodeproj
 1. In Xcode, select the `Furlough` scheme and your iPhone as the run destination.
 2. Signing is automatic under team `X9V4L6HR2R`. Xcode registers the four bundle IDs and enables Family Controls (development), App Groups, and NFC Tag Reading on first build.
 3. Press Run. On the phone, tap **Allow Screen Time access**, then **Allow** on the iOS prompt.
-4. Tap **+** to pick apps and websites. Open each one and set its windows and budget. Turn off **Same every day** to give each window its own days. Save.
+4. Tap **+** to pick apps and websites. Open each one and set its budget, and windows if you want them; with no windows it is open all day, up to the budget. Turn off **Same every day** to give each window its own days. Save.
 5. For the Brick, open the Brick card, choose apps, and pair a tag by holding the phone to it. Then **Brick** locks and **Unbrick** asks for the tag.
 
 Or from the command line, with the phone connected:

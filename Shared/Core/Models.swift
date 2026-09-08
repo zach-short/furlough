@@ -113,28 +113,34 @@ extension TimeWindow {
     }
 }
 
-/// When a target may be used, and for how many minutes per day in total.
+/// When a target may be used, and for how many minutes per day in total. No windows means
+/// open all day, every day: only the budget limits it. Windows narrow that to their hours,
+/// and once there are any, a day none of them covers is blocked.
 struct Rule: Codable, Hashable {
     var windows: [TimeWindow] = []
     var dailyBudgetMinutes: Int = Furlough.defaultBudgetMinutes
 
+    /// Midnight to midnight: what a rule without windows allows on every day.
+    static let allDay = TimeWindow(startMinute: 0, endMinute: Furlough.minutesPerDay)
+
     /// Permits everything. The baseline for a target that has no rule yet, and what "remove" means.
-    static let unrestricted = Rule(
-        windows: [TimeWindow(startMinute: 0, endMinute: Furlough.minutesPerDay)],
-        dailyBudgetMinutes: Furlough.minutesPerDay
-    )
+    static let unrestricted = Rule(windows: [], dailyBudgetMinutes: Furlough.minutesPerDay)
+    /// No budget, so never allowed: what a category gets.
     static let alwaysBlocked = Rule(windows: [], dailyBudgetMinutes: 0)
 
+    /// No windows of its own, so open all day up to the budget.
+    var isAllDay: Bool { windows.isEmpty }
     /// Allowed at some minute of some day.
-    var isEverAllowed: Bool { windows.contains { !$0.days.isEmpty } && dailyBudgetMinutes > 0 }
+    var isEverAllowed: Bool { dailyBudgetMinutes > 0 && (isAllDay || windows.contains { !$0.days.isEmpty }) }
     var effectiveBudgetMinutes: Int { isEverAllowed ? dailyBudgetMinutes : 0 }
     var sortedWindows: [TimeWindow] { windows.sorted() }
     /// Every window applies every day, so one list describes the whole week.
     var isSameEveryDay: Bool { windows.allSatisfy { $0.days == .all } }
 
-    /// The windows that apply on `weekday` (Calendar's 1…7), in order.
+    /// The windows that apply on `weekday` (Calendar's 1…7), in order: the whole day when
+    /// the rule has none of its own.
     func windows(on weekday: Int) -> [TimeWindow] {
-        sortedWindows.filter { $0.applies(on: weekday) }
+        isAllDay ? [Self.allDay] : sortedWindows.filter { $0.applies(on: weekday) }
     }
 
     /// One flag per minute of `weekday`; true where use is permitted.

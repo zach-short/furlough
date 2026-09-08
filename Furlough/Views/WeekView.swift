@@ -15,6 +15,9 @@ struct WeekDraft: Equatable {
 
     func spans(on weekday: Int) -> [TimeWindow] { spans[weekday] ?? [] }
 
+    /// No spans on any day: the rule is open all day, every day, up to the budget.
+    var isAllDay: Bool { spans.values.allSatisfy(\.isEmpty) }
+
     mutating func set(_ hours: [TimeWindow], on weekday: Int) {
         spans[weekday] = TimeWindow.joined(hours.map(\.span))
     }
@@ -95,7 +98,7 @@ struct WeekSheet: View {
 
     private var summary: String {
         let windows = week.windows
-        guard !windows.isEmpty else { return "No windows. Blocked all day, every day." }
+        guard !windows.isEmpty else { return "No windows. Open all day, every day, up to the budget." }
         return TimeFormat.schedule(Rule(windows: windows)).replacingOccurrences(of: " · ", with: "\n")
     }
 }
@@ -136,7 +139,11 @@ struct WeekGrid: View {
                             Button {
                                 onSelect(weekday)
                             } label: {
-                                DayColumn(spans: week.spans(on: weekday), hourHeight: hourHeight, isToday: weekday == today)
+                                DayColumn(
+                                    spans: week.isAllDay ? [Rule.allDay] : week.spans(on: weekday),
+                                    hourHeight: hourHeight,
+                                    isToday: weekday == today
+                                )
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel(calendar.standaloneWeekdaySymbols[weekday - 1])
@@ -176,6 +183,7 @@ struct WeekGrid: View {
     }
 
     private func accessibilityValue(for weekday: Int) -> String {
+        if week.isAllDay { return "All day" }
         let spans = week.spans(on: weekday)
         guard !spans.isEmpty else { return "No windows" }
         return spans.map(TimeFormat.window).joined(separator: ", ")
@@ -248,7 +256,7 @@ struct DayEditor: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                DayBar(spans: TimeWindow.joined(windows))
+                DayBar(spans: week.isAllDay ? [Rule.allDay] : TimeWindow.joined(windows))
                     .padding(.horizontal, 12)
                     .padding(.top, 12)
                     .padding(.bottom, 10)
@@ -256,7 +264,10 @@ struct DayEditor: View {
                 SectionLabel(text: "Windows on \(name)")
                 VStack(spacing: 0) {
                     if rows.isEmpty {
-                        Text("No windows. \(name) is blocked all day.")
+                        Text(week.isAllDay
+                            ? "No windows on any day, so \(name) is open all day, up to the budget. Add one here and the other days are blocked until they get their own."
+                            : "No windows. \(name) is blocked all day.")
+                            .fixedSize(horizontal: false, vertical: true)
                             .emberBody(13)
                             .foregroundStyle(Ember.muted)
                             .frame(maxWidth: .infinity, alignment: .leading)

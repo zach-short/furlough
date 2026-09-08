@@ -337,6 +337,12 @@ struct HeroPage: View {
                     big: .countdown(to: end), sub: "\(budget) budget · under \(Furlough.warningMinutes) min left"
                 )
             }
+            if target.rule?.isAllDay ?? false {
+                return Line(
+                    eyebrow: "Open all day", color: Ember.moss,
+                    big: .countdown(to: end), sub: "\(budget) budget · resets at midnight"
+                )
+            }
             return Line(
                 eyebrow: "Open now · until \(TimeFormat.minute(until))", color: Ember.moss,
                 big: .countdown(to: end), sub: "\(budget) budget today"
@@ -365,7 +371,7 @@ struct HeroPage: View {
         case .blockedAllDay:
             return Line(
                 eyebrow: "Always blocked", color: Ember.muted, big: .quiet("all day"),
-                sub: target.kind.isCategory ? "Everything in it is blocked." : "No allowed windows · tap to add one"
+                sub: target.kind.isCategory ? "Everything in it is blocked." : "No budget · tap to set one"
             )
         case .unconfigured:
             return Line(
@@ -460,7 +466,7 @@ struct TargetRow: View {
                 }
             }
             Spacer(minLength: 8)
-            StatusChip(status: status, glass: glass)
+            StatusChip(status: status, glass: glass, allDay: target.rule?.isAllDay ?? false)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)

@@ -78,9 +78,10 @@ final class MonitorExtension: DeviceActivityMonitor {
         let now = Date.now
         let state = SharedStore.load()
         let config = Policy.effectiveConfig(state, now: now)
+        // A rule without windows never closes; midnight only resets its budget.
         let closing = config.targets.filter { target in
             if case .open(let until) = Policy.status(of: target, config: config, runtime: state.runtime, now: now) {
-                return until == window.endMinute
+                return until == window.endMinute && !(target.rule?.isAllDay ?? false)
             }
             return false
         }

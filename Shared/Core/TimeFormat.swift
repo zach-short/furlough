@@ -59,6 +59,7 @@ enum TimeFormat {
     /// The whole week's windows: one list when they are the same every day, else one clause
     /// per group of days, broader groups first: "Every day 8:00 PM–midnight · Sat, Sun 12:00 AM–2:00 AM".
     static func schedule(_ rule: Rule, calendar: Calendar = .current) -> String {
+        if rule.isAllDay { return "All day" }
         if rule.isSameEveryDay {
             return rule.sortedWindows.map(window).joined(separator: ", ")
         }
@@ -94,7 +95,8 @@ enum TimeFormat {
     }
 
     static func nextOpen(_ next: NextOpen) -> String {
-        switch next.daysAhead {
+        if next.isMidnight { return "at midnight" }
+        return switch next.daysAhead {
         case 0: "at \(minute(next.minuteOfDay))"
         case 1: "tomorrow at \(minute(next.minuteOfDay))"
         case 7: "next \(weekdayName(daysAhead: 7)) at \(minute(next.minuteOfDay))"
@@ -104,7 +106,8 @@ enum TimeFormat {
 
     /// The short form for a row's status chip: a time today or tomorrow, else the day.
     static func chip(_ next: NextOpen) -> String {
-        next.daysAhead <= 1 ? minute(next.minuteOfDay) : weekdayName(daysAhead: next.daysAhead, abbreviated: true)
+        if next.isMidnight { return "midnight" }
+        return next.daysAhead <= 1 ? minute(next.minuteOfDay) : weekdayName(daysAhead: next.daysAhead, abbreviated: true)
     }
 
     static func status(_ status: TargetStatus) -> String {
@@ -153,7 +156,7 @@ enum ShieldText {
         case .unconfigured:
             return ("Not enforced yet", "Open Furlough and set a schedule for \(name).")
         case .blockedAllDay:
-            return ("\(name) is blocked", "It has no allowed windows.")
+            return ("\(name) is blocked", "It is blocked all day.")
         case .open:
             return ("Opening…", "Furlough is lifting the shield. Try again in a moment.")
         case .exhausted(let next):
