@@ -31,6 +31,11 @@ struct UsageView: View {
     /// its mark even if the fortnight is fetched again underneath it.
     @State private var states: [String: UsageCardState] = [:]
     @State private var busy: String?
+    /// A naming pass is in flight; see `nameApps`.
+    @State private var naming = false
+    /// How many times to ask Screen Time for the names before leaving it to a tap. Three, a
+    /// second apart, is far less than the time it takes to read the first card.
+    private static let namingAttempts = 3
     /// Path B: which card the tour is showing, 1…`UsageAnalysis.rankLimit`.
     @State private var position = 1
     @State private var showPicker = false
@@ -129,6 +134,7 @@ struct UsageView: View {
                     card(item, entry, days: summary.totalDays)
                 }
             }
+            if unnamed > 0 { namingFailure }
         } else {
             Text("Reading the last \(UsageReader.days) days…")
                 .emberBody(13)
@@ -157,6 +163,26 @@ struct UsageView: View {
                 undo: { undo(item) }
             )
         }
+    }
+
+    /// Screen Time would not say what these apps are called. Worth saying out loud rather than
+    /// leaving a card reading "This app" as though that were the app's name.
+    private var namingFailure: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(unnamed == 1
+                ? "Screen Time did not say what one of these apps is called."
+                : "Screen Time did not say what \(unnamed) of these apps are called.")
+                .emberBody(12)
+                .foregroundStyle(Ember.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            Button(naming ? "Asking…" : "Ask again") { Task { await nameApps() } }
+                .emberBody(13, .semibold)
+                .foregroundStyle(Ember.amber)
+                .buttonStyle(.plain)
+                .disabled(naming)
+        }
+        .padding(16)
+        .emberCard()
     }
 
     /// The ask, for a phone allowed the old way. `requestAuthorization` shows the new prompt
@@ -282,15 +308,56 @@ struct UsageView: View {
     // MARK: Doing it
 
     private func load() async {
-        guard #available(iOS 26.4, *), hasDataAccess, summary == nil else { return }
-        do {
-            let read = try await UsageReader.summary()
-            advice = read.recommendations
-            summary = read
-            failure = nil
-        } catch {
-            failure = error.localizedDescription
+        guard #available(iOS 26.4, *), hasDataAccess else { return }
+        if summary == nil {
+            do {
+                let read = try await UsageReader.summary()
+                advice = read.recommendations
+                summary = read
+                failure = nil
+                SharedStore.log("usage: \(read.entries.count) entries, \(advice.count) worth a rule")
+            } catch {
+                failure = error.localizedDescription
+                return
+            }
         }
+        await nameApps()
+    }
+
+    /// Puts Apple's names and icons back on the cards, and keeps asking while any of them is
+    /// still nameless.
+    ///
+    /// Data access names an app by its bundle identifier alone, so the only name that exists
+    /// comes from a token, and the only way to a token is a query into Screen Time's own store
+    /// (`UsageReader.fillingTokens`). That query is not reliable: it answers, or it comes back
+    /// with nothing, or it throws, and which one is not something the app can tell in advance.
+    /// One attempt is therefore not a design — a single empty answer is what left every card
+    /// saying "This app" until the screen was left and opened again. So it is asked again, a
+    /// second apart, and only while something it should have named is still unnamed.
+    private func nameApps() async {
+        guard #available(iOS 26.4, *) else { return }
+        naming = true
+        defer { naming = false }
+        for attempt in 1...Self.namingAttempts {
+            guard let read = summary, unnamed > 0 else { return }
+            do {
+                let named = try await UsageReader.fillingTokens(in: read)
+                summary = named
+                SharedStore.log("usage: naming attempt \(attempt) left \(unnamed) of \(advice.count) unnamed")
+                if unnamed == 0 { return }
+            } catch {
+                SharedStore.log("usage: naming attempt \(attempt) failed: \(error.localizedDescription)")
+            }
+            guard !Task.isCancelled else { return }
+            try? await Task.sleep(for: .seconds(1))
+        }
+    }
+
+    /// Suggestions Screen Time has still not handed a token for, so the card can only call the
+    /// app "This app".
+    private var unnamed: Int {
+        guard let summary else { return 0 }
+        return advice.filter { summary.entry(for: $0)?.targetKind == nil }.count
     }
 
     /// Write the suggested rule, adding the app first when Furlough does not manage it yet. A

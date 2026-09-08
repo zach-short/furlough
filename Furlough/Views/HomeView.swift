@@ -5,7 +5,7 @@ struct HomeView: View {
     /// The Application / Website popover under the + button.
     @State private var showAddChoice = false
     /// What the popover asked for; `addTargetsFlow` takes it from here to Apple's picker.
-    @State private var addRequest: AddChoice?
+    @State private var addRequest: AddRequest?
     @State private var showSettings = false
     @State private var showHelp = false
     @State private var showPending = false
@@ -56,7 +56,7 @@ struct HomeView: View {
                                 websiteCaption: "Type the address. Hours, but no daily limit"
                             ) { choice in
                                 showAddChoice = false
-                                addRequest = choice
+                                addRequest = .plain(choice)
                             }
                             .presentationCompactAdaptation(.popover)
                         }

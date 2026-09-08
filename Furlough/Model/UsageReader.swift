@@ -63,6 +63,57 @@ enum UsageReader {
         )
     }
 
+    /// The fortnight with its tokens filled in.
+    ///
+    /// Data access hands over minutes and a bundle identifier and nothing else: no
+    /// `localizedDisplayName`, and no token either. A token is the only thing that names an app
+    /// on screen (`Label(token)` draws Apple's own name and icon) and the only thing a rule can
+    /// be written on, so without this every card says "This app" over a blank tile and Apply
+    /// has nothing to write on. Matching each key against what is installed puts both back.
+    ///
+    /// One walk of the installed list for the whole summary, not one per entry. Entries Screen
+    /// Time counted that are not installed under that identifier any more keep their empty
+    /// token and draw as themselves.
+    @available(iOS 26.4, *)
+    static func fillingTokens(in summary: UsageSummary) async throws -> UsageSummary {
+        guard summary.entries.contains(where: { $0.targetKind == nil }) else { return summary }
+        let kinds = try await encodedKinds()
+        let decoder = JSONDecoder()
+        var filled = summary
+        filled.entries = try summary.entries.map { entry in
+            guard entry.targetKind == nil, let encoded = kinds[entry.key] else { return entry }
+            var found = entry
+            switch try decoder.decode(TargetKind.self, from: encoded) {
+            case .application(let token): found.applicationToken = token
+            case .webDomain(let token): found.webDomainToken = token
+            // Nothing else is keyed the way a usage entry is, so nothing else can match.
+            default: break
+            }
+            return found
+        }
+        return filled
+    }
+
+    /// Everything installed and everything visited, keyed the way `UsageCollector` keys an
+    /// entry, as encoded `TargetKind`s. Off the main actor and answering in bytes for the same
+    /// reason `encodedKind` is: `FamilyActivityData` and the arrays it hands back are not
+    /// Sendable, so they may neither be reached from an actor nor returned to one.
+    @available(iOS 26.4, *)
+    @concurrent
+    private static func encodedKinds() async throws -> [String: Data] {
+        let encoder = JSONEncoder()
+        var kinds: [String: Data] = [:]
+        for app in try await FamilyActivityData.shared.installedApplications {
+            guard let identifier = app.bundleIdentifier, let token = app.token else { continue }
+            kinds[identifier] = try encoder.encode(TargetKind.application(token))
+        }
+        for site in try await FamilyActivityData.shared.visitedWebDomains {
+            guard let domain = site.domain, let token = site.token else { continue }
+            kinds["web:\(domain)"] = try encoder.encode(TargetKind.webDomain(token))
+        }
+        return kinds
+    }
+
     /// The target for a usage entry Screen Time named but handed no token for: its key is a
     /// bundle identifier, or "web:" and a domain, looked up among the apps installed and the
     /// domains visited. Nil when it is not there.

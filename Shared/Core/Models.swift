@@ -381,6 +381,11 @@ struct Target: Codable, Hashable, Identifiable {
     /// name, so without this the widget, the notifications and the Live Activity have nothing
     /// to call an app but "This app". Optional so state written before it existed still
     /// decodes; `SharedStore` folds the learned names in on every load.
+    ///
+    /// Since 2026-09-08 one other thing may write it: when the companion nudge adds the app
+    /// half beside a website, Furlough already knows from the `Companions` table what it just
+    /// added, so it says so rather than waiting to be told. A name Screen Time teaches later
+    /// still wins — `SharedStore.load` folds the learned names over the top.
     var systemName: String?
     /// The tier Zach put this in, or nil while he has not said. Stored optional for the same
     /// reason `systemName` is: a synthesised `init(from:)` demands every non-optional key, and

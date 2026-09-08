@@ -6,6 +6,33 @@ enum AddChoice: Hashable, CaseIterable {
     case website
 }
 
+/// A trip to Apple's picker, and what to do with what it comes back with.
+///
+/// The two callers want opposite things from the same picker. The + button shows the whole
+/// selection and reads the answer as the whole truth, so anything unpicked is a removal. The
+/// companion nudge shows an empty one and asks a single question — "which app is this?" — so
+/// nothing may be removed on the strength of it, and what comes back is added beside the
+/// target that asked, wearing that target's rule.
+struct AddRequest: Hashable {
+    var choice: AddChoice
+    /// Set when the nudge on a target asked, rather than the + button.
+    var companion: Companion?
+
+    struct Companion: Hashable {
+        /// The target whose other half this is: the one whose rule the new one inherits.
+        var targetID: UUID
+        /// What the companions table calls the app, so it can be named before iOS ever names
+        /// it. Empty when several were picked and no single name fits.
+        var title: String
+    }
+
+    static func plain(_ choice: AddChoice) -> AddRequest { AddRequest(choice: choice) }
+
+    static func companion(_ choice: AddChoice, of targetID: UUID, titled title: String) -> AddRequest {
+        AddRequest(choice: choice, companion: Companion(targetID: targetID, title: title))
+    }
+}
+
 /// The little popover under the + button: Application or Website, each with one line saying
 /// what it means on this platform. Whoever shows it decides what happens next: on the phone
 /// both open Apple's picker, on the Mac they open different sheets.

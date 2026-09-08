@@ -24,7 +24,7 @@ struct RuleEditorView: View {
     @State private var tier = Utility.unset
     @State private var confirmBlockEssential = false
     /// Set when the companion nudge is taken up: the flow below opens the guide or the picker.
-    @State private var addRequest: AddChoice?
+    @State private var addRequest: AddRequest?
     @FocusState private var nicknameFocused: Bool
 
     /// A window with a stable identity while it is being edited.
@@ -157,7 +157,13 @@ struct RuleEditorView: View {
                             // on the spot. The nudge then goes on its own, because the hosts it
                             // was offering are among the ones Furlough knows.
                             case .sites(let hosts): model.addHosts(hosts)
-                            case .app: addRequest = .application
+                            // Still the picker: only Apple can mint an app's token, and
+                            // `FamilyActivityData` — the one API that could do it without her —
+                            // is EU-only for anyone who installs from the App Store. So the
+                            // trip is made as short as it can be instead: one question, and
+                            // what comes back already wears this target's hours.
+                            case .app(let name):
+                                addRequest = .companion(.application, of: target.id, titled: name)
                             }
                         } onDismiss: {
                             model.dismissCompanion(for: target.id)

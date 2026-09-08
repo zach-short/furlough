@@ -297,6 +297,58 @@ final class AppModel {
         return true
     }
 
+    // MARK: The app half, beside a website
+
+    /// What adding the companion app did, in the words the editor says back.
+    enum CompanionAddOutcome: Equatable {
+        case none
+        /// How many were added, and whether they inherited the website's hours.
+        case added(count: Int, inheritedRule: Bool)
+
+        var message: String? {
+            guard case .added(let count, let inherited) = self else { return nil }
+            let what = count == 1 ? "It" : "They"
+            return inherited
+                ? "\(what) got the same hours. Both halves are blocked together from now on."
+                : "Give this one hours and \(count == 1 ? "it" : "they") will follow. Nothing is blocked until you do."
+        }
+    }
+
+    /// Adds the app half beside a website, wearing that website's rule.
+    ///
+    /// Not `applyPicker`: that one reads a selection as the whole truth and schedules a removal
+    /// for every target absent from it, which is right for the + button and catastrophic here,
+    /// where the picker was deliberately opened empty to ask one question. Nothing is removed.
+    ///
+    /// The rule is copied rather than queued. A target's first rule is always instant — the
+    /// baseline for something Furlough has never managed is "unrestricted", so there is nothing
+    /// to loosen — and the pair being blocked together from the moment it is offered is the
+    /// whole point of the nudge.
+    ///
+    /// `title` names the new target from the companions table, so the widget, the notifications
+    /// and the Live Activity can say "YouTube" instead of "This app" before the shield has ever
+    /// covered it. `SharedStore.load` still lets a name Screen Time teaches later win.
+    @discardableResult
+    func addCompanionApps(_ selection: FamilyActivitySelection, for request: AddRequest.Companion) -> CompanionAddOutcome {
+        var current = SharedStore.load()
+        let existing = Set(current.config.targets.map(\.kind))
+        let inherited = current.config.target(id: request.targetID)?.rule
+        let tokens = selection.applicationTokens.filter { !existing.contains(.application($0)) }
+        guard !tokens.isEmpty else { return .none }
+
+        // Only one pick can be the app the nudge named; several means the name fits none of them.
+        let name = tokens.count == 1 && !request.title.isEmpty ? request.title : nil
+        for token in tokens {
+            current.config.targets.append(
+                Target(kind: .application(token), rule: inherited, systemName: name)
+            )
+        }
+        SharedStore.save(current)
+        SharedStore.log("added \(tokens.count) companion app(s) beside \(request.targetID)")
+        enforce(reason: "add companion app")
+        return .added(count: tokens.count, inheritedRule: inherited != nil)
+    }
+
     // MARK: Sites by name
 
     /// What adding a typed host did, in the words the sheet says back.

@@ -868,6 +868,54 @@ The plan for this stretch. Tick each phase off here as it lands.
     type a host → Add; then the rule editor, where the budget card should be a single line of
     explanation; then Safari, to see iOS's page inside the blocked hours.
 
+    (d) The app half, beside a website. Done 2026-09-08, after Zach reported the nudge's Add
+    button: it added the app as an unrelated target with no rule, let him pick any number of
+    apps, and then went on offering the app he had just added.
+
+    All three had one cause each. The picker was the general one, seeded with everything, and
+    its answer went through `applyPicker`, which reads a selection as the whole truth. And
+    "already in" is judged by the app's **learned** name, which iOS only supplies the first
+    time the shield covers something — so a freshly picked app is invisible to the nudge that
+    asked for it.
+
+    Now: `AddRequest` (`Shared/UI/AddChoice.swift`) says whether a trip to the picker is the +
+    button's or a nudge's. A nudge's opens the picker **empty** — it is asking one question and
+    must not be able to answer any other — and its answer goes to `AppModel.addCompanionApps`,
+    which adds beside the target that asked, removes nothing, and copies that target's rule
+    onto the new one. Copied rather than queued, because a target's first rule is always
+    instant: the baseline for something Furlough has never managed is "unrestricted", so there
+    is nothing to loosen. The new target is named from the `Companions` table at birth, so the
+    nudge clears itself and the widget says "YouTube" rather than "This app" before the shield
+    has ever covered it; `SharedStore.load` still lets a name Screen Time teaches later win,
+    which is why `Target.systemName`'s comment now names two writers.
+
+    **Why it is still two taps and not one.** Zach asked whether the two could be linked in one
+    click from a hardcoded table. The table is not the obstacle — `Companions` already carries
+    iOS bundle identifiers, and `UsageReader.kind(forKey:)` (the other session's, in `b3562cb`)
+    already turns one into a real `ApplicationToken` with no picker. The obstacle is the region.
+    Apple's `FamilyActivityData` page, read 2026-09-08:
+
+    > You can develop and test an app that uses this class on devices in any region. Customer
+    > installations of your app can only use the class on devices located in the EU that are
+    > signed in with an Apple Account with an EU country or region.
+
+    Zach is releasing to the US only, so that API works on his own phone and for nobody who
+    installs the app. One-click was therefore **not built**: it would be a branch that only
+    ever runs on the developer's device. Two taps that inherit the rule is as good as Apple
+    allows for a US install, and it behaves the same for everyone.
+
+    **Open question for whoever ships this.** The `com.apple.developer.family-controls.app-and-website-usage`
+    entitlement is in the app target (`b3562cb`) and feeds the Usage screen's in-app path. A
+    developer-forum report says that with that capability enabled the Screen Time approval
+    prompt becomes all-or-nothing — approve full data access or nothing. That was **not**
+    confirmed against Apple's documentation on 2026-09-08 and it should be, because if it is
+    true a US release pays a worse consent prompt for an API its users cannot reach. Do not rip
+    the entitlement out without checking what the Usage screen loses: it belongs to the session
+    that added it.
+
+    Installed 2026-09-08, unseen by anyone: open a site's rule editor, tap Add the app on the
+    nudge, pick one, and it should land with the site's hours and the nudge should go.
+
 21. **A setup as a file.** Export done 2026-09-08; import landed the same day in `48db063`,
     with the confirmation, the ceiling check and the provenance line following it.
 
