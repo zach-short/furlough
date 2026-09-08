@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import SwiftUI
 
 /// The menu bar item: an hourglass, and the countdown while something is open.
 ///
@@ -14,6 +15,13 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private let model: MacModel
     private var item: NSStatusItem?
     private var timer: Timer?
+    /// The last glass drawn and the image it made, so a tick that changes nothing does not
+    /// redraw the sand.
+    private var lastGlass: HourglassState?
+    private var lastImage: NSImage?
+    /// The 120 × 160 drawing at menu bar height. Under 40 pt it draws its bolder chip form,
+    /// the same picture the 12 pt row chips wear, and it stays inside one menu bar slot.
+    private static let glassSize = NSSize(width: 13.5, height: 18)
 
     init(model: MacModel) {
         self.model = model
@@ -43,8 +51,11 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         self.timer = timer
     }
 
-    /// The hourglass alone, filled while something is open. Drawn from `Policy.summary`, the
-    /// same source the widget and the phone's hero read, so the three cannot disagree.
+    /// The hourglass alone, at the sand level this moment has reached. Drawn from
+    /// `Policy.summary`, the same source the widget and the phone's hero read, so the three
+    /// cannot disagree — and it is Furlough's own hourglass rather than an SF Symbol of one.
+    /// ActivityKit does not exist here, so this item is the Mac's Live Activity, and like that
+    /// one it is a still: a new one whenever the picture would differ.
     ///
     /// Icon only, and that is the point: with the countdown beside it the item was about 85
     /// points wide, and on a notched Mac whose menu bar is full macOS pushes an item that big
@@ -52,12 +63,36 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     /// countdown moved to the top of the menu, one click away.
     private func refresh() {
         guard let button = item?.button else { return }
-        let summary = Policy.summary(state: model.state, now: model.clock.now)
-        let isOpen = summary.openUntil != nil || !summary.allDayNames.isEmpty
-        button.image = NSImage(
-            systemSymbolName: isOpen ? "hourglass.bottomhalf.filled" : "hourglass",
-            accessibilityDescription: isOpen ? "Furlough, something is open" : "Furlough"
+        let now = model.clock.now
+        let summary = Policy.summary(state: model.state, now: now)
+        var state = HourglassState.of(summary, now: now)
+        // Rounded to fortieths first: finer than a pixel at this size, so the sand still
+        // visibly drains through a window without a redraw every second.
+        state.sandLevel = (state.sandLevel * 40).rounded() / 40
+        state.moundLevel = (state.moundLevel * 40).rounded() / 40
+        if state != lastGlass || lastImage == nil {
+            lastGlass = state
+            let isOpen = summary.openUntil != nil || !summary.allDayNames.isEmpty
+            lastImage = Self.still(state, label: isOpen ? "Furlough, something is open" : "Furlough")
+            // A Mac that will not render the view still gets an hourglass, not a blank item.
+            lastImage = lastImage ?? NSImage(systemSymbolName: "hourglass", accessibilityDescription: "Furlough")
+        }
+        button.image = lastImage
+    }
+
+    /// One frame of the drawing as an image. Not a template image: the sand and the glow carry
+    /// the status, and a template would grey them out.
+    private static func still(_ state: HourglassState, label: String = "Furlough") -> NSImage? {
+        let renderer = ImageRenderer(
+            content: HourglassView(state: state, phase: 0, motion: false)
+                .frame(width: glassSize.width, height: glassSize.height)
         )
+        renderer.scale = NSScreen.main?.backingScaleFactor ?? 2
+        renderer.isOpaque = false
+        let image = renderer.nsImage
+        image?.isTemplate = false
+        image?.accessibilityDescription = label
+        return image
     }
 
     /// Says where macOS actually put the item, because not being able to see it is otherwise
@@ -102,7 +137,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             let status = Policy.status(
                 of: target, config: model.state.config, runtime: model.state.runtime, now: now
             )
-            menu.addItem(disabled("\(target.displayName): \(TimeFormat.status(status))"))
+            let row = disabled("\(target.displayName): \(TimeFormat.status(status))")
+            // The phone's row chip: the same glass in the same status colour beside the name.
+            row.image = Self.still(HourglassState.of(target, status: status, runtime: model.state.runtime, now: now))
+            menu.addItem(row)
         }
         menu.addItem(.separator())
         let open = NSMenuItem(

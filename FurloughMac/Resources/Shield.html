@@ -21,16 +21,27 @@
       radial-gradient(60vw 40vh at 90vw -4vh, rgba(245,158,74,.14), transparent 60%);
   }
   main { position: relative; text-align: center; max-width: 34rem; padding: 2rem; }
-  .glass {
-    width: 64px; height: 84px; margin: 0 auto 2rem;
-    border: 1.5px solid rgba(255,255,255,.35); border-radius: 12px 12px 12px 12px;
-    position: relative; background: rgba(255,255,255,.05);
-    clip-path: polygon(0 0, 100% 0, 60% 50%, 100% 100%, 0 100%, 40% 50%);
-    box-shadow: 0 0 40px rgba(229,86,61,.35);
+  svg.glass { display: block; width: 96px; height: 128px; margin: 0 auto 1.6rem; }
+  /* The glow breathes as it does in the app, and the lone grain of a window minutes away
+     falls, accelerating, once every 3.2 s. Everything else on this page holds still. */
+  /* The breath animates the glass's own glow, inside a wrapper that carries the status's
+     strength: a keyframe's opacity beats a presentation attribute, so the two have to sit on
+     different elements or every status glows alike. */
+  .breathing { animation: breathe 4.2s ease-in-out infinite; transform-origin: 60px 118px; }
+  @keyframes breathe {
+    0%, 100% { opacity: .72; transform: scale(.94); }
+    50%      { opacity: 1;   transform: scale(1.06); }
   }
-  .glass::after {
-    content: ""; position: absolute; left: 10px; right: 10px; bottom: 8px; height: 22px;
-    background: linear-gradient(#F59E4A, #E5563D); border-radius: 50% 50% 4px 4px / 60% 60% 4px 4px;
+  .grain { animation: fall 3.2s cubic-bezier(.45,0,.9,.55) infinite; }
+  @keyframes fall {
+    0%       { transform: translateY(0); opacity: 1; }
+    72%      { transform: translateY(var(--drop)); opacity: 1; }
+    82%      { transform: translateY(calc(var(--drop) - 3px)); opacity: 1; }
+    92%, 100% { transform: translateY(var(--drop)); opacity: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .breathing, .grain { animation: none; }
+    .grain { opacity: 0; }
   }
   .eyebrow { color: #F59E4A; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
   h1 { font-size: 30px; line-height: 1.15; letter-spacing: -.02em; margin: .5rem 0 .6rem; font-weight: 700; }
@@ -41,16 +52,108 @@
 <body>
 <div class="wall"></div>
 <main>
-  <div class="glass"></div>
+  <!-- Furlough's own hourglass, in the mockup's 120 x 160 space: the same body, caps and
+       highlight as Shared/UI/Hourglass.swift, filled with sand polygons that came out of
+       HourglassGeometry itself (scripts/hourglass-svg.swift). A browser cannot call the
+       Swift geometry, so this is the one place the picture is copied rather than drawn;
+       re-run that script if the geometry moves. -->
+  <svg class="glass" viewBox="0 0 120 160" aria-hidden="true">
+    <defs>
+      <linearGradient id="sand" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="160">
+        <stop offset="0" stop-color="#FFD59A"/><stop offset=".55" stop-color="#F59E4A"/><stop offset="1" stop-color="#E5563D"/>
+      </linearGradient>
+      <linearGradient id="emberSand" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="160">
+        <stop offset="0" stop-color="#E5563D"/><stop offset=".5" stop-color="#E5563D"/><stop offset="1" stop-color="#9C3524"/>
+      </linearGradient>
+      <linearGradient id="greySand" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="160">
+        <stop offset="0" stop-color="#8B847A"/><stop offset=".6" stop-color="#6A635B"/><stop offset="1" stop-color="#4E4841"/>
+      </linearGradient>
+      <linearGradient id="edgeCream" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="120" y2="160">
+        <stop offset="0" stop-color="#fff" stop-opacity=".6"/><stop offset=".5" stop-color="#fff" stop-opacity=".14"/><stop offset="1" stop-color="#fff" stop-opacity=".45"/>
+      </linearGradient>
+      <linearGradient id="edgeDim" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="120" y2="160">
+        <stop offset="0" stop-color="#fff" stop-opacity=".38"/><stop offset=".5" stop-color="#fff" stop-opacity=".1"/><stop offset="1" stop-color="#fff" stop-opacity=".3"/>
+      </linearGradient>
+      <linearGradient id="edgeGrey" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="120" y2="160">
+        <stop offset="0" stop-color="#fff" stop-opacity=".3"/><stop offset=".5" stop-color="#fff" stop-opacity=".1"/><stop offset="1" stop-color="#fff" stop-opacity=".24"/>
+      </linearGradient>
+      <linearGradient id="edgePending" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="120" y2="160">
+        <stop offset="0" stop-color="#F2B544" stop-opacity=".95"/><stop offset=".5" stop-color="#F2B544" stop-opacity=".55"/><stop offset="1" stop-color="#F2B544" stop-opacity=".9"/>
+      </linearGradient>
+      <radialGradient id="glowFill">
+        <stop offset="0" stop-color="#F59E4A" stop-opacity=".95"/><stop offset="1" stop-color="#F59E4A" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+    <g id="glowWrap" opacity=".35"><ellipse id="glow" cx="60" cy="118" rx="46" ry="34" fill="url(#glowFill)" opacity=".86"/></g>
+    <path id="bodyFill" fill="rgba(255,255,255,.07)" d="M22,12 L98,12 L98,32 C98,52 80,64 68,76 L68,84 C80,96 98,108 98,128 L98,148 L22,148 L22,128 C22,108 40,96 52,84 L52,76 C40,64 22,52 22,32 Z"/>
+    <polygon id="top"/>
+    <ellipse class="grain" id="grain" cx="60" cy="80" rx="1.6" ry="1.6" fill="#FFD59A" style="--drop: 63.5px" visibility="hidden"/>
+    <polygon id="mound"/>
+    <path id="bodyEdge" fill="none" stroke="url(#edgeCream)" stroke-width="2.5" stroke-linejoin="round"
+          d="M22,12 L98,12 L98,32 C98,52 80,64 68,76 L68,84 C80,96 98,108 98,128 L98,148 L22,148 L22,128 C22,108 40,96 52,84 L52,76 C40,64 22,52 22,32 Z"/>
+    <rect class="cap" x="18" y="8" width="84" height="8" rx="4" fill="#F5EFE6" fill-opacity=".92"/>
+    <rect class="cap" x="18" y="144" width="84" height="8" rx="4" fill="#F5EFE6" fill-opacity=".92"/>
+    <path d="M31,20 C31,34 37,42 45,50" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="2" stroke-linecap="round"/>
+  </svg>
   <div class="eyebrow">Furlough</div>
   <h1 id="t">Blocked by Furlough</h1>
   <p id="s">This site is outside its window.</p>
   <p class="foot">No unblock button. The window opens by itself.</p>
 </main>
 <script>
-  const q = new URLSearchParams(location.search);
-  if (q.get("t")) document.getElementById("t").textContent = q.get("t");
-  if (q.get("s")) document.getElementById("s").textContent = q.get("s");
+(function () {
+    // The sand, straight out of HourglassGeometry: see scripts/hourglass-svg.swift.
+    const SAND = {
+      soon: {
+        top: "58.5,81.0 58.4,80.5 58.1,80.0 57.7,79.5 57.2,79.0 56.7,78.5 56.1,78.0 55.4,77.5 54.7,77.0 53.9,76.5 53.0,76.0 52.5,75.5 52.0,75.0 51.5,74.5 50.9,74.0 50.4,73.5 49.9,73.0 49.4,72.5 48.8,72.0 48.3,71.5 47.7,71.0 47.2,70.5 46.7,70.0 46.1,69.5 45.6,69.0 45.0,68.5 44.5,68.0 43.9,67.5 43.4,67.0 42.8,66.5 42.3,66.0 41.8,65.5 41.2,65.0 40.7,64.5 40.2,64.0 39.7,63.5 39.2,63.0 38.7,62.5 38.2,62.0 37.7,61.5 37.2,61.0 36.7,60.5 36.2,60.0 35.7,59.5 35.3,59.0 34.8,58.5 34.4,58.0 33.9,57.5 33.5,57.0 33.1,56.5 32.7,56.0 32.3,55.5 31.9,55.0 31.5,54.5 31.1,54.0 30.7,53.5 30.3,53.0 30.0,52.5 29.6,52.0 29.3,51.5 29.0,51.0 28.6,50.5 28.3,50.0 28.0,49.5 27.7,49.0 27.5,48.5 27.2,48.0 26.9,47.5 26.7,47.0 26.4,46.5 26.2,46.0 25.9,45.5 25.7,45.0 25.5,44.5 25.3,44.0 25.1,43.5 24.9,43.0 24.8,42.5 24.6,42.0 24.4,41.5 24.3,41.0 24.1,40.5 24.0,40.0 23.9,39.5 23.8,39.0 23.7,38.5 23.6,38.0 23.5,37.5 23.4,37.0 23.3,36.5 23.2,36.0 23.2,35.5 23.1,35.0 23.1,34.5 23.1,34.0 23.0,33.5 23.0,33.0 23.0,32.5 23.0,32.0 23.0,31.5 23.0,31.0 23.0,30.5 23.0,30.0 23.0,29.5 23.0,29.0 23.0,28.5 23.0,28.0 23.0,27.5 23.0,27.0 23.0,26.5 23.0,26.0 23.0,25.5 23.0,25.0 23.0,24.5 23.0,24.0 23.0,23.5 23.0,23.2 25.3,24.6 27.6,25.9 29.9,27.2 32.3,28.4 34.6,29.5 36.9,30.5 39.2,31.5 41.5,32.4 43.8,33.3 46.1,34.0 48.4,34.7 50.8,35.3 53.1,35.8 55.4,36.1 57.7,36.4 60.0,36.5 62.3,36.4 64.6,36.1 66.9,35.8 69.3,35.3 71.6,34.7 73.9,34.0 76.2,33.3 78.5,32.4 80.8,31.5 83.1,30.5 85.4,29.5 87.8,28.4 90.1,27.2 92.4,25.9 94.7,24.6 97.0,23.2 97.0,23.7 97.0,24.2 97.0,24.7 97.0,25.2 97.0,25.7 97.0,26.2 97.0,26.7 97.0,27.2 97.0,27.7 97.0,28.2 97.0,28.7 97.0,29.2 97.0,29.7 97.0,30.2 97.0,30.7 97.0,31.2 97.0,31.7 97.0,32.2 97.0,32.7 97.0,33.2 97.0,33.7 96.9,34.2 96.9,34.7 96.8,35.2 96.8,35.7 96.7,36.2 96.7,36.7 96.6,37.2 96.5,37.7 96.4,38.2 96.3,38.7 96.2,39.2 96.1,39.7 95.9,40.2 95.8,40.7 95.7,41.2 95.5,41.7 95.3,42.2 95.2,42.7 95.0,43.2 94.8,43.7 94.6,44.2 94.4,44.7 94.2,45.2 94.0,45.7 93.7,46.2 93.5,46.7 93.2,47.2 93.0,47.7 92.7,48.2 92.4,48.7 92.1,49.2 91.8,49.7 91.5,50.2 91.2,50.7 90.9,51.2 90.6,51.7 90.2,52.2 89.9,52.7 89.5,53.2 89.1,53.7 88.8,54.2 88.4,54.7 88.0,55.2 87.6,55.7 87.2,56.2 86.7,56.7 86.3,57.2 85.9,57.7 85.4,58.2 85.0,58.7 84.5,59.2 84.1,59.7 83.6,60.2 83.1,60.7 82.6,61.2 82.1,61.7 81.6,62.2 81.1,62.7 80.6,63.2 80.1,63.7 79.6,64.2 79.1,64.7 78.5,65.2 78.0,65.7 77.5,66.2 76.9,66.7 76.4,67.2 75.8,67.7 75.3,68.2 74.7,68.7 74.2,69.2 73.7,69.7 73.1,70.2 72.6,70.7 72.0,71.2 71.5,71.7 70.9,72.2 70.4,72.7 69.9,73.2 69.3,73.7 68.8,74.2 68.3,74.7 67.8,75.2 67.3,75.7 66.6,76.2 65.8,76.7 65.0,77.2 64.3,77.7 63.7,78.2 63.1,78.7 62.6,79.2 62.1,79.7 61.8,80.2 61.6,80.7 61.5,81.0",
+        mound: "",
+      },
+      done: {
+        top: "",
+        mound: "23.0,144.0 23.0,143.9 23.0,142.9 23.0,141.9 23.0,140.9 23.0,139.9 23.0,138.9 23.0,137.9 23.0,136.9 23.0,135.9 23.0,134.9 23.0,133.9 23.0,132.9 23.0,131.9 23.0,130.9 23.0,129.9 23.0,128.9 23.0,127.9 23.0,126.9 23.1,125.9 23.1,124.9 23.3,123.9 23.4,122.9 24.3,122.1 25.6,121.2 27.0,120.4 28.3,119.6 29.6,118.8 30.9,118.0 32.3,117.2 33.6,116.4 34.9,115.5 36.2,114.7 37.5,113.9 38.9,113.1 40.2,112.3 41.5,111.5 42.8,110.7 44.1,109.9 45.5,109.1 46.8,108.3 48.1,107.5 49.4,106.7 50.8,106.0 52.1,105.2 53.4,104.5 54.7,103.8 56.0,103.1 57.4,102.5 58.7,102.1 60.0,102.0 61.3,102.1 62.6,102.5 64.0,103.1 65.3,103.8 66.6,104.5 67.9,105.2 69.3,106.0 70.6,106.7 71.9,107.5 73.2,108.3 74.5,109.1 75.9,109.9 77.2,110.7 78.5,111.5 79.8,112.3 81.1,113.1 82.5,113.9 83.8,114.7 85.1,115.5 86.4,116.4 87.8,117.2 89.1,118.0 90.4,118.8 91.7,119.6 93.0,120.4 94.4,121.2 95.7,122.1 96.6,122.9 96.7,123.9 96.9,124.9 96.9,125.9 97.0,126.9 97.0,127.9 97.0,128.9 97.0,129.9 97.0,130.9 97.0,131.9 97.0,132.9 97.0,133.9 97.0,134.9 97.0,135.9 97.0,136.9 97.0,137.9 97.0,138.9 97.0,139.9 97.0,140.9 97.0,141.9 97.0,142.9 97.0,143.9 97.0,144.0",
+      },
+      blocked: {
+        top: "",
+        mound: "23.0,144.0 23.0,143.4 23.0,142.4 23.0,141.4 23.0,140.4 23.0,139.4 23.0,138.4 23.0,137.4 24.3,136.6 25.6,135.8 27.0,135.0 28.3,134.2 29.6,133.4 30.9,132.5 32.3,131.7 33.6,130.9 34.9,130.1 36.2,129.3 37.5,128.5 38.9,127.7 40.2,126.9 41.5,126.1 42.8,125.3 44.1,124.5 45.5,123.7 46.8,122.9 48.1,122.1 49.4,121.3 50.8,120.5 52.1,119.8 53.4,119.0 54.7,118.3 56.0,117.7 57.4,117.1 58.7,116.7 60.0,116.6 61.3,116.7 62.6,117.1 64.0,117.7 65.3,118.3 66.6,119.0 67.9,119.8 69.3,120.5 70.6,121.3 71.9,122.1 73.2,122.9 74.5,123.7 75.9,124.5 77.2,125.3 78.5,126.1 79.8,126.9 81.1,127.7 82.5,128.5 83.8,129.3 85.1,130.1 86.4,130.9 87.8,131.7 89.1,132.5 90.4,133.4 91.7,134.2 93.0,135.0 94.4,135.8 95.7,136.6 97.0,137.4 97.0,138.4 97.0,139.4 97.0,140.4 97.0,141.4 97.0,142.4 97.0,143.4 97.0,144.0",
+      },
+    };
+
+    // One row per status the shield can show, matching HourglassState in Shared/UI/Hourglass.swift.
+    const STATES = {
+      soon:    { sand: "soon",    fill: "url(#sand)",      glass: "rgba(255,255,255,.07)",  edge: "edgeCream",   cap: .92, glow: "#F59E4A", strength: .55, pulse: true },
+      done:    { sand: "done",    fill: "url(#sand)",      glass: "rgba(255,255,255,.07)",  edge: "edgeCream",   cap: .92, glow: "#F59E4A", strength: .35 },
+      spent:   { sand: "done",    fill: "url(#emberSand)", glass: "rgba(255,255,255,.045)", edge: "edgeDim",     cap: .55, glow: "#E5563D", strength: .45 },
+      blocked: { sand: "blocked", fill: "url(#greySand)",  glass: "rgba(255,255,255,.035)", edge: "edgeGrey",    cap: .55, glow: null,      strength: 0 },
+      unset:   { sand: null,      fill: "url(#sand)",      glass: "rgba(242,181,68,.03)",   edge: "edgePending", cap: .35, glow: null,      strength: 0 },
+    };
+
+    const q = new URLSearchParams(location.search);
+    if (q.get("t")) document.getElementById("t").textContent = q.get("t");
+    if (q.get("s")) document.getElementById("s").textContent = q.get("s");
+
+    const state = STATES[q.get("k")] || STATES.done;
+    const sand = state.sand ? SAND[state.sand] : null;
+    const topSand = document.getElementById("top");
+    const mound = document.getElementById("mound");
+    // The top bulb holds the whole charge before a window, and the pile holds it after.
+    topSand.setAttribute("points", sand && state.sand === "soon" ? sand.top : "");
+    topSand.setAttribute("fill", state.fill);
+    mound.setAttribute("points", sand && state.sand !== "soon" ? sand.mound : "");
+    mound.setAttribute("fill", state.fill);
+    document.getElementById("bodyFill").setAttribute("fill", state.glass);
+    document.getElementById("bodyEdge").setAttribute("stroke", "url(#" + state.edge + ")");
+    for (const cap of document.querySelectorAll(".cap")) cap.setAttribute("fill-opacity", state.cap);
+    document.getElementById("glowWrap").setAttribute("opacity", state.glow ? state.strength : 0);
+    if (state.glow) {
+      for (const stop of document.querySelectorAll("#glowFill stop")) stop.setAttribute("stop-color", state.glow);
+      if (state.pulse) document.getElementById("glow").classList.add("breathing");
+    }
+    // A window minutes away lets a grain through now and then, as the app's glass does.
+    if (q.get("d") === "1" && state.sand === "soon") {
+      const grain = document.getElementById("grain");
+      grain.setAttribute("visibility", "visible");
+    }
+})();
 </script>
 </body>
 </html>

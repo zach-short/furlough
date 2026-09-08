@@ -181,6 +181,9 @@ struct HomeGroups {
         laterThisWeek.sort { $0.at < $1.at }
     }
 
+    /// Every target in the list's order: one hero page each, as on the phone.
+    var ordered: [Target] { sections.flatMap(\.targets) }
+
     var sections: [Section] {
         [
             Section(title: "Open now", targets: open.map(\.target)),
@@ -190,5 +193,95 @@ struct HomeGroups {
             Section(title: "Always blocked", targets: alwaysBlocked),
             Section(title: "Needs a schedule", targets: unconfigured),
         ].filter { !$0.targets.isEmpty }
+    }
+}
+
+
+/// The phone's hero header (H1 in design/HOURGLASS.md) as the Mac's front page: one page per
+/// managed app in the list's order, with a strip of tiny status hourglasses under it that is a
+/// status summary in itself. The Mac has no swipe, so the strip and a pair of chevrons turn the
+/// pages; clicking the page opens that app's rule, which is what tapping it does on the phone.
+/// It fills the detail pane while nothing is selected, so the living hourglass is the first
+/// thing the window shows rather than something you have to click to find.
+struct MacHeroPager: View {
+    let targets: [Target]
+    let statuses: [UUID: TargetStatus]
+    let runtime: RuntimeState
+    let now: Date
+    /// Seconds counted against the budget today, per target.
+    let usedSeconds: (UUID) -> Int
+    let onOpen: (UUID) -> Void
+    /// The page being shown; the second ticks rebuild this view, so it is state.
+    @State private var featured: UUID?
+
+    private var landing: UUID? {
+        targets.first { if case .open = statuses[$0.id] { return true }; return false }?.id ?? targets.first?.id
+    }
+
+    private var current: Target? {
+        targets.first { $0.id == featured } ?? targets.first
+    }
+
+    private var glasses: [UUID: HourglassState] {
+        Dictionary(uniqueKeysWithValues: targets.map { target in
+            (target.id, HourglassState.of(target, status: statuses[target.id] ?? .unconfigured, runtime: runtime, now: now))
+        })
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if let target = current {
+                HStack(spacing: 10) {
+                    turner(symbol: "chevron.left", by: -1)
+                    Button { onOpen(target.id) } label: {
+                        TargetHero(
+                            target: target,
+                            status: statuses[target.id] ?? .unconfigured,
+                            runtime: runtime,
+                            usedSeconds: usedSeconds(target.id),
+                            now: now
+                        )
+                        .frame(width: 420, alignment: .leading)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Open \(target.displayName)'s rule")
+                    turner(symbol: "chevron.right", by: 1)
+                }
+                if targets.count > 1 {
+                    HeroIndicator(pages: targets, glasses: glasses, featured: $featured)
+                        .frame(maxWidth: 420)
+                }
+                Text(targets.count > 1 ? "Click a glass to page through, or the page to set its windows." : "Click it to set its windows and budget.")
+                    .emberBody(11.5)
+                    .foregroundStyle(Ember.faint)
+                    .padding(.top, 6)
+            }
+        }
+        .animation(.snappy, value: featured)
+        .onAppear { if !targets.contains(where: { $0.id == featured }) { featured = landing } }
+        .onChange(of: targets.map(\.id)) { _, ids in
+            if let featured, !ids.contains(featured) { self.featured = landing }
+        }
+    }
+
+    /// One page forward or back, wrapping, for the mouse and for ⌘← / ⌘→.
+    @ViewBuilder
+    private func turner(symbol: String, by step: Int) -> some View {
+        Button {
+            guard let featured, let index = targets.firstIndex(where: { $0.id == featured }), targets.count > 1 else { return }
+            let next = (index + step + targets.count) % targets.count
+            self.featured = targets[next].id
+        } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(Ember.faint)
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .opacity(targets.count > 1 ? 1 : 0)
+        .disabled(targets.count < 2)
+        .keyboardShortcut(step < 0 ? .leftArrow : .rightArrow, modifiers: .command)
     }
 }

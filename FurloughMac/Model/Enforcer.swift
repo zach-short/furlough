@@ -186,13 +186,13 @@ final class Enforcer {
             )
         }
 
-        enforceApps(decision: decision, config: state.config, now: now)
-        enforceBrowser(decision: decision, config: state.config)
+        enforceApps(decision: decision, config: state.config, runtime: state.runtime, now: now)
+        enforceBrowser(decision: decision, config: state.config, runtime: state.runtime, now: now)
         lastDecision = decision
         return decision
     }
 
-    private func enforceApps(decision: Decision, config: Config, now: Date) {
+    private func enforceApps(decision: Decision, config: Config, runtime: RuntimeState, now: Date) {
         let running = NSWorkspace.shared.runningApplications
         grace.forget(except: Set(running.map(\.processIdentifier)))
         for app in running {
@@ -211,7 +211,9 @@ final class Enforcer {
                     let text = ShieldText.text(name: name, status: status, rule: target.rule)
                     shield.show(
                         name: name, title: text.title, subtitle: text.subtitle,
-                        icon: AppInfo.icon(for: bundleID), grace: deadline.timeIntervalSince(now)
+                        icon: AppInfo.icon(for: bundleID),
+                        glass: HourglassState.of(target, status: status ?? .blockedAllDay, runtime: runtime, now: now),
+                        grace: deadline.timeIntervalSince(now)
                     )
                 }
             case .wait:
@@ -227,7 +229,7 @@ final class Enforcer {
     /// Sends every window showing a blocked site to the shield page, in every running browser —
     /// not only the browser in front, and not only its front window. A blocked site left playing
     /// behind the window you are looking at is still a blocked site.
-    private func enforceBrowser(decision: Decision, config: Config) {
+    private func enforceBrowser(decision: Decision, config: Config, runtime: RuntimeState, now: Date) {
         guard config.targets.contains(where: { $0.kind.isHost }) else { return }
         for browser in browsers.snapshots() {
             for tab in browser.tabs {
@@ -236,9 +238,10 @@ final class Enforcer {
                 let blocked = status.map { !$0.isAllowed } ?? decision.blockedHosts.contains(target.host)
                 guard blocked else { continue }
                 let text = ShieldText.text(name: target.displayName, status: status, rule: target.rule)
+                let glass = HourglassState.of(target, status: status ?? .blockedAllDay, runtime: runtime, now: now)
                 browsers.redirect(
                     browser.bundleID, kind: browser.kind, window: tab.window,
-                    to: ShieldPage.url(title: text.title, subtitle: text.subtitle)
+                    to: ShieldPage.url(title: text.title, subtitle: text.subtitle, glass: glass)
                 )
                 SharedStore.log("blocked \(host) in \(AppInfo.name(for: browser.bundleID) ?? browser.bundleID)")
             }
@@ -329,14 +332,31 @@ enum AppInfo {
     }
 }
 
-/// The page a blocked tab is sent to, bundled with the app.
+/// The page a blocked tab is sent to, bundled with the app. It draws Furlough's own hourglass
+/// in the status the site is in, as the phone's shield does since it started rendering the real
+/// drawing into its icon slot; `k` names the status and `d` asks for the lone grain.
 enum ShieldPage {
-    static func url(title: String, subtitle: String) -> URL {
+    static func url(title: String, subtitle: String, glass: HourglassState = .doneForToday) -> URL {
         guard let file = Bundle.main.url(forResource: "Shield", withExtension: "html"),
               var components = URLComponents(url: file, resolvingAgainstBaseURL: false) else {
             return URL(string: "about:blank")!
         }
-        components.queryItems = [URLQueryItem(name: "t", value: title), URLQueryItem(name: "s", value: subtitle)]
+        components.queryItems = [
+            URLQueryItem(name: "t", value: title),
+            URLQueryItem(name: "s", value: subtitle),
+            URLQueryItem(name: "k", value: key(for: glass)),
+        ]
+        if glass.dropsGrain { components.queryItems?.append(URLQueryItem(name: "d", value: "1")) }
         return components.url ?? file
+    }
+
+    /// Which of the page's five glasses to draw. A blocked site is never inside its window, so
+    /// there is no draining state here; anything unrecognised falls back to a settled glass.
+    static func key(for glass: HourglassState) -> String {
+        if glass == .usedUp { return "spent" }
+        if glass == .alwaysBlocked { return "blocked" }
+        if glass == .unconfigured { return "unset" }
+        if glass == .doneForToday { return "done" }
+        return glass.sandLevel > 0.5 ? "soon" : "done"
     }
 }

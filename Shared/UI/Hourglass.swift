@@ -153,6 +153,36 @@ extension HourglassState.Tone {
     }
 }
 
+extension HourglassState {
+    /// The widget's glass: the open target closing soonest, else whatever opens next, else an
+    /// all-day app draining towards midnight.
+    static func of(_ summary: Policy.Summary, now: Date) -> HourglassState {
+        if let until = summary.openUntil, until > now, !summary.openNames.isEmpty {
+            let start = summary.openStart ?? now
+            let total = until.timeIntervalSince(start)
+            let level = total > 0 ? min(1, max(0, until.timeIntervalSince(now) / total)) : 0
+            return .open(level: level, warned: summary.openWarned)
+        }
+        if let next = summary.nextOpenAt {
+            if summary.nextOpenIsExhausted { return .usedUp }
+            if Calendar.current.isDate(next, inSameDayAs: now) {
+                return .comingSoon(inMinutes: next.timeIntervalSince(now) / 60)
+            }
+            return .doneForToday
+        }
+        if !summary.allDayNames.isEmpty {
+            let calendar = Calendar.current
+            let start = calendar.startOfDay(for: now)
+            let end = calendar.date(byAdding: .day, value: 1, to: start) ?? now
+            let total = end.timeIntervalSince(start)
+            let level = total > 0 ? min(1, max(0, end.timeIntervalSince(now) / total)) : 0
+            return .open(level: level, warned: summary.allDayWarned)
+        }
+        if summary.isEmpty { return .unconfigured }
+        return summary.isAnchored ? .anchored : .alwaysBlocked
+    }
+}
+
 /// The glass hourglass from the mockups, drawn as vectors in a 120 × 160 space and coloured
 /// by `state`. `phase` is a running clock in seconds that moves the stream, the glow pulse and
 /// the falling grain; hold it constant for a still picture (widgets, the Live Activity), which

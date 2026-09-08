@@ -183,11 +183,18 @@ struct MacHomeView: View {
                         .emberDisplaySmall(13.5)
                         .foregroundStyle(Ember.cream)
                         .lineLimit(1)
-                    Text(pending.map { "Change pending · \($0.effectiveAt.formatted(date: .abbreviated, time: .shortened))" }
-                         ?? RowCopy.detail(target: target, status: status, now: now))
+                    // The rule line stays, as on the phone: a change waiting says so on a line
+                    // of its own rather than hiding the rule being enforced until then.
+                    Text(RowCopy.detail(target: target, status: status, now: now))
                         .emberBody(11)
-                        .foregroundStyle(pending == nil ? Ember.muted : Ember.pending)
+                        .foregroundStyle(Ember.muted)
                         .lineLimit(1)
+                    if let pending {
+                        Text(RowCopy.pendingLine(pending))
+                            .emberBody(10.5, .semibold)
+                            .foregroundStyle(Ember.pending)
+                            .lineLimit(1)
+                    }
                 }
                 Spacer(minLength: 6)
                 StatusChip(status: status, glass: .of(target, status: status, runtime: model.state.runtime, now: now), allDay: target.rule?.isAllDay ?? false)
@@ -198,6 +205,27 @@ struct MacHomeView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    /// Nothing selected, but something is managed: the phone's hero, paging through every app
+    /// with the living hourglass, so the window opens on the sand rather than on an invitation.
+    private var hero: some View {
+        let state = model.state
+        let config = Policy.effectiveConfig(state, now: now)
+        let statuses = Dictionary(uniqueKeysWithValues: config.targets.map { target in
+            (target.id, Policy.status(of: target, config: config, runtime: state.runtime, now: now))
+        })
+        let groups = HomeGroups(targets: config.targets, statuses: statuses, now: now)
+        return MacHeroPager(
+            targets: groups.ordered,
+            statuses: statuses,
+            runtime: state.runtime,
+            now: now,
+            usedSeconds: { model.enforcer.usedSeconds(for: $0) },
+            onOpen: { selection = $0 }
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(40)
     }
 
     private func headline(_ summary: Policy.Summary) -> String {
@@ -235,6 +263,8 @@ struct MacHomeView: View {
         if let selection, model.state.config.target(id: selection) != nil {
             MacRuleEditor(targetID: selection)
                 .id(selection)
+        } else if !model.state.config.targets.isEmpty {
+            hero
         } else {
             VStack(spacing: 14) {
                 LivingHourglass(state: .open(level: 0.62, warned: false))

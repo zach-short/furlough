@@ -219,6 +219,10 @@ enum RowCopy {
         let today = rule.windows(on: Policy.weekday(now)).map { TimeFormat.window($0) }
         return today.isEmpty ? "Not today · \(budget)" : "Today \(today.joined(separator: ", ")) · \(budget)"
     }
+
+    static func pendingLine(_ change: PendingChange) -> String {
+        "Change pending · \(change.effectiveAt.formatted(date: .abbreviated, time: .shortened))"
+    }
 }
 
 /// A sheet chrome: title, Done, dark ground.

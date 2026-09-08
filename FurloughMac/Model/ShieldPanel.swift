@@ -11,8 +11,11 @@ final class ShieldPanel {
     /// `grace` is the seconds left before the app is force-quit, when there are enough of them
     /// to be worth showing. It is a duration rather than a date because the card is drawn by
     /// the system against the device's clock, while Furlough runs on its own.
-    func show(name: String, title: String, subtitle: String, icon: NSImage?, grace: TimeInterval? = nil) {
-        let card = ShieldCard(name: name, title: title, subtitle: subtitle, icon: icon, grace: grace) { [weak self] in self?.hide() }
+    func show(
+        name: String, title: String, subtitle: String, icon: NSImage?,
+        glass: HourglassState = .doneForToday, grace: TimeInterval? = nil
+    ) {
+        let card = ShieldCard(name: name, title: title, subtitle: subtitle, icon: icon, glass: glass, grace: grace) { [weak self] in self?.hide() }
         let hosting = NSHostingView(rootView: card)
         let size = hosting.fittingSize
         hosting.frame = NSRect(origin: .zero, size: size)
@@ -77,6 +80,9 @@ struct ShieldCard: View {
     let title: String
     let subtitle: String
     let icon: NSImage?
+    /// The app's own hourglass in this target's status, as the phone's shield now draws in its
+    /// icon slot. Here it can be the living one: the card is a view, not a still handed to iOS.
+    var glass: HourglassState = .doneForToday
     /// Seconds of grace left before the app is force-quit, when it is worth counting down.
     var grace: TimeInterval?
     let onDismiss: () -> Void
@@ -87,16 +93,21 @@ struct ShieldCard: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
-            Group {
-                if let icon {
-                    Image(nsImage: icon).resizable().interpolation(.high)
-                } else {
-                    Image(systemName: "hourglass")
-                        .font(.system(size: 26, weight: .medium))
-                        .foregroundStyle(Ember.amber)
+            LivingHourglass(state: glass)
+                .frame(width: 40, height: 53)
+                .compositingGroup()
+                .shadow(color: (glass.glow ?? .clear).opacity(0.4), radius: 12)
+                // The app's icon, small, at the foot of the glass: the card arrives over
+                // whatever you were doing, so it still has to say which app went.
+                .overlay(alignment: .bottomTrailing) {
+                    if let icon {
+                        Image(nsImage: icon)
+                            .resizable()
+                            .interpolation(.high)
+                            .frame(width: 18, height: 18)
+                            .offset(x: 6, y: 2)
+                    }
                 }
-            }
-            .frame(width: 44, height: 44)
             VStack(alignment: .leading, spacing: 4) {
                 Eyebrow(text: "Furlough", color: Ember.amber)
                 Text(title)
