@@ -71,7 +71,7 @@ Apple's Screen Time API does not exist on the Mac: FamilyControls, ManagedSettin
 | The home-screen widget | A desktop widget with the same card: **Edit Widgets** on the desktop or in Notification Center, then add Furlough |
 | The Live Activity and Dynamic Island | A menu bar item with the countdown. ActivityKit does not exist on the Mac |
 | The Anchor | Nothing: a Mac has no NFC reader |
-| Escape: Settings > Screen Time > turn Furlough off | Escape: Force Quit. Quit is refused while anything is blocked; logging out and shutting down are always allowed. Force Quit lifts every block at once, but a launchd agent reopens Furlough within a minute, so it does not buy the rest of the day. Furlough opens at login |
+| Escape: Settings > Screen Time > turn Furlough off | Escape: Force Quit. Quit is refused while anything is blocked; logging out and shutting down are always allowed. Force Quit lifts every block at once, but a launchd agent reopens Furlough about ten seconds later, so it buys nothing worth having. Furlough opens at login |
 
 Windows per weekday, budgets, the pending list and the loosening delay are the same code as the phone, and so are **Visualize windows**, **Use windows from another app** and **Apply these windows to other apps**. The selected app's page opens with the phone's hero: the living hourglass, the countdown, and how much of today's budget is used, which the Mac knows because it counts the minutes itself. The sidebar groups apps the way the phone's home screen does. Rules are per device; nothing syncs.
 

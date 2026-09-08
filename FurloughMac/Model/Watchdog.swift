@@ -4,8 +4,8 @@ import ServiceManagement
 /// A launchd agent that opens Furlough again when it is not running.
 ///
 /// Force Quit stays the documented escape on the Mac, and it still works: quitting Furlough
-/// that way lifts every block at once. What it no longer does is buy the rest of the day —
-/// within a minute the agent opens Furlough again and the rules come back. That is the same
+/// that way lifts every block at once. What it no longer does is buy anything worth having —
+/// within ten seconds the agent opens Furlough again and the rules come back. That is the same
 /// bargain as the phone, where turning Screen Time access off works and is meant to be a
 /// deliberate act rather than a shortcut.
 ///
@@ -26,7 +26,7 @@ enum Watchdog {
     /// job at registration and does not re-read it when the app is replaced, so an agent
     /// registered by an older build would keep running the old command — here, one with no
     /// `--background`, which would put the window back on every watchdog reopen.
-    private static let plistVersion = 2
+    private static let plistVersion = 3
     private static let versionKey = "furlough.watchdog.plistVersion"
 
     /// Bundled at `Contents/Library/LaunchAgents/` by the copy-files phase in `project.yml`.
@@ -45,7 +45,7 @@ enum Watchdog {
             if on {
                 guard status != .enabled else { return true }
                 try service.register()
-                SharedStore.log("watchdog on: Furlough reopens within a minute of being quit")
+                SharedStore.log("watchdog on: Furlough reopens within seconds of being quit")
             } else {
                 guard status == .enabled else { return true }
                 try service.unregister()

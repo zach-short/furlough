@@ -21,8 +21,11 @@
 	</array>
 	<key>RunAtLoad</key>
 	<true/>
+	<!-- Ten seconds, Zach's call 2026-09-08: Force Quit stays the escape and still lifts every
+	     block, but it buys seconds rather than a minute. launchd will not run a job more often
+	     than every ten seconds, so this is the floor. -->
 	<key>StartInterval</key>
-	<integer>60</integer>
+	<integer>10</integer>
 	<key>ProcessType</key>
 	<string>Background</string>
 </dict>

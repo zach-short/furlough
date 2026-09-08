@@ -335,7 +335,8 @@ Done:
 - **The Mac reading only the front tab of the front window** — step 7. Every window of every
   running browser is read and redirected now.
 - **The Mac having no watchdog** — step 7. Zach said yes on 2026-09-08: `SMAppService.agent`,
-  `open -g -b` once a minute. Force Quit still lifts every block; it just stops buying the
+  `open -g -b` every ten seconds (60 until Zach shortened it, 2026-09-08). Force Quit still
+  lifts every block; it just stops buying the
   rest of the day.
 
 Open, and where each one lives:
@@ -535,6 +536,17 @@ The plan for this stretch. Tick each phase off here as it lands.
    second `open` gives `onscreen=true`.
    **Not yet verified by a person**: that closing the window drops the Dock icon and leaves
    Furlough enforcing. The code says so; nobody has clicked the red button.
+   **The watchdog reopens in ten seconds, not sixty** (Zach's call 2026-09-08, after asking
+   whether Furlough could work the way Rectangle does). Ten is launchd's floor for
+   `StartInterval`. Measured on the machine: killed at 16:07:46, back seven seconds later.
+   Force Quit is still the documented escape and still lifts every block the moment it lands —
+   it just buys seconds now. README says so.
+   Worth recording for the next time this comes up, since Zach asked it directly: Furlough
+   already *is* the Rectangle shape, and more. `/Applications/Rectangle.app` on this Mac is
+   `LSUIElement = true` with **no `Contents/Library/LaunchAgents` at all** — only a
+   `LoginItems/RectangleLauncher.app` to start it. So nothing runs on Rectangle's behalf, and
+   force-quitting it stops window snapping until it is launched again. Furlough is the one that
+   comes back by itself.
    **Still owed**: README's Mac table still says the Live Activity's counterpart is "a menu bar
    item with the countdown", and now also needs to say Furlough lives in the menu bar with no
    Dock icon. True of the code, false of this Mac, so it needs a sentence either way — left
@@ -763,7 +775,9 @@ name `Furlough`, macOS 26, non-sandboxed, hardened runtime with the
   login: `Watchdog` registers `SMAppService.agent` from
   `Contents/Library/LaunchAgents/com.zachshort.furlough.mac.watchdog.plist` (copied in by a
   copy-files phase in `project.yml`), which runs `open -g -b com.zachshort.furlough.mac` every
-  60 seconds. `open` hands off to a running copy instead of starting a second one, which is
+  10 seconds — 60 until 2026-09-08, when Zach asked for it shortened; ten is launchd's floor
+  for `StartInterval`. Bump `Watchdog.plistVersion` on any change here or the agent keeps the
+  old job. `open` hands off to a running copy instead of starting a second one, which is
   what a plain `KeepAlive` agent could not do — launchd and a user launch would race and leave
   two enforcers ticking against one store — and `-g` keeps the reopen out of the user's face.
   It is registered at `finishOnboarding` and again at every `start()` when onboarded, and
