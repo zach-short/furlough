@@ -1,21 +1,20 @@
+import FamilyControls
 import SwiftUI
 
-/// One slot of the ranking, in a frame the app fixed: the row for that position, or, in the
-/// first empty slot, a line saying the list ended. Every text is allowed its lines and the
+/// One slot of the ranking, in a frame the app fixed: the whole card for that position, or, in
+/// the first empty slot, a line saying the list ended. Every text is allowed its lines and the
 /// whole thing sits at the top, so nothing is squeezed to fit or centred out of view.
 struct RankView: View {
     let slot: RankSlot
 
     var body: some View {
         Group {
-            if let item = slot.item {
-                RecommendationRow(item: item)
-                    .padding(14)
-                    .reportCard()
+            if let item = slot.item, let entry = slot.entry {
+                UsageReportCard(item: item, entry: entry, days: slot.days)
             } else if slot.position == slot.count + 1 {
                 Text(slot.count == 0
                     ? "Nothing on this phone passes \(Int(UsageAnalysis.minimumDailyMinutes)) minutes a day in the last \(slot.days) days."
-                    : "Nothing else passes \(Int(UsageAnalysis.minimumDailyMinutes)) minutes a day.")
+                    : "That is everything over \(Int(UsageAnalysis.minimumDailyMinutes)) minutes a day.")
                     .emberBody(12)
                     .foregroundStyle(Ember.faint)
                     .padding(.horizontal, 4)
@@ -25,94 +24,30 @@ struct RankView: View {
     }
 }
 
-/// One line of advice: the name, the daily average, where it piles up, and the rule. Sized
-/// for the app's fixed slot: two lines for where, three for the rule.
-struct RecommendationRow: View {
+/// One app or site, answering the three questions in order: what it is and how much of the day
+/// it takes, where that time falls, and what Furlough would do about it. The same card the app
+/// draws for itself where iOS lets it read the numbers; here Screen Time draws it, and the
+/// person carries the rule into the editor by hand, because nothing leaves this sandbox.
+struct UsageReportCard: View {
     let item: Recommendation
+    let entry: UsageEntry
+    let days: Int
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(item.name)
-                    .emberDisplaySmall(17)
-                    .foregroundStyle(Ember.cream)
-                    .lineLimit(1)
-                Spacer(minLength: 12)
-                Text("\(TimeFormat.budget(Int(item.averageDailyMinutes.rounded())))/day")
-                    .emberNumerals(13)
-                    .lineLimit(1)
-            }
-            Text(Self.whereItGoes(item))
-                .emberBody(13)
-                .foregroundStyle(Ember.muted)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 8) {
-                    Eyebrow(text: "Suggested", color: Ember.amber)
-                    if item.lateNightShare >= 0.5 {
-                        Eyebrow(text: "Mostly late at night", color: Ember.ember)
-                    }
-                }
-                Text(TimeFormat.rule(item.rule))
+        VStack(alignment: .leading, spacing: 13) {
+            header
+            VStack(alignment: .leading, spacing: 8) {
+                UsageHours(histogram: entry.histogram, item: item)
+                Text(item.whereLine())
                     .emberBody(13)
-                    .foregroundStyle(Ember.cream)
-                    .lineLimit(3)
+                    .foregroundStyle(Ember.muted)
+                    .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
             }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    /// "Mostly 10:00 PM–1:00 AM weekdays; 2:00 PM–3:00 PM weekends, 14 pickups a day."
-    static func whereItGoes(_ item: Recommendation) -> String {
-        let pickups = "\(Int(item.pickupsPerDay.rounded())) pickups a day"
-        guard !item.peaks.isEmpty else { return "Spread across the day, \(pickups)." }
-        let piles = item.peaks
-            .map { "\(TimeFormat.window($0.window)) \(TimeFormat.days($0.days).lowercased())" }
-            .joined(separator: "; ")
-        return "Mostly \(piles), \(pickups)."
-    }
-}
-
-/// One thing's average day, hour by hour, with the hours a rule would close lit in ember.
-struct FocusView: View {
-    let summary: UsageSummary
-
-    private var entry: UsageEntry? {
-        summary.entries.max { $0.histogram.totalMinutes < $1.histogram.totalMinutes }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if let entry {
-                let advice = UsageAnalysis.recommendation(key: entry.key, name: entry.name, histogram: entry.histogram)
-                let closed = Set(advice?.peaks.flatMap { UsageAnalysis.hours(of: $0.window) } ?? [])
-                HStack(alignment: .firstTextBaseline) {
-                    Text("\(TimeFormat.budget(Int(entry.histogram.averageDailyMinutes.rounded()))) a day")
-                        .emberNumerals(13)
-                    Spacer()
-                    Eyebrow(text: "\(Int(entry.histogram.pickupsPerDay.rounded())) pickups · \(summary.totalDays) days")
-                }
-                HourBars(hourly: entry.histogram.hourlyAverage(on: .all), closed: closed)
-                if let advice {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Eyebrow(text: "Suggested", color: Ember.amber)
-                        Text(TimeFormat.rule(advice.rule))
-                            .emberBody(12)
-                            .foregroundStyle(Ember.cream)
-                            .lineLimit(2)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                } else {
-                    Text("Under \(Int(UsageAnalysis.minimumDailyMinutes)) minutes a day. Nothing to cut.")
-                        .emberBody(12)
-                        .foregroundStyle(Ember.muted)
-                }
-            } else {
-                Text("No use in this stretch.")
-                    .emberBody(12)
-                    .foregroundStyle(Ember.muted)
+            Rectangle().fill(Ember.cardBorder).frame(height: 1)
+            VStack(alignment: .leading, spacing: 9) {
+                Eyebrow(text: "What Furlough would do", color: Ember.amber)
+                RuleDrawing(item: item)
             }
         }
         .padding(14)
@@ -120,33 +55,82 @@ struct FocusView: View {
         .reportCard()
         .frame(maxHeight: .infinity, alignment: .top)
     }
+
+    private var header: some View {
+        HStack(spacing: 11) {
+            ReportTile(entry: entry)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.name)
+                    .emberDisplaySmall(17)
+                    .foregroundStyle(Ember.cream)
+                    .lineLimit(1)
+                Text(subtitle)
+                    .emberBody(11)
+                    .foregroundStyle(Ember.faint)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(TimeFormat.budget(Int(item.averageDailyMinutes.rounded())))
+                    .emberNumerals(15)
+                Text("a day")
+                    .emberBody(11)
+                    .foregroundStyle(Ember.faint)
+            }
+            .lineLimit(1)
+            .fixedSize()
+        }
+    }
+
+    /// Pickups only when there are enough of them to say something.
+    private var subtitle: String {
+        let pickups = Int(item.pickupsPerDay.rounded())
+        guard pickups >= 1 else { return "Last \(days) days" }
+        return "\(pickups) pickups a day · last \(days) days"
+    }
 }
 
-/// Twenty-four bars, tallest to the busiest hour; the closed ones in ember.
-struct HourBars: View {
-    let hourly: [Double]
-    let closed: Set<Int>
+/// The real icon, when Screen Time handed a token over with the numbers. Apple's `Label(token)`
+/// is always 32 pt with its artwork filling about two thirds of that, so the tile measures the
+/// view and scales past the padding. The same measured scaling `TokenTile` does in the app,
+/// written again because `Furlough/Views` is not among this extension's sources; if the two
+/// ever have to agree on more than a number, move `TokenTile` into `Shared/UI`.
+private struct ReportTile: View {
+    let entry: UsageEntry
+    var size: CGFloat = 34
+    @State private var natural = CGSize.zero
+    private static let artworkFraction: CGFloat = 0.655
+
+    private var hasToken: Bool { entry.applicationToken != nil || entry.webDomainToken != nil }
 
     var body: some View {
-        let tallest = max(hourly.max() ?? 0, 1)
-        VStack(spacing: 4) {
-            HStack(alignment: .bottom, spacing: 2) {
-                ForEach(0..<24, id: \.self) { hour in
-                    RoundedRectangle(cornerRadius: 2, style: .continuous)
-                        .fill(closed.contains(hour) ? Ember.ember : Ember.cream.opacity(0.35))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: max(2, 48 * (hourly[hour] / tallest)))
-                }
-            }
-            .frame(height: 48, alignment: .bottom)
-            HStack {
-                ForEach([0, 6, 12, 18], id: \.self) { hour in
-                    Text(TimeFormat.shortMinute(hour * 60))
-                    if hour != 18 { Spacer() }
-                }
-            }
-            .font(EmberFont.label(9))
-            .foregroundStyle(Ember.faint)
+        if hasToken {
+            let longest = max(natural.width, natural.height)
+            let scale = longest > 0 ? size / (longest * Self.artworkFraction) : 1
+            icon
+                .labelStyle(.iconOnly)
+                .onGeometryChange(for: CGSize.self) { $0.size } action: { natural = $0 }
+                .scaleEffect(scale)
+                .frame(width: size, height: size)
+        } else {
+            // Screen Time counted it but handed over no token, so there is no artwork to draw.
+            Image(systemName: entry.key.hasPrefix("web:") ? "globe" : "square.dashed")
+                .font(.system(size: size * 0.48, weight: .semibold))
+                .foregroundStyle(Ember.amber)
+                .frame(width: size, height: size)
+                .background(
+                    Color.white.opacity(0.07),
+                    in: RoundedRectangle(cornerRadius: size * 0.26, style: .continuous)
+                )
+        }
+    }
+
+    @ViewBuilder
+    private var icon: some View {
+        if let token = entry.applicationToken {
+            Label(token)
+        } else if let token = entry.webDomainToken {
+            Label(token)
         }
     }
 }

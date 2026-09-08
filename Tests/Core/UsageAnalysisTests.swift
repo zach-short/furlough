@@ -169,4 +169,145 @@ struct UsageAnalysisTests {
         #expect(ranked.map(\.key) == ["z", "a", "b"])
         #expect(UsageAnalysis.rank([(key: "z", name: "Z", histogram: heavy), (key: "a", name: "A", histogram: light)], limit: 1).map(\.key) == ["z"])
     }
+
+    @Test("a peak too wide to close leaves only a budget")
+    func peakTooWideToClose() throws {
+        // Twenty minutes an hour from 7 AM to 6 PM: 60 % of it needs eight hours, and "closed
+        // 7 AM to 3 PM" is not a suggestion anybody takes.
+        var spread: [Int: Double] = [:]
+        for hour in 7...18 { spread[hour] = 20 }
+        #expect((UsageAnalysis.peak(in: hourly(spread))?.spanMinutes ?? 0) > UsageAnalysis.longestPeakMinutes)
+
+        let advice = try #require(UsageAnalysis.recommendation(
+            key: "com.example.scroll",
+            name: "Scroll",
+            histogram: histogram(weekdays: spread, weekend: spread)
+        ))
+        #expect(advice.peaks.isEmpty)
+        #expect(advice.isBudgetOnly)
+        #expect(advice.rule.isAllDay)
+        #expect(advice.rule.dailyBudgetMinutes == 120)
+    }
+
+    @Test("a peak too wide to close becomes a bedtime when most of it is late")
+    func bedtime() throws {
+        // Eleven minutes in each late hour and nine in each of 4 PM to 10 PM: the run holding
+        // 60 % is seven hours long, too wide to suggest, but 55 % of it lands after 10 PM.
+        var owl: [Int: Double] = [:]
+        for hour in UsageAnalysis.lateHours { owl[hour] = 11 }
+        for hour in 16...21 { owl[hour] = 9 }
+        #expect(UsageAnalysis.share(of: UsageAnalysis.lateHours, in: hourly(owl)) >= UsageAnalysis.bedtimeShare)
+        #expect((UsageAnalysis.peak(in: hourly(owl))?.spanMinutes ?? 0) > UsageAnalysis.longestPeakMinutes)
+
+        let advice = try #require(UsageAnalysis.recommendation(
+            key: "com.example.owl",
+            name: "Owl",
+            histogram: histogram(weekdays: owl, weekend: owl)
+        ))
+        // Both groups came out the same, so the suggestion says it once.
+        #expect(advice.peaks == [Recommendation.Peak(days: .all, window: UsageAnalysis.bedtime)])
+        #expect(advice.rule.windows == [window(4 * 60, 22 * 60)])
+        #expect(advice.rule.dailyBudgetMinutes == 60)
+    }
+
+    @Test("the late share of one day group, and the runs a strip draws")
+    func sharesAndRuns() {
+        #expect(UsageAnalysis.share(of: [22, 23], in: hourly([22: 30, 12: 10])) == 0.75)
+        #expect(UsageAnalysis.share(of: [22], in: hourly([:])) == 0)
+        #expect(UsageAnalysis.runs(of: [22, 23, 0, 1]) == [0..<2, 22..<24])
+        #expect(UsageAnalysis.runs(of: []) == [])
+        #expect(UsageAnalysis.runs(of: Set(0..<24)) == [0..<24])
+    }
+}
+
+/// The two sentences a card says. Every one of them is checked whole, through `plainSpaces`,
+/// because a card is only as good as the line a stranger reads off it.
+@Suite("Suggestions in words")
+struct UsageWordsTests {
+    private func advice(_ peaks: [Recommendation.Peak], budget: Int = 35) -> Recommendation {
+        Recommendation(
+            key: "com.example.app",
+            name: "App",
+            averageDailyMinutes: 90,
+            pickupsPerDay: 12,
+            lateNightShare: 0.2,
+            peaks: peaks,
+            rule: Rule(windows: [], dailyBudgetMinutes: budget)
+        )
+    }
+
+    @Test("one pile leads with the part of the day it falls in")
+    func onePeak() {
+        let evenings = advice([Recommendation.Peak(days: .weekend, window: window(19 * 60, 23 * 60))])
+        #expect(plainSpaces(evenings.whereLine(calendar: cal)) == "Mostly evenings: 7 PM to 11 PM on weekends.")
+        #expect(plainSpaces(evenings.consequence(calendar: cal)) == "Closed 7 PM to 11 PM on weekends, and 35 min a day the rest of the time.")
+
+        let nights = advice([Recommendation.Peak(days: .all, window: UsageAnalysis.bedtime)])
+        #expect(plainSpaces(nights.whereLine(calendar: cal)) == "Mostly late nights: 10 PM to 4 AM every day.")
+        #expect(plainSpaces(nights.consequence(calendar: cal)) == "Closed 10 PM to 4 AM every day, and 35 min a day the rest of the time.")
+    }
+
+    @Test("two piles let the hours carry the sentence")
+    func twoPeaks() {
+        let item = advice([
+            Recommendation.Peak(days: .weekdays, window: window(21 * 60, 23 * 60)),
+            Recommendation.Peak(days: .weekend, window: window(14 * 60, 18 * 60)),
+        ], budget: 60)
+        #expect(plainSpaces(item.whereLine(calendar: cal)) == "Mostly 9 PM to 11 PM on weekdays, and 2 PM to 6 PM on weekends.")
+        #expect(plainSpaces(item.consequence(calendar: cal))
+            == "Closed 9 PM to 11 PM on weekdays and 2 PM to 6 PM on weekends, and 1 hour a day the rest of the time.")
+    }
+
+    @Test("nothing to close says so, and offers the budget alone")
+    func budgetOnly() {
+        let item = advice([], budget: 45)
+        #expect(item.isBudgetOnly)
+        #expect(item.whereLine(calendar: cal) == "Spread through the day; no one stretch stands out.")
+        #expect(item.consequence(calendar: cal) == "45 min a day, whenever you like.")
+    }
+
+    @Test("midnight and noon are words, and a window is read by its middle")
+    func clockWords() {
+        #expect(TimeFormat.hour(0, calendar: cal) == "midnight")
+        #expect(TimeFormat.hour(Furlough.minutesPerDay, calendar: cal) == "midnight")
+        #expect(TimeFormat.hour(12 * 60, calendar: cal) == "noon")
+        #expect(plainSpaces(TimeFormat.hour(19 * 60, calendar: cal)) == "7 PM")
+        #expect(plainSpaces(TimeFormat.span(window(22 * 60, Furlough.minutesPerDay), calendar: cal)) == "10 PM to midnight")
+        #expect(TimeFormat.onDays(.all, calendar: cal) == "every day")
+        #expect(TimeFormat.onDays(.weekdays, calendar: cal) == "on weekdays")
+        #expect(TimeFormat.onDays([.monday, .tuesday, .wednesday], calendar: cal) == "on Mon–Wed")
+
+        #expect(UsageAnalysis.partOfDay(window(8 * 60, 11 * 60)) == "mornings")
+        #expect(UsageAnalysis.partOfDay(window(13 * 60, 16 * 60)) == "afternoons")
+        #expect(UsageAnalysis.partOfDay(window(19 * 60, 23 * 60)) == "evenings")
+        #expect(UsageAnalysis.partOfDay(UsageAnalysis.bedtime) == "late nights")
+    }
+}
+
+/// The rows a card draws: one when the week is treated alike, two when it is not.
+@Suite("Usage card rows")
+struct UsageRowTests {
+    @Test("identical hours draw one row; different hours draw two")
+    func rows() {
+        let everyDay = Recommendation(
+            key: "k", name: "K", averageDailyMinutes: 60, pickupsPerDay: 1, lateNightShare: 0.6,
+            peaks: [Recommendation.Peak(days: .all, window: UsageAnalysis.bedtime)],
+            rule: Rule(windows: [], dailyBudgetMinutes: 30)
+        )
+        #expect(UsageRow.rows(for: everyDay).map(\.label) == ["Every day"])
+        #expect(UsageRow.rows(for: everyDay).first?.closed == UsageAnalysis.lateHours)
+
+        let split = Recommendation(
+            key: "k", name: "K", averageDailyMinutes: 60, pickupsPerDay: 1, lateNightShare: 0.1,
+            peaks: [
+                Recommendation.Peak(days: .weekdays, window: window(21 * 60, 23 * 60)),
+                Recommendation.Peak(days: .weekend, window: window(14 * 60, 16 * 60)),
+            ],
+            rule: Rule(windows: [], dailyBudgetMinutes: 30)
+        )
+        #expect(UsageRow.rows(for: split).map(\.label) == ["Weekdays", "Weekends"])
+        #expect(UsageRow.rows(for: split).map(\.closed) == [[21, 22], [14, 15]])
+
+        #expect(UsageRow.rows(for: nil).map(\.closed) == [[]])
+    }
 }

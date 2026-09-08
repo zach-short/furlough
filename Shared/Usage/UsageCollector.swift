@@ -8,11 +8,10 @@ import SwiftUI
 /// height the app already knows.
 extension DeviceActivityReport.Context {
     /// The `position`-th heaviest app or site on the phone, 1 the heaviest, with the rule it
-    /// would take: one row, one report. The slot after the last worthwhile one says so; slots
-    /// past that draw nothing. `UsageAnalysis.rankLimit` says how many there are.
+    /// would take: one card, one report. The slot after the last worthwhile one says so; slots
+    /// past that draw nothing. `UsageAnalysis.rankLimit` says how many there are. The app shows
+    /// one at a time, so at most one or two of these remote views ever exist together.
     static func rank(_ position: Int) -> Self { Self("rank-\(position)") }
-    /// One thing, which the app filters to its token: its hours, and the rule for it.
-    static let focus = Self("focus")
 }
 
 /// One app or website as Screen Time reported it, folded onto the week. The token rides along
@@ -29,6 +28,23 @@ struct UsageEntry: Hashable, @unchecked Sendable {
 
     /// The shape `UsageAnalysis.rank` reads.
     var ranked: (key: String, name: String, histogram: UsageHistogram) { (key, name, histogram) }
+
+    /// The target this entry is, when Screen Time handed a token over with the numbers: what a
+    /// rule is written on, and what draws the real icon. Nil for something it counted but
+    /// named no token for; `UsageReader.kind(forKey:)` goes looking for those.
+    var targetKind: TargetKind? {
+        if let applicationToken { return .application(applicationToken) }
+        if let webDomainToken { return .webDomain(webDomainToken) }
+        return nil
+    }
+
+    /// What to call this where there is no token to draw Apple's own name from. With data
+    /// access `localizedDisplayName` is nil and `name` falls back to the bundle identifier,
+    /// which is not a name anybody should be shown: a site names itself, an app does not.
+    var plainName: String {
+        if key.hasPrefix("web:") { return String(key.dropFirst(4)) }
+        return name == key ? "This app" : name
+    }
 }
 
 /// Everything one walk of the data found.

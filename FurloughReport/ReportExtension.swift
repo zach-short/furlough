@@ -19,6 +19,5 @@ struct FurloughReport: DeviceActivityReportExtension {
         RankReport(3) { RankView(slot: $0) }
         RankReport(4) { RankView(slot: $0) }
         RankReport(5) { RankView(slot: $0) }
-        FocusReport { FocusView(summary: $0) }
     }
 }

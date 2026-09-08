@@ -21,14 +21,23 @@ struct RootView: View {
                     .transition(.opacity)
                     .zIndex(1)
             } else if model.isAuthorized {
-                HomeView()
-                    .transition(.opacity)
+                // The step between access and the first rule: a fortnight of use, app by app,
+                // with the rule each one would take. Skippable, and Settings opens the same
+                // screen again whenever it is wanted.
+                if model.showsUsageStep {
+                    UsageView(role: .onboarding)
+                        .transition(.opacity)
+                } else {
+                    HomeView()
+                        .transition(.opacity)
+                }
             } else {
                 OnboardingView()
                     .transition(.opacity)
             }
         }
         .animation(.easeInOut(duration: Launch.dissolve), value: model.isAuthorized)
+        .animation(.easeInOut(duration: Launch.dissolve), value: model.showsUsageStep)
         .preferredColorScheme(.dark)
         .tint(Ember.ember)
         .task { await model.observeAuthorization() }

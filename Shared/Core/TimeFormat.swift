@@ -51,6 +51,32 @@ enum TimeFormat {
         "\(minute(window.startMinute, calendar: calendar))–\(minute(window.endMinute, calendar: calendar))"
     }
 
+    /// An hour on the clock as it is said out loud: "midnight", "noon", "7 PM". A suggestion
+    /// is made of whole hours, so it never needs the minutes `minute` prints, and "7 PM to
+    /// 4 AM" is what a person reads without stopping.
+    static func hour(_ minute: Int, calendar: Calendar = .current) -> String {
+        let wrapped = ((minute % Furlough.minutesPerDay) + Furlough.minutesPerDay) % Furlough.minutesPerDay
+        if wrapped == 0 { return "midnight" }
+        if wrapped == Furlough.minutesPerDay / 2 { return "noon" }
+        return shortMinute(wrapped, calendar: calendar)
+    }
+
+    /// A stretch of the day the way it is spoken: "7 PM to 4 AM", "10 PM to midnight". Reads a
+    /// night as the one span it is, because a suggestion draws it as one band.
+    static func span(_ window: TimeWindow, calendar: Calendar = .current) -> String {
+        "\(hour(window.startMinute, calendar: calendar)) to \(hour(window.endMinute, calendar: calendar))"
+    }
+
+    /// Days as they follow a time in a sentence: "every day", "on weekdays", "on Mon–Thu". The
+    /// three group words are ordinary words and read lowercase mid-sentence; day names are
+    /// names, and keep their capitals.
+    static func onDays(_ group: Weekdays, calendar: Calendar = .current) -> String {
+        if group == .all { return "every day" }
+        if group == .weekdays { return "on weekdays" }
+        if group == .weekend { return "on weekends" }
+        return "on \(days(group, calendar: calendar))"
+    }
+
     static func budget(_ minutes: Int) -> String {
         if minutes >= 60, minutes % 60 == 0 {
             return minutes == 60 ? "1 hour" : "\(minutes / 60) hours"

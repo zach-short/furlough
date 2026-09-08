@@ -53,6 +53,11 @@ final class AppModel {
     /// go through the loosening delay.
     private var companionDismissed = Set(UserDefaults.standard.stringArray(forKey: AppModel.companionDismissedKey) ?? [])
     private static let companionDismissedKey = "furlough.companionDismissed"
+    /// The usage step has had its turn. Beside the two above for the same reason: it records
+    /// what has been shown, not what is blocked, so it must not travel in an exported setup and
+    /// must not wait out a loosening delay.
+    private(set) var hasSeenUsageStep = UserDefaults.standard.bool(forKey: AppModel.usageStepKey)
+    private static let usageStepKey = "furlough.sawUsageStep"
 
     var isAuthorized: Bool {
         switch authorization {
@@ -62,11 +67,36 @@ final class AppModel {
         }
     }
 
+    /// Whether the usage step is on screen. It sits between Screen Time access and the first
+    /// rule, because seeing where a fortnight went is the shortest way from an empty Furlough
+    /// to one that is set up — and once there are rules, it has nothing left to say that
+    /// Settings cannot say later.
+    ///
+    /// Stored rather than derived, and only ever turned on by `considerUsageStep`: applying a
+    /// suggestion inside the step gives Furlough its first rule, and a condition that read the
+    /// targets live would pull the screen out from under the person mid-flow. `finishUsageStep`
+    /// is the one way out.
+    private(set) var showsUsageStep = false
+
+    /// Turns the step on the first time Furlough has access and nothing to enforce yet.
+    private func considerUsageStep() {
+        guard !hasSeenUsageStep, isAuthorized, state.config.targets.isEmpty else { return }
+        showsUsageStep = true
+    }
+
+    /// The step is done with, whether it was worked through or waved away.
+    func finishUsageStep() {
+        UserDefaults.standard.set(true, forKey: Self.usageStepKey)
+        hasSeenUsageStep = true
+        showsUsageStep = false
+    }
+
     // MARK: Lifecycle
 
     func activate() {
         note(AuthorizationCenter.shared.authorizationStatus)
         reload()
+        considerUsageStep()
         Task { await refreshNotificationStatus() }
         // Before the authorization guard: a tag scan is how the anchor is lifted, and it has
         // to work even on a launch where FamilyControls has not answered yet.
@@ -94,6 +124,7 @@ final class AppModel {
         } else if status == .denied {
             UserDefaults.standard.set(false, forKey: AppModel.wasAuthorizedKey)
         }
+        considerUsageStep()
     }
 
     func requestAuthorization() async {
@@ -241,6 +272,29 @@ final class AppModel {
         SharedStore.log("picker: added \(outcome.added), removals scheduled \(outcome.removalsScheduled)")
         enforce(reason: "picker")
         return outcome
+    }
+
+    /// How long after adding an app the usage flow may still take it straight back: long enough
+    /// to work through a screenful of suggestions, far short of living under one.
+    static let undoWindow: TimeInterval = 30 * 60
+
+    /// Takes back an app the usage flow has just added, and the rule it wrote on it. Not a
+    /// loosening waiting out the delay: the delay is there so a rule you have been living under
+    /// cannot be dropped on a whim, and this one was written and taken back inside one screen,
+    /// minutes old, before it ever shielded anything — the same judgement `applyPicker` makes
+    /// about a target that has no rule yet. Refuses anything older than `undoWindow`, which is
+    /// why the flow offers Undo only on what it added itself. False when nothing was undone.
+    func undoFreshTarget(_ id: UUID) -> Bool {
+        var current = SharedStore.load()
+        guard let target = current.config.targets.first(where: { $0.id == id }),
+              current.now.timeIntervalSince(target.addedAt) <= Self.undoWindow
+        else { return false }
+        current.config.targets.removeAll { $0.id == id }
+        current.pending.removeAll { $0.targetID == id }
+        SharedStore.save(current)
+        SharedStore.log("usage flow took back \(target.displayName), added \(Int(current.now.timeIntervalSince(target.addedAt))) s ago")
+        enforce(reason: "usage undo")
+        return true
     }
 
     // MARK: Sites by name
