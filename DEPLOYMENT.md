@@ -13,7 +13,9 @@ what the app *is*.
 | Apple Distribution certificate | **Missing.** This Mac has only *Apple Development: Zach Short*. |
 | App Store Connect app record | Not created. |
 | `PrivacyInfo.xcprivacy` | **Done** — app + all three extensions, verified in the built bundles. |
-| Release configuration compiles | **Verified**, clean, from `HEAD`. |
+| Release configuration compiles | **Verified**, clean and warning-free, from `HEAD`. |
+| Release build keeps the no-unblock promise | **Verified against the binary**, 2026-09-08, `d9d59ec`. See section 6. |
+| Embedded entitlements in a signed build | **Unverifiable until the entitlement and cert land.** See section 6. |
 | Build-number scheme | Still `CURRENT_PROJECT_VERSION: 1`. Needs to move per upload. |
 | Screenshots, description, privacy policy, support URL | Not started. |
 | App Review notes | Drafted below. |
@@ -144,7 +146,77 @@ xcodebuild archive … CURRENT_PROJECT_VERSION=$(date -u +%Y%m%d%H%M)
 A UTC timestamp always rises, never collides, and says when a build was cut. `MARKETING_VERSION`
 stays `1.0` in `project.yml` and moves by hand for a real release.
 
-## 6. Archiving and uploading
+## 6. The audit that says the promise holds
+
+Furlough tells the person, in onboarding and again in Settings, that a release build has no
+unblock button. A reviewer reads that claim too, and `resetEverything` is one misplaced `#endif`
+away from making it false. Prove it against the built binary before every upload; the source only
+shows intent.
+
+Run 2026-09-08 against `d9d59ec`, clean. Nothing here blocked submission.
+
+**The method is the part worth keeping.** Probe the *Debug* build for the same thing you probe the
+Release build for. A probe that finds nothing in Release proves nothing unless the same probe
+finds something in Debug — and the first run of this audit returned zero for every probe in *both*
+configurations, which looked like a pass and was not. Xcode splits a Debug build's code into
+`Furlough.app/Furlough.debug.dylib` and leaves a small stub at `Furlough.app/Furlough`; the probe
+was reading the stub. A Release build has no such dylib and keeps its code in the executable.
+
+```bash
+# build both from a clean worktree, unsigned
+for cfg in Release Debug; do
+  xcodebuild -project Furlough.xcodeproj -scheme Furlough -configuration $cfg \
+    -destination 'generic/platform=iOS' -derivedDataPath build/DD-$cfg \
+    CODE_SIGNING_ALLOWED=NO build > build/$cfg.log 2>&1
+done
+
+DBG=build/DD-Debug/Build/Products/Debug-iphoneos/Furlough.app/Furlough.debug.dylib
+REL=build/DD-Release/Build/Products/Release-iphoneos/Furlough.app/Furlough
+
+for probe in resetEverything clearEverything; do
+  printf '%-18s Debug=%s Release=%s\n' "$probe" \
+    "$(nm -a "$DBG" | grep -c "$probe")" "$(nm -a "$REL" | grep -c "$probe")"
+done
+for probe in "Reset everything" "Debug builds only" "no unblock button"; do
+  printf '%-22s Debug=%s Release=%s\n' "$probe" \
+    "$(strings -a "$DBG" | grep -cF "$probe")" "$(strings -a "$REL" | grep -cF "$probe")"
+done
+```
+
+Expected: the first four probes present in Debug and **zero** in Release; `no unblock button`
+present in **both**, because that is the copy explaining the promise and it must survive. That last
+row is the control — it is what proves the zeros above it are real absences rather than a broken
+probe.
+
+What the run confirmed, beyond the strings:
+
+- Three `#if DEBUG` sites exist and no more: `AppModel.resetEverything` and its two call sites in
+  `SettingsView` (the Testing card and the confirmation dialog). Every other conditional in
+  `Shared/Core` is an `#if os(iOS)` platform gate, not a build-config one.
+- `clearEverything` is dead-code-eliminated from Release, not merely unreachable.
+- `removeTarget` queues the delay for any target that has a rule; only a never-ruled target
+  removes at once, which is the documented baseline and not an escape.
+- Weighing anchor needs the paired tag and refuses a wrong one, and pairing is refused while
+  anchored, so no new tag can become the key to a lock already closed.
+- There are no App Intents, no URL schemes and no Control Widget, so nothing outside the app can
+  reach a state change. If phase 8 ever adds them, anchoring is safe to expose and release is not.
+- Bundle hygiene: three extensions embedded, four privacy manifests at their bundle roots, icon
+  1024 × 1024 with **no alpha** (an icon with transparency is rejected as `ITMS-90717`),
+  `ITSAppUsesNonExemptEncryption` false, no warnings in our own code, no stray `print()`.
+
+**What this cannot check yet.** The builds above are unsigned (`CODE_SIGNING_ALLOWED=NO`), so
+there is nothing for `codesign -d --entitlements` to read, and whether Family Controls actually
+lands in the signed binary is exactly the question the known "app approved, extensions still
+Pending" failure turns on. Re-run this audit once the entitlement and the distribution
+certificate exist, and add:
+
+```bash
+codesign -d --entitlements - build/export/Furlough.ipa   # and each .appex inside
+```
+
+That is the last gate before the first upload.
+
+## 7. Archiving and uploading
 
 None of this works before step 1 lands; it is written down so it is ready when it does.
 
@@ -179,7 +251,7 @@ Then, in App Store Connect: the build appears after processing, TestFlight inter
 no review, and **external** testing needs a Beta App Review — which is where the notes below start
 mattering.
 
-## 7. Notes for App Review — paste these
+## 8. Notes for App Review — paste these
 
 A Screen Time app that deliberately has no unblock button is exactly the kind of thing a reviewer
 bounces for being unclear or for trapping the user, and a reviewer who cannot get past onboarding
@@ -218,7 +290,7 @@ rejects on that alone. Both TestFlight external review and App Review should get
 > **No account, no network, no data collection.** Furlough has no server and no network code.
 > Rules and activity tokens never leave the device.
 
-## 8. Screenshots, and a wrinkle worth knowing early
+## 9. Screenshots, and a wrinkle worth knowing early
 
 App Store Connect wants one 6.9-inch iPhone set (1320 × 2868, 1290 × 2796 or 1260 × 2736 portrait)
 and scales it down for smaller phones. The wrinkle is that neither device that could produce those
