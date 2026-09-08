@@ -74,8 +74,14 @@ struct MacHomeView: View {
     // MARK: Sidebar
 
     private var sidebar: some View {
-        let summary = Policy.summary(state: model.state, now: now)
-        let targets = model.state.config.targets
+        let state = model.state
+        let summary = Policy.summary(state: state, now: now)
+        let config = Policy.effectiveConfig(state, now: now)
+        let targets = config.targets
+        let statuses = Dictionary(uniqueKeysWithValues: targets.map { target in
+            (target.id, Policy.status(of: target, config: config, runtime: state.runtime, now: now))
+        })
+        let groups = HomeGroups(targets: targets, statuses: statuses, now: now)
         return VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
                 Spacer()
@@ -145,12 +151,12 @@ struct MacHomeView: View {
                         .emberCard()
                         .padding(.top, 16)
                     } else {
-                        ForEach(groups(targets), id: \.title) { group in
-                            SectionLabel(text: group.title)
+                        ForEach(groups.sections) { section in
+                            SectionLabel(text: section.title)
                             VStack(spacing: 0) {
-                                ForEach(group.targets) { target in
-                                    row(target)
-                                    if target.id != group.targets.last?.id { CardDivider() }
+                                ForEach(section.targets) { target in
+                                    row(target, status: statuses[target.id] ?? .unconfigured)
+                                    if target.id != section.targets.last?.id { CardDivider() }
                                 }
                             }
                             .emberCard()
@@ -164,8 +170,7 @@ struct MacHomeView: View {
         }
     }
 
-    private func row(_ target: Target) -> some View {
-        let status = Policy.status(of: target, config: model.state.config, runtime: model.state.runtime, now: now)
+    private func row(_ target: Target, status: TargetStatus) -> some View {
         let pending = model.state.pending.first { $0.targetID == target.id }
         let selected = selection == target.id
         return Button {
@@ -193,29 +198,6 @@ struct MacHomeView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-    }
-
-    private struct Group {
-        let title: String
-        let targets: [Target]
-    }
-
-    private func groups(_ targets: [Target]) -> [Group] {
-        var open: [Target] = [], later: [Target] = [], blocked: [Target] = [], setup: [Target] = []
-        for target in targets {
-            switch Policy.status(of: target, config: model.state.config, runtime: model.state.runtime, now: now) {
-            case .open: open.append(target)
-            case .unconfigured: setup.append(target)
-            case .closed(let next) where next.isToday: later.append(target)
-            default: blocked.append(target)
-            }
-        }
-        return [
-            Group(title: "Open now", targets: open),
-            Group(title: "Later today", targets: later),
-            Group(title: "Blocked", targets: blocked),
-            Group(title: "Set up", targets: setup),
-        ].filter { !$0.targets.isEmpty }
     }
 
     private func headline(_ summary: Policy.Summary) -> String {

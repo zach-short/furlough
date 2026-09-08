@@ -67,6 +67,16 @@ final class Enforcer {
         ledger.dayKey == Policy.dayKey(.now) ? Int(ledger.seconds[id] ?? 0) : 0
     }
 
+    #if DEBUG
+    /// Forgets today's counted usage and warnings, for Settings > Testing > Reset everything.
+    func resetUsage() {
+        ledger = UsageLedger(dayKey: Policy.dayKey(.now))
+        ledger.save()
+        windowWarned = [:]
+        lastShield = [:]
+    }
+    #endif
+
     // MARK: The tick
 
     private func tick(reason: String?) {

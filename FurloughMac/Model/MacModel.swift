@@ -222,7 +222,7 @@ final class MacModel {
     private static func assign(_ rule: Rule, to id: UUID, in state: inout SharedState) -> ProposalResult {
         guard let index = state.config.targets.firstIndex(where: { $0.id == id }) else { return .unchanged }
         let target = state.config.targets[index]
-        guard target.rule != rule else { return .unchanged }
+        guard !(target.rule?.isEquivalent(to: rule) ?? false) else { return .unchanged }
         state.pending.removeAll { change in
             if case .setRule(let targetID, _) = change.kind { return targetID == id }
             return false
@@ -278,6 +278,21 @@ final class MacModel {
         enforce(reason: "delay edit")
         return result
     }
+
+    #if DEBUG
+    // MARK: Testing
+
+    /// Wipes every target, rule and pending change, forgets today's counted usage, and
+    /// enforces the empty state so the app matches a fresh install that is still onboarded.
+    /// Compiled into Debug builds only: a Release build keeps its promise of no unblock button.
+    func resetEverything() {
+        SharedStore.reset()
+        enforcer.resetUsage()
+        SharedStore.log("reset everything (Debug build)")
+        lastError = nil
+        enforce(reason: "reset")
+    }
+    #endif
 }
 
 // MARK: - Mac lookups on the shared model

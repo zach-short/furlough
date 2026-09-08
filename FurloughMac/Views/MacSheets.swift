@@ -232,7 +232,7 @@ struct ApplyRuleSheet: View {
         }
         var now = 0, later = 0, same = 0
         for target in chosen {
-            if target.rule == rule {
+            if target.rule?.isEquivalent(to: rule) ?? false {
                 same += 1
             } else if Policy.classify(newRule: rule, against: target) == .tightening {
                 now += 1
@@ -349,9 +349,11 @@ struct PendingCard: View {
 
 struct SettingsSheet: View {
     @Environment(MacModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
     @State private var delayHours = Furlough.defaultLoosenDelayHours
     @State private var result: ProposalResult?
     @State private var showLog = false
+    @State private var confirmReset = false
 
     var body: some View {
         SheetFrame(title: showLog ? "Activity log" : "Settings", width: 560, height: 640) {
@@ -370,6 +372,16 @@ struct SettingsSheet: View {
         } message: { result in
             Text(result.message)
         }
+        #if DEBUG
+        .confirmationDialog("Reset everything?", isPresented: $confirmReset, titleVisibility: .visible) {
+            Button("Reset everything", role: .destructive) {
+                model.resetEverything()
+                dismiss()
+            }
+        } message: {
+            Text("Every app, rule and pending change is forgotten, along with today's usage. Furlough stays set up and keeps running.")
+        }
+        #endif
     }
 
     private var settings: some View {
@@ -454,6 +466,17 @@ struct SettingsSheet: View {
                     .foregroundStyle(Ember.muted)
                     .padding(.horizontal, 8)
                     .padding(.bottom, 20)
+
+                #if DEBUG
+                SectionLabel(text: "Testing")
+                VStack(spacing: 0) {
+                    CardAction(title: "Reset everything") { confirmReset = true }
+                }
+                .emberCard()
+                Footnote(text: "Debug builds only. Forgets every app, rule, pending change and today's usage, and lifts every block.")
+                    .padding(.top, 8)
+                    .padding(.bottom, 20)
+                #endif
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 24)
@@ -500,6 +523,11 @@ struct LogView: View {
                 }
                 .buttonStyle(.plain)
                 Spacer()
+                Button("Refresh") { entries = SharedStore.logEntries() }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Ember.muted)
+                    .emberBody(12.5)
+                    .padding(.trailing, 14)
                 Button("Clear") {
                     SharedStore.clearLog()
                     entries = []

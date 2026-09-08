@@ -16,6 +16,7 @@ struct MacRuleEditor: View {
     @State private var showApply = false
     /// Targets chosen in the apply sheet, applied once the sheet has gone so the alert can show.
     @State private var applyTo: [UUID]?
+    @State private var showWeek = false
     /// What the last save did, shown in the Saved alert.
     @State private var saved: String?
     @State private var confirmRemove = false
@@ -39,6 +40,17 @@ struct MacRuleEditor: View {
             }
             return result
         }
+
+        /// Rows by group of days, then by time of day: the order the list always reads in.
+        static func sorted(_ rows: [DraftWindow]) -> [DraftWindow] {
+            let order = TimeWindow.grouped(rows.map(\.window))
+            return rows.sorted { a, b in
+                (order.firstIndex(of: a.window) ?? 0) < (order.firstIndex(of: b.window) ?? 0)
+            }
+        }
+
+        /// Joined, then sorted: what a committed edit leaves behind.
+        static func tidy(_ rows: [DraftWindow]) -> [DraftWindow] { sorted(joined(rows)) }
     }
 
     private var target: Target? { model.state.config.target(id: targetID) }
@@ -47,7 +59,20 @@ struct MacRuleEditor: View {
     private var trimmedNickname: String { nickname.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var hasChanges: Bool {
         guard let target else { return false }
-        return target.rule != draft || (target.nickname != trimmedNickname && !trimmedNickname.isEmpty)
+        return !(target.rule?.isEquivalent(to: draft) ?? false) || (target.nickname != trimmedNickname && !trimmedNickname.isEmpty)
+    }
+
+    /// The draft as a week for the visual editor. Writing back merges identical spans across
+    /// days into one window and sets the Same every day toggle to match.
+    private var weekDraft: Binding<WeekDraft> {
+        Binding(
+            get: { WeekDraft(windows: windows) },
+            set: { week in
+                let merged = TimeWindow.grouped(week.windows)
+                drafts = merged.map { DraftWindow(window: $0) }
+                byDay = !merged.allSatisfy { $0.days == .all }
+            }
+        )
     }
 
     private var sameEveryDay: Binding<Bool> {
@@ -108,6 +133,9 @@ struct MacRuleEditor: View {
                 delayHours: model.state.config.loosenDelayHours
             ) { ids in applyTo = ids }
         }
+        .sheet(isPresented: $showWeek) {
+            WeekSheet(week: weekDraft)
+        }
         .alert("Saved", isPresented: Binding(get: { saved != nil }, set: { if !$0 { saved = nil } }), presenting: saved) { _ in
             Button("OK") { saved = nil }
         } message: { message in
@@ -117,36 +145,17 @@ struct MacRuleEditor: View {
 
     // MARK: Sections
 
+    /// The phone's hero for this app: living hourglass, countdown, and what is used today.
     private func header(_ target: Target) -> some View {
-        let status = Policy.status(of: target, config: model.state.config, runtime: model.state.runtime, now: now)
-        return HStack(spacing: 14) {
-            KindTile(kind: target.kind, size: 52)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(target.displayName)
-                    .emberDisplay(24)
-                    .foregroundStyle(Ember.cream)
-                    .lineLimit(1)
-                Text(subtitle(target, status: status))
-                    .emberBody(12)
-                    .foregroundStyle(Ember.muted)
-                    .lineLimit(1)
-            }
-            Spacer()
-            HourglassView(state: .of(target, status: status, runtime: model.state.runtime, now: now))
-                .frame(width: 30, height: 40)
-        }
+        TargetHero(
+            target: target,
+            status: Policy.status(of: target, config: model.state.config, runtime: model.state.runtime, now: now),
+            runtime: model.state.runtime,
+            usedSeconds: model.usedSeconds(for: target.id),
+            now: now
+        )
         .padding(.horizontal, 6)
         .padding(.bottom, 14)
-    }
-
-    private func subtitle(_ target: Target, status: TargetStatus) -> String {
-        let identity: String = switch target.kind {
-        case .macApp(let bundleID): bundleID
-        case .host(let host): "\(host) and its subdomains"
-        }
-        guard let rule = target.rule, rule.isEverAllowed else { return identity }
-        let used = model.usedSeconds(for: target.id) / 60
-        return "\(TimeFormat.status(status)) · \(used) of \(rule.dailyBudgetMinutes) min used today · \(identity)"
     }
 
     private var nicknameCard: some View {
@@ -198,6 +207,8 @@ struct MacRuleEditor: View {
                 CardDivider()
             }
             CardAction(title: "Add window", symbol: "plus") { addWindow() }
+            CardDivider()
+            CardAction(title: "Visualize windows", symbol: "calendar") { showWeek = true }
             if !copyCandidates.isEmpty {
                 CardDivider()
                 Menu {
@@ -288,7 +299,7 @@ struct MacRuleEditor: View {
     private func effect(for target: Target) -> Effect {
         if let error = draft.validationError { return .error(error) }
         if !hasChanges { return .noChanges }
-        if target.rule == draft { return .nicknameOnly }
+        if target.rule?.isEquivalent(to: draft) ?? false { return .nicknameOnly }
         if Policy.classify(newRule: draft, against: target) == .tightening { return .tightening }
         return .loosening(Date.now.addingTimeInterval(model.state.config.loosenDelay))
     }
@@ -331,33 +342,42 @@ struct MacRuleEditor: View {
         }.first
         let rule = pendingRule ?? target.rule ?? Rule()
         budget = rule.dailyBudgetMinutes > 0 ? rule.dailyBudgetMinutes : Furlough.defaultBudgetMinutes
-        drafts = rule.sortedWindows.map { DraftWindow(window: $0) }
+        drafts = TimeWindow.grouped(rule.windows).map { DraftWindow(window: $0) }
         byDay = !rule.isSameEveryDay
     }
 
+    /// Replaces the draft with another target's rule. Nothing is saved until Save.
     private func adopt(_ rule: Rule) {
         withAnimation(.snappy) {
-            drafts = rule.sortedWindows.map { DraftWindow(window: $0) }
+            drafts = TimeWindow.grouped(rule.windows).map { DraftWindow(window: $0) }
             budget = rule.dailyBudgetMinutes > 0 ? rule.dailyBudgetMinutes : Furlough.defaultBudgetMinutes
             byDay = !rule.isSameEveryDay
         }
     }
 
+    /// The first window is an evening. Each one after that goes on the same days as the last
+    /// row, where those days have room: after the latest window, or from the first free hour
+    /// once the evening is taken, so "later on weekends" starts as the early-morning window
+    /// it has to be. Nothing is added when those days are full. Rows are only joined when
+    /// the rule is saved: the time fields commit as you type, so joining sooner would move a
+    /// row out from under the cursor.
     private func addWindow() {
-        var start = windows.map(\.endMinute).max() ?? 12 * 60
-        if start > Furlough.minutesPerDay - 60 { start = 0 }
-        let window = TimeWindow(startMinute: start, endMinute: min(start + 60, Furlough.minutesPerDay))
-        withAnimation(.snappy) { drafts.append(DraftWindow(window: window)) }
+        var window = TimeWindow(startMinute: 20 * 60, endMinute: 22 * 60)
+        if let last = drafts.last {
+            guard let free = TimeWindow.nextFree(after: windows, on: last.window.days) else { return }
+            window = free
+        }
+        withAnimation(.snappy) { drafts = DraftWindow.sorted(drafts + [DraftWindow(window: window)]) }
     }
 
     private func save() {
-        drafts = DraftWindow.joined(drafts)
+        drafts = DraftWindow.tidy(drafts)
         saved = model.propose(rule: draft, nickname: nickname, for: targetID).message
     }
 
     /// Saves the draft here and gives it to `ids` as well, in one go.
     private func applyToOthers(_ ids: [UUID]) {
-        drafts = DraftWindow.joined(drafts)
+        drafts = DraftWindow.tidy(drafts)
         saved = model.apply(rule: draft, nickname: nickname, for: targetID, andTo: ids).message
     }
 }
@@ -439,31 +459,39 @@ struct TimeField: View {
 /// Seven round day toggles in the calendar's order, amber when on, with the days named beside them.
 struct DayStrip: View {
     @Binding var days: Weekdays
+    /// Shown in cream and not toggleable: the day whose hours are being applied elsewhere.
+    var locked: Weekdays = []
+    /// Replaces "No days" when an empty pick is fine rather than an error.
+    var placeholder: String?
     private let calendar = Calendar.current
 
     var body: some View {
         HStack(spacing: 5) {
             ForEach(Weekdays.ordered(calendar: calendar), id: \.self) { weekday in
                 let on = days.contains(weekday: weekday)
+                let isLocked = locked.contains(weekday: weekday)
                 Button {
                     withAnimation(.snappy(duration: 0.2)) { days.toggle(weekday: weekday) }
                 } label: {
                     Text(calendar.veryShortStandaloneWeekdaySymbols[weekday - 1])
                         .font(EmberFont.label(10))
-                        .foregroundStyle(on ? Ember.ground : Ember.faint)
+                        .foregroundStyle(on || isLocked ? Ember.ground : Ember.faint)
                         .frame(width: 24, height: 24)
-                        .background(on ? Ember.amber : Color.white.opacity(0.07), in: Circle())
-                        .overlay(Circle().strokeBorder(on ? Color.clear : Ember.cardBorder, lineWidth: 1))
+                        .background(isLocked ? Ember.cream : on ? Ember.amber : Color.white.opacity(0.07), in: Circle())
+                        .overlay(Circle().strokeBorder(on || isLocked ? Color.clear : Ember.cardBorder, lineWidth: 1))
                         .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
+                .disabled(isLocked)
                 .help(calendar.standaloneWeekdaySymbols[weekday - 1])
+                .accessibilityAddTraits(on ? .isSelected : [])
             }
             Spacer(minLength: 6)
-            Text(days.isEmpty ? "No days" : TimeFormat.days(days, calendar: calendar))
+            Text(days.isEmpty ? (placeholder ?? "No days") : TimeFormat.days(days, calendar: calendar))
                 .emberBody(10.5)
-                .foregroundStyle(days.isEmpty ? Ember.ember : Ember.faint)
+                .foregroundStyle(days.isEmpty && placeholder == nil ? Ember.ember : Ember.faint)
                 .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
     }
 }
