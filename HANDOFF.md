@@ -475,15 +475,28 @@ The plan for this stretch. Tick each phase off here as it lands.
    `Policy.summary` the widget reads, and `MacAppDelegate` building it in
    `applicationDidFinishLaunching` rather than a property initialiser — the delegate is not
    `@MainActor`, so it cannot reach `MacModel.shared` there.
-   **And it still does not show, because nothing does on this Mac.** The rewrite was tested on
-   the machine: a raw `NSStatusItem` from a twenty-line AppKit app, bundled and signed, does not
-   appear either, with a title or icon-only. So it is not `MenuBarExtra`, not SwiftUI, not our
-   label, and not width — this Mac draws no third-party menu bar item at all as of 2026-09-08.
-   The item reports `isVisible=true` and gets a button, which is why the log now carries one
-   line at install: it is the only way to tell "Furlough never added it" from "macOS did not
-   draw it". The likely remedy is restarting the menu bar host or a logout; Zach has not tried
-   it. **Keep the AppKit version regardless**: it is the correct API, it is verified to run, and
-   it is what will work the moment the Mac does.
+   **It does not show, and the reason is the notch.** Solved 2026-09-08 after two wrong
+   answers, both recorded here so nobody repeats them. It is not `MenuBarExtra` (a raw
+   `NSStatusItem` from a twenty-line AppKit app does not appear either), and it is not that this
+   Mac refuses third-party items — the *first* conclusion written here, and it was wrong.
+   The measurement that settled it: log the status item's button window frame a second or two
+   **after layout**, not at creation, when it is still `(0, 0, w, 0)` and says nothing.
+   ```
+   frame=(752.0, 949.0, 27.0, 33.0)   screen=(0.0, 0.0, 1512.0, 982.0)
+   ```
+   x = 752 on a 1512-point screen is dead centre: macOS placed the item **under the notch**,
+   where the camera housing hides it. The menu bar's right-hand region is full, so a new item
+   overflows leftward into the notch and is invisible. The apparent free space in a screenshot
+   of the menu bar *is* the notch, which is what made the earlier reading wrong.
+   So the remedy is Zach's, not the code's: free a menu bar slot (⌘-drag an item out, turn some
+   off in System Settings > Control Center, or quit a menu bar app) and the hourglass appears.
+   Worth knowing that Furlough's item is about 85 points wide with the countdown against the
+   test's 27, so it needs correspondingly more room; an icon-only item would fit sooner if that
+   is ever worth offering.
+   **Keep the AppKit version regardless**: `MenuBarExtra` was still a dead end for its own
+   reasons, this is the correct API, and it is verified to run and to be placed. The one line
+   the log carries at install stays useful — it separates "Furlough never added it" from "macOS
+   put it somewhere you cannot see".
    **The watchdog reopen brings back no window**, done the same day and verified on the machine.
    The agent passes `--args --background` (`Watchdog.backgroundFlag`), the scene takes
    `.defaultLaunchBehavior(.suppressed)` on such a launch, and — the part that is not obvious —
