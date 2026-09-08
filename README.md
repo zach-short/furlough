@@ -39,6 +39,7 @@ Rules for each app live in an App Group so all four processes read the same stat
 - Tap **Brick** in the app and everything in the list is shielded immediately, no tag needed. Bricking is tightening.
 - **Unbrick** opens the NFC reader; only the tag you paired lifts the brick, instantly. This is the one unblock in Furlough, and it exists only for the Brick. Rule-based targets never get one.
 - While bricked, the list and the paired tag cannot be changed, so nothing can loosen under the lock. Bricking is refused until a tag is paired, so there is always a way back.
+- **Forget tag** on the Brick screen unpairs the tag after a confirmation. It is only offered while the brick is off; forgetting the tag while bricked would leave no way back, so the button is hidden and the model refuses it. Bricking stays refused until a new tag is paired.
 - When the brick is off, each app falls back to its windows and budget, or to nothing if it has no rule. Bricking an app that is already outside its window changes nothing visible.
 - Pairing reads the tag's hardware identifier; nothing is written, so any NTAG sticker or an existing Brick device works.
 
