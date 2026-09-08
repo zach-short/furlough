@@ -110,6 +110,8 @@ open Furlough.xcodeproj
 4. Tap **+** to pick apps and websites. Open each one and set its budget, and windows if you want them; with no windows it is open all day, up to the budget. Turn off **Same every day** to give each window its own days. Save.
 5. For the Anchor, open the Anchor card, choose apps, and pair a tag by holding the phone to it. Then **Anchor** locks and **Unanchor** asks for the tag.
 
+Building a fork means replacing my identifiers with yours. Change `DEVELOPMENT_TEAM` and the bundle IDs in `project.yml`, the App Group in each target's `.entitlements`, the watchdog label under `FurloughMac/Resources/LaunchAgents`, and `appGroupID` / `macAppGroupID` in `Shared/Core/Furlough.swift`, then re-run `xcodegen generate`. The Mac group carries the team ID in front of it because macOS will not accept a `group.` prefix without a registered Mac.
+
 Or from the command line, with the phone connected:
 
 ```bash
