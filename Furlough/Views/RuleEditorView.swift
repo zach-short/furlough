@@ -12,8 +12,12 @@ struct RuleEditorView: View {
     /// Whether each window shows its day strip. Off means every window applies every day.
     @State private var byDay = false
     @State private var showCopy = false
+    @State private var showApply = false
+    /// Targets chosen in the apply sheet, applied once the sheet has gone so the alert can show.
+    @State private var applyTo: [UUID]?
     @State private var showWeek = false
-    @State private var result: ProposalResult?
+    /// What the last save did, shown in the alert that closes the editor.
+    @State private var saved: String?
     @State private var confirmRemove = false
     @FocusState private var nicknameFocused: Bool
 
@@ -62,6 +66,11 @@ struct RuleEditorView: View {
         model.state.config.targets.filter {
             $0.id != targetID && !$0.kind.isCategory && ($0.rule?.isEverAllowed ?? false)
         }
+    }
+
+    /// Other apps and sites this draft can be given to, set up or not.
+    private var applyCandidates: [Target] {
+        model.state.config.targets.filter { $0.id != targetID && !$0.kind.isCategory }
     }
 
     /// The draft as a week for the visual editor. Writing back merges identical spans across
@@ -151,7 +160,7 @@ struct RuleEditorView: View {
         .onAppear(perform: load)
         .confirmationDialog("Remove from Furlough?", isPresented: $confirmRemove, titleVisibility: .visible) {
             Button("Remove", role: .destructive) {
-                result = model.removeTarget(id: targetID)
+                saved = model.removeTarget(id: targetID).message
             }
         }
         .sheet(isPresented: $showCopy) {
@@ -159,16 +168,27 @@ struct RuleEditorView: View {
                 if let rule = source.rule { adopt(rule) }
             }
         }
+        .sheet(isPresented: $showApply, onDismiss: {
+            guard let ids = applyTo else { return }
+            applyTo = nil
+            applyToOthers(ids)
+        }) {
+            ApplyRuleSheet(
+                candidates: applyCandidates,
+                rule: draft,
+                delayHours: model.state.config.loosenDelayHours
+            ) { ids in applyTo = ids }
+        }
         .sheet(isPresented: $showWeek) {
             WeekSheet(week: weekDraft)
         }
-        .alert("Saved", isPresented: Binding(get: { result != nil }, set: { if !$0 { result = nil } }), presenting: result) { _ in
+        .alert("Saved", isPresented: Binding(get: { saved != nil }, set: { if !$0 { saved = nil } }), presenting: saved) { _ in
             Button("OK") {
-                result = nil
+                saved = nil
                 dismiss()
             }
-        } message: { result in
-            Text(result.message)
+        } message: { message in
+            Text(message)
         }
     }
 
@@ -247,6 +267,12 @@ struct RuleEditorView: View {
             if !copyCandidates.isEmpty {
                 CardDivider()
                 cardAction("Use windows from another app", symbol: "doc.on.doc") { showCopy = true }
+            }
+            if !applyCandidates.isEmpty {
+                CardDivider()
+                cardAction("Apply these windows to other apps", symbol: "arrowshape.turn.up.right") { showApply = true }
+                    .disabled(draft.validationError != nil)
+                    .opacity(draft.validationError == nil ? 1 : 0.45)
             }
         }
         .emberCard()
@@ -350,7 +376,13 @@ struct RuleEditorView: View {
 
     private func save() {
         nicknameFocused = false
-        result = model.propose(rule: draft, nickname: nickname, for: targetID)
+        saved = model.propose(rule: draft, nickname: nickname, for: targetID).message
+    }
+
+    /// Saves the draft here and gives it to `ids` as well, in one go.
+    private func applyToOthers(_ ids: [UUID]) {
+        nicknameFocused = false
+        saved = model.apply(rule: draft, nickname: nickname, for: targetID, andTo: ids).message
     }
 }
 
@@ -535,6 +567,147 @@ struct CopyRuleSheet: View {
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .presentationBackground(Ember.ground)
+    }
+}
+
+/// Picks the other apps and sites that get this rule, any number at once. Each row shows what
+/// it has now; the line above the button says what applying will do, since each one is judged
+/// on its own: tighter lands now, looser waits out the delay.
+struct ApplyRuleSheet: View {
+    let candidates: [Target]
+    let rule: Rule
+    let delayHours: Int
+    let onApply: ([UUID]) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var selected: Set<UUID> = []
+
+    private var chosen: [Target] { candidates.filter { selected.contains($0.id) } }
+    private var allChosen: Bool { selected.count == candidates.count }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    VStack(spacing: 0) {
+                        ForEach(Array(candidates.enumerated()), id: \.element.id) { index, target in
+                            if index > 0 { CardDivider() }
+                            row(target)
+                        }
+                    }
+                    .emberCard()
+                    .sensoryFeedback(.selection, trigger: selected)
+                    Footnote(text: summary, alignment: .center)
+                        .padding(.top, 10)
+                    ProminentButton(title: buttonTitle) {
+                        onApply(chosen.map(\.id))
+                        dismiss()
+                    }
+                    .disabled(selected.isEmpty)
+                    .padding(.top, 14)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 32)
+            }
+            .background(EmberWall())
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("Apply windows to")
+                        .emberBody(15, .semibold)
+                        .foregroundStyle(Ember.cream)
+                }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                        .tint(Ember.cream)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(allChosen ? "None" : "All") {
+                        withAnimation(.snappy(duration: 0.2)) {
+                            selected = allChosen ? [] : Set(candidates.map(\.id))
+                        }
+                    }
+                    .tint(Ember.cream)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Ember.ground)
+    }
+
+    private func row(_ target: Target) -> some View {
+        let on = selected.contains(target.id)
+        return Button {
+            withAnimation(.snappy(duration: 0.2)) {
+                if on { selected.remove(target.id) } else { selected.insert(target.id) }
+            }
+        } label: {
+            HStack(spacing: 10) {
+                TokenTile(kind: target.kind, size: 34)
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        TokenName(kind: target.kind)
+                        if !target.nickname.isEmpty {
+                            Text(target.nickname)
+                                .emberBody(11.5)
+                                .foregroundStyle(Ember.muted)
+                                .lineLimit(1)
+                        }
+                    }
+                    Text(TimeFormat.rule(target.rule))
+                        .emberBody(11.5)
+                        .foregroundStyle(Ember.muted)
+                        .lineLimit(2)
+                }
+                Spacer(minLength: 8)
+                Image(systemName: on ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(on ? Ember.amber : Ember.faint)
+                    .contentTransition(.symbolEffect(.replace))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+
+    /// What applying does to the chosen rows, each judged against what it has now.
+    private var summary: String {
+        guard !chosen.isEmpty else {
+            return "Gives each one these windows, days and daily budget, and saves them here too."
+        }
+        var now = 0, later = 0, same = 0
+        for target in chosen {
+            if target.rule?.isEquivalent(to: rule) ?? false {
+                same += 1
+            } else if Policy.classify(newRule: rule, against: target) == .tightening {
+                now += 1
+            } else {
+                later += 1
+            }
+        }
+        var parts: [String] = []
+        if now > 0 { parts.append("Tighter for \(now), applied now") }
+        if later > 0 { parts.append("Looser for \(later), after \(TimeFormat.delay(hours: delayHours))") }
+        if same > 0 { parts.append("\(same) unchanged") }
+        return parts.joined(separator: " · ")
+    }
+
+    private var buttonTitle: String {
+        let count = chosen.count
+        guard count > 0 else { return "Apply" }
+        let apps = chosen.filter { if case .application = $0.kind { return true }; return false }.count
+        let noun = switch (apps, count) {
+        case (count, 1): "app"
+        case (count, _): "apps"
+        case (0, 1): "site"
+        case (0, _): "sites"
+        default: "apps and sites"
+        }
+        return "Apply to \(count) \(noun)"
     }
 }
 

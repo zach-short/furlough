@@ -46,7 +46,10 @@ small codebase he fully understands over a fork. He is interactive: ask when a d
   Categories are blocked by their zero budget (`Rule.alwaysBlocked`). The rule editor has a
   "Same every day" toggle that hides or shows a day strip on
   each window, a "Use windows from another app" sheet that copies another target's
-  windows, days and budget into the draft, and a "Visualize windows" sheet
+  windows, days and budget into the draft, an "Apply these windows to other apps" sheet
+  (added 2026-09-07) that saves the draft here and gives it to any number of chosen
+  targets in one save (`AppModel.apply`; each classified on its own, so tightenings land
+  now and loosenings queue), and a "Visualize windows" sheet
   (`Views/WeekView.swift`): a seven-column 24-hour grid, a per-day editor reached by
   tapping a column, and "Apply to other days" which adds that day's hours to the chosen
   days on top of what they have, joining spans that overlap or touch (Zach's call,
