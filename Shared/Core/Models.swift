@@ -507,3 +507,42 @@ struct SharedState: Codable, Equatable {
     var pending: [PendingChange] = []
     var runtime = RuntimeState()
 }
+
+#if !os(iOS)
+// MARK: - Mac lookups
+
+/// Finding a target by what the Mac calls it. Here rather than beside the Mac's model because
+/// the import reads them too, and `Shared/Core` is the only place both can see.
+extension Config {
+    func target(bundleID: String) -> Target? {
+        targets.first { $0.kind == .macApp(bundleID: bundleID) }
+    }
+
+    /// The target whose host is `host` or a parent domain of it: "m.youtube.com" matches "youtube.com".
+    func target(host: String) -> Target? {
+        let host = host.lowercased()
+        return targets
+            .filter { if case .host(let h) = $0.kind { return Hosts.matches(host, rule: h) }; return false }
+            .max { a, b in a.host.count < b.host.count }
+    }
+}
+
+extension TargetKind {
+    var isHost: Bool {
+        if case .host = self { return true }
+        return false
+    }
+}
+
+extension Target {
+    var bundleID: String? {
+        if case .macApp(let id) = kind { return id }
+        return nil
+    }
+
+    var host: String {
+        if case .host(let h) = kind { return h }
+        return ""
+    }
+}
+#endif

@@ -167,12 +167,18 @@ struct CompanionSheet: View {
         _chosen = State(initialValue: Set(items.map(\.kind)))
     }
 
+    /// What one row measures: a 30pt tile with 8pt above and below, and the divider under it.
+    /// The sheet is sized in whole rows, so this has to be what a row really is — sized by the
+    /// row before it was drawn, the card sat in a taller box and the sheet had a band of air
+    /// under it that grew with every row.
+    private let rowHeight: CGFloat = 50
+
     /// True when what was added is an app, so the offer is its websites.
     private var addedIsApp: Bool { if case .macApp = added.kind { return true }; return false }
     private var selected: [Item] { items.filter { chosen.contains($0.kind) } }
 
     var body: some View {
-        SheetFrame(title: title, width: 460, height: 236 + CGFloat(min(items.count, 4)) * 54) {
+        SheetFrame(title: title, width: 460, height: 240 + CGFloat(min(items.count, 4)) * rowHeight) {
             VStack(alignment: .leading, spacing: 0) {
                 Text(explanation)
                     .emberBody(13)
@@ -190,7 +196,7 @@ struct CompanionSheet: View {
                     .emberCard()
                 }
                 .scrollBounceBehavior(.basedOnSize)
-                Footnote(text: "Nothing is enforced until it has a schedule. Set \(added.displayName)'s, then apply those windows to the rest from its editor so they keep the same hours.")
+                Footnote(text: "Nothing is enforced until it has a schedule. Set \(added.displayName)'s, then apply those windows to \(items.count == 1 ? "it" : "the rest") from its editor so they keep the same hours.")
                     .padding(.top, 10)
                 ProminentButton(title: buttonTitle) {
                     onAdd(selected)
@@ -251,9 +257,10 @@ struct CompanionSheet: View {
     }
 
     private var explanation: String {
-        addedIsApp
-            ? "\(added.displayName) is in. The site is the same thing in a browser tab; blocked together, there is no back door."
-            : "\(added.displayName) is in. The app is the same thing without the browser; blocked together, there is no back door."
+        let several = items.count > 1
+        return addedIsApp
+            ? "\(added.displayName) is in. \(several ? "The sites are" : "The site is") the same thing in a browser tab; blocked together, there is no back door."
+            : "\(added.displayName) is in. \(several ? "The apps are" : "The app is") the same thing without the browser; blocked together, there is no back door."
     }
 
     private var buttonTitle: String {
@@ -482,11 +489,24 @@ struct SettingsSheet: View {
     @State private var setupFile: SetupDocument?
     @State private var setupName = ""
     @State private var exportError: String?
+    @State private var showImporter = false
+    @State private var review: ImportPlan?
+    @State private var importError: String?
+
+    private var title: String {
+        if showLog { return "Activity log" }
+        return review == nil ? "Settings" : "Restore from a file"
+    }
 
     var body: some View {
-        SheetFrame(title: showLog ? "Activity log" : "Settings", width: 560, height: 640) {
+        SheetFrame(title: title, width: 560, height: 640) {
             if showLog {
                 LogView(onBack: { showLog = false })
+            } else if let review {
+                MacImportReview(plan: review, onBack: { self.review = nil }) {
+                    model.applyImport(review)
+                    self.review = nil
+                }
             } else {
                 settings
             }
@@ -516,6 +536,22 @@ struct SettingsSheet: View {
         }
         .alert("Download my setup", isPresented: Binding(get: { exportError != nil }, set: { if !$0 { exportError = nil } }), presenting: exportError) { _ in
             Button("OK") { exportError = nil }
+        } message: { error in
+            Text(error)
+        }
+        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.json]) { outcome in
+            switch outcome {
+            case .success(let url):
+                switch model.review(fileAt: url) {
+                case .success(let plan): review = plan
+                case .failure(let refusal): importError = refusal.message
+                }
+            case .failure(let error):
+                importError = error.localizedDescription
+            }
+        }
+        .alert("Restore from a file", isPresented: Binding(get: { importError != nil }, set: { if !$0 { importError = nil } }), presenting: importError) { _ in
+            Button("OK") { importError = nil }
         } message: { error in
             Text(error)
         }
@@ -635,9 +671,11 @@ struct SettingsSheet: View {
                 SectionLabel(text: "Your setup")
                 VStack(spacing: 0) {
                     CardAction(title: "Download my setup", symbol: "square.and.arrow.down", color: Ember.cream) { exportSetup() }
+                    CardDivider()
+                    CardAction(title: "Restore from a file", symbol: "square.and.arrow.up", color: Ember.cream) { showImporter = true }
                 }
                 .emberCard()
-                Footnote(text: "Saves your apps, websites, rules, budgets, tiers and delay as a JSON file. Mac targets are bundle identifiers and hosts, so this file is the whole setup and another Mac can take it as it stands.")
+                Footnote(text: "Saves your apps, websites, rules, budgets, tiers and delay as a JSON file. Mac targets are bundle identifiers and hosts, so this file is the whole setup and another Mac can take it as it stands.\n\nRestoring is a proposal, not a rewind: every rule in the file goes through the same delay the rule editor does, so anything in it that loosens your rules waits. You see the whole of it before any of it happens.")
                     .padding(.top, 8)
                     .padding(.bottom, 20)
 

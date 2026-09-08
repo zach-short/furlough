@@ -47,6 +47,12 @@ final class AppModel {
     /// keeps access, so it keeps this too.
     let wasAuthorized = UserDefaults.standard.bool(forKey: AppModel.wasAuthorizedKey)
     private static let wasAuthorizedKey = "furlough.wasAuthorized"
+    /// Targets whose "the other half is missing" nudge has been waved away. Beside
+    /// `wasAuthorized` in the app's own defaults rather than in `Config`: it records what has
+    /// been said, not what is blocked, so it must not be exported with a setup and must not
+    /// go through the loosening delay.
+    private var companionDismissed = Set(UserDefaults.standard.stringArray(forKey: AppModel.companionDismissedKey) ?? [])
+    private static let companionDismissedKey = "furlough.companionDismissed"
 
     var isAuthorized: Bool {
         switch authorization {
@@ -228,6 +234,89 @@ final class AppModel {
         SharedStore.log("picker: added \(outcome.added), removals scheduled \(outcome.removalsScheduled)")
         enforce(reason: "picker")
         return outcome
+    }
+
+    // MARK: Importing a setup
+
+    /// Opens a chosen file, or says why it will not be read. Writes nothing.
+    ///
+    /// The phone stops here rather than going straight to a plan: a Screen Time target is an
+    /// opaque token scoped to this device and this install, so the file cannot say which app
+    /// each of its rules belonged to and the person has to. `ImportSetupView` asks, and hands
+    /// the answers back to `plan`.
+    func openSetup(fileAt url: URL) -> Result<ConfigExport, ConfigImport.Refusal> {
+        do {
+            return .success(try ConfigImport.read(contentsOf: url))
+        } catch {
+            SharedStore.log("import refused: \(error)")
+            return .failure(error)
+        }
+    }
+
+    func plan(_ export: ConfigExport, matches: [ImportMatch]) -> ImportPlan {
+        let current = SharedStore.load()
+        return ConfigImport.plan(export, matches: matches, state: current, now: current.now)
+    }
+
+    /// Applies a whole plan in one save and one enforcement pass.
+    ///
+    /// `propose`, `setUtility` and the rest each save and then re-register every DeviceActivity
+    /// schedule, which is right for one edit typed by hand and wrong for twenty arriving
+    /// together. The targets a file adds are appended by the plan rather than through
+    /// `applyPicker`: that method reads a selection as the whole truth and schedules a removal
+    /// for everything absent from it, which is exactly wrong for a file that only ever adds.
+    func applyImport(_ plan: ImportPlan) {
+        SharedStore.mutate { state in
+            let now = state.now
+            ConfigImport.apply(plan, to: &state, now: now)
+        }
+        SharedStore.log("imported a setup: \(plan.added.count) new, \(plan.immediate.count) now, \(plan.queued.count) queued, \(plan.skipped.count) not used")
+        enforce(reason: "import")
+    }
+
+    // MARK: The other half
+
+    /// What to offer beside `target`, or nil when there is nothing to say.
+    ///
+    /// Nothing can be offered as a target is added: a Screen Time token is opaque. The shield
+    /// learns the name the first time it covers something, and from that name `Companions`
+    /// still answers — so the offer arrives on the second look rather than the first, which
+    /// is the best the phone can do. Nil once the other half is in, once the nudge has been
+    /// waved away, and for anything the table does not know.
+    ///
+    /// "Already in" can only be judged by learned name, so a half that is in Furlough but has
+    /// never been blocked is invisible here and can be offered once. Dismissing it settles
+    /// that for good, which is why the nudge is dismissible rather than merely closable.
+    func companion(for target: Target) -> Companions.Half? {
+        guard !companionDismissed.contains(target.id.uuidString) else { return nil }
+        guard let name = target.systemName, !name.isEmpty else { return nil }
+        switch target.kind {
+        case .application:
+            let hosts = Companions.missingHosts(forAppNamed: name, knownHosts: learnedNames(ofHosts: true))
+            return hosts.isEmpty ? nil : .sites(hosts)
+        case .webDomain:
+            // A website target's learned name is its domain, so the lookup goes the other way.
+            return Companions.missingApp(forHost: name, knownAppNames: learnedNames(ofHosts: false)).map(Companions.Half.app)
+        case .category:
+            return nil
+        }
+    }
+
+    /// Said once is enough: a nudge that comes back is a nag.
+    func dismissCompanion(for id: UUID) {
+        companionDismissed.insert(id.uuidString)
+        UserDefaults.standard.set(Array(companionDismissed), forKey: AppModel.companionDismissedKey)
+    }
+
+    /// The names the shield has taught, from one side of the list or the other.
+    private func learnedNames(ofHosts: Bool) -> [String] {
+        state.config.targets.compactMap { target in
+            switch target.kind {
+            case .webDomain: ofHosts ? target.systemName : nil
+            case .application: ofHosts ? nil : target.systemName
+            case .category: nil
+            }
+        }
     }
 
     // MARK: Rules
@@ -551,6 +640,8 @@ final class AppModel {
     func resetEverything() {
         SharedStore.reset()
         ShieldReconciler.clearEverything()
+        companionDismissed = []
+        UserDefaults.standard.removeObject(forKey: AppModel.companionDismissedKey)
         SharedStore.log("reset everything (Debug build)")
         lastError = nil
         enforce(reason: "reset")

@@ -247,6 +247,41 @@ final class MacModel {
         return added
     }
 
+    // MARK: Importing a setup
+
+    /// What a chosen file would do here. Reads the store rather than the view's copy of it,
+    /// and writes nothing: the plan exists to be shown before any of it happens.
+    func review(fileAt url: URL) -> Result<ImportPlan, ConfigImport.Refusal> {
+        do {
+            let export = try ConfigImport.read(contentsOf: url)
+            let current = SharedStore.load()
+            return .success(ConfigImport.plan(
+                export,
+                matches: ConfigImport.matches(for: export, config: current.config),
+                state: current,
+                now: current.now
+            ))
+        } catch {
+            SharedStore.log("import refused: \(error)")
+            return .failure(error)
+        }
+    }
+
+    /// Applies a whole plan in one save and one enforcement pass.
+    ///
+    /// `propose`, `setUtility` and the rest each save and re-enforce, which is right for one
+    /// edit typed by hand and wrong for twenty arriving together: it would be twenty writes and
+    /// twenty passes over every browser tab. So the plan is worked out against `Policy`
+    /// directly and applied whole, and the Mac is made to match it once at the end.
+    func applyImport(_ plan: ImportPlan) {
+        SharedStore.mutate { state in
+            let now = state.now
+            ConfigImport.apply(plan, to: &state, now: now)
+        }
+        SharedStore.log("imported a setup: \(plan.added.count) new, \(plan.immediate.count) now, \(plan.queued.count) queued, \(plan.skipped.count) not used")
+        enforce(reason: "import")
+    }
+
     func classify(rule: Rule, for id: UUID) -> ChangeClass {
         Policy.classify(newRule: rule, against: state.config.target(id: id))
     }
@@ -434,39 +469,4 @@ final class MacModel {
         enforce(reason: "reset")
     }
     #endif
-}
-
-// MARK: - Mac lookups on the shared model
-
-extension Config {
-    func target(bundleID: String) -> Target? {
-        targets.first { $0.kind == .macApp(bundleID: bundleID) }
-    }
-
-    /// The target whose host is `host` or a parent domain of it: "m.youtube.com" matches "youtube.com".
-    func target(host: String) -> Target? {
-        let host = host.lowercased()
-        return targets
-            .filter { if case .host(let h) = $0.kind { return Hosts.matches(host, rule: h) }; return false }
-            .max { a, b in a.host.count < b.host.count }
-    }
-}
-
-extension TargetKind {
-    var isHost: Bool {
-        if case .host = self { return true }
-        return false
-    }
-}
-
-extension Target {
-    var bundleID: String? {
-        if case .macApp(let id) = kind { return id }
-        return nil
-    }
-
-    var host: String {
-        if case .host(let h) = kind { return h }
-        return ""
-    }
 }
