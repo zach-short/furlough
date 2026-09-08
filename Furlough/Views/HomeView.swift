@@ -3,6 +3,10 @@ import SwiftUI
 
 struct HomeView: View {
     @Environment(AppModel.self) private var model
+    /// The Application / Website popover under the + button.
+    @State private var showAddChoice = false
+    /// Which of the two the picker was opened for; it wears a matching header and footer.
+    @State private var pickerFor: AddChoice = .application
     @State private var showPicker = false
     @State private var selection = FamilyActivitySelection(includeEntireCategory: true)
     @State private var pickerOutcome: AppModel.PickerOutcome?
@@ -43,16 +47,23 @@ struct HomeView: View {
                     ToolbarSpacer(.fixed, placement: .topBarTrailing)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Add", systemImage: "plus") {
-                        selection = model.pickerSelection
-                        showPicker = true
-                    }
-                    .tint(Ember.cream)
+                    Button("Add", systemImage: "plus") { showAddChoice = true }
+                        .tint(Ember.cream)
+                        .popover(isPresented: $showAddChoice, arrowEdge: .top) {
+                            AddChoicePopover(
+                                applicationCaption: "Apps and categories, from Apple's picker",
+                                websiteCaption: "Any site by its address, from the same picker"
+                            ) { choice in
+                                showAddChoice = false
+                                openPicker(for: choice)
+                            }
+                            .presentationCompactAdaptation(.popover)
+                        }
                 }
             }
             .familyActivityPicker(
-                headerText: "Choose what Furlough manages",
-                footerText: "Picking a category adds every app in it, each with its own rule.",
+                headerText: pickerHeader,
+                footerText: pickerFooter,
                 isPresented: $showPicker,
                 selection: $selection
             )
@@ -74,6 +85,33 @@ struct HomeView: View {
             }
             .sheet(isPresented: $showPending) { PendingChangesView() }
             .sheet(isPresented: $showSettings) { SettingsView() }
+        }
+    }
+
+    /// Apple's one picker holds apps, categories and websites alike; Website only changes what
+    /// it says on the way in. Sites are inside each category, after its apps, as Add Website.
+    private var pickerHeader: String {
+        switch pickerFor {
+        case .application: "Choose apps and categories"
+        case .website: "Choose websites"
+        }
+    }
+
+    private var pickerFooter: String {
+        switch pickerFor {
+        case .application: "Picking a category adds every app in it, each with its own rule."
+        case .website: "Open a category, scroll past its apps to Websites and tap Add Website. Each site gets its own rule."
+        }
+    }
+
+    /// Opens the picker once the popover has gone. A sheet presented while the popover is
+    /// still on its way out is dropped, so this waits out the dismissal first.
+    private func openPicker(for choice: AddChoice) {
+        pickerFor = choice
+        selection = model.pickerSelection
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(350))
+            showPicker = true
         }
     }
 }

@@ -25,6 +25,7 @@ Rules for each app live in an App Group so all four processes read the same stat
 ### The commitment device
 
 - Adding an app is instant. Nothing is enforced until you save its first rule, and that first rule is always "tighter than nothing", so it applies instantly too.
+- The **+** button asks **Application** or **Website** first, in a small popover. On the phone both open Apple's picker, which holds apps, categories and websites alike: sites are inside each category, after its apps, under **Add Website**, and the Website choice says so on the way in. On the Mac, Application lists the apps on the Mac and Website asks for a host.
 - Shrinking a window, removing a window, taking a day off a window, or lowering a budget applies instantly.
 - An app with no windows is open all day, up to its budget. Giving it a first window applies instantly (it is open less than before); removing its last window reopens the whole day, so that waits out the delay.
 - Extending a window, adding a window, adding a day to a window, raising a budget, or removing an app is queued for the loosening delay (24 hours by default). Pending changes are listed in the app and can be cancelled.

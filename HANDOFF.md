@@ -163,7 +163,11 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   `BrickGlyph`),
   `Home` (`HomeContent` holds the featured page id, `HomeGroups` for the sections including
   "Later this week" and `ordered` for the page order, `HeroPager`, `HeroPage` ticking once a
-  second, `HeroIndicator`, `EmptyHero`, `TargetRow`), `Components` (`TokenLabel`, `TokenName`, `TokenTile`,
+  second, `HeroIndicator`, `EmptyHero`, `TargetRow`; the + button shows `AddChoicePopover`
+  from `Shared/UI/AddChoice.swift`, Application or Website, added 2026-09-07; both open the
+  one `FamilyActivityPicker`, which holds websites under each category as "Add Website", so
+  the choice only sets the picker's header and footer, and the picker is presented after a
+  short wait because a sheet presented while the popover is still dismissing is dropped), `Components` (`TokenLabel`, `TokenName`, `TokenTile`,
   `StatusChip`, `RowCopy`, `ProminentButton`, `GhostButton`, `SectionLabel`, `Footnote`,
   `CardDivider`), `RuleEditor` (`WindowRow` with `DayStrip`, `CopyRuleSheet`, `TimeChip`,
   `TimePickerSheet`, `EffectBanner`), `WeekView` (`WeekDraft`, `WeekSheet`, `WeekGrid`,
@@ -316,7 +320,9 @@ name `Furlough`, macOS 26, non-sandboxed, hardened runtime with the
   documented escape. A launchd KeepAlive agent would be the next hardening; it was not done
   because launchd and a user launch would race to start two instances.
 - Views mirror the phone with a sidebar plus detail layout (`MacRootView`, `MacRuleEditor`,
-  `MacSheets`, `MacOnboardingView`, `MenuBar`). `MacComponents.swift` duplicates
+  `MacSheets`, `MacOnboardingView`, `MenuBar`). The sidebar's + button shows the shared
+  `AddChoicePopover` (an NSPopover), and Application or Website opens `AddAppSheet` or
+  `AddSiteSheet`; seen working on this Mac on 2026-09-07. `MacComponents.swift` duplicates
   `ProminentButton`, `GhostButton`, `SectionLabel`, `Footnote`, `CardDivider`, `StatusChip`,
   `RowCopy` and `BudgetSlider` rather than moving them out of `Furlough/Views`, because that
   folder was being edited in another session at the time; unify into `Shared/UI` when quiet.

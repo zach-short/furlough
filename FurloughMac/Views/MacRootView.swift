@@ -30,6 +30,8 @@ struct MacRootView: View {
 struct MacHomeView: View {
     @Environment(MacModel.self) private var model
     @State private var selection: UUID?
+    /// The Application / Website popover under the + button.
+    @State private var showAddChoice = false
     @State private var showAddApp = false
     @State private var showAddSite = false
     @State private var showPending = false
@@ -81,22 +83,31 @@ struct MacHomeView: View {
                     .help("Pending changes")
                 GlassCircleButton(symbol: "gearshape") { showSettings = true }
                     .help("Settings")
-                Menu {
-                    Button("Add app…") { showAddApp = true }
-                    Button("Add website…") { showAddSite = true }
+                Button {
+                    showAddChoice = true
                 } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(Ember.cream)
                         .frame(width: 34, height: 34)
+                        .contentShape(Circle())
                 }
-                .menuStyle(.button)
                 .buttonStyle(.glassProminent)
                 .tint(Ember.ember)
                 .clipShape(Circle())
-                .menuIndicator(.hidden)
-                .fixedSize()
                 .help("Add an app or website")
+                .popover(isPresented: $showAddChoice, arrowEdge: .bottom) {
+                    AddChoicePopover(
+                        applicationCaption: "Any app on this Mac",
+                        websiteCaption: "A site and its subdomains, in any browser"
+                    ) { choice in
+                        showAddChoice = false
+                        switch choice {
+                        case .application: showAddApp = true
+                        case .website: showAddSite = true
+                        }
+                    }
+                }
             }
             .padding(.top, 14)
             .padding(.horizontal, 16)
