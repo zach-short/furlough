@@ -6,7 +6,9 @@ import SwiftUI
 /// exhaustion. The same value drives the hero, the 12 pt row chips, the widget and the Live
 /// Activity.
 struct HourglassState: Equatable {
-    enum Glass: Equatable { case cream, amber, dim, grey, pending }
+    /// `ink` is the glass on a light ground rather than the app's dark room: the Mac's menu
+    /// bar follows the desktop picture, and cream caps on a white bar are not there at all.
+    enum Glass: Equatable { case cream, amber, dim, grey, pending, ink }
     enum Tone: Equatable { case sand, amber, ember, grey }
     enum Pulse: Equatable {
         case none, slow, fast, breathe
@@ -97,6 +99,7 @@ extension HourglassState.Glass {
         case .dim: .white.opacity(0.045)
         case .grey: .white.opacity(0.035)
         case .pending: Ember.pending.opacity(0.03)
+        case .ink: .black.opacity(0.05)
         }
     }
 
@@ -108,6 +111,7 @@ extension HourglassState.Glass {
         case .dim: (.white, 0.38, 0.1, 0.3)
         case .grey: (.white, 0.3, 0.1, 0.24)
         case .pending: (Ember.pending, 0.95, 0.55, 0.9)
+        case .ink: (.black, 0.8, 0.45, 0.7)
         }
         return LinearGradient(
             stops: [
@@ -124,6 +128,15 @@ extension HourglassState.Glass {
         case .cream, .amber: 0.92
         case .dim, .grey: 0.55
         case .pending: 0.35
+        case .ink: 0.85
+        }
+    }
+
+    /// The caps are cream against the dark room, and the room's own dark against a light one.
+    var capColor: Color {
+        switch self {
+        case .ink: Ember.ground
+        default: Ember.cream
         }
     }
 }
@@ -282,10 +295,10 @@ struct HourglassView: View {
                     .stroke(state.glass.stroke, style: StrokeStyle(lineWidth: (mini ? 7 : 2.5) * scale, lineJoin: .round))
                     .opacity(outlineOpacity)
                 HourglassPartShape(part: .cap(top: true, height: capHeight))
-                    .fill(Ember.cream.opacity(state.glass.capOpacity))
+                    .fill(state.glass.capColor.opacity(state.glass.capOpacity))
                 HourglassPartShape(part: .cap(top: false, height: capHeight))
-                    .fill(Ember.cream.opacity(state.glass.capOpacity))
-                if !mini {
+                    .fill(state.glass.capColor.opacity(state.glass.capOpacity))
+                if !mini, state.glass != .ink {
                     HourglassPartShape(part: .highlight)
                         .stroke(Color.white.opacity(0.55), style: StrokeStyle(lineWidth: 2 * scale, lineCap: .round))
                     if state.showsCube {

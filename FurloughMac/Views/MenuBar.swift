@@ -15,9 +15,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private let model: MacModel
     private var item: NSStatusItem?
     private var timer: Timer?
-    /// The last glass drawn and the image it made, so a tick that changes nothing does not
-    /// redraw the sand.
+    /// The last glass drawn, the appearance it was drawn for, and the image the two made, so a
+    /// tick that changes nothing does not redraw the sand.
     private var lastGlass: HourglassState?
+    private var lastDark = true
     private var lastImage: NSImage?
     /// The 120 × 160 drawing at menu bar height. Under 40 pt it draws its bolder chip form,
     /// the same picture the 12 pt row chips wear, and it stays inside one menu bar slot.
@@ -70,19 +71,35 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         // visibly drains through a window without a redraw every second.
         state.sandLevel = (state.sandLevel * 40).rounded() / 40
         state.moundLevel = (state.moundLevel * 40).rounded() / 40
-        if state != lastGlass || lastImage == nil {
+        // The glass is drawn in cream and white, for the app's dark room. A menu bar is not
+        // always dark — it follows the desktop picture as much as the system theme — so on a
+        // light one it is drawn in ink instead, which keeps the sand and the status colour
+        // rather than falling back to a silhouette that reads as a smudge at this size.
+        let isDark = button.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        if state != lastGlass || isDark != lastDark || lastImage == nil {
             lastGlass = state
+            lastDark = isDark
             let isOpen = summary.openUntil != nil || !summary.allDayNames.isEmpty
-            lastImage = Self.still(state, label: isOpen ? "Furlough, something is open" : "Furlough")
+            lastImage = Self.still(
+                state, onDark: isDark,
+                label: isOpen ? "Furlough, something is open" : "Furlough"
+            )
             // A Mac that will not render the view still gets an hourglass, not a blank item.
             lastImage = lastImage ?? NSImage(systemSymbolName: "hourglass", accessibilityDescription: "Furlough")
         }
         button.image = lastImage
     }
 
-    /// One frame of the drawing as an image. Not a template image: the sand and the glow carry
-    /// the status, and a template would grey them out.
-    private static func still(_ state: HourglassState, label: String = "Furlough") -> NSImage? {
+    /// One frame of the drawing as an image, in the glass that suits the ground it will sit on.
+    /// Never a template image: the sand and the glow carry the status, and a template would
+    /// flatten them into one colour.
+    private static func still(_ state: HourglassState, onDark: Bool = true, label: String = "Furlough") -> NSImage? {
+        var state = state
+        if !onDark {
+            state.glass = .ink
+            // The glow is a soft halo for a dark room; on a light one it is a smudge.
+            state.glow = nil
+        }
         let renderer = ImageRenderer(
             content: HourglassView(state: state, phase: 0, motion: false)
                 .frame(width: glassSize.width, height: glassSize.height)
@@ -139,7 +156,13 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             )
             let row = disabled("\(target.displayName): \(TimeFormat.status(status))")
             // The phone's row chip: the same glass in the same status colour beside the name.
-            row.image = Self.still(HourglassState.of(target, status: status, runtime: model.state.runtime, now: now))
+            // A menu is drawn in the system's appearance, not the bar's, so it is asked rather
+            // than the bar; on a light one the glass goes in as a template, as the item does.
+            let onDark = NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            row.image = Self.still(
+                HourglassState.of(target, status: status, runtime: model.state.runtime, now: now),
+                onDark: onDark, label: target.displayName
+            )
             menu.addItem(row)
         }
         menu.addItem(.separator())
