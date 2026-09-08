@@ -35,6 +35,7 @@ struct MacHomeView: View {
     @State private var showAddSite = false
     @State private var showPending = false
     @State private var showSettings = false
+    @State private var showHelp = false
     /// The other half of what was just added, held until the add sheet has fully gone: a sheet
     /// presented over one still leaving is dropped, so the offer waits for `onDismiss`.
     @State private var pendingCompanion: CompanionPrompt?
@@ -91,6 +92,7 @@ struct MacHomeView: View {
         }
         .sheet(isPresented: $showPending) { PendingSheet() }
         .sheet(isPresented: $showSettings) { SettingsSheet() }
+        .sheet(isPresented: $showHelp) { HelpSheet() }
         .onChange(of: model.state.config.targets.map(\.id)) { _, ids in
             if let selection, !ids.contains(selection) { self.selection = nil }
         }
@@ -143,6 +145,8 @@ struct MacHomeView: View {
                     .help("Pending changes")
                 GlassCircleButton(symbol: "gearshape") { showSettings = true }
                     .help("Settings")
+                GlassCircleButton(symbol: "questionmark") { showHelp = true }
+                    .help("Help")
                 Button {
                     showAddChoice = true
                 } label: {
