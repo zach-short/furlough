@@ -151,29 +151,89 @@ final class MacModel {
     func propose(rule: Rule, nickname: String, for id: UUID) -> ProposalResult {
         var current = SharedStore.load()
         guard let index = current.config.targets.firstIndex(where: { $0.id == id }) else { return .unchanged }
-        let trimmed = nickname.trimmingCharacters(in: .whitespacesAndNewlines)
-        current.config.targets[index].nickname = trimmed.isEmpty ? current.config.targets[index].defaultName : trimmed
-        let target = current.config.targets[index]
+        Self.rename(index, to: nickname, in: &current)
+        let result = Self.assign(rule, to: id, in: &current)
+        SharedStore.save(current)
+        SharedStore.log("rule edit for \(current.config.targets[index].displayName): \(result)")
+        enforce(reason: "rule edit")
+        return result
+    }
 
-        var result = ProposalResult.unchanged
-        if target.rule != rule {
-            current.pending.removeAll { change in
-                if case .setRule(let targetID, _) = change.kind { return targetID == id }
-                return false
+    /// What "Apply these windows to other apps" did: how many got the rule now, how many wait
+    /// out the delay, and when those land.
+    struct ApplyOutcome: Equatable {
+        var appliedNow = 0
+        var scheduled = 0
+        var effectiveAt: Date?
+
+        var message: String {
+            var lines: [String] = []
+            if appliedNow > 0 {
+                lines.append("Applied to \(appliedNow) now.")
             }
-            if Policy.classify(newRule: rule, against: target) == .tightening {
-                current.config.targets[index].rule = rule
-                result = .appliedNow
-            } else {
-                let effectiveAt = Date.now.addingTimeInterval(current.config.loosenDelay)
-                current.pending.append(PendingChange(kind: .setRule(targetID: id, rule: rule), effectiveAt: effectiveAt))
-                result = .scheduled(effectiveAt)
+            if scheduled > 0, let effectiveAt {
+                let when = effectiveAt.formatted(date: .abbreviated, time: .shortened)
+                lines.append(scheduled == 1
+                    ? "1 loosens its rules, so it takes effect \(when)."
+                    : "\(scheduled) loosen their rules, so they take effect \(when).")
+            }
+            if lines.isEmpty { return "Nothing changed. They already had these windows." }
+            return lines.joined(separator: "\n\n")
+        }
+    }
+
+    /// One rule for several targets in one save: the editor's draft for the app it was written
+    /// on (with its name) and for every app chosen in "Apply these windows to other apps".
+    /// Each target is judged on its own, so the rule lands now where it tightens and waits out
+    /// the delay where it loosens, the same as saving each one by hand.
+    func apply(rule: Rule, nickname: String, for id: UUID, andTo others: [UUID]) -> ApplyOutcome {
+        var current = SharedStore.load()
+        if let index = current.config.targets.firstIndex(where: { $0.id == id }) {
+            Self.rename(index, to: nickname, in: &current)
+        }
+        var outcome = ApplyOutcome()
+        for targetID in [id] + others {
+            switch Self.assign(rule, to: targetID, in: &current) {
+            case .appliedNow:
+                outcome.appliedNow += 1
+            case .scheduled(let date):
+                outcome.scheduled += 1
+                outcome.effectiveAt = date
+            case .unchanged:
+                break
             }
         }
         SharedStore.save(current)
-        SharedStore.log("rule edit for \(target.displayName): \(result)")
-        enforce(reason: "rule edit")
-        return result
+        SharedStore.log("rule applied to \(1 + others.count) target(s): \(outcome.appliedNow) now, \(outcome.scheduled) scheduled")
+        enforce(reason: "rule apply")
+        return outcome
+    }
+
+    /// The name shown for the target at `index`: the trimmed nickname, or the app's own name
+    /// when that is empty.
+    private static func rename(_ index: Int, to nickname: String, in state: inout SharedState) {
+        let trimmed = nickname.trimmingCharacters(in: .whitespacesAndNewlines)
+        state.config.targets[index].nickname = trimmed.isEmpty ? state.config.targets[index].defaultName : trimmed
+    }
+
+    /// Gives `id` the rule, or leaves it alone when it already has it. A tightening lands in
+    /// the config; a loosening replaces any rule already pending for that target with one that
+    /// waits out the delay. Nothing is saved.
+    private static func assign(_ rule: Rule, to id: UUID, in state: inout SharedState) -> ProposalResult {
+        guard let index = state.config.targets.firstIndex(where: { $0.id == id }) else { return .unchanged }
+        let target = state.config.targets[index]
+        guard target.rule != rule else { return .unchanged }
+        state.pending.removeAll { change in
+            if case .setRule(let targetID, _) = change.kind { return targetID == id }
+            return false
+        }
+        if Policy.classify(newRule: rule, against: target) == .tightening {
+            state.config.targets[index].rule = rule
+            return .appliedNow
+        }
+        let effectiveAt = Date.now.addingTimeInterval(state.config.loosenDelay)
+        state.pending.append(PendingChange(kind: .setRule(targetID: id, rule: rule), effectiveAt: effectiveAt))
+        return .scheduled(effectiveAt)
     }
 
     func removeTarget(id: UUID) -> ProposalResult {

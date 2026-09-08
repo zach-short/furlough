@@ -310,7 +310,10 @@ name `Furlough`, macOS 26, non-sandboxed, hardened runtime with the
   `ProminentButton`, `GhostButton`, `SectionLabel`, `Footnote`, `CardDivider`, `StatusChip`,
   `RowCopy` and `BudgetSlider` rather than moving them out of `Furlough/Views`, because that
   folder was being edited in another session at the time; unify into `Shared/UI` when quiet.
-  Times are `DatePicker` fields; an end of 12:00 AM means midnight (1440).
+  Times are `DatePicker` fields; an end of 12:00 AM means midnight (1440). `MacRuleEditor`
+  has the phone's "Use windows from another app" (a menu) and "Apply these windows to other
+  apps" (`ApplyRuleSheet` in `MacSheets.swift`, backed by `MacModel.apply`, same semantics as
+  the phone's).
 - Verified on this Mac (2026-09-07): Release build clean, installed to `/Applications`,
   a target blocked all day was quit within a second of launching and logged. Not yet seen by
   a person: the window itself, the shield panel, the browser redirect (it needs the one-time

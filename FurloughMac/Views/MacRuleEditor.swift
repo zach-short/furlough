@@ -13,7 +13,11 @@ struct MacRuleEditor: View {
     @State private var budget = Furlough.defaultBudgetMinutes
     @State private var byDay = false
     @State private var loaded = false
-    @State private var result: ProposalResult?
+    @State private var showApply = false
+    /// Targets chosen in the apply sheet, applied once the sheet has gone so the alert can show.
+    @State private var applyTo: [UUID]?
+    /// What the last save did, shown in the Saved alert.
+    @State private var saved: String?
     @State private var confirmRemove = false
     @State private var now = Date.now
     private let clock = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -91,12 +95,23 @@ struct MacRuleEditor: View {
         .onReceive(clock) { now = $0 }
         .onAppear(perform: load)
         .confirmationDialog("Remove from Furlough?", isPresented: $confirmRemove, titleVisibility: .visible) {
-            Button("Remove", role: .destructive) { result = model.removeTarget(id: targetID) }
+            Button("Remove", role: .destructive) { saved = model.removeTarget(id: targetID).message }
         }
-        .alert("Saved", isPresented: Binding(get: { result != nil }, set: { if !$0 { result = nil } }), presenting: result) { _ in
-            Button("OK") { result = nil }
-        } message: { result in
-            Text(result.message)
+        .sheet(isPresented: $showApply, onDismiss: {
+            guard let ids = applyTo else { return }
+            applyTo = nil
+            applyToOthers(ids)
+        }) {
+            ApplyRuleSheet(
+                candidates: applyCandidates,
+                rule: draft,
+                delayHours: model.state.config.loosenDelayHours
+            ) { ids in applyTo = ids }
+        }
+        .alert("Saved", isPresented: Binding(get: { saved != nil }, set: { if !$0 { saved = nil } }), presenting: saved) { _ in
+            Button("OK") { saved = nil }
+        } message: { message in
+            Text(message)
         }
     }
 
@@ -206,12 +221,23 @@ struct MacRuleEditor: View {
                 .buttonStyle(.plain)
                 .menuIndicator(.hidden)
             }
+            if !applyCandidates.isEmpty {
+                CardDivider()
+                CardAction(title: "Apply these windows to other apps", symbol: "arrowshape.turn.up.right") { showApply = true }
+                    .disabled(draft.validationError != nil)
+                    .opacity(draft.validationError == nil ? 1 : 0.45)
+            }
         }
         .emberCard()
     }
 
     private var copyCandidates: [Target] {
         model.state.config.targets.filter { $0.id != targetID && ($0.rule?.isEverAllowed ?? false) }
+    }
+
+    /// Every other app and site, set up or not.
+    private var applyCandidates: [Target] {
+        model.state.config.targets.filter { $0.id != targetID }
     }
 
     private func budgetCard(_ target: Target) -> some View {
@@ -326,7 +352,13 @@ struct MacRuleEditor: View {
 
     private func save() {
         drafts = DraftWindow.joined(drafts)
-        result = model.propose(rule: draft, nickname: nickname, for: targetID)
+        saved = model.propose(rule: draft, nickname: nickname, for: targetID).message
+    }
+
+    /// Saves the draft here and gives it to `ids` as well, in one go.
+    private func applyToOthers(_ ids: [UUID]) {
+        drafts = DraftWindow.joined(drafts)
+        saved = model.apply(rule: draft, nickname: nickname, for: targetID, andTo: ids).message
     }
 }
 
