@@ -157,7 +157,9 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   syncs the Live Activity), `Model/Monitoring.swift` (DeviceActivity registration),
   `Model/LiveActivityManager.swift`, `Model/TagScanner.swift` (Core NFC tag session as one
   async call; the identifier is read at detection, no connect), `Views/`: `Root` (dark scheme,
-  ember tint), `Onboarding`, `Brick` (`BrickView`, `BrickCard` on Home, `BrickToggleButton`,
+  ember tint, holds the launch screen for a returning user and dissolves between launch,
+  onboarding and home), `Launch` (`LaunchView`, the `Launch` timings,
+  `HourglassState.launching`), `Onboarding`, `Brick` (`BrickView`, `BrickCard` on Home, `BrickToggleButton`,
   `BrickGlyph`),
   `Home` (`HomeContent` holds the featured page id, `HomeGroups` for the sections including
   "Later this week" and `ordered` for the page order, `HeroPager`, `HeroPage` ticking once a
@@ -213,6 +215,14 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   without connecting (unverified on device, see step 2).
   `AuthorizationStatus.approvedWithDataAccess` exists from iOS 26.4; `AppModel.isAuthorized`
   handles it with a default case.
+- After a cold start `AuthorizationCenter.shared.authorizationStatus` reads `.notDetermined`
+  for a moment before the real answer, which flashed onboarding before Home (Zach reported it
+  2026-09-07). `AppModel.observeAuthorization()` follows the `$authorizationStatus` publisher
+  and enforces when access arrives after activation; `AppModel.wasAuthorized` (the app's own
+  defaults, key `furlough.wasAuthorized`, set on a definite answer) lets `RootView` hold
+  `LaunchView` for `Launch.hold`, plus up to `Launch.patience` while the answer is still
+  pending, then dissolve. The system launch screen is the `LaunchBackground` colour (Ground)
+  from `project.yml`, so the flat frame before ours matches.
 - Live Activities cannot animate custom views, so the hourglass in the activity and the
   island is drawn at the level of the last sync; only `Text(timerInterval:)` moves by itself.
 - ActivityKit's `Activity` is not Sendable; `LiveActivityManager` marks it

@@ -64,6 +64,12 @@ padding and are separated by the card border color.
 **App tiles.** 34 pt (48 pt in the rule-editor header), radius 9 (13 for the large one).
 Render the real icon with FamilyControls `Label(token)`.
 
+**Launch.** A returning user opens on the launch colour (Ground, set as the system launch
+screen); then the wall, a running hourglass (106 × 140 pt, Amber glow at 60 %, slow pulse)
+and the "FURLOUGH" eyebrow fade up over 0.45 s, hold 1 s, and dissolve into Home over
+0.55 s. The wall stays put under the dissolve, so only the glass and the name move. A fresh
+install goes straight to onboarding, and granting access dissolves onboarding into Home.
+
 **Home.** Top bar: glass gear on the left, "N pending" glass pill (Pending color) and glass
 plus on the right. Hero: one page per managed app, paged horizontally in the list's order
 and landing on the first open app (design/HOURGLASS.md, Direction C with header H1). Each

@@ -1,3 +1,4 @@
+import Combine
 import FamilyControls
 import Foundation
 import ManagedSettings
@@ -29,6 +30,12 @@ final class AppModel {
     var notificationsGranted: Bool?
     let isAppGroupAvailable = SharedStore.isAppGroupAvailable
     private let scanner = TagScanner()
+    /// Screen Time access stood at the end of an earlier run. FamilyControls reports "not
+    /// determined" for a moment after a cold start, so the root trusts this to hold the launch
+    /// screen instead of flashing onboarding. Kept in the app's own defaults: a Debug reset
+    /// keeps access, so it keeps this too.
+    let wasAuthorized = UserDefaults.standard.bool(forKey: AppModel.wasAuthorizedKey)
+    private static let wasAuthorizedKey = "furlough.wasAuthorized"
 
     var isAuthorized: Bool {
         switch authorization {
@@ -41,11 +48,32 @@ final class AppModel {
     // MARK: Lifecycle
 
     func activate() {
-        authorization = AuthorizationCenter.shared.authorizationStatus
+        note(AuthorizationCenter.shared.authorizationStatus)
         reload()
         Task { await refreshNotificationStatus() }
         guard isAuthorized else { return }
         enforce(reason: "app active")
+    }
+
+    /// Follows FamilyControls' own updates. After a cold start the first read says "not
+    /// determined" and the real answer arrives here a moment later; if the app went active in
+    /// between, this enforces now, as `activate()` could not.
+    func observeAuthorization() async {
+        for await status in AuthorizationCenter.shared.$authorizationStatus.values {
+            let hadAccess = isAuthorized
+            note(status)
+            if isAuthorized, !hadAccess { enforce(reason: "authorized") }
+        }
+    }
+
+    /// Records the status, and a definite answer for the next launch (see `wasAuthorized`).
+    private func note(_ status: AuthorizationStatus) {
+        authorization = status
+        if isAuthorized {
+            UserDefaults.standard.set(true, forKey: AppModel.wasAuthorizedKey)
+        } else if status == .denied {
+            UserDefaults.standard.set(false, forKey: AppModel.wasAuthorizedKey)
+        }
     }
 
     func requestAuthorization() async {
@@ -55,7 +83,7 @@ final class AppModel {
         } catch {
             lastError = "Screen Time access failed: \(error.localizedDescription)"
         }
-        authorization = AuthorizationCenter.shared.authorizationStatus
+        note(AuthorizationCenter.shared.authorizationStatus)
         if isAuthorized { enforce(reason: "authorized") }
     }
 
