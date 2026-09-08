@@ -2,7 +2,7 @@
 
 A personal iOS and Mac app blocker with no unblock button.
 
-Pick the apps and websites that eat your time. Give each one a daily minute budget (say 30 minutes) and, if you want, allowed windows (say 8:00–10:00 PM), the same every day or different per day of the week (until midnight on school nights, until 2 AM on weekends). With no windows an app is open all day, up to its budget. Outside the windows, or once the budget is spent, iOS shields the app. The only way to loosen a rule is to wait: loosening edits take effect 24 hours after you make them, and you can cancel them in the meantime. Tightening edits apply instantly.
+Pick the apps and websites that eat your time. Give each one a daily minute budget (say 30 minutes) and, if you want, allowed windows (say 8:00–10:00 PM, or 5:00 PM to 4:00 AM for a weekend night), the same every day or different per day of the week (until midnight on school nights, until 2 AM on weekends). With no windows an app is open all day, up to its budget. Outside the windows, or once the budget is spent, iOS shields the app. The only way to loosen a rule is to wait: loosening edits take effect 24 hours after you make them, and you can cancel them in the meantime. Tightening edits apply instantly.
 
 There is also the Anchor: a second set of apps you lock in one tap, from anywhere, and can only unlock by holding your phone to a physical NFC tag you paired. Leave the tag at home and your phone stays anchored until you are back.
 
@@ -36,7 +36,7 @@ lands, while there is still time to cancel it, and one when it lands.
 - **How much it is worth** puts each app in one of four tiers, and the tier scales its delay: **Essential** waits a quarter of the base, **Useful** the base itself, **Idle** twice it, **Hazard** four times. With the default 24 hours that runs 6 hours for Messages to 4 days for TikTok, and no tier can ever wait less than an hour. A new app is Useful until you say otherwise, and Furlough suggests a tier for the apps and sites it recognises.
 - Moving an app toward Hazard lengthens its delay, so it applies the moment you save. Moving it toward Essential shortens the delay, which is itself a loosening: it queues behind the delay that app has *today*. So marking TikTok essential and reopening it in the same save still waits the full four days.
 - Blocking an app that is worth keeping says so before you save, and blocking an **Essential** one asks twice. The warning names the actual cost — that blocking Messages stops codes texted to you arriving, that blocking an authenticator stops you signing in anywhere. Furlough has no emergency unblock, so this is the last cheap moment to change your mind. Apps Furlough exists to block are never questioned.
-- Windows never cross midnight. "Until 2 AM on Saturday night" is an evening window plus a 12:00–2:00 AM window on Sunday, and the budget still resets at midnight.
+- A window can run past midnight: set 5:00 PM → 4:00 AM and the row says so, marked **+1**, counted as 11 h. Furlough keeps it as the two windows it really is — the evening, and the early morning on the day after — because the rules engine and Screen Time both work a day at a time, and reads it back as the one row you wrote. Pick weekends and Monday morning opens too, because Sunday night is one of the nights you asked for; the budget resets at midnight, so those small hours get a fresh one. The editor says both under the windows.
 - When setting up an app, **Use windows from another app** copies another app's windows, days and budget into the editor, so a second app can get the same rule in two taps.
 - **Apply these windows to other apps** goes the other way: pick any of the other apps and sites and they all get this rule in one save, along with the app you wrote it on. Each is judged on its own, so it lands now where it is tighter and waits out the delay where it is looser.
 - **Visualize windows** opens the week as a seven-column, 24-hour grid. Tap a day to see just its hours, change them, and **Apply to other days** to add the same hours to any other days, on top of what they have.
@@ -171,7 +171,7 @@ xcodebuild test -project Furlough.xcodeproj -scheme FurloughCoreTests -destinati
 
 ## Known limits of the Screen Time API
 
-- Windows must be at least 15 minutes and cannot cross midnight (split them in two).
+- Windows must be at least 15 minutes and, as stored, cannot cross midnight. A night is kept as two of them, one either side of midnight, and each half needs its own 15 minutes.
 - At most 19 distinct windows across all apps (iOS allows 20 monitored activities, and one is the daily budget tracker).
 - The monitor extension can fire a few minutes late, and threshold callbacks occasionally fire twice. Every callback is idempotent, so this is harmless.
 - Distributing outside Xcode (TestFlight, App Store) needs the Family Controls distribution entitlement, requested per bundle ID, which can take weeks. `~/Projects/archive/furlough/testflight-deployment/DEPLOYMENT.md` has the request, and everything else the App Store wants.

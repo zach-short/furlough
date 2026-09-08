@@ -36,6 +36,41 @@ and the three header layouts as working phones. Built the same day:
 - Quarter marks were not built: no `mark:` events, no quarter map. The budget shows only
   through the two callbacks that exist: amber at the 5-minute warning, ember when spent.
 
+## Sand, rebuilt (2026-09-08)
+
+Zach's note after living with it: the top sand floated in the middle of the bulb with air on
+both sides, and the stream was a dashed line at one speed with nothing happening where it
+landed. Rebuilt in `Shared/UI/HourglassGeometry.swift` (pure geometry, no SwiftUI, checked by
+a scratch script) and the shapes in `Hourglass.swift`:
+
+- The sand fills the bulb it is in. Both bulbs are walked from the mockup's body path (the
+  two Béziers into the neck, solved by bisection into a quarter-unit table of half widths),
+  inset one unit so the wall's stroke stays a line; the stroke is now drawn over the sand.
+- The top surface is a funnel: a bowl whose depth is 36 % of the width where the sand meets
+  the wall, with a shadow at the bottom, shallower as the last of it runs into the neck.
+  Through the neck the sand narrows from the neck's width to the stream's 3 units at the
+  orifice (y 81), so the charge pours into the stream instead of stopping on a straight
+  line above it, which Zach spotted on the phone. The
+  pile below is a cone at about 32°, the angle of repose of dry sand, with a rounded tip
+  under the stream and a lighter patch of fresh sand there; it spreads to the walls as it
+  grows and fills the corners when it reaches them.
+- A level is a share of one charge by area, not a height. One charge is the pile at its
+  tallest (tip at y 102); the top bulb's level-1 edge is whatever holds the same area (y
+  23.85, so a little air under the lid), and tables invert area to edge or tip. The surface
+  drops slowly while the bulb is wide and quickly as it narrows, and top plus pile is
+  conserved through a window.
+- The stream is grains. `HourglassStream` emits 34 a second from the neck at 16 units/s under
+  150 units/s² of gravity, each with its own sideways offset and size from a hash of its
+  index, the column wandering slowly and spreading a little as it falls, each grain stretched
+  along its fall in proportion to its speed. Everything is a function of the phase, so a
+  still phase (widgets, the Live Activity) shows a full stream and the Anchor is the stream
+  at one fixed phase. Landing grains throw two chips with a 40 % chance, which hop under the
+  same gravity, roll on the pile's surface and fade over 0.42 s; a small dust haze shimmers
+  where the stream lands. The lone grain of a window minutes away now accelerates, hops once
+  and fades. Reduce Motion and the 12 pt chips keep a solid tapering column.
+- Grains are one `Path` of ellipses per opacity band, so a frame is four fills at most, and
+  nothing here needs `Canvas`, so the widget and shield extensions draw the same picture.
+
 The rest of this file is the brief as presented.
 
 ## What the app can actually know

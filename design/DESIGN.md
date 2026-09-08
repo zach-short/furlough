@@ -27,9 +27,13 @@ countdown and the glowing hourglass.
 | Card border | white 12%, 1 pt | Card edge |
 | Slider fill | Ember → Amber, horizontal | Budget slider |
 
-Wall (the background behind everything): Ground, plus a radial ember glow centered at
-x 28% / y 104% (60% alpha, fading out by 62% radius), plus a faint amber glow at the top
-right (14% alpha). A very light noise overlay (about 7%) keeps gradients from banding.
+Wall (the background behind everything): Ground, plus a radial ember glow with a 58% of width
+by 35% of height radius (60% alpha, fading out by 62% radius), plus a faint amber glow at the
+top right (14% alpha). A very light noise overlay (about 7%) keeps gradients from banding. The
+ember laps the room rather than sitting still: a 103 s orbit about the middle, 70% of the width
+by 56% of the height out, with its reach breathing ±20% every 41 s and its pace wobbling every
+32 s. The orbit is polar, so the ember always clears the middle of the screen, where the content
+sits — at its widest it passes just off each edge. Reduce Motion parks it at x 28% / y 104%.
 
 Shield tint over the wall: Ember at 22% on `.systemUltraThinMaterialDark`.
 

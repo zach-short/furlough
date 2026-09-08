@@ -198,3 +198,118 @@ struct TargetTests {
         #expect(target.displayName == "Tube")
     }
 }
+
+/// An evening that runs into the next morning. The editors take it as one row; Furlough keeps
+/// the two windows it really is, because the rules engine and DeviceActivity work a day at a
+/// time, and reads them back as the row it was written as.
+@Suite("A night")
+struct NightTests {
+    @Test("days move forward through the week, Saturday coming round to Sunday")
+    func shiftedDays() {
+        #expect(Weekdays.saturday.shifted(by: 1) == .sunday)
+        #expect(Weekdays.weekend.shifted(by: 1) == [.sunday, .monday])
+        #expect(Weekdays.all.shifted(by: 1) == .all)
+        #expect(Weekdays.monday.shifted(by: 0) == .monday)
+        #expect(Weekdays.monday.shifted(by: 7) == .monday)
+        #expect(Weekdays.weekdays.shifted(by: 2) == [.wednesday, .thursday, .friday, .saturday, .sunday])
+    }
+
+    @Test("it splits at midnight, the morning landing on the days after")
+    func split() {
+        let night = window(17 * 60, 4 * 60, .weekend)
+        #expect(night.isNight)
+        #expect(night.spanMinutes == 11 * 60)
+        #expect(night.split == [
+            window(17 * 60, Furlough.minutesPerDay, .weekend),
+            window(0, 4 * 60, [.sunday, .monday]),
+        ])
+    }
+
+    @Test("an evening that stops at midnight has no morning half")
+    func endsAtMidnight() {
+        #expect(window(17 * 60, 0).split == [window(17 * 60, Furlough.minutesPerDay)])
+        #expect(!window(17 * 60, Furlough.minutesPerDay).isNight)
+        #expect(window(17 * 60, Furlough.minutesPerDay).split == [window(17 * 60, Furlough.minutesPerDay)])
+    }
+
+    @Test("the halves fold back into the night they were written as")
+    func fold() {
+        let weekend = window(17 * 60, 4 * 60, .weekend)
+        #expect(TimeWindow.folded(weekend.split) == [weekend])
+        let nightly = window(20 * 60, 2 * 60)
+        #expect(TimeWindow.folded(nightly.split) == [nightly])
+    }
+
+    @Test("a morning that is not the one after stays a window of its own")
+    func foldsOnlyTheDayAfter() {
+        let evening = window(17 * 60, Furlough.minutesPerDay, .saturday)
+        let morning = window(0, 4 * 60, .saturday)
+        #expect(TimeWindow.folded([evening, morning]) == [evening, morning])
+        // Nothing else is touched: an ordinary evening is left where it is.
+        let plain = window(20 * 60, 22 * 60)
+        #expect(TimeWindow.folded([plain]) == [plain])
+        #expect(TimeWindow.folded([Rule.allDay]) == [Rule.allDay])
+    }
+
+    @Test("it is judged by its halves, which each need the minimum")
+    func validity() {
+        #expect(window(17 * 60, 4 * 60).isValidDraft)
+        // Fifteen minutes end to end, but ten before midnight and five after: neither can be kept.
+        #expect(!window(1430, 5).isValidDraft)
+        #expect(window(1425, 15).isValidDraft)
+        #expect(!window(1200, 1210).isValidDraft)
+    }
+
+    /// Saturday 12 September 2026 into the Sunday: 5 PM until 4 AM, on the weekend.
+    @Test("it stays open until the morning it really ends")
+    func openPastMidnight() {
+        let target = makeTarget("TikTok", rule: Rule(windows: window(17 * 60, 4 * 60, .weekend).split, dailyBudgetMinutes: 240))
+        let config = makeConfig([target])
+        func status(_ now: Date) -> TargetStatus {
+            Policy.status(of: target, config: config, runtime: RuntimeState(), now: now, calendar: cal)
+        }
+        // Saturday at 11 PM: open past midnight, to 4 AM on the Sunday.
+        let saturdayNight = at(12, 23, 0)
+        #expect(status(saturdayNight) == .open(until: Furlough.minutesPerDay + 4 * 60))
+        #expect(Policy.date(atMinute: Furlough.minutesPerDay + 4 * 60, of: saturdayNight, calendar: cal) == at(13, 4, 0))
+        #expect(TimeFormat.until(Furlough.minutesPerDay + 4 * 60, calendar: cal) == TimeFormat.minute(4 * 60, calendar: cal))
+        // Sunday at 2 AM: the same night, now ending later today.
+        #expect(status(at(13, 2, 0)) == .open(until: 4 * 60))
+        // Sunday at 5 AM: shut, until the Sunday evening.
+        #expect(status(at(13, 5, 0)) == .closed(nextOpen: NextOpen(minuteOfDay: 17 * 60, daysAhead: 0)))
+    }
+
+    @Test("midnight is a join, and both sides of it know")
+    func join() {
+        let rule = Rule(windows: window(17 * 60, 4 * 60, .weekend).split, dailyBudgetMinutes: 240)
+        // Saturday runs into Sunday, and Sunday into Monday.
+        #expect(rule.continuation(after: 7) == window(0, 4 * 60, [.sunday, .monday]))
+        #expect(rule.continues(into: 1) == window(17 * 60, Furlough.minutesPerDay, .weekend))
+        // Tuesday has nothing either side of it.
+        #expect(rule.continuation(after: 3) == nil)
+        #expect(rule.continues(into: 3) == nil)
+        // A rule without windows only resets its budget at midnight.
+        #expect(Rule(windows: [], dailyBudgetMinutes: 30).continuation(after: 7) == nil)
+        #expect(Rule(windows: [], dailyBudgetMinutes: 30).continues(into: 1) == nil)
+        // An evening that stops at midnight beside a morning that is not the one after it.
+        let apart = Rule(windows: [window(17 * 60, Furlough.minutesPerDay, .saturday), window(0, 4 * 60, .saturday)], dailyBudgetMinutes: 30)
+        #expect(apart.continuation(after: 7) == nil)
+        #expect(apart.continues(into: 7) == nil)
+    }
+
+    @Test("what it becomes is an ordinary rule, and reads as one span")
+    func inARule() {
+        let rule = Rule(windows: window(17 * 60, 4 * 60, .weekend).split, dailyBudgetMinutes: 30)
+        #expect(rule.validationError == nil)
+        // Sunday 1 AM is open, from Saturday night; Saturday 1 AM is not.
+        #expect(rule.allowedMask(on: 1)[60])
+        #expect(!rule.allowedMask(on: 7)[60])
+        // Monday 1 AM is open too, because Sunday night is one of the nights asked for.
+        #expect(rule.allowedMask(on: 2)[60])
+        // One span rather than an evening and a morning apart. The times themselves come from
+        // the formatter, which spaces AM and PM its own way.
+        let evening = TimeFormat.minute(17 * 60, calendar: cal)
+        let morning = TimeFormat.minute(4 * 60, calendar: cal)
+        #expect(TimeFormat.schedule(rule, calendar: cal) == "Weekends \(evening)–\(morning)")
+    }
+}

@@ -31,10 +31,14 @@ struct MacRuleEditor: View {
         var window: TimeWindow
 
         /// Rows on the same days that overlap or touch, joined into the earlier row, in order.
+        /// A night is left out of it: its end is a time on the next morning, so it neither
+        /// swallows a later row nor is swallowed by an earlier one.
         static func joined(_ rows: [DraftWindow]) -> [DraftWindow] {
             var result: [DraftWindow] = []
             for row in rows.sorted(by: { $0.window < $1.window }) {
-                if let index = result.lastIndex(where: { $0.window.days == row.window.days }),
+                if !row.window.isNight,
+                   let index = result.lastIndex(where: { $0.window.days == row.window.days }),
+                   !result[index].window.isNight,
                    row.window.startMinute <= result[index].window.endMinute {
                     result[index].window.endMinute = max(result[index].window.endMinute, row.window.endMinute)
                 } else {
@@ -57,7 +61,8 @@ struct MacRuleEditor: View {
     }
 
     private var target: Target? { model.state.config.target(id: targetID) }
-    private var windows: [TimeWindow] { drafts.map(\.window) }
+    /// The rows as Furlough stores them: a night becomes its evening and the morning after.
+    private var windows: [TimeWindow] { drafts.flatMap { $0.window.split } }
     private var draft: Rule { Rule(windows: windows, dailyBudgetMinutes: budget) }
     private var trimmedNickname: String { nickname.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var hasChanges: Bool {
@@ -83,6 +88,12 @@ struct MacRuleEditor: View {
         )
     }
 
+    /// What a night takes from the day after it, said under the windows while one is drafted.
+    static let nightNote = """
+        A window that runs past midnight opens the early hours of the next day too, and the \
+        budget resets at midnight, so those hours get a fresh one.
+        """
+
     /// A tier already queued for this target is what the editor should show, as a queued rule is.
     private var pendingTier: Utility? {
         model.state.pending.compactMap { change -> Utility? in
@@ -97,7 +108,7 @@ struct MacRuleEditor: View {
         Binding(
             get: { WeekDraft(windows: windows) },
             set: { week in
-                let merged = TimeWindow.grouped(week.windows)
+                let merged = TimeWindow.grouped(TimeWindow.folded(week.windows))
                 drafts = merged.map { DraftWindow(window: $0) }
                 byDay = !merged.allSatisfy { $0.days == .all }
             }
@@ -127,6 +138,10 @@ struct MacRuleEditor: View {
                     nicknameCard
                     SectionLabel(text: "Allowed windows")
                     windowsCard
+                    if drafts.contains(where: { $0.window.isNight }) {
+                        Footnote(text: Self.nightNote)
+                            .padding(.top, 8)
+                    }
                     SectionLabel(text: "Daily budget")
                     budgetCard(target)
                     SectionLabel(text: "How much it is worth")
@@ -392,14 +407,14 @@ struct MacRuleEditor: View {
         let rule = pendingRule ?? target.rule ?? Rule()
         tier = pendingTier ?? target.utility
         budget = rule.dailyBudgetMinutes > 0 ? rule.dailyBudgetMinutes : Furlough.defaultBudgetMinutes
-        drafts = TimeWindow.grouped(rule.windows).map { DraftWindow(window: $0) }
+        drafts = TimeWindow.grouped(TimeWindow.folded(rule.windows)).map { DraftWindow(window: $0) }
         byDay = !rule.isSameEveryDay
     }
 
     /// Replaces the draft with another target's rule. Nothing is saved until Save.
     private func adopt(_ rule: Rule) {
         withAnimation(.snappy) {
-            drafts = TimeWindow.grouped(rule.windows).map { DraftWindow(window: $0) }
+            drafts = TimeWindow.grouped(TimeWindow.folded(rule.windows)).map { DraftWindow(window: $0) }
             budget = rule.dailyBudgetMinutes > 0 ? rule.dailyBudgetMinutes : Furlough.defaultBudgetMinutes
             byDay = !rule.isSameEveryDay
         }
@@ -447,7 +462,9 @@ struct MacRuleEditor: View {
 }
 
 /// One allowed window: two time fields, the duration, a quiet remove button, and, when the
-/// rule varies by day, a strip of day toggles beneath. An end of 12:00 AM means midnight.
+/// rule varies by day, a strip of day toggles beneath. An end of 12:00 AM means midnight, and
+/// an end earlier than the start is a night: marked "+1", counted through midnight, and stored
+/// as the evening and the morning after.
 struct WindowRow: View {
     @Binding var window: TimeWindow
     var showsDays = false
@@ -461,11 +478,17 @@ struct WindowRow: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Ember.muted)
                 TimeField(minute: $window.endMinute, allowsMidnight: true)
+                if window.isNight {
+                    Text("+1")
+                        .font(EmberFont.label(9))
+                        .foregroundStyle(Ember.amber)
+                        .help("The morning after it opens")
+                }
                 Spacer(minLength: 4)
-                Text(durationText(window.durationMinutes))
+                Text(durationText(window.spanMinutes))
                     .emberBody(11.5)
                     .monospacedDigit()
-                    .foregroundStyle(window.isValid ? Ember.muted : Ember.ember)
+                    .foregroundStyle(window.isValidDraft ? Ember.muted : Ember.ember)
                 Button(action: onRemove) {
                     Image(systemName: "xmark")
                         .font(.system(size: 11, weight: .bold))

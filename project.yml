@@ -64,9 +64,6 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
-          - UIInterfaceOrientationPortraitUpsideDown
-          - UIInterfaceOrientationLandscapeLeft
-          - UIInterfaceOrientationLandscapeRight
         UIAppFonts:
           - BricolageGrotesque_72pt-Bold.ttf
           - BricolageGrotesque_48pt-SemiBold.ttf
@@ -128,6 +125,7 @@ targets:
       # The shield draws the real hourglass (see ShieldExtension.still), so it needs the
       # drawing and the colours it fills with — not the rest of Shared/UI.
       - path: Shared/UI/Hourglass.swift
+      - path: Shared/UI/HourglassGeometry.swift
       - path: Shared/UI/Theme.swift
       - path: Shared/PrivacyInfo.xcprivacy
         buildPhase: resources

@@ -155,12 +155,13 @@ extension HourglassState.Tone {
 
 /// The glass hourglass from the mockups, drawn as vectors in a 120 × 160 space and coloured
 /// by `state`. `phase` is a running clock in seconds that moves the stream, the glow pulse and
-/// the falling grain; hold it constant for a still picture (widgets, the Live Activity).
+/// the falling grain; hold it constant for a still picture (widgets, the Live Activity), which
+/// still shows a full stream since every grain is a function of the phase.
 /// Under 40 pt tall it switches to a bolder chip drawing for rows and the page indicator.
 struct HourglassView: View {
     var state: HourglassState
     var phase: TimeInterval = 0
-    /// False under Reduce Motion: the stream is a solid line and nothing pulses.
+    /// False under Reduce Motion: the stream is a solid column and nothing pulses.
     var motion = true
     /// Seconds since the view appeared, for the one-time outline pulse of an empty glass.
     var appearSeconds: TimeInterval?
@@ -170,9 +171,16 @@ struct HourglassView: View {
             let scale = min(geo.size.width / 120, geo.size.height / 160)
             let mini = 160 * scale < 40
             let origin = CGPoint(x: (geo.size.width - 120 * scale) / 2, y: (geo.size.height - 160 * scale) / 2)
-            let landing = 144 - 38 * state.moundLevel - 1.5
-            let streamWidth = (mini ? 6 : 3) * scale
+            let peak = HourglassGeometry.peak(level: state.moundLevel)
+            let landing = peak - 0.5
             let capHeight: Double = mini ? 10 : 8
+            let streaming = state.isRunning || state.isFrozen
+            /// Grains, not a column: the full drawing with motion, or the frozen glass, which is one frame of it.
+            let grainy = streaming && !mini && motion
+            let streamPhase = state.isFrozen ? HourglassView.frozenPhase : phase
+            let unit = { (point: CGPoint) in
+                UnitPoint(x: (origin.x + point.x * scale) / geo.size.width, y: (origin.y + point.y * scale) / geo.size.height)
+            }
             ZStack(alignment: .topLeading) {
                 if let glow = state.glow {
                     let pulse = pulseValue
@@ -192,34 +200,57 @@ struct HourglassView: View {
                 }
                 HourglassPartShape(part: .body)
                     .fill(state.glass.fill)
+                if state.sandLevel > 0.002 {
+                    let edge = HourglassGeometry.topEdge(level: state.sandLevel)
+                    TopSandShape(level: state.sandLevel)
+                        .fill(state.sand.gradient)
+                    // The funnel: a shadow in the bowl where the sand slides down to the neck.
+                    TopSandShape(level: state.sandLevel)
+                        .fill(RadialGradient(
+                            colors: [.black.opacity(mini ? 0.2 : 0.34), .clear],
+                            center: unit(HourglassGeometry.funnelBottom(edge: edge)),
+                            startRadius: 0, endRadius: max(1, HourglassGeometry.halfWidth(at: edge) * 1.15 * scale)
+                        ))
+                }
+                if streaming {
+                    StreamShape(landing: landing, topWidth: mini ? 6 : 3, bottomWidth: mini ? 5 : 2.2)
+                        .fill(Ember.sandLight.opacity(grainy ? 0.26 : 0.95))
+                    if grainy {
+                        let grains = HourglassStream.grains(phase: streamPhase, top: HourglassGeometry.streamTop, landing: landing) {
+                            HourglassGeometry.pileSurface(x: $0, peak: peak)
+                        }
+                        ForEach(GrainsShape.Layer.allCases, id: \.self) { layer in
+                            GrainsShape(grains: grains.filter { layer.holds($0) })
+                                .fill(Ember.sandLight.opacity(layer.opacity))
+                        }
+                        // Dust where the stream lands.
+                        Ellipse()
+                            .fill(RadialGradient(
+                                colors: [Ember.sandLight.opacity(0.42 * dustFlicker(streamPhase)), .clear],
+                                center: .center, startRadius: 0, endRadius: 9 * scale
+                            ))
+                            .frame(width: 18 * scale, height: 8 * scale)
+                            .position(x: origin.x + 60 * scale, y: origin.y + (landing + 0.5) * scale)
+                    }
+                }
+                if let grain = loneGrain(landing: landing) {
+                    GrainsShape(grains: [grain])
+                        .fill(Ember.sandLight.opacity(grain.alpha))
+                }
+                if state.moundLevel > 0.002 {
+                    MoundShape(level: state.moundLevel)
+                        .fill(state.mound.gradient)
+                    // Fresh sand at the tip, where the stream lands, is lighter than the settled slopes.
+                    MoundShape(level: state.moundLevel)
+                        .fill(RadialGradient(
+                            colors: [Ember.sandLight.opacity(mini ? 0.18 : 0.28), .clear],
+                            center: unit(CGPoint(x: HourglassGeometry.centerX, y: peak + 1.5)),
+                            startRadius: 0, endRadius: 11 * scale
+                        ))
+                }
                 HourglassPartShape(part: .body)
                     .stroke(state.glass.stroke, style: StrokeStyle(lineWidth: (mini ? 7 : 2.5) * scale, lineJoin: .round))
                     .opacity(outlineOpacity)
-                TopSandShape(level: state.sandLevel)
-                    .fill(state.sand.gradient)
-                if state.isRunning || state.isFrozen {
-                    let solid = state.isFrozen || !motion
-                    HourglassPartShape(part: .stream(landing: landing))
-                        .stroke(Ember.sandLight.opacity(solid && !state.isFrozen ? 0.95 : 0.5), style: StrokeStyle(lineWidth: streamWidth, lineCap: .round))
-                    if state.isFrozen || motion {
-                        HourglassPartShape(part: .stream(landing: landing))
-                            .stroke(
-                                Ember.sandLight,
-                                style: StrokeStyle(
-                                    lineWidth: streamWidth, lineCap: .round,
-                                    dash: [3 * scale, 3.5 * scale], dashPhase: (state.isFrozen ? 0 : dashPhase) * scale
-                                )
-                            )
-                    }
-                }
-                if let grainY {
-                    Circle()
-                        .fill(Ember.sandLight)
-                        .frame(width: (mini ? 8 : 3.8) * scale, height: (mini ? 8 : 3.8) * scale)
-                        .position(x: origin.x + 60 * scale, y: origin.y + grainY * scale)
-                }
-                MoundShape(level: state.moundLevel)
-                    .fill(state.mound.gradient)
                 HourglassPartShape(part: .cap(top: true, height: capHeight))
                     .fill(Ember.cream.opacity(state.glass.capOpacity))
                 HourglassPartShape(part: .cap(top: false, height: capHeight))
@@ -242,23 +273,24 @@ struct HourglassView: View {
         .accessibilityHidden(true)
     }
 
+    /// The frame the Anchor stops the stream on: chosen so grains fill the fall and a few chips are mid-air.
+    static let frozenPhase: TimeInterval = 2.75
+
     /// 0…1 along the glow's breath; 0.5 when nothing pulses.
     private var pulseValue: Double {
         guard motion, state.pulse != .none else { return 0.5 }
         return (sin(phase / state.pulse.period * 2 * .pi) + 1) / 2
     }
 
-    /// Grains run down the stream: about 26 units a second in the 120-space.
-    private var dashPhase: Double {
-        -(phase * 26).truncatingRemainder(dividingBy: 6.5)
+    /// The landing dust shimmers with the arrivals, 0.6…1.
+    private func dustFlicker(_ phase: TimeInterval) -> Double {
+        0.8 + 0.2 * sin(phase * 13.1) * sin(phase * 7.3)
     }
 
-    /// Where the falling grain is, in the 120-space, or nil between drops.
-    private var grainY: Double? {
-        guard state.dropsGrain, motion else { return nil }
-        let cycle = phase.truncatingRemainder(dividingBy: 3.2)
-        guard cycle < 1.2 else { return nil }
-        return 72 + 70 * pow(cycle / 1.2, 1.5)
+    /// The grain that slips through when the window is minutes away, or nil between drops.
+    private func loneGrain(landing: Double) -> SandGrain? {
+        guard state.dropsGrain, motion, !state.isRunning else { return nil }
+        return HourglassStream.loneGrain(phase: phase, top: HourglassGeometry.streamTop, landing: landing)
     }
 
     /// The pending outline fades up once when it appears.
@@ -299,7 +331,6 @@ struct LivingHourglass: View {
 /// The fixed pieces of the drawing. Coordinates are the mockup's 120 × 160 SVG space.
 enum HourglassPart {
     case body
-    case stream(landing: Double)
     case cap(top: Bool, height: Double)
     case highlight
     case cube
@@ -322,9 +353,6 @@ enum HourglassPart {
             p.addLine(to: CGPoint(x: 52, y: 76))
             p.addCurve(to: CGPoint(x: 22, y: 32), control1: CGPoint(x: 40, y: 64), control2: CGPoint(x: 22, y: 52))
             p.closeSubpath()
-        case .stream(let landing):
-            p.move(to: CGPoint(x: 60, y: 70))
-            p.addLine(to: CGPoint(x: 60, y: max(72, landing)))
         case .cap(let top, let height):
             p.addRoundedRect(in: CGRect(x: 18, y: top ? 16 - height : 144, width: 84, height: height), cornerSize: CGSize(width: 4, height: 4))
         case .highlight:
@@ -358,7 +386,8 @@ struct HourglassPartShape: Shape {
     }
 }
 
-/// The sand in the top bulb, from 0 (empty) to 1 (full). Animatable.
+/// The sand in the top bulb, from 0 (empty) to 1 (one charge), resting against the walls with
+/// a funnel down to the neck. Animatable.
 struct TopSandShape: Shape {
     var level: Double
 
@@ -368,16 +397,12 @@ struct TopSandShape: Shape {
     }
 
     func path(in rect: CGRect) -> Path {
-        let level = max(0, min(1, level))
-        guard level > 0.002 else { return Path() }
-        let surface = 36 + (1 - level) * 30
-        let below = Path(CGRect(x: 0, y: surface, width: 120, height: 68 - surface))
-        return HourglassGeometry.fit(HourglassGeometry.fullTopSand.intersection(below), in: rect)
+        HourglassGeometry.fit(HourglassGeometry.polygon(HourglassGeometry.topSand(edge: HourglassGeometry.topEdge(level: level))), in: rect)
     }
 }
 
-/// The mound in the bottom bulb, from 0 (nothing) to 1 (the full pile). A small pile is
-/// narrow as well as low. Animatable.
+/// The pile in the bottom bulb, from 0 (nothing) to 1 (one charge): a cone that spreads to the
+/// walls as it grows. Animatable.
 struct MoundShape: Shape {
     var level: Double
 
@@ -387,27 +412,71 @@ struct MoundShape: Shape {
     }
 
     func path(in rect: CGRect) -> Path {
-        let h = 38 * max(0, min(1, level))
-        guard h > 0.15 else { return Path() }
-        let w = 12 + 18 * (h / 38)
+        HourglassGeometry.fit(HourglassGeometry.polygon(HourglassGeometry.pile(peak: HourglassGeometry.peak(level: level))), in: rect)
+    }
+}
+
+/// The column of the stream, from the neck to the top of the pile, a little narrower at the
+/// bottom where the grains have spread apart. Solid under Reduce Motion and in the chips; a
+/// faint haze behind the grains otherwise.
+struct StreamShape: Shape {
+    var landing: Double
+    var topWidth: Double
+    var bottomWidth: Double
+
+    func path(in rect: CGRect) -> Path {
+        let top = HourglassGeometry.streamTop
+        let bottom = max(top + 1, landing + 0.5)
         var p = Path()
-        p.move(to: CGPoint(x: 60 - w, y: 144 - 0.21 * h))
-        p.addCurve(
-            to: CGPoint(x: 60, y: 144 - h),
-            control1: CGPoint(x: 60 - w, y: 144 - 0.63 * h), control2: CGPoint(x: 60 - w * 0.53, y: 144 - 0.89 * h)
-        )
-        p.addCurve(
-            to: CGPoint(x: 60 + w, y: 144 - 0.21 * h),
-            control1: CGPoint(x: 60 + w * 0.53, y: 144 - 0.89 * h), control2: CGPoint(x: 60 + w, y: 144 - 0.63 * h)
-        )
-        p.addLine(to: CGPoint(x: 60 + w, y: 144))
-        p.addLine(to: CGPoint(x: 60 - w, y: 144))
+        p.move(to: CGPoint(x: 60 - topWidth / 2, y: top))
+        p.addLine(to: CGPoint(x: 60 + topWidth / 2, y: top))
+        p.addLine(to: CGPoint(x: 60 + bottomWidth / 2, y: bottom))
+        p.addLine(to: CGPoint(x: 60 - bottomWidth / 2, y: bottom))
         p.closeSubpath()
         return HourglassGeometry.fit(p, in: rect)
     }
 }
 
-enum HourglassGeometry {
+/// Grains as one path of small ellipses, so a frame of forty grains is one fill.
+struct GrainsShape: Shape {
+    /// Chips fade as they settle; a fill has one opacity, so they are drawn in a few bands.
+    enum Layer: CaseIterable {
+        case solid, dimming, faint, gone
+
+        var opacity: Double {
+            switch self {
+            case .solid: 0.96
+            case .dimming: 0.68
+            case .faint: 0.38
+            case .gone: 0.14
+            }
+        }
+
+        func holds(_ grain: SandGrain) -> Bool {
+            switch self {
+            case .solid: grain.alpha > 0.78
+            case .dimming: grain.alpha > 0.52 && grain.alpha <= 0.78
+            case .faint: grain.alpha > 0.26 && grain.alpha <= 0.52
+            case .gone: grain.alpha <= 0.26
+            }
+        }
+    }
+
+    var grains: [SandGrain]
+
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        for grain in grains {
+            p.addEllipse(in: CGRect(
+                x: grain.x - grain.radius, y: grain.y - grain.radius - grain.stretch / 2,
+                width: 2 * grain.radius, height: 2 * grain.radius + grain.stretch
+            ))
+        }
+        return HourglassGeometry.fit(p, in: rect)
+    }
+}
+
+extension HourglassGeometry {
     static func fit(_ path: Path, in rect: CGRect) -> Path {
         let scale = min(rect.width / 120, rect.height / 160)
         let dx = rect.minX + (rect.width - 120 * scale) / 2
@@ -415,13 +484,12 @@ enum HourglassGeometry {
         return path.applying(CGAffineTransform(translationX: dx, y: dy).scaledBy(x: scale, y: scale))
     }
 
-    /// The top bulb full of sand, its surface flat at y 36 and its point in the neck at 66.
-    static var fullTopSand: Path {
+    /// A closed path through the polygon's points.
+    static func polygon(_ points: [CGPoint]) -> Path {
         var p = Path()
-        p.move(to: CGPoint(x: 40, y: 36))
-        p.addLine(to: CGPoint(x: 80, y: 36))
-        p.addCurve(to: CGPoint(x: 60, y: 66), control1: CGPoint(x: 80, y: 48), control2: CGPoint(x: 68, y: 58))
-        p.addCurve(to: CGPoint(x: 40, y: 36), control1: CGPoint(x: 52, y: 58), control2: CGPoint(x: 40, y: 48))
+        guard let first = points.first else { return p }
+        p.move(to: first)
+        for point in points.dropFirst() { p.addLine(to: point) }
         p.closeSubpath()
         return p
     }

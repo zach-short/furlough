@@ -101,17 +101,24 @@ struct Eyebrow: View {
     }
 }
 
-/// The background behind every screen: a warm dark ground, one ember glow low on the left,
-/// a faint amber glow top right, and a light grain to keep the gradients from banding.
+/// The background behind every screen: a warm dark ground, one ember glow that laps the room,
+/// a faint amber glow top right, and a light grain to keep the gradients from banding. Reduce
+/// Motion parks the ember at its resting place, low on the left.
 struct EmberWall: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         GeometryReader { geo in
             let width = geo.size.width
             let height = geo.size.height
             ZStack {
                 Ember.ground
-                glow(color: Ember.ember.opacity(0.6), radiusX: 0.70 * width, radiusY: 0.42 * height, fade: 0.62)
-                    .position(x: 0.28 * width, y: 1.04 * height)
+                // Only the ember redraws on the clock; the ground, the amber and the grain hold still.
+                TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion)) { context in
+                    let center = emberCenter(at: context.date.timeIntervalSinceReferenceDate)
+                    glow(color: Ember.ember.opacity(0.6), radiusX: 0.58 * width, radiusY: 0.35 * height, fade: 0.62)
+                        .position(x: center.x * width, y: center.y * height)
+                }
                 glow(color: Ember.amber.opacity(0.14), radiusX: 0.60 * width, radiusY: 0.40 * height, fade: 0.60)
                     .position(x: 0.90 * width, y: -0.04 * height)
                 Image("Noise")
@@ -122,6 +129,21 @@ struct EmberWall: View {
             .compositingGroup()
         }
         .ignoresSafeArea()
+    }
+
+    /// Where the ember sits, as a fraction of the wall. It laps the room in a hundred seconds,
+    /// its reach breathing in and out and its pace wobbling, so the path is a long way from
+    /// repeating. Because the orbit is polar, `reach` sets a floor the ember never crosses: even
+    /// at its tightest it sits a fade radius clear of the middle, where the content is. Keep the
+    /// wobble below the period ratio (32/103) or the pace goes negative and the ember backs up.
+    private func emberCenter(at phase: TimeInterval) -> CGPoint {
+        guard !reduceMotion else { return CGPoint(x: 0.28, y: 1.04) }
+        let angle = phase / 103 * 2 * .pi + 0.18 * sin(phase / 32 * 2 * .pi)
+        let reach = 0.86 + 0.20 * sin(phase / 41 * 2 * .pi)
+        return CGPoint(
+            x: 0.5 + 0.70 * reach * cos(angle),
+            y: 0.5 + 0.56 * reach * sin(angle)
+        )
     }
 
     /// An elliptical radial glow that fades to clear at `fade` of its radius.

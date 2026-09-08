@@ -30,11 +30,16 @@ struct RuleEditorView: View {
         let id = UUID()
         var window: TimeWindow
 
-        /// Rows on the same days that overlap or touch, joined into the earlier row.
+        /// Rows on the same days that overlap or touch, joined into the earlier row. A night
+        /// is left out of it: its end is a time on the next morning, so it neither swallows a
+        /// later row nor is swallowed by an earlier one. A night that does overlap its
+        /// neighbours is caught by validation once it is split, and said so.
         static func joined(_ rows: [DraftWindow]) -> [DraftWindow] {
             var result: [DraftWindow] = []
             for row in rows.sorted(by: { $0.window < $1.window }) {
-                if let index = result.lastIndex(where: { $0.window.days == row.window.days }),
+                if !row.window.isNight,
+                   let index = result.lastIndex(where: { $0.window.days == row.window.days }),
+                   !result[index].window.isNight,
                    row.window.startMinute <= result[index].window.endMinute {
                     result[index].window.endMinute = max(result[index].window.endMinute, row.window.endMinute)
                 } else {
@@ -57,7 +62,8 @@ struct RuleEditorView: View {
     }
 
     private var target: Target? { model.state.config.target(id: targetID) }
-    private var windows: [TimeWindow] { drafts.map(\.window) }
+    /// The rows as Furlough stores them: a night becomes its evening and the morning after.
+    private var windows: [TimeWindow] { drafts.flatMap { $0.window.split } }
     private var draft: Rule { Rule(windows: windows, dailyBudgetMinutes: budget) }
     private var trimmedNickname: String { nickname.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var hasChanges: Bool {
@@ -85,6 +91,12 @@ struct RuleEditorView: View {
         )
     }
 
+    /// What a night takes from the day after it, said under the windows while one is drafted.
+    static let nightNote = """
+        A window that runs past midnight opens the early hours of the next day too, and the \
+        budget resets at midnight, so those hours get a fresh one.
+        """
+
     /// Other apps and sites with windows worth copying.
     private var copyCandidates: [Target] {
         model.state.config.targets.filter {
@@ -103,7 +115,7 @@ struct RuleEditorView: View {
         Binding(
             get: { WeekDraft(windows: windows) },
             set: { week in
-                let merged = TimeWindow.grouped(week.windows)
+                let merged = TimeWindow.grouped(TimeWindow.folded(week.windows))
                 drafts = merged.map { DraftWindow(window: $0) }
                 byDay = !merged.allSatisfy { $0.days == .all }
             }
@@ -134,6 +146,10 @@ struct RuleEditorView: View {
                     if !target.kind.isCategory {
                         SectionLabel(text: "Allowed windows")
                         windowsCard
+                        if drafts.contains(where: { $0.window.isNight }) {
+                            Footnote(text: Self.nightNote)
+                                .padding(.top, 8)
+                        }
                         SectionLabel(text: "Daily budget")
                         budgetCard
                         SectionLabel(text: "How much it is worth")
@@ -400,14 +416,14 @@ struct RuleEditorView: View {
         let rule = pendingRule ?? target.rule ?? Rule()
         tier = pendingTier ?? target.utility
         budget = rule.dailyBudgetMinutes > 0 ? rule.dailyBudgetMinutes : Furlough.defaultBudgetMinutes
-        drafts = TimeWindow.grouped(rule.windows).map { DraftWindow(window: $0) }
+        drafts = TimeWindow.grouped(TimeWindow.folded(rule.windows)).map { DraftWindow(window: $0) }
         byDay = !rule.isSameEveryDay
     }
 
     /// Replaces the draft with another target's rule. Nothing is saved until Save.
     private func adopt(_ rule: Rule) {
         withAnimation(.snappy) {
-            drafts = TimeWindow.grouped(rule.windows).map { DraftWindow(window: $0) }
+            drafts = TimeWindow.grouped(TimeWindow.folded(rule.windows)).map { DraftWindow(window: $0) }
             budget = rule.dailyBudgetMinutes > 0 ? rule.dailyBudgetMinutes : Furlough.defaultBudgetMinutes
             byDay = !rule.isSameEveryDay
         }
@@ -469,7 +485,9 @@ struct RuleEditorView: View {
 
 /// One allowed window: two glass time chips, an arrow, the duration, a quiet remove button,
 /// and, when the rule varies by day, a strip of day toggles beneath. `onCommit` fires when
-/// a time picker closes, so the owner can join rows that now touch.
+/// a time picker closes, so the owner can join rows that now touch. An end earlier than the
+/// start is a night: the chip marks it "+1", the duration counts through midnight, and the
+/// row is stored as the evening and the morning after.
 struct WindowRow: View {
     @Binding var window: TimeWindow
     var showsDays = false
@@ -491,14 +509,14 @@ struct WindowRow: View {
                         Image(systemName: "arrow.right")
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(Ember.muted)
-                        TimeChip(minute: window.endMinute) { editing = .end }
+                        TimeChip(minute: window.endMinute, nextDay: window.isNight) { editing = .end }
                     }
                 }
                 Spacer(minLength: 4)
-                Text(durationText(window.durationMinutes))
+                Text(durationText(window.spanMinutes))
                     .emberBody(11.5)
                     .monospacedDigit()
-                    .foregroundStyle(window.isValid ? Ember.muted : Ember.ember)
+                    .foregroundStyle(window.isValidDraft ? Ember.muted : Ember.ember)
                 Button(action: onRemove) {
                     Image(systemName: "xmark")
                         .font(.system(size: 11, weight: .bold))
@@ -522,7 +540,8 @@ struct WindowRow: View {
             TimePickerSheet(
                 title: edge == .start ? "Opens at" : "Closes at",
                 minute: edge == .start ? $window.startMinute : $window.endMinute,
-                allowsMidnight: edge == .end
+                allowsMidnight: edge == .end,
+                nextDayAfter: edge == .end ? window.startMinute : nil
             )
         }
     }
@@ -803,17 +822,27 @@ struct ApplyRuleSheet: View {
 /// A glass chip showing a time of day.
 struct TimeChip: View {
     let minute: Int
+    /// The time falls on the morning after the window opened, so the chip says "+1".
+    var nextDay = false
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Text(TimeFormat.minute(minute))
-                .emberBody(13, .semibold)
-                .monospacedDigit()
-                .foregroundStyle(Ember.cream)
-                .padding(.horizontal, 11)
-                .padding(.vertical, 7)
-                .contentShape(Rectangle())
+            HStack(spacing: 3) {
+                Text(TimeFormat.minute(minute))
+                    .emberBody(13, .semibold)
+                    .monospacedDigit()
+                    .foregroundStyle(Ember.cream)
+                if nextDay {
+                    Text("+1")
+                        .font(EmberFont.label(9))
+                        .foregroundStyle(Ember.amber)
+                        .accessibilityLabel("next day")
+                }
+            }
+            .padding(.horizontal, 11)
+            .padding(.vertical, 7)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 10))
@@ -825,7 +854,15 @@ struct TimePickerSheet: View {
     let title: String
     @Binding var minute: Int
     var allowsMidnight = false
+    /// The start this end is judged against. A time at or before it lands on the next morning,
+    /// which the readout says while the wheel is still turning.
+    var nextDayAfter: Int?
     @Environment(\.dismiss) private var dismiss
+
+    private var isNextDay: Bool {
+        guard let nextDayAfter else { return false }
+        return minute < nextDayAfter
+    }
 
     var body: some View {
         VStack(spacing: 8) {
@@ -834,6 +871,10 @@ struct TimePickerSheet: View {
             Text(TimeFormat.minute(minute))
                 .emberNumerals(30)
                 .contentTransition(.numericText())
+            Text("next day")
+                .emberBody(11.5)
+                .foregroundStyle(Ember.amber)
+                .opacity(isNextDay ? 1 : 0)
             DatePicker("Time", selection: dateBinding, displayedComponents: .hourAndMinute)
                 .datePickerStyle(.wheel)
                 .labelsHidden()
@@ -843,7 +884,7 @@ struct TimePickerSheet: View {
                 .padding(.bottom, 20)
         }
         .frame(maxWidth: .infinity)
-        .presentationDetents([.height(400)])
+        .presentationDetents([.height(420)])
         .presentationDragIndicator(.visible)
         .presentationBackground { EmberWall() }
     }
@@ -853,7 +894,9 @@ struct TimePickerSheet: View {
             get: { Policy.date(atMinute: min(minute, Furlough.minutesPerDay - 1), of: .now) },
             set: { date in
                 let picked = Policy.minuteOfDay(date)
-                minute = (allowsMidnight && picked == Furlough.minutesPerDay - 1) ? Furlough.minutesPerDay : picked
+                // Both ends of the wheel mean the same midnight, and only an end can be one.
+                let isMidnight = picked == 0 || picked == Furlough.minutesPerDay - 1
+                minute = (allowsMidnight && isMidnight) ? Furlough.minutesPerDay : picked
             }
         )
     }

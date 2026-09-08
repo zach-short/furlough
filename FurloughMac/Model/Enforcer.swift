@@ -170,7 +170,10 @@ final class Enforcer {
             }
         }
 
-        // A window closing soon. A rule without windows has no closing time, only a budget.
+        // A window closing soon. A rule without windows has no closing time, only a budget, and
+        // neither has the evening half of a night: its `until` is a time on the next morning,
+        // which no minute of today is five minutes short of, so the warning waits for the
+        // morning half and the hour the night really ends.
         let minute = Policy.minuteOfDay(now)
         for target in state.config.targets where target.rule?.isAllDay == false {
             guard case .open(let until) = decision.statuses[target.id], until - minute == Furlough.warningMinutes,
@@ -179,7 +182,7 @@ final class Enforcer {
             Notifier.post(
                 id: "closing-\(target.id.uuidString)-\(until)",
                 title: "5 minutes left",
-                body: "\(target.displayName) closes at \(TimeFormat.minute(until))."
+                body: "\(target.displayName) closes at \(TimeFormat.until(until))."
             )
         }
 

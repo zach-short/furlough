@@ -30,6 +30,15 @@ struct Weekdays: OptionSet, Hashable {
     func contains(weekday: Int) -> Bool { contains(Weekdays(weekday: weekday)) }
     mutating func toggle(weekday: Int) { formSymmetricDifference(Weekdays(weekday: weekday)) }
 
+    /// The same days moved forward through the week. The morning after a Saturday night is a
+    /// Sunday, so a night's two halves sit on days one apart. Sunday is bit 0, so a day later
+    /// is a bit up, and Saturday comes round to Sunday again.
+    func shifted(by days: Int) -> Weekdays {
+        let step = ((days % 7) + 7) % 7
+        let bits = Int(rawValue)
+        return Weekdays(rawValue: UInt8((bits << step | bits >> (7 - step)) & 0x7F))
+    }
+
     /// Calendar weekday numbers in the order the user's calendar lays a week out.
     static func ordered(calendar: Calendar = .current) -> [Int] {
         (0..<7).map { (calendar.firstWeekday - 1 + $0) % 7 + 1 }
@@ -60,8 +69,10 @@ extension Weekdays: Codable {
 }
 
 /// A span of minutes inside one calendar day, on the days of the week it applies.
-/// `endMinute` is exclusive and may be 1440 (midnight). A span never crosses midnight; an
-/// evening that runs late is an evening window plus an early-morning window on the next day.
+/// `endMinute` is exclusive and may be 1440 (midnight). A stored span never crosses midnight;
+/// an evening that runs late is an evening window plus an early-morning window on the next day.
+/// The editors let one be written the way it is said — "5 PM until 4 AM" — and `split` turns
+/// that night into the pair Furlough keeps, with `folded` reading it back as one row.
 struct TimeWindow: Codable, Hashable, Identifiable, Comparable {
     var startMinute: Int
     var endMinute: Int
@@ -74,6 +85,62 @@ struct TimeWindow: Codable, Hashable, Identifiable, Comparable {
         startMinute >= 0
             && endMinute <= Furlough.minutesPerDay
             && durationMinutes >= Furlough.minimumWindowMinutes
+    }
+
+    /// An evening that runs into the next morning: the end falls earlier in the day than the
+    /// start. Only ever drafted, never stored — both the rules engine and DeviceActivity work
+    /// a day at a time — but it is how a late night is said, so the editors take one and split
+    /// it on the way in.
+    var isNight: Bool { endMinute < startMinute }
+
+    /// How long the window is, a night's two halves counted together.
+    var spanMinutes: Int {
+        isNight ? Furlough.minutesPerDay - startMinute + endMinute : durationMinutes
+    }
+
+    /// True when every window this becomes is one Furlough can keep. A night is judged by its
+    /// halves, because the halves are what DeviceActivity is given and each has its own minimum.
+    var isValidDraft: Bool {
+        let parts = split
+        return !parts.isEmpty && parts.allSatisfy(\.isValid)
+    }
+
+    /// The windows this really is: itself, or, for a night, the evening on the days it starts
+    /// and the early morning on the days after. An evening that runs to exactly midnight has
+    /// no morning half and comes back alone.
+    var split: [TimeWindow] {
+        guard isNight else { return [self] }
+        var parts = [TimeWindow(startMinute: startMinute, endMinute: Furlough.minutesPerDay, days: days)]
+        if endMinute > 0 {
+            parts.append(TimeWindow(startMinute: 0, endMinute: endMinute, days: days.shifted(by: 1)))
+        }
+        return parts
+    }
+
+    /// Half of a night as stored: an evening that ends at midnight, and the morning that starts
+    /// at it. The all-day window is neither.
+    private var isEveningHalf: Bool { startMinute > 0 && endMinute == Furlough.minutesPerDay }
+    private var isMorningHalf: Bool { startMinute == 0 && endMinute < Furlough.minutesPerDay }
+
+    /// `split` in reverse: an evening ending at midnight and a morning starting at midnight on
+    /// the days after are one night again. Exact rather than a guess — those two windows and
+    /// that one night allow the very same minutes of the week — so a night reads back as the
+    /// row it was written as, and a pair someone wrote by hand reads as the night it is.
+    static func folded(_ windows: [TimeWindow]) -> [TimeWindow] {
+        let sorted = windows.sorted()
+        var mornings = sorted.filter(\.isMorningHalf)
+        var result: [TimeWindow] = []
+        for window in sorted where !window.isMorningHalf {
+            guard window.isEveningHalf,
+                  let index = mornings.firstIndex(where: { $0.days == window.days.shifted(by: 1) })
+            else {
+                result.append(window)
+                continue
+            }
+            let morning = mornings.remove(at: index)
+            result.append(TimeWindow(startMinute: window.startMinute, endMinute: morning.endMinute, days: window.days))
+        }
+        return result + mornings
     }
 
     /// The same span on every day. DeviceActivity is told about each distinct span once; the
@@ -211,6 +278,24 @@ struct Rule: Codable, Hashable {
         return mask
     }
 
+    /// The window on the day after that this day's last one runs into: the morning half of a
+    /// night, whose evening half ends at midnight. Nil when the day ends where it says it does.
+    /// A rule without windows has none — midnight only resets its budget.
+    func continuation(after weekday: Int) -> TimeWindow? {
+        guard !isAllDay else { return nil }
+        return windows(on: weekday % 7 + 1).first { $0.startMinute == 0 && $0.endMinute < Furlough.minutesPerDay }
+    }
+
+    /// The window on the day before that runs into this one, when this day opens at midnight
+    /// because the evening before never closed. Nil when the day begins on its own.
+    func continues(into weekday: Int) -> TimeWindow? {
+        guard !isAllDay,
+              windows(on: weekday).contains(where: { $0.startMinute == 0 && $0.endMinute < Furlough.minutesPerDay })
+        else { return nil }
+        return windows(on: weekday == 1 ? 7 : weekday - 1)
+            .first { $0.startMinute > 0 && $0.endMinute == Furlough.minutesPerDay }
+    }
+
     func window(containing minute: Int, on weekday: Int) -> TimeWindow? {
         guard isEverAllowed else { return nil }
         return windows(on: weekday).first { $0.contains(minuteOfDay: minute) }
@@ -231,7 +316,7 @@ struct Rule: Codable, Hashable {
     /// Problems that make the rule unusable, or nil.
     var validationError: String? {
         for window in windows where !window.isValid {
-            return "Each window must be at least \(Furlough.minimumWindowMinutes) minutes and end after it starts."
+            return "Each window must be at least \(Furlough.minimumWindowMinutes) minutes long, and a night that runs past midnight needs that much on each side of it."
         }
         if windows.contains(where: { $0.days.isEmpty }) {
             return "Each window needs at least one day."

@@ -75,7 +75,7 @@ struct StatusChip: View {
     private var text: String? {
         switch status {
         case .anchored: "Anchored"
-        case .open(let until): allDay ? "All day" : TimeFormat.minute(until)
+        case .open(let until): allDay ? "All day" : TimeFormat.until(until)
         case .closed(let next): TimeFormat.chip(next)
         case .exhausted(let next): next.map { TimeFormat.chip($0) }
         case .unconfigured: "Set up"

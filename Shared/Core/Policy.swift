@@ -9,7 +9,10 @@ enum TargetStatus: Equatable {
     case unconfigured
     case blockedAllDay
     /// Inside a window with budget remaining. `until` is the window's end minute, midnight
-    /// for a rule without windows.
+    /// for a rule without windows, and past 1440 for a night: an evening that runs into the
+    /// next morning is stored as two windows, but it is one window to whoever is using it, so
+    /// it says the morning it really ends. `Policy.date(atMinute:of:)` reads those minutes on
+    /// into the next day; `TimeFormat.until` says them.
     case open(until: Int)
     case exhausted(nextOpen: NextOpen?)
     case closed(nextOpen: NextOpen)
@@ -213,12 +216,21 @@ enum Policy {
             return .exhausted(nextOpen: nextOpen(in: rule, afterWeekday: weekday))
         }
         if let current = rule.window(containing: minute, on: weekday) {
-            return .open(until: current.endMinute)
+            return .open(until: end(of: current, in: rule, on: weekday))
         }
         if let next = rule.windows(on: weekday).first(where: { $0.startMinute > minute }) {
             return .closed(nextOpen: NextOpen(minuteOfDay: next.startMinute, daysAhead: 0))
         }
         return .closed(nextOpen: nextOpen(in: rule, afterWeekday: weekday) ?? NextOpen(minuteOfDay: 0, daysAhead: 1))
+    }
+
+    /// When a window really ends, counted from the start of `weekday`. An evening that ends at
+    /// midnight where the next day opens at midnight is half of a night: it runs on past 1440,
+    /// to the end of the morning half. Nothing shuts at the join, so nothing says it does.
+    static func end(of window: TimeWindow, in rule: Rule, on weekday: Int) -> Int {
+        guard window.endMinute == Furlough.minutesPerDay,
+              let morning = rule.continuation(after: weekday) else { return window.endMinute }
+        return Furlough.minutesPerDay + morning.endMinute
     }
 
     /// The first window on the nearest day after `weekday` that has one, up to a week out.

@@ -18,24 +18,35 @@ final class MonitorExtension: DeviceActivityMonitor {
     /// lifted the shields; this only says so, which is the difference between a window opening
     /// and Zach noticing it opened. A window activity also fires on days none of its targets
     /// use it, and then nothing is `.open` against this end and nothing is posted.
+    ///
+    /// A night is stored as an evening and the morning after it, so midnight is a join and not
+    /// an opening: the morning half is skipped for anything that was already open through it,
+    /// and the evening half matches a target whose window runs on past midnight.
     private func announceOpening(_ activity: DeviceActivityName) {
         guard let window = ActivityNaming.parseWindow(activity.rawValue) else { return }
         let state = SharedStore.load()
         let now = state.now
         let config = Policy.effectiveConfig(state, now: now)
-        let opened = config.targets.filter { target in
-            guard !(target.rule?.isAllDay ?? false) else { return false }
-            if case .open(let until) = Policy.status(of: target, config: config, runtime: state.runtime, now: now) {
-                return until == window.endMinute
-            }
-            return false
+        let weekday = Policy.weekday(now)
+        let opened: [(name: String, until: Int)] = config.targets.compactMap { target in
+            guard let rule = target.rule, !rule.isAllDay else { return nil }
+            guard !(window.startMinute == 0 && rule.continues(into: weekday) != nil) else { return nil }
+            guard case .open(let until) = Policy.status(of: target, config: config, runtime: state.runtime, now: now)
+            else { return nil }
+            let isThisWindow = until == window.endMinute
+                || (window.endMinute == Furlough.minutesPerDay && until > Furlough.minutesPerDay)
+            return isThisWindow ? (target.displayName, until) : nil
         }
         guard !opened.isEmpty else { return }
-        let names = opened.map(\.displayName).joined(separator: ", ")
+        let names = opened.map(\.name).joined(separator: ", ")
+        let ends = Set(opened.map(\.until))
+        // One closing time when they share one, which is every case but a night opening beside
+        // an evening that stops at midnight.
+        let end = ends.count == 1 ? ends.first ?? window.endMinute : nil
         Notifier.post(
             id: "opened-\(activity.rawValue)",
             title: "Window opened",
-            body: "\(names) — open until \(TimeFormat.minute(window.endMinute))."
+            body: end.map { "\(names) — open until \(TimeFormat.until($0))." } ?? "\(names) — open now."
         )
     }
 
@@ -104,7 +115,9 @@ final class MonitorExtension: DeviceActivityMonitor {
         let state = SharedStore.load()
         let now = state.now
         let config = Policy.effectiveConfig(state, now: now)
-        // A rule without windows never closes; midnight only resets its budget.
+        // A rule without windows never closes; midnight only resets its budget. Neither does
+        // the evening half of a night, whose `until` is a time on the next morning and so
+        // never matches the midnight this activity ends at.
         let closing = config.targets.filter { target in
             if case .open(let until) = Policy.status(of: target, config: config, runtime: state.runtime, now: now) {
                 return until == window.endMinute && !(target.rule?.isAllDay ?? false)
@@ -116,7 +129,7 @@ final class MonitorExtension: DeviceActivityMonitor {
         Notifier.post(
             id: "closing-\(activity.rawValue)",
             title: "Window closing",
-            body: "\(names) will close at \(TimeFormat.minute(window.endMinute))."
+            body: "\(names) will close at \(TimeFormat.until(window.endMinute))."
         )
     }
 

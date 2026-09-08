@@ -33,6 +33,14 @@ enum TimeFormat {
         return date.formatted(style(calendar).hour(.defaultDigits(amPM: .abbreviated)).minute())
     }
 
+    /// When an open window ends. 1440 is midnight tonight; past it is a night's morning, so
+    /// 1680 is 4:00 AM tomorrow. Anything less is an ordinary time today.
+    static func until(_ minute: Int, calendar: Calendar = .current) -> String {
+        minute > Furlough.minutesPerDay
+            ? self.minute(minute - Furlough.minutesPerDay, calendar: calendar)
+            : self.minute(minute, calendar: calendar)
+    }
+
     static func window(_ window: TimeWindow, calendar: Calendar = .current) -> String {
         "\(minute(window.startMinute, calendar: calendar))–\(minute(window.endMinute, calendar: calendar))"
     }
@@ -75,13 +83,16 @@ enum TimeFormat {
 
     /// The whole week's windows: one list when they are the same every day, else one clause
     /// per group of days, broader groups first: "Every day 8:00 PM–midnight · Sat, Sun 12:00 AM–2:00 AM".
+    /// A night stored as its two halves is read back as the one span it is, so a rule reads the
+    /// way it was written: "Weekends 5:00 PM–4:00 AM", not an evening and a morning apart.
     static func schedule(_ rule: Rule, calendar: Calendar = .current) -> String {
         if rule.isAllDay { return "All day" }
+        let listed = TimeWindow.folded(rule.windows)
         if rule.isSameEveryDay {
-            return rule.sortedWindows.map { window($0, calendar: calendar) }.joined(separator: ", ")
+            return listed.sorted().map { window($0, calendar: calendar) }.joined(separator: ", ")
         }
         var groups: [(days: Weekdays, windows: [TimeWindow])] = []
-        for window in rule.sortedWindows {
+        for window in TimeWindow.grouped(listed, calendar: calendar) {
             if let index = groups.firstIndex(where: { $0.days == window.days }) {
                 groups[index].windows.append(window)
             } else {
@@ -137,7 +148,7 @@ enum TimeFormat {
         case .anchored: "Anchored"
         case .unconfigured: "Not enforced until you set a schedule"
         case .blockedAllDay: "Blocked all day"
-        case .open(let until): "Open until \(minute(until, calendar: calendar))"
+        case .open(let end): "Open until \(until(end, calendar: calendar))"
         case .exhausted(let next):
             if let next {
                 "Used up for today · opens \(nextOpen(next, calendar: calendar))"

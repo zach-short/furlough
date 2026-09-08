@@ -103,7 +103,7 @@ struct TargetHero: View {
                 )
             }
             return Line(
-                eyebrow: "Open now · until \(TimeFormat.minute(until))", color: Ember.moss,
+                eyebrow: "Open now · until \(TimeFormat.until(until))", color: Ember.moss,
                 big: .countdown(to: end), sub: used
             )
         case .closed(let next):
