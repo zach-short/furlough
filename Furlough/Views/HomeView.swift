@@ -548,14 +548,15 @@ struct TargetRow: View {
         HStack(spacing: 10) {
             TokenTile(kind: target.kind, size: 34)
             VStack(alignment: .leading, spacing: 1) {
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                // A nickname takes the name's place in the display face, as it does on the
+                // hero; without one the system name can only be sized, not restyled.
+                if target.nickname.isEmpty {
                     TokenName(kind: target.kind)
-                    if !target.nickname.isEmpty {
-                        Text(target.nickname)
-                            .emberBody(11.5)
-                            .foregroundStyle(Ember.muted)
-                            .lineLimit(1)
-                    }
+                } else {
+                    Text(target.nickname)
+                        .emberDisplaySmall(13.5)
+                        .foregroundStyle(Ember.cream)
+                        .lineLimit(1)
                 }
                 Text(RowCopy.detail(target: target, status: status, now: now))
                     .emberBody(11.5)
