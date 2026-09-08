@@ -136,8 +136,12 @@ struct MacRuleEditor: View {
                 if let target {
                     header(target)
                     nicknameCard
-                    Footnote(text: "The nickname shows on the shield card, the menu bar's menu and the widget. Empty it to go back to \(target.defaultName).")
-                        .padding(.top, 8)
+                    // The way back is only worth saying once there is something to undo.
+                    Footnote(
+                        text: "The nickname shows on the shield card, the menu bar's menu and the widget."
+                            + (trimmedNickname.isEmpty ? "" : " Empty it to go back to \(target.defaultName).")
+                    )
+                    .padding(.top, 8)
                     SectionLabel(text: "Allowed windows")
                     windowsCard
                     if drafts.contains(where: { $0.window.isNight }) {
