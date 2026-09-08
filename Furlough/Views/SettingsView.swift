@@ -178,6 +178,22 @@ struct SettingsView: View {
                 action("Allow notifications") { Task { await model.requestNotifications() } }
             }
             CardDivider()
+            NavigationLink { UsageView() } label: {
+                HStack {
+                    Text("Where the time goes")
+                        .emberBody(13)
+                        .foregroundStyle(Ember.cream)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Ember.faint)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 11)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            CardDivider()
             NavigationLink { LogView() } label: {
                 HStack {
                     Text("Activity log")
