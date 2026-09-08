@@ -3,6 +3,7 @@ import FamilyControls
 import Foundation
 import ManagedSettings
 import Observation
+import UIKit
 import UserNotifications
 import WidgetKit
 
@@ -24,12 +25,22 @@ enum ProposalResult: Equatable {
 @MainActor
 @Observable
 final class AppModel {
+    /// One model for the app and for the App Intents behind it: an intent can run with no
+    /// window on screen, and it has to change the same state the views are watching rather
+    /// than a second copy of it. The Mac has done this since it had a menu bar to run from.
+    static let shared = AppModel()
+
     var authorization = AuthorizationCenter.shared.authorizationStatus
     var state = SharedStore.load()
     var lastError: String?
+    /// Something to say after an action that had no screen of its own to say it in — an
+    /// intent run from Spotlight. The root shows it once and clears it.
+    var notice: String?
     var notificationsGranted: Bool?
     let isAppGroupAvailable = SharedStore.isAppGroupAvailable
     private let scanner = TagScanner()
+    /// A Weigh Anchor intent waiting for Furlough to reach the foreground; see below.
+    @ObservationIgnored private var wantsWeighAnchor = false
     /// Screen Time access stood at the end of an earlier run. FamilyControls reports "not
     /// determined" for a moment after a cold start, so the root trusts this to hold the launch
     /// screen instead of flashing onboarding. Kept in the app's own defaults: a Debug reset
@@ -51,6 +62,9 @@ final class AppModel {
         note(AuthorizationCenter.shared.authorizationStatus)
         reload()
         Task { await refreshNotificationStatus() }
+        // Before the authorization guard: a tag scan is how the anchor is lifted, and it has
+        // to work even on a launch where FamilyControls has not answered yet.
+        weighAnchorIfInFront()
         guard isAuthorized else { return }
         enforce(reason: "app active")
     }
@@ -389,6 +403,35 @@ final class AppModel {
         SharedStore.log("weighed anchor with the paired tag")
         enforce(reason: "weigh anchor")
         return .released
+    }
+
+    /// Asked for by the Weigh Anchor intent, which opens the app to get here.
+    ///
+    /// Held rather than run on the spot when Furlough is not yet in front: an intent that
+    /// opens the app can perform before or after the scene goes active, and NFC only reads
+    /// for a foreground app. Whichever of the two happens second is the one that scans.
+    func requestWeighAnchor() {
+        wantsWeighAnchor = true
+        weighAnchorIfInFront()
+    }
+
+    /// Runs a held request, once there is a foreground app to run it in.
+    func weighAnchorIfInFront() {
+        guard wantsWeighAnchor, UIApplication.shared.applicationState == .active else { return }
+        wantsWeighAnchor = false
+        guard state.config.anchor.isAnchored else {
+            notice = "Nothing is anchored."
+            return
+        }
+        Task {
+            switch await unanchorWithTag() {
+            case .released: notice = "Anchor weighed. Everything it held is back on its own rules."
+            case .wrongTag: notice = "That is not the paired tag. The anchor holds."
+            case .failed(let why): notice = why
+            // Cancelling the scan is an answer, not a failure: nothing to say.
+            case .anchored, .paired, .cancelled: break
+            }
+        }
     }
 
     /// Pairs (or replaces) the tag. Refused while anchored, or any tag could become the key.

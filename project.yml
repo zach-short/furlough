@@ -36,6 +36,7 @@ targets:
     sources:
       - path: Furlough
       - path: Shared/Core
+      - path: Shared/Intents
       - path: Shared/LiveActivity
       - path: Shared/UI
       - path: Shared/PrivacyInfo.xcprivacy
@@ -206,6 +207,10 @@ targets:
       # The Mac's force-quit grace is pure and decides whether an app is killed under a save
       # dialog, so it is tested here rather than left to the device pass.
       - path: FurloughMac/Model/QuitGrace.swift
+      # The sentence the App Intents answer with. Pure, and listed on its own: the intents
+      # beside it need an app to run in, and AppIntents metadata has no business in a test
+      # bundle.
+      - path: Shared/Intents/StatusSpeech.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.zachshort.furlough.coretests
@@ -226,6 +231,7 @@ targets:
         excludes:
           - ShieldReconciler.swift
           - ActivityNaming.swift
+      - path: Shared/Intents
       - path: Shared/UI
       - path: Furlough/Fonts
         type: folder

@@ -44,6 +44,20 @@ struct RootView: View {
         } message: {
             Text(model.lastError ?? "")
         }
+        // What an App Intent has to say, once it is back in an app that can say it. Its own
+        // alert rather than `lastError`: none of these is a thing going wrong, and the wrong
+        // tag least of all — that is the anchor working.
+        .alert(
+            "Furlough",
+            isPresented: Binding(
+                get: { model.notice != nil },
+                set: { if !$0 { model.notice = nil } }
+            )
+        ) {
+            Button("OK") { model.notice = nil }
+        } message: {
+            Text(model.notice ?? "")
+        }
     }
 
     /// Keeps the launch screen up for its fixed time, and a little longer only if iOS has not
