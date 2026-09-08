@@ -174,4 +174,4 @@ xcodebuild test -project Furlough.xcodeproj -scheme FurloughCoreTests -destinati
 - Windows must be at least 15 minutes and cannot cross midnight (split them in two).
 - At most 19 distinct windows across all apps (iOS allows 20 monitored activities, and one is the daily budget tracker).
 - The monitor extension can fire a few minutes late, and threshold callbacks occasionally fire twice. Every callback is idempotent, so this is harmless.
-- Distributing outside Xcode (TestFlight, App Store) needs the Family Controls distribution entitlement, requested per bundle ID, which can take weeks. `DEPLOYMENT.md` has the request, and everything else the App Store wants.
+- Distributing outside Xcode (TestFlight, App Store) needs the Family Controls distribution entitlement, requested per bundle ID, which can take weeks. `~/Projects/archive/furlough/testflight-deployment/DEPLOYMENT.md` has the request, and everything else the App Store wants.

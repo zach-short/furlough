@@ -11,7 +11,8 @@
 # ~/.appstoreconnect/private_keys/AuthKey_<KEY_ID>.p8. Keep the .p8 out of this repo.
 #
 # None of this can succeed before the Family Controls distribution entitlement is granted and
-# an Apple Distribution certificate exists on this Mac; see DEPLOYMENT.md sections 1 and 2.
+# an Apple Distribution certificate exists on this Mac; see sections 1 and 2 of
+# ~/Projects/archive/furlough/testflight-deployment/DEPLOYMENT.md.
 # It will fail at signing, loudly, rather than producing something unsigned and misleading.
 
 set -euo pipefail
@@ -37,7 +38,8 @@ xcodebuild -project Furlough.xcodeproj -scheme Furlough -configuration Release \
 
 # The promise check, on the thing that actually ships rather than on the source. Debug-only code
 # is one misplaced #endif from surviving into a release, and the app tells the person in
-# onboarding and in Settings that a release build has no unblock button. DEPLOYMENT.md section 6
+# onboarding and in Settings that a release build has no unblock button. The archived
+# DEPLOYMENT.md section 6
 # has the full audit and why the Debug side of the comparison matters; this is the cheap guard.
 echo "==> Checking the release keeps its promise"
 APP_BINARY="$ARCHIVE/Products/Applications/Furlough.app/Furlough"
@@ -51,7 +53,7 @@ for probe in resetEverything clearEverything; do
 done
 if ! strings -a "$APP_BINARY" | grep -qF "no unblock button"; then
     # If this copy is missing, the probes above proved nothing: they would report a clean pass
-    # against a binary they cannot actually read. See the debug-dylib trap in DEPLOYMENT.md.
+    # against a binary they cannot actually read. See the debug-dylib trap in the archived doc.
     echo "REFUSING TO SHIP: the control string is missing from the archived binary." >&2
     echo "The check above is not measuring what it claims to. Do not trust it." >&2
     exit 1
