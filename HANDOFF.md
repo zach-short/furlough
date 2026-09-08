@@ -11,7 +11,10 @@ small codebase he fully understands over a fork. He is interactive: ask when a d
   `xcodegen generate`. Never hand-edit the `.xcodeproj` (it is gitignored).
 - Mac: Xcode 26.6 (build 17F113, iOS 26.5 SDK), Swift 6.3, Homebrew, XcodeGen 2.46.
 - Phone: iPhone 17 Pro, iOS 26.6, UDID `00008150-0010050A0247801C`, paired to this Mac.
-  It was not connected during the previous session, so nothing has run on it yet.
+  When it is plugged in and unlocked, `xcrun devicectl list devices` says "available" and
+  `xcodebuild -showdestinations` lists it; when it says "unavailable", ask Zach to plug it in.
+  The build, install and launch commands below are verified. Nothing can screenshot the phone
+  from the Mac; Zach sends screenshots (HEIC: convert with `sips -s format png`).
 - Apple team `X9V4L6HR2R` (paid). Automatic signing works from the command line; all four
   bundle IDs are provisioned with Family Controls (development) and App Groups.
 - Build check (use this after every change; the log goes to `build/build.log`):
@@ -78,10 +81,18 @@ catalog also holds `AccentColor`, because the widget target compiles it too and 
 accent colour is missing. The app icon is done
 (`Furlough/Assets.xcassets/AppIcon.appiconset/icon-1024.png`).
 
-The restyle itself (step 1 below) is built and committed but has not been seen on a phone.
-Things to confirm on device first: FamilyControls' `Label(token)` honours our font and colour
-(`TokenName`), `TokenTile` measures the system icon and scales it to 34/48 pt (it may look
-small or clipped), and the glass toolbar items split into gear · pending pill · plus.
+The restyle has been seen on the phone (2026-09-07) and matches the mockups: wall, glass
+toolbar circles, hero, countdown, cards, chips, section labels all as intended. Findings from
+a sizing lab run on the device, now applied:
+- `Label(token)`'s title view ignores `.font`, `.fontWeight`, `.foregroundStyle` and
+  `.textScale`, but follows `.dynamicTypeSize` (`.xSmall` ≈ 14 pt, `.xxxLarge` ≈ 23 pt). It
+  renders in SF, white. `TokenName(kind:size:)` wraps that; the hero shows the nickname in
+  Bricolage when one is set, else the system name at `.xxxLarge`. `legibilityWeight: .bold`
+  is applied speculatively; nobody has confirmed it bolds.
+- The icon view is always 32 pt whatever is proposed, with the artwork in about 65 % of it.
+  `TokenTile` measures it and scales by `size / (32 × 0.655)`, no frame of its own.
+- Zach's next ask is the living hourglass hero; the brief with directions is
+  `design/HOURGLASS.md`. Present the directions, get his pick, then build.
 
 ## Code map
 
@@ -111,7 +122,8 @@ small or clipped), and the glass toolbar items split into gear · pending pill �
 - `FurloughMonitor/MonitorExtension.swift`: every callback reconciles from shared state.
 - `FurloughShield/ShieldExtension.swift`: reads shared state, writes the copy via `ShieldText`.
 - `FurloughWidgets/`: `StatusWidget.swift`, `WindowLiveActivity.swift`, bundle.
-- `design/`: `DESIGN.md`, `icons/` (candidates), `scripts/make-icon.swift` (old placeholder).
+- `design/`: `DESIGN.md`, `HOURGLASS.md` (the next brief), `icons/` (candidates);
+  `scripts/make-icon.swift` (old placeholder), `scripts/make-noise.swift` (the wall grain).
 
 ## How enforcement works (do not break these invariants)
 
@@ -168,14 +180,21 @@ small or clipped), and the glass toolbar items split into gear · pending pill �
 
 ## Next work, in order
 
-1. **Restyle the app to `design/DESIGN.md`.** Done (commit "Ember Glass restyle"), not yet
-   seen on a device. Every screen, the widget, the Live Activity and the shield colours follow
-   the spec; the shield icon is still the SF hourglass in Amber until step 4 generates art.
-2. **Install on the phone and run the first test plan.** Start with the look (see above), Onboarding allow flow, pick apps,
-   set a window starting a few minutes out (at least 15 min long), confirm the shield shows
-   "Opens at …", confirm it lifts by itself at the window start, confirm the "Time's up" flow
-   after the budget, confirm app deletion is denied while blocked. Fix what Zach reports.
-3. **Live Activity at window start** without opening the app (see the quirk above).
+1. **The living hourglass hero** (`design/HOURGLASS.md`). Offer Zach the directions and
+   header layouts, ideally as a mockup board like the one he chose Ember Glass from; wait for
+   his pick; then build it, including the coloured status hourglasses in rows, widget and
+   Live Activity if the direction calls for them. Build clean, commit, install, get his report.
+2. **Finish the device test plan.** Verified on 2026-09-07 from screenshots: onboarding, the
+   picker, the rule editor, home grouping, the countdown, a budget exhausting (TikTok showed
+   "Used up today" under Tomorrow). Not yet reported: the shield copy and colours, the shield
+   lifting by itself at window start, app deletion denied while blocked, the widget, the Live
+   Activity, and the whole Brick flow (pair a tag, brick, wrong tag refused, unbrick, and
+   whether the tag identifier is stable across two scans). Fix what Zach reports. The shield
+   icon is still the SF hourglass in Amber until step 4 generates art.
+3. **Live Activity at window start** without opening the app (see the quirk above). Zach
+   asked whether widgets and the Dynamic Island exist: they do (small, medium, lock-screen
+   rectangle; compact, minimal and expanded island); this step is only about starting the
+   activity without the app in the foreground.
 4. **Imagery with the Higgsfield MCP, only with Zach's go-ahead per item, conserving credits**
    (balance was about 413 after spending about 5). Preflight every call with `get_cost: true`.
    Reference the icon jobs by id as `image_references`: original `27b1c254-594f-46fe-9b3e-232c38a9e9d2`,
