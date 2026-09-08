@@ -29,7 +29,11 @@ struct PendingChangesView: View {
                         .padding(.top, 80)
                     }
                     ForEach(pending) { change in
-                        PendingCard(change: change, target: change.targetID.flatMap { model.state.config.target(id: $0) }) {
+                        PendingCard(
+                            change: change,
+                            target: change.targetID.flatMap { model.state.config.target(id: $0) },
+                            delta: PendingText.delta(for: change, in: model.state.config)
+                        ) {
                             withAnimation(.snappy) { model.cancelPending(id: change.id) }
                         }
                     }
@@ -59,6 +63,7 @@ struct PendingChangesView: View {
 struct PendingCard: View {
     let change: PendingChange
     let target: Target?
+    let delta: PendingText.Delta
     let onCancel: () -> Void
 
     var body: some View {
@@ -66,7 +71,7 @@ struct PendingCard: View {
             HStack(spacing: 10) {
                 if let target {
                     TokenTile(kind: target.kind, size: 34)
-                    VStack(alignment: .leading, spacing: 1) {
+                    VStack(alignment: .leading, spacing: 3) {
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
                             TokenName(kind: target.kind)
                             if !target.nickname.isEmpty {
@@ -75,22 +80,18 @@ struct PendingCard: View {
                                     .foregroundStyle(Ember.muted)
                             }
                         }
-                        Text(description)
-                            .emberBody(11.5)
-                            .foregroundStyle(Ember.muted)
+                        PendingDeltaView(delta: delta)
                     }
                 } else {
                     Image(systemName: "clock.arrow.circlepath")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(Ember.pending)
                         .frame(width: 34, height: 34)
-                    VStack(alignment: .leading, spacing: 1) {
+                    VStack(alignment: .leading, spacing: 3) {
                         Text("Loosening delay")
                             .emberDisplaySmall(13.5)
                             .foregroundStyle(Ember.cream)
-                        Text(description)
-                            .emberBody(11.5)
-                            .foregroundStyle(Ember.muted)
+                        PendingDeltaView(delta: delta)
                     }
                 }
                 Spacer(minLength: 0)
@@ -107,14 +108,5 @@ struct PendingCard: View {
             GhostButton(title: "Cancel change", action: onCancel)
         }
         .emberCard()
-    }
-
-    private var description: String {
-        switch change.kind {
-        case .setRule(_, let rule): "New rule: \(TimeFormat.rule(rule))"
-        case .removeTarget: "Remove from Furlough"
-        case .setDelay(let hours): "Becomes \(TimeFormat.delay(hours: hours))"
-        case .setUtility(_, let level): "Becomes \(level.label.lowercased()), which shortens its delay"
-        }
     }
 }

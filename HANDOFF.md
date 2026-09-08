@@ -172,11 +172,14 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   `PendingNotifications.swift` (`PlannedNotification`, the pure `plan`, `sync`, and the one
   `Notifier` both platforms post through),
   `ActivityLimit.swift` (how many DeviceActivity activities a save would need; iOS-only, and
-  harmlessly unused on the Mac).
+  harmlessly unused on the Mac),
+  `PendingText.swift` (`Delta`, the old → new pair a pending card shows; pure, so the phone
+  and the Mac cannot word it differently).
 - `Tests/Core` (target `FurloughCoreTests`, macOS, Swift Testing, no host app): `Support.swift`
   (the pinned calendar and the fixtures), `ModelsTests`, `PolicyStatusTests`,
   `PolicyPendingTests`, `PolicySummaryTests`, `NamingTests`, `DecodingTests`, `ClockTests`,
-  `QuitGraceTests`, `PendingNotificationTests`. 110 tests in 17 suites.
+  `QuitGraceTests`, `PendingNotificationTests`, `UtilityTests`, `UtilityPlanTests`,
+  `ActivityLimitTests`, `PendingTextTests`. 182 tests in 29 suites.
 - `Shared/LiveActivity/FurloughActivityAttributes.swift` (app + widgets).
 - `Shared/UI/Theme.swift` (app + widgets), `Shared/UI/Hourglass.swift` (`HourglassState`
   with its presets and `of(target:status:runtime:now:)`, `HourglassView(state:phase:)` pure,
@@ -342,7 +345,7 @@ Open, and where each one lives:
 - Window start lagging by minutes with no way to hurry it → step 6/step 3; the shield extension
   has the App Group and the entitlement, so it may be able to reconcile itself on `.open`.
 - Categories only being blockable all day → step 12. Ask Zach first.
-- Pending cards showing the new rule rather than old → new → step 6.
+- Pending cards showing the new rule rather than old → new → **done**, step 6.
 - `widgetURL` and the `furlough://target/<id>` scheme, and iPad → step 6.
 - Anchor from anywhere (App Intents, Siri, Control Center, the Action button) → step 8.
 - Real usage on the phone (`DeviceActivityReport`) → step 9.
@@ -481,9 +484,18 @@ The plan for this stretch. Tick each phase off here as it lands.
    targets actually ticked. **Deliberately not wired into `MacRuleEditor`**: the Mac has no
    DeviceActivity, so the limit does not exist there and gating on it would refuse valid Mac
    rules. The Mac browser poll at two seconds landed with step 7 (`Browsers.pollInterval`).
-   Still open here: pending cards showing old rule → new rule, `widgetURL` and the
-   `furlough://target/<id>` scheme, and iPad (ask Zach). `widgetURL` needs a target id on
-   `Policy.Summary`, which today carries only names.
+   Pending cards showing old rule → new rule is done 2026-09-08, as
+   `Shared/Core/PendingText.swift` (`PendingText.delta(for:in:calendar:)` → a `now`/`becomes`
+   pair) plus `Shared/UI/PendingDeltaView`, which both `PendingChangesView` and
+   `MacSheets.PendingCard` draw, so the two cards cannot drift — the second piece of step 16
+   done early. The baseline is deliberately the target's *saved* rule and not another queued
+   one: `assign` on both platforms removes any `setRule` already queued for a target, so at
+   most one is ever in flight and the saved rule is what stays in force until it lands. A tier
+   change names the wait on each side ("Useful · waits 1 day" → "Essential · waits 6 hours"),
+   because the tier's name alone does not say what changing it buys, which is the only reason
+   to change it. 9 tests in `Tests/Core/PendingTextTests.swift`.
+   Still open here: `widgetURL` and the `furlough://target/<id>` scheme, and iPad (ask Zach).
+   `widgetURL` needs a target id on `Policy.Summary`, which today carries only names.
 7. **Mac hardening**: the 45-second grace before force quit with a countdown on the panel, and
    every window of every running browser rather than only the front one, are both done
    2026-09-08 (`QuitGrace.swift`, `Browsers.snapshots()`, `Tests/Core/QuitGraceTests.swift`;
