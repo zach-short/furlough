@@ -1,7 +1,7 @@
 # Handoff: Furlough
 
 You are picking up Furlough, a personal iOS Screen Time blocker for Zach. Read this file,
-then `README.md` and `design/DESIGN.md`, before touching code (and `DEPLOYMENT.md` if the
+then `README.md` and `design/DESIGN.md`, before touching code (and `~/Projects/archive/furlough/testflight-deployment/DEPLOYMENT.md` if the
 work is about shipping). Do not re-ask anything under
 "Settled". Zach is a web developer (Next.js, Vercel), comfortable with Xcode, and prefers a
 small codebase he fully understands over a fork. He is interactive: ask when a decision is his.
@@ -354,6 +354,44 @@ Open, and where each one lives:
   raw hours field, because one tier drives both the delay and the warnings.
 - iCloud sync of the Anchor → step 18. Rules cannot sync: tokens versus bundle ids.
 
+## The utility tiers, reviewed 2026-09-08
+
+The tier feature (`Utility`, `AppUtility`, `UtilityPicker`, `Target.utilityLevel`) was written in
+a parallel session and reviewed after it landed. The delay arithmetic holds up: `delayHours`
+floors at `Furlough.minimumLoosenDelayHours` so a small base times `essential` cannot round to
+nothing, `setDelay` waits `Config.longestDelay` rather than the base because cutting the base
+loosens every target at once, and a tier moving toward essential queues behind the delay the
+target has *today*. The obvious escapes were traced and none of them shorten a wait:
+"call it essential then loosen it", remove-and-re-add, and cutting the base while a target is
+essential all cost the old delay first.
+
+Three defects were found and fixed:
+
+- `hasChanges` in both rule editors compared `target.utilityLevel` (a `Utility?`, nil until
+  someone picks a tier) against `tier` (never nil). `nil != .useful` is true, so Save was live on
+  an untouched editor for every target nobody had tiered, the banner said "Only the name changes"
+  instead of "No changes", and saving recorded a tier the user never chose — which turns off the
+  suggestion for good. Now compares `target.utility`.
+- A queued tier change could not be cancelled from the editor. The picker is seeded from the
+  *queued* tier (`pendingTier ?? target.utility`), but `setUtility` guarded on the *saved* tier, so
+  choosing the saved one back compared equal, returned `.unchanged`, and left the loosening
+  queued — the wrong way round for a commitment device. The decision now lives in
+  `Policy.plan(utility:for:queued:)`, which is pure and tested: it drops a queued change whatever
+  else it decides, and treats "the tier it already has" as an instant change when one was queued.
+  Both `AppModel.setUtility` and `MacModel.setUtility` go through it.
+- `warnsBeforeAnchoring` promised in its comment to warn "one tier wider" than blocking and was
+  in fact identical to it. Zach chose the comment's version on 2026-09-08: idle now warns before
+  an anchor and still says nothing before an ordinary rule, since anchoring is instant and only
+  the tag lifts it. `UtilityText.fallback` gained an idle line, because the useful tier's "worth
+  having around" would have been flattery. One test in `UtilityTests` asserted the old silence
+  and was updated.
+
+Also: the doc comment for `setUtility` had come to rest above `anchorCaution`, so the wrong
+function was documented on both platforms.
+
+Not changed, and worth a second opinion: `Config.anchorWarning` calls its result `worst` when it
+means the *highest*-utility tier held (the lowest `rawValue`), which reads backwards.
+
 ## Next work, in order
 
 The plan for this stretch. Tick each phase off here as it lands.
@@ -519,7 +557,7 @@ The plan for this stretch. Tick each phase off here as it lands.
     shield icon and the hero, an onboarding hero, and short README clips.
 18. **Sync the Anchor across devices** through CloudKit or the key-value store. Rules cannot
     sync (tokens versus bundle ids). Ask Zach whether he wants it at all.
-19. **TestFlight, then the App Store.** Started 2026-09-08; `DEPLOYMENT.md` is the map and the
+19. **TestFlight, then the App Store.** Started 2026-09-08; `~/Projects/archive/furlough/testflight-deployment/DEPLOYMENT.md` is the map and the
     status table. Done so far: `Shared/PrivacyInfo.xcprivacy` (Data Not Collected; the two
     required-reason APIs are UserDefaults `1C8F.1`/`CA92.1` and system boot time `35F9.1` for
     `Clock.uptime`), carried as a resource by all four iOS targets and verified at the root of

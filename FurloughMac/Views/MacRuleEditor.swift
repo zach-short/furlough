@@ -64,7 +64,7 @@ struct MacRuleEditor: View {
         guard let target else { return false }
         return !(target.rule?.isEquivalent(to: draft) ?? false)
             || (target.nickname != trimmedNickname && !trimmedNickname.isEmpty)
-            || target.utilityLevel != tier
+            || target.utility != tier
     }
 
     /// What Furlough would have guessed, offered only while Zach has not answered for himself.

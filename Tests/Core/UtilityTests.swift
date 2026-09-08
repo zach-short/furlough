@@ -74,8 +74,18 @@ struct AnchorWarningTests {
 
     @Test("An anchor holding only what Furlough exists to block says nothing")
     func hazardsAreSilent() {
-        let config = config([("TikTok", .hazard), ("Reddit", .idle)], anchoring: ["TikTok", "Reddit"])
+        let config = config([("TikTok", .hazard)], anchoring: ["TikTok"])
         #expect(config.anchorWarning == nil)
+    }
+
+    /// Changed 2026-09-08: anchoring is instant and only the tag lifts it, so it warns one tier
+    /// wider than blocking does. Idle used to be silent here and now speaks; hazard still does not.
+    @Test("Idle speaks before an anchor, though it says nothing before a rule")
+    func idleWarnsBeforeAnchoring() {
+        let config = config([("TikTok", .hazard), ("Reddit", .idle)], anchoring: ["TikTok", "Reddit"])
+        let warning = try! #require(config.anchorWarning)
+        #expect(warning.utility == .idle)
+        #expect(warning.names == ["Reddit"])
     }
 
     @Test("The worst tier in the anchor is the one that speaks, and names its own")

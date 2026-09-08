@@ -423,11 +423,6 @@ final class AppModel {
         return .failed(error.localizedDescription)
     }
 
-    /// Puts `id` in a tier. Moving toward hazard lengthens its delay and lands now; moving
-    /// toward essential shortens it, so it queues behind the delay the target has *today* —
-    /// which is what keeps "call it essential, then loosen it" from being a way round the wait.
-    /// A target with no rule yet is enforcing nothing, so its first tier is free, exactly as
-    /// its first rule is.
     /// What anchoring would take away that is worth keeping, in the words both the Anchor
     /// screen and the Anchor button use. Nil when the anchor holds nothing worth a warning.
     var anchorCaution: (text: String, isSevere: Bool)? {
@@ -441,15 +436,28 @@ final class AppModel {
         return (text, warning.utility == .essential)
     }
 
+    /// Puts `id` in a tier. Moving toward hazard lengthens its delay and lands now; moving
+    /// toward essential shortens it, so it queues behind the delay the target has *today* —
+    /// which is what keeps "call it essential, then loosen it" from being a way round the wait.
+    /// A target with no rule yet is enforcing nothing, so its first tier is free, exactly as
+    /// its first rule is. Choosing the tier the target already has cancels a queued change.
     func setUtility(_ level: Utility, for id: UUID) -> ProposalResult {
         var current = SharedStore.load()
-        guard let target = current.config.target(id: id), target.utilityLevel != level else { return .unchanged }
+        guard let target = current.config.target(id: id) else { return .unchanged }
+        let queued = current.pending.contains { change in
+            if case .setUtility(let targetID, _) = change.kind { return targetID == id }
+            return false
+        }
+        let plan = Policy.plan(utility: level, for: target, queued: queued)
+        guard plan != .unchanged else { return .unchanged }
+        // Dropped whatever happens next: choosing the saved tier back is how a queued change
+        // is cancelled, and a new one replaces it rather than stacking on it.
         current.pending.removeAll { change in
             if case .setUtility(let targetID, _) = change.kind { return targetID == id }
             return false
         }
         var result = ProposalResult.unchanged
-        if target.rule == nil || Policy.classify(newUtility: level, against: target) == .tightening {
+        if plan == .now {
             if let index = current.config.targets.firstIndex(where: { $0.id == id }) {
                 current.config.targets[index].utilityLevel = level
             }

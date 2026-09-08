@@ -38,6 +38,17 @@ enum ChangeClass: Equatable {
     case loosening
 }
 
+/// What `Policy.plan(utility:for:queued:)` says to do with a tier edit.
+enum UtilityPlan: Equatable {
+    /// Nothing to do, and nothing queued to drop.
+    case unchanged
+    /// Set it now: it lengthens the wait, or the target enforces nothing yet, or the only
+    /// thing happening is that a queued change is being cancelled.
+    case now
+    /// Queue it behind the delay the target has today: it shortens the wait.
+    case queue
+}
+
 #if os(iOS)
 /// What the shields should look like right now.
 struct Decision {
@@ -153,6 +164,26 @@ enum Policy {
         let old = target?.rule ?? .unrestricted
         let new = newRule ?? .unrestricted
         return new.isTighterOrEqual(to: old) ? .tightening : .loosening
+    }
+
+    /// What setting `level` on `target` should do. `queued` says whether a tier change is
+    /// already waiting for this target.
+    ///
+    /// A queued tier change is dropped whichever answer comes back, and that is the point: the
+    /// rule editor seeds its picker from the queued tier rather than the saved one, so choosing
+    /// the saved tier back is the obvious way to cancel a queued change. It used to be a silent
+    /// no-op that left the loosening in place, which is the wrong way for a commitment device
+    /// to fail.
+    ///
+    /// The comparison is against `target.utility`, not `target.utilityLevel`: a target nobody
+    /// has tiered is already effectively `.unset`, so choosing that tier is not a change.
+    static func plan(utility level: Utility, for target: Target, queued: Bool) -> UtilityPlan {
+        guard target.utility != level || queued else { return .unchanged }
+        // The tier is already what was asked for, so only the queued change is being dropped.
+        if target.utility == level { return .now }
+        // Nothing is enforced yet, so the first tier is free, exactly as the first rule is.
+        if target.rule == nil { return .now }
+        return classify(newUtility: level, against: target) == .tightening ? .now : .queue
     }
 
     /// A tier changes nothing about what is allowed, only how long the next loosening waits —

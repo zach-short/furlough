@@ -56,8 +56,11 @@ enum Utility: Int, Codable, CaseIterable, Sendable {
     /// past the banner that matters.
     var warnsBeforeBlocking: Bool { self == .essential || self == .useful }
 
-    /// Anchoring is instant and only the paired tag lifts it, so it warns one tier wider.
-    var warnsBeforeAnchoring: Bool { warnsBeforeBlocking }
+    /// Anchoring is instant, covers things that are not even targets, and only the paired tag
+    /// lifts it — no delay runs out and no rule brings it back. So it warns one tier wider than
+    /// blocking does: idle is worth a sentence when the tag might be in another room, even
+    /// though it is not worth one for an ordinary rule.
+    var warnsBeforeAnchoring: Bool { warnsBeforeBlocking || self == .idle }
 }
 
 extension Config {
@@ -140,6 +143,9 @@ enum UtilityText {
     private static func fallback(name: String, utility: Utility) -> String {
         switch utility {
         case .essential: "\(name) is how this phone does its job."
+        // Only reachable from `anchoring`: idle is below the line for an ordinary block, and
+        // saying it is "worth having around" would be flattery. What is true is that it goes.
+        case .idle: "\(name) goes the moment you anchor."
         default: "\(name) is worth having around."
         }
     }
