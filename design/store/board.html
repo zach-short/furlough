@@ -1,0 +1,226 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Furlough — App Store panorama</title>
+<style>
+  /* Local fonts so renders are deterministic offline. Chrome needs
+     --allow-file-access-from-files to load these over file://. */
+  @font-face { font-family: 'Bricolage'; font-weight: 700;
+    src: url('../../Furlough/Fonts/BricolageGrotesque_72pt-Bold.ttf'); }
+  @font-face { font-family: 'Bricolage'; font-weight: 600;
+    src: url('../../Furlough/Fonts/BricolageGrotesque_48pt-SemiBold.ttf'); }
+  @font-face { font-family: 'Onest'; font-weight: 400;
+    src: url('../../Furlough/Fonts/Onest-Regular.ttf'); }
+  @font-face { font-family: 'Onest'; font-weight: 600;
+    src: url('../../Furlough/Fonts/Onest-SemiBold.ttf'); }
+  @font-face { font-family: 'GeistMono'; font-weight: 500;
+    src: url('../../Furlough/Fonts/GeistMono-Medium.ttf'); }
+
+  :root {
+    --ground: #0F0D0B; --ember: #E5563D; --amber: #F59E4A; --cream: #F5EFE6;
+    --muted: #B8AFA3; --faint: #7E766B; --moss: #7BC96F; --sand-light: #FFD59A;
+    --frame-w: 1320px; --frame-h: 2868px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--ground); overflow: hidden; }
+  body { width: var(--frame-w); height: var(--frame-h); }
+  body.all { width: calc(var(--frame-w) * 5); }
+
+  .panorama {
+    position: relative; width: calc(var(--frame-w) * 5); height: var(--frame-h);
+    background: var(--ground);
+    /* One light rig spanning all five frames: the glows straddle the seams. */
+    background-image:
+      radial-gradient(ellipse 34% 46% at 8% 88%,  rgba(229,86,61,.34), transparent 64%),
+      radial-gradient(ellipse 30% 40% at 38% 8%,  rgba(245,158,74,.15), transparent 62%),
+      radial-gradient(ellipse 26% 38% at 62% 96%, rgba(245,158,74,.16), transparent 60%),
+      radial-gradient(ellipse 36% 48% at 94% 12%, rgba(229,86,61,.24), transparent 64%);
+  }
+  /* The sand stream: a single arc drawn once across 6600px. */
+  .stream { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
+  .grain { position: absolute; inset: 0; opacity: .22; mix-blend-mode: overlay;
+           pointer-events: none; }
+
+  .frames { position: relative; z-index: 2; display: flex; height: 100%; }
+  .frame { position: relative; width: var(--frame-w); height: var(--frame-h);
+           padding: 210px 96px 0; display: flex; flex-direction: column; }
+  /* Seam guides — only drawn in review mode, never in an exported frame. */
+  body.all .frame + .frame::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+    background: rgba(245,158,74,.28);
+  }
+
+  .eyebrow { font: 600 30px/1 'Onest', sans-serif; letter-spacing: .16em;
+             text-transform: uppercase; color: var(--amber); margin-bottom: 34px; }
+  .eyebrow.ember { color: var(--ember); } .eyebrow.moss { color: var(--moss); }
+  h1 { font: 700 108px/1.03 'Bricolage', sans-serif; color: var(--cream);
+       letter-spacing: -.022em; max-width: 15ch; }
+  .sub { font: 400 42px/1.42 'Onest', sans-serif; color: var(--muted);
+         margin-top: 32px; max-width: 24ch; }
+
+  /* The device: tilt is progressive across the row, so the five read as an arc. */
+  .stage { flex: 1; display: flex; align-items: flex-start; justify-content: center;
+           perspective: 3200px; margin-top: 96px; }
+  .device {
+    position: relative; width: 812px; height: 1766px; border-radius: 96px;
+    background: linear-gradient(148deg, #3A342E, #17140F 42%, #0A0908);
+    padding: 15px; box-shadow: 0 6px 0 rgba(255,255,255,.10) inset,
+      0 120px 190px rgba(0,0,0,.62), 0 0 190px rgba(229,86,61,.16);
+    transform-style: preserve-3d;
+  }
+  .frame:nth-child(1) .device { transform: rotateY(17deg)  rotateX(5deg) rotateZ(-1.6deg) translateY(0); }
+  .frame:nth-child(2) .device { transform: rotateY(9deg)   rotateX(3deg) rotateZ(-.8deg) translateY(-58px); }
+  .frame:nth-child(3) .device { transform: rotateY(0deg)   rotateX(1.5deg)               translateY(-96px); }
+  .frame:nth-child(4) .device { transform: rotateY(-9deg)  rotateX(3deg) rotateZ(.8deg)  translateY(-58px); }
+  .frame:nth-child(5) .device { transform: rotateY(-17deg) rotateX(5deg) rotateZ(1.6deg) translateY(0); }
+
+  .screen { position: relative; width: 100%; height: 100%; border-radius: 82px;
+            overflow: hidden; background: var(--ground); }
+  .screen img { position: absolute; inset: 0; width: 100%; height: 100%;
+                object-fit: cover; z-index: 2; }
+
+  /* Placeholder shown until design/store/raw/0N.png exists. */
+  .mock { position: absolute; inset: 0; padding: 56px 48px;
+          background-image: radial-gradient(ellipse 80% 40% at 30% 104%, rgba(229,86,61,.30), transparent 62%); }
+  .statusbar { display: flex; justify-content: space-between; align-items: center;
+               font: 500 30px 'GeistMono', monospace; color: var(--cream); padding: 12px 26px 0; }
+  .mocktitle { font: 700 62px/1.1 'Bricolage', sans-serif; color: var(--cream);
+               margin: 92px 0 12px; letter-spacing: -.02em; }
+  .mocknote { font: 400 30px 'Onest', sans-serif; color: var(--faint); }
+  .glass { display: block; margin: 84px auto 0; }
+  .row { display: flex; align-items: center; gap: 26px; margin-top: 34px;
+         padding: 30px 32px; border-radius: 30px; background: rgba(255,255,255,.06);
+         border: 1px solid rgba(255,255,255,.12); }
+  .dot { width: 26px; height: 26px; border-radius: 50%; background: var(--amber); }
+  .dot.ember { background: var(--ember); } .dot.moss { background: var(--moss); }
+  .rowtext { font: 600 32px 'Onest', sans-serif; color: var(--cream); }
+  .rowmeta { margin-left: auto; font: 500 28px 'GeistMono', monospace; color: var(--faint); }
+  .ph { position: absolute; bottom: 54px; left: 0; right: 0; text-align: center;
+        font: 500 24px 'GeistMono', monospace; color: var(--faint); letter-spacing: .1em; }
+</style>
+
+<div class="panorama">
+  <svg class="stream" viewBox="0 0 6600 2868" preserveAspectRatio="none">
+    <defs>
+      <linearGradient id="sand" x1="0" x2="1">
+        <stop offset="0"   stop-color="#E5563D" stop-opacity="0"/>
+        <stop offset=".22" stop-color="#E5563D" stop-opacity=".85"/>
+        <stop offset=".55" stop-color="#F59E4A" stop-opacity=".95"/>
+        <stop offset=".82" stop-color="#FFD59A" stop-opacity=".70"/>
+        <stop offset="1"   stop-color="#FFD59A" stop-opacity="0"/>
+      </linearGradient>
+      <filter id="soft"><feGaussianBlur stdDeviation="26"/></filter>
+      <filter id="noise">
+        <feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="3"/>
+        <feColorMatrix type="saturate" values="0"/>
+      </filter>
+    </defs>
+    <path d="M-100 1980 C 800 1660, 1750 2320, 2620 1980 S 4180 1520, 5080 1840 S 6250 2260, 6700 1900"
+          fill="none" stroke="url(#sand)" stroke-width="46" filter="url(#soft)" opacity=".55"/>
+    <path d="M-100 1980 C 800 1660, 1750 2320, 2620 1980 S 4180 1520, 5080 1840 S 6250 2260, 6700 1900"
+          fill="none" stroke="url(#sand)" stroke-width="5"/>
+  </svg>
+  <svg class="grain"><rect width="100%" height="100%" filter="url(#noise)"/></svg>
+
+  <div class="frames">
+    <section class="frame">
+      <div class="eyebrow ember">The rule</div>
+      <h1>No unblock button.</h1>
+      <p class="sub">Pick the apps that eat your time. Furlough shields them when the time is gone.</p>
+      <div class="stage"><div class="device"><div class="screen">
+        <img src="raw/01.png" onerror="this.remove()">
+        <div class="mock">
+          <div class="statusbar"><span>9:41</span><span>&#9679;&#9679;&#9679;&#9679;</span></div>
+          <div class="mocktitle">Instagram</div>
+          <div class="mocknote">Shielded &middot; opens 8:00 PM</div>
+          <svg class="glass" width="360" height="470" viewBox="0 0 360 470">
+            <path d="M70 30 h220 v70 l-90 130 90 130 v70 H70 v-70 l90-130 -90-130 Z"
+                  fill="none" stroke="#F5EFE6" stroke-opacity=".28" stroke-width="7"/>
+            <path d="M110 60 h140 v34 l-70 100 70 100 v34 H110 v-34 l70-100 -70-100 Z"
+                  fill="#E5563D" fill-opacity=".55"/>
+          </svg>
+          <div class="ph">PLACEHOLDER &middot; DROP raw/01.png</div>
+        </div>
+      </div></div></div>
+    </section>
+
+    <section class="frame">
+      <div class="eyebrow">Budgets</div>
+      <h1>Thirty minutes. Then it&#8217;s gone.</h1>
+      <p class="sub">Give every app a daily budget. Spend it whenever you like.</p>
+      <div class="stage"><div class="device"><div class="screen">
+        <img src="raw/02.png" onerror="this.remove()">
+        <div class="mock">
+          <div class="statusbar"><span>9:41</span><span>&#9679;&#9679;&#9679;&#9679;</span></div>
+          <div class="mocktitle">Daily budget</div>
+          <div class="mocknote">30 minutes &middot; 12 left</div>
+          <div class="row"><span class="dot"></span><span class="rowtext">Instagram</span><span class="rowmeta">12m</span></div>
+          <div class="row"><span class="dot ember"></span><span class="rowtext">TikTok</span><span class="rowmeta">0m</span></div>
+          <div class="row"><span class="dot moss"></span><span class="rowtext">Safari</span><span class="rowmeta">48m</span></div>
+          <div class="ph">PLACEHOLDER &middot; DROP raw/02.png</div>
+        </div>
+      </div></div></div>
+    </section>
+
+    <section class="frame">
+      <div class="eyebrow">Windows</div>
+      <h1>Open only when you said so.</h1>
+      <p class="sub">Eight to ten on school nights. Later on weekends. Your call, once.</p>
+      <div class="stage"><div class="device"><div class="screen">
+        <img src="raw/03.png" onerror="this.remove()">
+        <div class="mock">
+          <div class="statusbar"><span>9:41</span><span>&#9679;&#9679;&#9679;&#9679;</span></div>
+          <div class="mocktitle">Windows</div>
+          <div class="mocknote">Same every day &middot; off</div>
+          <div class="row"><span class="dot"></span><span class="rowtext">Mon&#8211;Thu</span><span class="rowmeta">20:00&#8211;22:00</span></div>
+          <div class="row"><span class="dot"></span><span class="rowtext">Fri&#8211;Sat</span><span class="rowmeta">20:00&#8211;02:00</span></div>
+          <div class="ph">PLACEHOLDER &middot; DROP raw/03.png</div>
+        </div>
+      </div></div></div>
+    </section>
+
+    <section class="frame">
+      <div class="eyebrow">The delay</div>
+      <h1>Loosening waits a day.</h1>
+      <p class="sub">Tightening is instant. Every loosening lands 24 hours later &#8212; and you can cancel it.</p>
+      <div class="stage"><div class="device"><div class="screen">
+        <img src="raw/04.png" onerror="this.remove()">
+        <div class="mock">
+          <div class="statusbar"><span>9:41</span><span>&#9679;&#9679;&#9679;&#9679;</span></div>
+          <div class="mocktitle">Pending</div>
+          <div class="mocknote">Lands tomorrow, 9:41 AM</div>
+          <div class="row"><span class="dot"></span><span class="rowtext">Budget 30 &#8594; 45m</span><span class="rowmeta">23h</span></div>
+          <div class="row"><span class="dot"></span><span class="rowtext">Window +1h</span><span class="rowmeta">23h</span></div>
+          <div class="ph">PLACEHOLDER &middot; DROP raw/04.png</div>
+        </div>
+      </div></div></div>
+    </section>
+
+    <section class="frame">
+      <div class="eyebrow moss">The Anchor</div>
+      <h1>Locked till you tap the tag.</h1>
+      <p class="sub">One tap locks. Only a physical NFC tag unlocks. Leave it at home.</p>
+      <div class="stage"><div class="device"><div class="screen">
+        <img src="raw/05.png" onerror="this.remove()">
+        <div class="mock">
+          <div class="statusbar"><span>9:41</span><span>&#9679;&#9679;&#9679;&#9679;</span></div>
+          <div class="mocktitle">Anchored</div>
+          <div class="mocknote">Hold your phone to the tag</div>
+          <svg class="glass" width="360" height="360" viewBox="0 0 360 360">
+            <circle cx="180" cy="180" r="140" fill="none" stroke="#7BC96F" stroke-opacity=".30" stroke-width="7"/>
+            <circle cx="180" cy="180" r="96"  fill="none" stroke="#7BC96F" stroke-opacity=".55" stroke-width="7"/>
+            <circle cx="180" cy="180" r="46"  fill="#7BC96F" fill-opacity=".55"/>
+          </svg>
+          <div class="ph">PLACEHOLDER &middot; DROP raw/05.png</div>
+        </div>
+      </div></div></div>
+    </section>
+  </div>
+</div>
+
+<script>
+  // ?f=1..5 renders one 1320x2868 frame; ?f=all renders the whole 6600px panorama.
+  const f = new URLSearchParams(location.search).get('f') || 'all';
+  const pan = document.querySelector('.panorama');
+  if (f === 'all') { document.body.classList.add('all'); }
+  else { pan.style.marginLeft = (-1320 * (parseInt(f, 10) - 1)) + 'px'; }
+</script>
