@@ -41,8 +41,13 @@ small codebase he fully understands over a fork. He is interactive: ask when a d
   and one daily minute budget. Windows never cross midnight: a late weekend night is an
   evening window plus an early-morning window on the next day. No windows means always
   blocked. The rule editor has a "Same every day" toggle that hides or shows a day strip on
-  each window, and a "Use windows from another app" sheet that copies another target's
-  windows, days and budget into the draft. Categories are always-blocked containers; apps inside them that have their own
+  each window, a "Use windows from another app" sheet that copies another target's
+  windows, days and budget into the draft, and a "Visualize windows" sheet
+  (`Views/WeekView.swift`): a seven-column 24-hour grid, a per-day editor reached by
+  tapping a column, and "Apply to other days" which gives chosen days exactly that day's
+  hours. `WeekDraft` is the bridge: per-day span lists both ways, merging identical spans
+  across days back into one window, so edits in the sheet land in the editor's draft
+  through one binding and the Same every day toggle follows. Categories are always-blocked containers; apps inside them that have their own
   windows are excepted.
 - Rule-based targets have no unblock action, and must never get one, not even for testing.
   The single exception is the Brick profile (`Config.brick`, decided 2026-09-07): a separate
@@ -140,7 +145,8 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   second, `HeroIndicator`, `EmptyHero`, `TargetRow`), `Components` (`TokenLabel`, `TokenName`, `TokenTile`,
   `StatusChip`, `RowCopy`, `ProminentButton`, `GhostButton`, `SectionLabel`, `Footnote`,
   `CardDivider`), `RuleEditor` (`WindowRow` with `DayStrip`, `CopyRuleSheet`, `TimeChip`,
-  `TimePickerSheet`, `EffectBanner`), `BudgetSlider` (piecewise
+  `TimePickerSheet`, `EffectBanner`), `WeekView` (`WeekDraft`, `WeekSheet`, `WeekGrid`,
+  `DayColumn`, `WindowBlock`, `DayEditor`, `DayBar`), `BudgetSlider` (piecewise
   linear over the 5/30/60/120/240 ticks), `PendingChanges`, `Settings` + `LogView`. Screens are
   `ScrollView`s over `EmberWall`, not `List`/`Form`; the iOS 26 toolbar supplies the glass.
 - `FurloughMonitor/MonitorExtension.swift`: every callback reconciles from shared state.

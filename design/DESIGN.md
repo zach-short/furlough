@@ -105,13 +105,26 @@ widget." Cards: Nickname (text field), Allowed windows (a "Same every day" row w
 Ember-tinted toggle; glass time chips with an arrow between, duration on the right; when the
 toggle is off, a strip of seven 26 pt round day toggles under each window, Onest Bold 10 pt
 initials, Amber fill with Ground text when on, white 7% with a card border when off, and the
-days named in Faint on the right; "+ Add window" and "Use windows from another app" in
-Ember), Daily budget (value in Geist Mono
+days named in Faint on the right; "+ Add window", "Visualize windows" and "Use windows from
+another app" in Ember), Daily budget (value in Geist Mono
 with a small "MIN" label, hint "across all windows", slider 5–240 in steps of 5 with ticks at
 5 / 30 / 60 / 120 / 240, Ember-to-Amber fill, glass knob). Effect banner: Moss tint,
 "Tighter than now · applies immediately", or Pending tint with the effective date. Save is
 glassProminent Ember with cream text. "Remove from Furlough" is a ghost button in Ember with a
 footnote "Removing loosens your rules, so it takes 1 day."
+
+**Week sheet.** Full-height sheet titled "Week". A card holds the grid: day initials across
+the top as 9.5 pt eyebrows (today in Amber), hours down a 40 pt gutter in Geist Mono 8.5 pt
+Faint every three hours, card-border hairlines at those hours, seven equal columns with
+hairlines between and a 7 % Amber tint on today. Each window is a rounded (5 pt) Amber block
+at 92 % with its start time in Geist Mono 8 pt Ground at the top and its end at the bottom
+when the block is tall enough. Below the card, "Tap a day to see and change its hours" and
+an "In words" card with the grouped schedule, one group per line. Tapping a column pushes
+the day editor: the weekday name as the title, a card with a 26 pt horizontal 24-hour bar
+(white 7 % track, Amber segments, ticks at 6, 12 and 18), the day's window rows without day
+strips, "+ Add window", any validation error in Ember, then an "Apply to other days" card
+with a day strip where the current day is a Cream, non-interactive circle, a glassProminent
+"Apply to Sat, Sun" button, and a footnote that says what it will do or what it just did.
 
 **Shield.** iOS lays it out. We supply: background blur `.systemUltraThinMaterialDark`,
 background color Ember at 22%, icon = the hourglass with a transparent background (to be

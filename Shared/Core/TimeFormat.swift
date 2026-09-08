@@ -6,6 +6,16 @@ enum TimeFormat {
         return Policy.date(atMinute: minute, of: .now).formatted(date: .omitted, time: .shortened)
     }
 
+    /// "8 PM", "8:30 PM", "12 AM" for midnight either end; follows the locale's clock.
+    static func shortMinute(_ minute: Int) -> String {
+        let wrapped = minute % Furlough.minutesPerDay
+        let date = Policy.date(atMinute: wrapped, of: .now)
+        if wrapped % 60 == 0 {
+            return date.formatted(.dateTime.hour(.defaultDigits(amPM: .abbreviated)))
+        }
+        return date.formatted(.dateTime.hour(.defaultDigits(amPM: .abbreviated)).minute())
+    }
+
     static func window(_ window: TimeWindow) -> String {
         "\(minute(window.startMinute))–\(minute(window.endMinute))"
     }

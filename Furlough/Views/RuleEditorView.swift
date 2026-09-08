@@ -12,6 +12,7 @@ struct RuleEditorView: View {
     /// Whether each window shows its day strip. Off means every window applies every day.
     @State private var byDay = false
     @State private var showCopy = false
+    @State private var showWeek = false
     @State private var result: ProposalResult?
     @State private var confirmRemove = false
     @FocusState private var nicknameFocused: Bool
@@ -36,6 +37,19 @@ struct RuleEditorView: View {
         model.state.config.targets.filter {
             $0.id != targetID && !$0.kind.isCategory && ($0.rule?.isEverAllowed ?? false)
         }
+    }
+
+    /// The draft as a week for the visual editor. Writing back merges identical spans across
+    /// days into one window and sets the Same every day toggle to match.
+    private var weekDraft: Binding<WeekDraft> {
+        Binding(
+            get: { WeekDraft(windows: windows) },
+            set: { week in
+                let merged = week.windows
+                drafts = merged.map { DraftWindow(window: $0) }
+                byDay = !merged.allSatisfy { $0.days == .all }
+            }
+        )
     }
 
     private var sameEveryDay: Binding<Bool> {
@@ -119,6 +133,9 @@ struct RuleEditorView: View {
                 if let rule = source.rule { adopt(rule) }
             }
         }
+        .sheet(isPresented: $showWeek) {
+            WeekSheet(week: weekDraft)
+        }
         .alert("Saved", isPresented: Binding(get: { result != nil }, set: { if !$0 { result = nil } }), presenting: result) { _ in
             Button("OK") {
                 result = nil
@@ -187,6 +204,8 @@ struct RuleEditorView: View {
                 CardDivider()
             }
             cardAction("Add window", symbol: "plus") { addWindow() }
+            CardDivider()
+            cardAction("Visualize windows", symbol: "calendar") { showWeek = true }
             if !copyCandidates.isEmpty {
                 CardDivider()
                 cardAction("Use windows from another app", symbol: "doc.on.doc") { showCopy = true }
@@ -366,31 +385,37 @@ struct WindowRow: View {
 /// Seven round day toggles in the calendar's order, amber when on, with the days named beside them.
 struct DayStrip: View {
     @Binding var days: Weekdays
+    /// Shown in cream and not toggleable: the day whose hours are being applied elsewhere.
+    var locked: Weekdays = []
+    /// Replaces "No days" when an empty pick is fine rather than an error.
+    var placeholder: String?
     private let calendar = Calendar.current
 
     var body: some View {
         HStack(spacing: 5) {
             ForEach(Weekdays.ordered(calendar: calendar), id: \.self) { weekday in
                 let on = days.contains(weekday: weekday)
+                let isLocked = locked.contains(weekday: weekday)
                 Button {
                     withAnimation(.snappy(duration: 0.2)) { days.toggle(weekday: weekday) }
                 } label: {
                     Text(calendar.veryShortStandaloneWeekdaySymbols[weekday - 1])
                         .font(EmberFont.label(10))
-                        .foregroundStyle(on ? Ember.ground : Ember.faint)
+                        .foregroundStyle(on || isLocked ? Ember.ground : Ember.faint)
                         .frame(width: 26, height: 26)
-                        .background(on ? Ember.amber : Color.white.opacity(0.07), in: Circle())
-                        .overlay(Circle().strokeBorder(on ? Color.clear : Ember.cardBorder, lineWidth: 1))
+                        .background(isLocked ? Ember.cream : on ? Ember.amber : Color.white.opacity(0.07), in: Circle())
+                        .overlay(Circle().strokeBorder(on || isLocked ? Color.clear : Ember.cardBorder, lineWidth: 1))
                         .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
+                .disabled(isLocked)
                 .accessibilityLabel(calendar.standaloneWeekdaySymbols[weekday - 1])
                 .accessibilityAddTraits(on ? .isSelected : [])
             }
             Spacer(minLength: 6)
-            Text(TimeFormat.days(days, calendar: calendar))
+            Text(days.isEmpty ? (placeholder ?? "No days") : TimeFormat.days(days, calendar: calendar))
                 .emberBody(10.5)
-                .foregroundStyle(days.isEmpty ? Ember.ember : Ember.faint)
+                .foregroundStyle(days.isEmpty && placeholder == nil ? Ember.ember : Ember.faint)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
         }
