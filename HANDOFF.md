@@ -175,6 +175,10 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   weekday names, + `ShieldText`; every function that renders a date takes a `calendar:`),
   `Hosts.swift` (`normalize`, `matches`; it lived in `MacModel.swift` until the tests wanted
   it, and is harmlessly unused on iOS),
+  `Companions.swift` (the table of things that are both an app and a site: `pair(forBundleID:name:)`,
+  `pair(forHost:)`, and for the phone `missingHosts(forAppNamed:knownHosts:)` /
+  `missingApp(forHost:knownAppNames:)` plus the `Half` they answer in; names carry their own
+  case for showing and are matched without it),
   `PendingNotifications.swift` (`PlannedNotification`, the pure `plan`, `sync`, and the one
   `Notifier` both platforms post through),
   `ActivityLimit.swift` (how many DeviceActivity activities a save would need; iOS-only, and
@@ -185,8 +189,10 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   (the pinned calendar and the fixtures), `ModelsTests`, `PolicyStatusTests`,
   `PolicyPendingTests`, `PolicySummaryTests`, `NamingTests`, `DecodingTests`, `ClockTests`,
   `QuitGraceTests`, `PendingNotificationTests`, `UtilityTests`, `UtilityPlanTests`,
-  `ActivityLimitTests`, `PendingTextTests`. 182 tests in 29 suites.
+  `ActivityLimitTests`, `PendingTextTests`, `CompanionsTests`. 267 tests in 37 suites.
 - `Shared/LiveActivity/FurloughActivityAttributes.swift` (app + widgets).
+- `Shared/UI/CompanionNudge.swift` (the phone's "you have one half of this" banner, on a
+  named target whose other half is missing; the Mac asks at add time instead).
 - `Shared/UI/Theme.swift` (app + widgets), `Shared/UI/Hourglass.swift` (`HourglassState`
   with its presets and `of(target:status:runtime:now:)`, `HourglassView(state:phase:)` pure,
   `LivingHourglass` animated, `TopSandShape`/`MoundShape` animatable).
@@ -206,9 +212,12 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   one `FamilyActivityPicker`, which holds websites under each category as "Add Website", so
   the choice sets the picker's header and footer, and Website first opens
   `AddWebsiteGuideView` (added 2026-09-08) with the three steps to a site, because the footer
-  alone read as a broken button; everything is presented through `openAfterDismissal`, a short
-  wait, because a sheet presented while the popover or the previous sheet is still dismissing
-  is dropped), `AddWebsiteGuide` (a self-sizing sheet: measured `contentHeight` into a
+  alone read as a broken button; since 2026-09-08 that whole path lives in
+  `AddTargets.swift` as `AddTargetsFlow`, a view modifier driven by one `AddChoice?` binding,
+  so Home and a rule editor reach the same picker with the same copy (`PickerCopy`) — inside
+  it everything is presented after a short wait, because a sheet presented while the popover
+  or the previous sheet is still dismissing is dropped),
+  `AddWebsiteGuide` (a self-sizing sheet: measured `contentHeight` into a
   `.height` detent, `StepRow`; the only way iOS mints a `WebDomainToken` is inside Apple's
   picker, so there is no typed-host path on the phone the way there is on the Mac),
   `Components` (`TokenLabel`, `TokenName`, `TokenTile`,
@@ -713,6 +722,51 @@ The plan for this stretch. Tick each phase off here as it lands.
     6.9-inch set, the phone is 6.3-inch, and Family Controls does not run in the Simulator, so the
     real screens have to be composed into full-size frames.
 
+20. **Both halves of the same thing.** Done 2026-09-08, both platforms; only (c) is left, and
+    it needs Zach's yes first.
+
+    (a) The Mac, at the moment of adding: adding the YouTube app offers youtube.com, adding
+    youtube.com offers the YouTube app, one switch each in `CompanionSheet` (`MacSheets.swift`),
+    fed by the `Companions` table (`Shared/Core`, tested) and by what a browser's "install as
+    app" wrapper says in its bundle (`AppCatalog.webHosts` reads `CrAppModeShortcutURL`).
+    **Seen on screen 2026-09-08** — rendered from the real code against this Mac's real
+    installed apps, both directions, four widths (`SheetFrame` in a borderless `NSHostingView`
+    window, photographed with `screencapture`; `ImageRenderer` draws a `ScrollView` as an empty
+    box and `cacheDisplay` drops the glass, so neither can be trusted for this sheet, and the
+    window has to be **key** or every control draws in its inactive grey). What that showed
+    and fixed: the height reserved 54pt a row where a row is 50, so the card sat in a taller
+    box with a band of air under it that grew with every row; and the explanation stayed
+    singular ("The site is the same thing") with four sites listed. The footnote now says
+    "apply those windows to it" for one companion rather than "to the rest". On this Mac the
+    YouTube Music Chrome wrapper offers music.youtube.com and discord.com offers Discord;
+    reddit.com offers nothing, because no Reddit app is installed — and no sheet is shown at
+    all when there is nothing to offer, which is the right answer, not a miss.
+
+    (b) The phone, one step later. A token says nothing at add time, so there is nothing to
+    offer as it is added — but the shield learns the name the first time it covers something
+    (`Target.systemName`), and `Companions.missingHosts(forAppNamed:knownHosts:)` /
+    `missingApp(forHost:knownAppNames:)` answer from a name alone (both tested). A named target
+    whose other half is not in Furlough carries one dismissible `CompanionNudge` (`Shared/UI`)
+    at the top of its rule editor: "youtube.com is the same thing in a browser tab" with **Add
+    the website** and **Not now**. Add opens the path Home already had, now shared as
+    `AddTargetsFlow` (`Furlough/Views/AddTargets.swift`, used by `HomeView` and
+    `RuleEditorView`): the website guide, then Apple's picker. The dismissal is per target in
+    the app's own defaults (`furlough.companionDismissed`), not in `Config` — it records what
+    has been said, not what is blocked, so it must not be exported with a setup and must not
+    queue behind the loosening delay; the Debug reset clears it. Because "already in" can only
+    be judged by learned name, a half that is in Furlough but has never been blocked is
+    invisible and can be offered once; dismissing settles it. **The nudge itself was rendered
+    and seen at iPhone width; nobody has yet seen it on the phone** — installed 2026-09-08 for
+    Zach to check (open a target the shield has already named, e.g. YouTube or Instagram, and
+    look under the app's name at the top of its editor).
+
+    (c) Ask Zach first, not started: sites by name on the phone. `WebDomain(domain:)` is public
+    in ManagedSettings and `store.webContent.blockedByFilter = .auto([...])` blocks a host with
+    no token — but it switches the adult-content filter on system-wide, Safari shows its own
+    Restricted page rather than the shield, and with no token nothing is counted, so such a
+    target can have windows but no budget. That is a different product than the picker's
+    sites; do not start it without his yes.
+
 ## Style rules
 
 Swift 6 language mode with approachable concurrency, SwiftUI, `@Observable`, async/await, no
@@ -789,7 +843,12 @@ name `Furlough`, macOS 26, non-sandboxed, hardened runtime with the
   nothing on this Mac, and a minimal app reproduces it, so `MenuBar.swift` is written, compiled
   and dead until someone hand-rolls an `NSStatusItem`). The sidebar's + button shows the shared
   `AddChoicePopover` (an NSPopover), and Application or Website opens `AddAppSheet` or
-  `AddSiteSheet`; seen working on this Mac on 2026-09-07. `MacComponents.swift` duplicates
+  `AddSiteSheet`; seen working on this Mac on 2026-09-07. Since 2026-09-08 either add is
+  followed by `CompanionSheet` (the same file) when the thing has another half: the sites an
+  app is also at, or the installed apps a site is also in, from `Companions` plus any wrapper
+  whose bundle names the site. The offer waits for the add sheet's `onDismiss` — a sheet
+  presented over one still leaving is dropped — and `MacModel.addHosts`/`addApps` land the
+  chosen ones in one save. Nothing added is enforced until it has a schedule, as ever. `MacComponents.swift` duplicates
   `ProminentButton`, `GhostButton`, `SectionLabel`, `Footnote`, `CardDivider`, `StatusChip`,
   `RowCopy` and `BudgetSlider` rather than moving them out of `Furlough/Views`, because that
   folder was being edited in another session at the time; unify into `Shared/UI` when quiet.

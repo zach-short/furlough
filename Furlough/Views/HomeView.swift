@@ -1,19 +1,11 @@
-import FamilyControls
 import SwiftUI
 
 struct HomeView: View {
     @Environment(AppModel.self) private var model
     /// The Application / Website popover under the + button.
     @State private var showAddChoice = false
-    /// Which of the two the picker was opened for; it wears a matching header and footer.
-    @State private var pickerFor: AddChoice = .application
-    /// The three steps to a website, shown before the picker.
-    @State private var showWebsiteGuide = false
-    /// Set by the guide's button, read once the guide has finished dismissing.
-    @State private var guideWantsPicker = false
-    @State private var showPicker = false
-    @State private var selection = FamilyActivitySelection(includeEntireCategory: true)
-    @State private var pickerOutcome: AppModel.PickerOutcome?
+    /// What the popover asked for; `addTargetsFlow` takes it from here to Apple's picker.
+    @State private var addRequest: AddChoice?
     @State private var showSettings = false
     @State private var showPending = false
 
@@ -59,81 +51,15 @@ struct HomeView: View {
                                 websiteCaption: "A site from the same picker, three steps in"
                             ) { choice in
                                 showAddChoice = false
-                                switch choice {
-                                case .application: openPicker(for: .application)
-                                case .website: openAfterDismissal { showWebsiteGuide = true }
-                                }
+                                addRequest = choice
                             }
                             .presentationCompactAdaptation(.popover)
                         }
                 }
             }
-            .familyActivityPicker(
-                headerText: pickerHeader,
-                footerText: pickerFooter,
-                isPresented: $showPicker,
-                selection: $selection
-            )
-            .onChange(of: showPicker) { _, presented in
-                guard !presented else { return }
-                let outcome = model.applyPicker(selection)
-                if outcome.added > 0 || outcome.removalsScheduled > 0 {
-                    pickerOutcome = outcome
-                }
-            }
-            .alert(
-                "Selection updated",
-                isPresented: Binding(get: { pickerOutcome != nil }, set: { if !$0 { pickerOutcome = nil } }),
-                presenting: pickerOutcome
-            ) { _ in
-                Button("OK") { pickerOutcome = nil }
-            } message: { outcome in
-                Text(outcome.message)
-            }
-            .sheet(
-                isPresented: $showWebsiteGuide,
-                onDismiss: {
-                    guard guideWantsPicker else { return }
-                    guideWantsPicker = false
-                    openPicker(for: .website)
-                }
-            ) {
-                AddWebsiteGuideView { guideWantsPicker = true }
-            }
+            .addTargetsFlow($addRequest)
             .sheet(isPresented: $showPending) { PendingChangesView() }
             .sheet(isPresented: $showSettings) { SettingsView() }
-        }
-    }
-
-    /// Apple's one picker holds apps, categories and websites alike; Website only changes what
-    /// it says on the way in, after `AddWebsiteGuideView` has said where the sites are.
-    private var pickerHeader: String {
-        switch pickerFor {
-        case .application: "Choose apps and categories"
-        case .website: "Choose websites"
-        }
-    }
-
-    private var pickerFooter: String {
-        switch pickerFor {
-        case .application: "Picking a category adds every app in it, each with its own rule."
-        case .website: "Open a category, scroll past its apps to Websites and tap Add Website. Each site gets its own rule."
-        }
-    }
-
-    /// Opens the picker once whatever came before it has gone.
-    private func openPicker(for choice: AddChoice) {
-        pickerFor = choice
-        selection = model.pickerSelection
-        openAfterDismissal { showPicker = true }
-    }
-
-    /// A sheet presented while the popover is still on its way out, or in the same breath as
-    /// another sheet's dismissal, is dropped; this waits that out first.
-    private func openAfterDismissal(_ present: @escaping @MainActor () -> Void) {
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(350))
-            present()
         }
     }
 }

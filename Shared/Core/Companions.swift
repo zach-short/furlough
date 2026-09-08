@@ -9,13 +9,17 @@ import Foundation
 /// that needs no Mac; `AppCatalog` adds the half that does, reading where a browser's
 /// "install as app" wrapper opens straight out of its bundle.
 ///
-/// Nothing here runs on the phone yet. A Screen Time token says nothing about which app it is
-/// until the shield learns a name, and a website can only be minted inside Apple's picker, so
-/// there is no side to offer and no way to add it: see `AddWebsiteGuideView`.
+/// The phone comes at it a step later. A Screen Time token says nothing about which app it is,
+/// so nothing can be offered as it is added; but the shield learns the name the first time it
+/// covers something, and `missingHosts`/`missingApp` answer from a name alone. Adding the other
+/// half there is still Apple's picker's job — see `AddWebsiteGuideView` — so all the phone
+/// offers is a nudge towards it.
 enum Companions {
     /// One thing, however many names, identifiers and hosts it goes by.
     struct Pair: Hashable, Sendable {
-        /// Lowercased: as Finder shows an app on the Mac and as the shield reports it on iOS.
+        /// As the thing is written, first the name to show. Matching ignores case and spacing,
+        /// so the table can carry "YouTube Music" and still recognise what Finder shows on the
+        /// Mac and what the shield reports on iOS.
         let names: [String]
         /// Lowercased Mac and iOS identifiers. The iOS ones matter on the Mac too: an Apple
         /// silicon Mac runs iPhone apps under their own identifier.
@@ -30,10 +34,14 @@ enum Companions {
             self.hosts = hosts
         }
 
+        /// What to call it: the first name in the table.
+        var title: String { names[0] }
+
         /// True when this is the app: by identifier first, then by the name on its bundle.
         func matches(bundleID: String, name: String) -> Bool {
-            bundleIDs.contains(Companions.normalize(bundleID: bundleID))
-                || names.contains(Companions.normalize(name: name))
+            let key = Companions.normalize(name: name)
+            return bundleIDs.contains(Companions.normalize(bundleID: bundleID))
+                || (!key.isEmpty && names.contains { Companions.normalize(name: $0) == key })
         }
     }
 
@@ -63,6 +71,42 @@ enum Companions {
         return best?.pair
     }
 
+    // MARK: The phone's half
+
+    /// The half of a thing that Furlough does not have yet.
+    enum Half: Equatable, Sendable {
+        /// Websites the app is also at, in table order.
+        case sites([String])
+        /// The app the website is also in, by name.
+        case app(String)
+    }
+
+    /// The websites an app is also at that Furlough does not have, in table order.
+    ///
+    /// This is the lookup the phone can use. A Screen Time token says nothing about what it
+    /// is, so nothing can be offered when a target is added; but the shield learns the name
+    /// the first time it covers something (`SharedStore.learnName`), and from a name alone
+    /// the table still answers. `knownHosts` is what Furlough already blocks — the domains
+    /// its website targets have been learned as — so a site that is in is never offered.
+    static func missingHosts(forAppNamed name: String, knownHosts: [String]) -> [String] {
+        let hosts = hosts(forBundleID: "", name: name)
+        guard !hosts.isEmpty else { return [] }
+        let known = knownHosts.compactMap(Hosts.normalize)
+        return hosts.filter { host in !known.contains { Hosts.matches($0, rule: host) } }
+    }
+
+    /// What to call the app a website is also in, when Furlough does not have it already.
+    ///
+    /// A name, not something to add: on the phone only Apple's picker can mint an app token,
+    /// so the most anything can do is say which app to look for and open the picker.
+    static func missingApp(forHost host: String, knownAppNames: [String]) -> String? {
+        guard let pair = pair(forHost: host) else { return nil }
+        guard !knownAppNames.contains(where: { pair.matches(bundleID: "", name: $0) }) else { return nil }
+        return pair.title
+    }
+
+    // MARK: Normalizing
+
     /// Identifiers lowercased, with a Catalyst app's "maccatalyst." shed so the X app on a Mac
     /// matches the X app on a phone.
     static func normalize(bundleID: String) -> String {
@@ -80,41 +124,41 @@ enum Companions {
     /// Things that are both an app and a site. Only what is worth blocking: Mail is also at
     /// gmail.com, but nobody adds Mail to keep themselves off it.
     static let pairs: [Pair] = [
-        Pair(["youtube"], ["com.google.ios.youtube"], hosts: ["youtube.com"]),
-        Pair(["youtube music"], ["com.google.ios.youtubemusic"], hosts: ["music.youtube.com"]),
-        Pair(["netflix"], ["com.netflix.netflix"], hosts: ["netflix.com"]),
-        Pair(["twitch"], ["tv.twitch"], hosts: ["twitch.tv"]),
-        Pair(["prime video", "amazon prime video"], ["com.amazon.aiv.aivapp"], hosts: ["primevideo.com"]),
-        Pair(["hulu"], ["com.hulu.plus"], hosts: ["hulu.com"]),
-        Pair(["disney+", "disney plus"], ["com.disney.disneyplus"], hosts: ["disneyplus.com"]),
-        Pair(["max", "hbo max"], ["com.wbd.stream", "com.hbo.hbonow"], hosts: ["max.com"]),
+        Pair(["YouTube"], ["com.google.ios.youtube"], hosts: ["youtube.com"]),
+        Pair(["YouTube Music"], ["com.google.ios.youtubemusic"], hosts: ["music.youtube.com"]),
+        Pair(["Netflix"], ["com.netflix.netflix"], hosts: ["netflix.com"]),
+        Pair(["Twitch"], ["tv.twitch"], hosts: ["twitch.tv"]),
+        Pair(["Prime Video", "Amazon Prime Video"], ["com.amazon.aiv.aivapp"], hosts: ["primevideo.com"]),
+        Pair(["Hulu"], ["com.hulu.plus"], hosts: ["hulu.com"]),
+        Pair(["Disney+", "Disney Plus"], ["com.disney.disneyplus"], hosts: ["disneyplus.com"]),
+        Pair(["Max", "HBO Max"], ["com.wbd.stream", "com.hbo.hbonow"], hosts: ["max.com"]),
 
-        Pair(["tiktok"], ["com.zhiliaoapp.musically", "com.ss.iphone.ugc.ame"], hosts: ["tiktok.com"]),
-        Pair(["instagram"], ["com.burbn.instagram"], hosts: ["instagram.com"]),
-        Pair(["reddit"], ["com.reddit.reddit"], hosts: ["reddit.com"]),
-        Pair(["x", "twitter"], ["com.atebits.tweetie2"], hosts: ["x.com", "twitter.com"]),
-        Pair(["threads"], ["com.burbn.barcelona"], hosts: ["threads.com", "threads.net"]),
-        Pair(["bluesky"], ["xyz.blueskyweb.app"], hosts: ["bsky.app"]),
-        Pair(["snapchat"], ["com.toyopagroup.picaboo"], hosts: ["snapchat.com"]),
-        Pair(["facebook"], ["com.facebook.facebook"], hosts: ["facebook.com"]),
-        Pair(["messenger"], ["com.facebook.messenger"], hosts: ["messenger.com"]),
-        Pair(["pinterest"], ["pinterest", "com.pinterest"], hosts: ["pinterest.com"]),
-        Pair(["linkedin"], ["com.linkedin.linkedin"], hosts: ["linkedin.com"]),
-        Pair(["tumblr"], ["com.tumblr.tumblr"], hosts: ["tumblr.com"]),
+        Pair(["TikTok"], ["com.zhiliaoapp.musically", "com.ss.iphone.ugc.ame"], hosts: ["tiktok.com"]),
+        Pair(["Instagram"], ["com.burbn.instagram"], hosts: ["instagram.com"]),
+        Pair(["Reddit"], ["com.reddit.reddit"], hosts: ["reddit.com"]),
+        Pair(["X", "Twitter"], ["com.atebits.tweetie2"], hosts: ["x.com", "twitter.com"]),
+        Pair(["Threads"], ["com.burbn.barcelona"], hosts: ["threads.com", "threads.net"]),
+        Pair(["Bluesky"], ["xyz.blueskyweb.app"], hosts: ["bsky.app"]),
+        Pair(["Snapchat"], ["com.toyopagroup.picaboo"], hosts: ["snapchat.com"]),
+        Pair(["Facebook"], ["com.facebook.facebook"], hosts: ["facebook.com"]),
+        Pair(["Messenger"], ["com.facebook.messenger"], hosts: ["messenger.com"]),
+        Pair(["Pinterest"], ["pinterest", "com.pinterest"], hosts: ["pinterest.com"]),
+        Pair(["LinkedIn"], ["com.linkedin.linkedin"], hosts: ["linkedin.com"]),
+        Pair(["Tumblr"], ["com.tumblr.tumblr"], hosts: ["tumblr.com"]),
 
-        Pair(["discord"], ["com.hnc.discord", "com.hammerandchisel.discord"], hosts: ["discord.com"]),
-        Pair(["slack"], ["com.tinyspeck.slackmacgap", "com.tinyspeck.chatlyio"], hosts: ["slack.com"]),
-        Pair(["whatsapp"], ["net.whatsapp.whatsapp"], hosts: ["web.whatsapp.com"]),
-        Pair(["telegram"], ["ru.keepcoder.telegram", "ph.telegra.telegraph"], hosts: ["web.telegram.org"]),
-        Pair(["zoom", "zoom.us"], ["us.zoom.xos", "us.zoom.videomeetings"], hosts: ["zoom.us"]),
-        Pair(["spotify"], ["com.spotify.client"], hosts: ["open.spotify.com"]),
-        Pair(["notion"], ["notion.id"], hosts: ["notion.so"]),
-        Pair(["figma"], ["com.figma.desktop"], hosts: ["figma.com"]),
-        Pair(["chatgpt"], ["com.openai.chat"], hosts: ["chatgpt.com", "chat.openai.com"]),
+        Pair(["Discord"], ["com.hnc.discord", "com.hammerandchisel.discord"], hosts: ["discord.com"]),
+        Pair(["Slack"], ["com.tinyspeck.slackmacgap", "com.tinyspeck.chatlyio"], hosts: ["slack.com"]),
+        Pair(["WhatsApp"], ["net.whatsapp.whatsapp"], hosts: ["web.whatsapp.com"]),
+        Pair(["Telegram"], ["ru.keepcoder.telegram", "ph.telegra.telegraph"], hosts: ["web.telegram.org"]),
+        Pair(["Zoom", "zoom.us"], ["us.zoom.xos", "us.zoom.videomeetings"], hosts: ["zoom.us"]),
+        Pair(["Spotify"], ["com.spotify.client"], hosts: ["open.spotify.com"]),
+        Pair(["Notion"], ["notion.id"], hosts: ["notion.so"]),
+        Pair(["Figma"], ["com.figma.desktop"], hosts: ["figma.com"]),
+        Pair(["ChatGPT"], ["com.openai.chat"], hosts: ["chatgpt.com", "chat.openai.com"]),
 
-        Pair(["steam"], ["com.valvesoftware.steam"], hosts: ["store.steampowered.com", "steamcommunity.com"]),
-        Pair(["amazon"], ["com.amazon.amazon"], hosts: ["amazon.com"]),
-        Pair(["draftkings", "draftkings sportsbook"], hosts: ["draftkings.com"]),
-        Pair(["fanduel", "fanduel sportsbook"], hosts: ["fanduel.com"]),
+        Pair(["Steam"], ["com.valvesoftware.steam"], hosts: ["store.steampowered.com", "steamcommunity.com"]),
+        Pair(["Amazon"], ["com.amazon.amazon"], hosts: ["amazon.com"]),
+        Pair(["DraftKings", "DraftKings Sportsbook"], hosts: ["draftkings.com"]),
+        Pair(["FanDuel", "FanDuel Sportsbook"], hosts: ["fanduel.com"]),
     ]
 }

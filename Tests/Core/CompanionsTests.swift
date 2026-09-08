@@ -28,15 +28,61 @@ struct CompanionsTests {
 
     @Test("A website finds its app, subdomains included")
     func byHost() {
-        #expect(Companions.pair(forHost: "m.youtube.com")?.names == ["youtube"])
-        #expect(Companions.pair(forHost: "https://old.reddit.com/r/all")?.names == ["reddit"])
-        #expect(Companions.pair(forHost: "twitter.com")?.names == ["x", "twitter"])
+        #expect(Companions.pair(forHost: "m.youtube.com")?.title == "YouTube")
+        #expect(Companions.pair(forHost: "https://old.reddit.com/r/all")?.title == "Reddit")
+        #expect(Companions.pair(forHost: "twitter.com")?.title == "X")
     }
 
     @Test("The longest host wins, so YouTube Music is not YouTube")
     func longestHostWins() {
-        #expect(Companions.pair(forHost: "music.youtube.com")?.names == ["youtube music"])
-        #expect(Companions.pair(forHost: "www.youtube.com")?.names == ["youtube"])
+        #expect(Companions.pair(forHost: "music.youtube.com")?.title == "YouTube Music")
+        #expect(Companions.pair(forHost: "www.youtube.com")?.title == "YouTube")
+    }
+
+    @Test("The name to show keeps the case the table wrote it in")
+    func title() {
+        #expect(Companions.pair(forBundleID: "com.openai.chat", name: "")?.title == "ChatGPT")
+        #expect(Companions.pair(forBundleID: "", name: "youtube music")?.title == "YouTube Music")
+        #expect(Companions.pair(forHost: "primevideo.com")?.title == "Prime Video")
+    }
+
+    @Test("An empty name matches nothing, so an app with no learned name offers nothing")
+    func emptyNameMatchesNothing() {
+        #expect(Companions.pair(forBundleID: "", name: "") == nil)
+        #expect(Companions.missingHosts(forAppNamed: "", knownHosts: []).isEmpty)
+    }
+
+    // MARK: The phone's half
+
+    @Test("A named app offers the sites Furlough does not have")
+    func missingHosts() {
+        #expect(Companions.missingHosts(forAppNamed: "YouTube", knownHosts: []) == ["youtube.com"])
+        #expect(Companions.missingHosts(forAppNamed: "  chatgpt ", knownHosts: []) == ["chatgpt.com", "chat.openai.com"])
+        #expect(Companions.missingHosts(forAppNamed: "Xcode", knownHosts: []).isEmpty)
+    }
+
+    @Test("A site already in Furlough is not offered again, subdomains included")
+    func missingHostsSkipsWhatIsIn() {
+        #expect(Companions.missingHosts(forAppNamed: "YouTube", knownHosts: ["youtube.com"]).isEmpty)
+        #expect(Companions.missingHosts(forAppNamed: "YouTube", knownHosts: ["m.youtube.com"]).isEmpty)
+        #expect(Companions.missingHosts(forAppNamed: "ChatGPT", knownHosts: ["chatgpt.com"]) == ["chat.openai.com"])
+        // The other way round is not a match: youtube.com does not cover music.youtube.com.
+        #expect(Companions.missingHosts(forAppNamed: "YouTube Music", knownHosts: ["youtube.com"]) == ["music.youtube.com"])
+    }
+
+    @Test("A named site says which app to look for")
+    func missingApp() {
+        #expect(Companions.missingApp(forHost: "m.youtube.com", knownAppNames: []) == "YouTube")
+        #expect(Companions.missingApp(forHost: "twitter.com", knownAppNames: []) == "X")
+        #expect(Companions.missingApp(forHost: "example.org", knownAppNames: []) == nil)
+    }
+
+    @Test("An app Furlough already has is not asked for again, under any of its names")
+    func missingAppSkipsWhatIsIn() {
+        #expect(Companions.missingApp(forHost: "x.com", knownAppNames: ["X"]) == nil)
+        #expect(Companions.missingApp(forHost: "x.com", knownAppNames: ["Twitter"]) == nil)
+        #expect(Companions.missingApp(forHost: "primevideo.com", knownAppNames: ["Amazon Prime Video"]) == nil)
+        #expect(Companions.missingApp(forHost: "x.com", knownAppNames: ["Safari", ""]) == "X")
     }
 
     @Test("A site with no app, or no site at all, is nobody's other half")
@@ -58,7 +104,7 @@ struct CompanionsTests {
                 #expect(Companions.pair(forBundleID: bundleID, name: "") == pair)
             }
             for name in pair.names {
-                #expect(name == Companions.normalize(name: name), "\(name) is not normalized")
+                #expect(Companions.pair(forBundleID: "", name: name.uppercased()) == pair, "\(name) does not find its own pair")
             }
         }
     }

@@ -23,6 +23,8 @@ struct RuleEditorView: View {
     /// whether it lands now or queues.
     @State private var tier = Utility.unset
     @State private var confirmBlockEssential = false
+    /// Set when the companion nudge is taken up: the flow below opens the guide or the picker.
+    @State private var addRequest: AddChoice?
     @FocusState private var nicknameFocused: Bool
 
     /// A window with a stable identity while it is being edited.
@@ -142,6 +144,14 @@ struct RuleEditorView: View {
             VStack(alignment: .leading, spacing: 0) {
                 if let target {
                     header(target)
+                    if let companion = model.companion(for: target) {
+                        CompanionNudge(companion: companion) {
+                            addRequest = companion.addChoice
+                        } onDismiss: {
+                            model.dismissCompanion(for: target.id)
+                        }
+                        .padding(.bottom, 14)
+                    }
                     nicknameCard
                     if !target.kind.isCategory {
                         SectionLabel(text: "Allowed windows")
@@ -198,6 +208,7 @@ struct RuleEditorView: View {
             .padding(.bottom, 48)
         }
         .background(EmberWall())
+        .addTargetsFlow($addRequest)
         .scrollDismissesKeyboard(.interactively)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
