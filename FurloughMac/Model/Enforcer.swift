@@ -119,9 +119,9 @@ final class Enforcer {
             }
         }
 
-        // A window closing soon.
+        // A window closing soon. A rule without windows has no closing time, only a budget.
         let minute = Policy.minuteOfDay(now)
-        for target in state.config.targets {
+        for target in state.config.targets where target.rule?.isAllDay == false {
             guard case .open(let until) = decision.statuses[target.id], until - minute == Furlough.warningMinutes,
                   windowWarned[target.id] != until else { continue }
             windowWarned[target.id] = until

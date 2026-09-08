@@ -174,7 +174,7 @@ struct MacHomeView: View {
                         .lineLimit(1)
                 }
                 Spacer(minLength: 6)
-                StatusChip(status: status, glass: .of(target, status: status, runtime: model.state.runtime, now: now))
+                StatusChip(status: status, glass: .of(target, status: status, runtime: model.state.runtime, now: now), allDay: target.rule?.isAllDay ?? false)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 9)
@@ -212,12 +212,19 @@ struct MacHomeView: View {
             let extra = summary.openNames.count > 1 ? " +\(summary.openNames.count - 1)" : ""
             return "\(name)\(extra) open · \(TimeFormat.countdown(from: now, to: until))"
         }
+        if let name = summary.allDayNames.first {
+            let extra = summary.allDayNames.count > 1 ? " +\(summary.allDayNames.count - 1)" : ""
+            return "\(name)\(extra) open all day"
+        }
         if summary.isEmpty { return "No unblock button." }
         if summary.blockedCount > 0 { return "\(summary.blockedCount) blocked." }
         return "Nothing enforced yet."
     }
 
     private func subline(_ summary: Policy.Summary) -> String? {
+        if summary.openUntil == nil, !summary.allDayNames.isEmpty {
+            return "Up to the budget · resets at midnight"
+        }
         if let at = summary.nextOpenAt, let name = summary.nextOpenNames.first {
             let when = Policy.daysAhead(of: at, from: now) == 0
                 ? at.formatted(date: .omitted, time: .shortened)

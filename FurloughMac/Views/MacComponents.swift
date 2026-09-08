@@ -167,6 +167,8 @@ struct KindTile: View {
 struct StatusChip: View {
     let status: TargetStatus
     let glass: HourglassState
+    /// The rule has no windows, so there is no closing time to show.
+    var allDay = false
 
     var body: some View {
         HStack(spacing: 5) {
@@ -186,7 +188,7 @@ struct StatusChip: View {
     private var text: String? {
         switch status {
         case .bricked: "Bricked"
-        case .open(let until): TimeFormat.minute(until)
+        case .open(let until): allDay ? "All day" : TimeFormat.minute(until)
         case .closed(let next): TimeFormat.chip(next)
         case .exhausted(let next): next.map(TimeFormat.chip)
         case .unconfigured: "Set up"
@@ -208,7 +210,7 @@ enum RowCopy {
     /// The rule line under a row's name. A rule that varies by day shows today's windows.
     static func detail(target: Target, status: TargetStatus, now: Date = .now) -> String {
         guard let rule = target.rule else { return "Not enforced yet" }
-        guard rule.isEverAllowed else { return "No windows" }
+        guard rule.isEverAllowed else { return "Blocked all day" }
         let budget = TimeFormat.budget(rule.dailyBudgetMinutes)
         if case .exhausted = status { return "Used up today · \(budget)" }
         if rule.isSameEveryDay {

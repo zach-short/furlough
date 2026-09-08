@@ -152,18 +152,27 @@ struct MacRuleEditor: View {
 
     private var windowsCard: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Text("Same every day")
+            if drafts.isEmpty {
+                Text("No windows. Open all day, up to the budget.")
                     .emberBody(13)
-                    .foregroundStyle(Ember.cream)
-                Spacer()
-                Toggle("Same every day", isOn: sameEveryDay)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .tint(Ember.ember)
+                    .foregroundStyle(Ember.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 11)
+            } else {
+                HStack(spacing: 12) {
+                    Text("Same every day")
+                        .emberBody(13)
+                        .foregroundStyle(Ember.cream)
+                    Spacer()
+                    Toggle("Same every day", isOn: sameEveryDay)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                        .tint(Ember.ember)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
             CardDivider()
             ForEach($drafts) { $draft in
                 WindowRow(
@@ -218,7 +227,7 @@ struct MacRuleEditor: View {
                         .foregroundStyle(Ember.faint)
                 }
                 Spacer()
-                Text("per day, in total")
+                Text(drafts.isEmpty ? "for the whole day" : "across all windows")
                     .emberBody(11.5)
                     .foregroundStyle(Ember.muted)
             }
@@ -247,12 +256,11 @@ struct MacRuleEditor: View {
     // MARK: Effect
 
     private enum Effect {
-        case noChanges, nicknameOnly, tightening, loosening(Date), blockedAllDay, error(String)
+        case noChanges, nicknameOnly, tightening, loosening(Date), error(String)
     }
 
     private func effect(for target: Target) -> Effect {
         if let error = draft.validationError { return .error(error) }
-        if !draft.isEverAllowed { return .blockedAllDay }
         if !hasChanges { return .noChanges }
         if target.rule == draft { return .nicknameOnly }
         if Policy.classify(newRule: draft, against: target) == .tightening { return .tightening }
@@ -265,7 +273,6 @@ struct MacRuleEditor: View {
         case .nicknameOnly: ("textformat", "Only the name changes; that is instant.", Ember.muted)
         case .tightening: ("bolt.fill", "Tighter than now, so it applies the moment you save.", Ember.moss)
         case .loosening(let date): ("clock", "This loosens your rules. It takes effect \(date.formatted(date: .abbreviated, time: .shortened)); until then the current rule holds.", Ember.pending)
-        case .blockedAllDay: ("lock.fill", "No windows means blocked all day.", Ember.muted)
         case .error(let message): ("exclamationmark.triangle.fill", message, Ember.ember)
         }
         return HStack(alignment: .top, spacing: 8) {
@@ -297,12 +304,8 @@ struct MacRuleEditor: View {
             return nil
         }.first
         let rule = pendingRule ?? target.rule ?? Rule()
-        var windows = rule.sortedWindows
         budget = rule.dailyBudgetMinutes > 0 ? rule.dailyBudgetMinutes : Furlough.defaultBudgetMinutes
-        if windows.isEmpty, target.rule == nil {
-            windows = [TimeWindow(startMinute: 20 * 60, endMinute: 22 * 60)]
-        }
-        drafts = windows.map { DraftWindow(window: $0) }
+        drafts = rule.sortedWindows.map { DraftWindow(window: $0) }
         byDay = !rule.isSameEveryDay
     }
 

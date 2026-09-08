@@ -11,7 +11,7 @@ struct MenuBarLabel: View {
     var body: some View {
         let summary = Policy.summary(state: model.state, now: now)
         HStack(spacing: 4) {
-            Image(systemName: summary.openUntil != nil ? "hourglass.bottomhalf.filled" : "hourglass")
+            Image(systemName: summary.openUntil != nil || !summary.allDayNames.isEmpty ? "hourglass.bottomhalf.filled" : "hourglass")
             if let until = summary.openUntil {
                 Text(TimeFormat.countdown(from: now, to: until)).monospacedDigit()
             }
