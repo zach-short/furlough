@@ -142,6 +142,11 @@ extension ExportedTarget {
         case .category:
             kind = .category
             identifier = nil
+        // A typed host is a string another device can look up, so unlike a token it exports
+        // with an identifier — which is what lets a phone setup land on a Mac and back.
+        case .host(let host):
+            kind = .website
+            identifier = host
         #else
         case .macApp(let bundleID):
             kind = .app

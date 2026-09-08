@@ -129,3 +129,59 @@ struct DecodingTests {
         #expect(rule.isEverAllowed)
     }
 }
+
+/// What a `TargetKind` looks like on disk.
+///
+/// This matters more than it looks. `TargetKind` gained a case on 2026-09-08 — websites by
+/// name on the phone — and the state on Zach's phone was written by builds that had never
+/// heard of it. Swift synthesises an enum's `Codable` as a single-key object named after the
+/// case, so a new case adds a name nothing older ever wrote and changes nothing about the
+/// names already there. These pin that shape, so a later hand-written `init(from:)` or a
+/// renamed case cannot quietly make an existing phone's targets undecodable.
+///
+/// Read on macOS, so the cases here are the Mac's. The mechanism is the same one the phone's
+/// three token cases go through; there is no iOS test bundle to read those in.
+@Suite("How a target kind is stored")
+struct TargetKindDecodingTests {
+    let decoder = JSONDecoder()
+    let encoder = JSONEncoder()
+
+    @Test("a kind written before the sibling case existed still decodes")
+    func olderKindStillDecodes() throws {
+        let kind = try decoder.decode(TargetKind.self, from: Data(#"{"macApp":{"bundleID":"com.apple.Safari"}}"#.utf8))
+        #expect(kind == .macApp(bundleID: "com.apple.Safari"))
+    }
+
+    @Test("each case is stored under its own name")
+    func casesAreKeyedByName() throws {
+        let app = String(data: try encoder.encode(TargetKind.macApp(bundleID: "com.apple.Safari")), encoding: .utf8)
+        #expect(app?.contains("\"macApp\"") == true)
+        let host = String(data: try encoder.encode(TargetKind.host("youtube.com")), encoding: .utf8)
+        #expect(host?.contains("\"host\"") == true)
+        #expect(host?.contains("macApp") == false)
+    }
+
+    @Test("a whole config of older targets decodes with the new case in the enum")
+    func olderConfigDecodes() throws {
+        let json = """
+        {"targets":[\
+        {"id":"6B29FC40-CA47-1067-B31D-00DD010662DA","kind":{"macApp":{"bundleID":"com.apple.Safari"}},\
+        "nickname":"Safari","addedAt":0}],\
+        "loosenDelayHours":24,"schemaVersion":1}
+        """
+        let config = try decoder.decode(Config.self, from: Data(json.utf8))
+        #expect(config.targets.count == 1)
+        #expect(config.targets[0].kind == .macApp(bundleID: "com.apple.Safari"))
+        #expect(config.targets[0].nickname == "Safari")
+        #expect(config.targets[0].rule == nil)
+        #expect(config.loosenDelayHours == 24)
+    }
+
+    @Test("a kind round-trips")
+    func roundTrip() throws {
+        for kind in [TargetKind.macApp(bundleID: "com.apple.Safari"), .host("youtube.com")] {
+            let back = try decoder.decode(TargetKind.self, from: try encoder.encode(kind))
+            #expect(back == kind)
+        }
+    }
+}

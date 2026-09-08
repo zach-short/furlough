@@ -22,7 +22,8 @@ enum ShieldReconciler {
         SharedStore.save(state)
         SharedStore.log(
             "reconcile (\(reason)): shielded apps=\(decision.shieldedApps.count) web=\(decision.shieldedWeb.count) "
-            + "categories=\(decision.categories.count) open apps=\(decision.allowedApps.count) web=\(decision.allowedWeb.count)"
+            + "categories=\(decision.categories.count) filtered hosts=\(decision.filteredHosts.count) "
+            + "open apps=\(decision.allowedApps.count) web=\(decision.allowedWeb.count)"
         )
         return decision
     }
@@ -37,6 +38,14 @@ enum ShieldReconciler {
         store.shield.webDomainCategories = decision.categories.isEmpty
             ? nil
             : .specific(decision.categories, except: decision.allowedWeb)
+        // Typed hosts, which have no token to shield. `.specific` names exactly these and
+        // touches nothing else: verified on the phone 2026-09-08 with a throwaway store —
+        // example.com showed iOS's own "Website Not Allowed" page while amazon.com loaded, and
+        // Screen Time's system-wide content filter stayed as it was. `.auto` is the case that
+        // would have switched Apple's adult filter on for the whole phone; it is not used.
+        store.webContent.blockedByFilter = decision.webFilterHosts.map { hosts in
+            .specific(Set(hosts.map { WebDomain(domain: $0) }))
+        }
         // Deny deleting apps only while something is shielded, so the flag can never outlive a block.
         store.application.denyAppRemoval = decision.isAnythingShielded ? true : nil
     }

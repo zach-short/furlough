@@ -100,7 +100,7 @@ struct SettingsView: View {
                 }
             }
             .sheet(item: $chosenSetup) { chosen in
-                ImportSetupView(export: chosen.export)
+                ImportSetupView(export: chosen.export, config: model.state.config)
             }
             .alert("Restore from a file", isPresented: Binding(get: { importError != nil }, set: { if !$0 { importError = nil } }), presenting: importError) { _ in
                 Button("OK") { importError = nil }

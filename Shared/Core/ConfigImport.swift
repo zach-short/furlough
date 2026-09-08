@@ -611,7 +611,6 @@ extension ConfigImport {
     }
 }
 
-#if os(iOS)
 extension ConfigImport {
     /// What the phone can work out for itself, before anybody is asked.
     ///
@@ -630,6 +629,11 @@ extension ConfigImport {
     /// Read against a config that grows as the file is read, the way the Mac's does, so a file
     /// listing both "youtube.com" and "m.youtube.com" lands on one target rather than two: the
     /// second is a subdomain of the first, and `Config.target(host:)` is the thing that knows it.
+    ///
+    /// Only `ImportSetupView` calls this, so it is the phone's — but it is not behind an
+    /// `#if os(iOS)`, because everything it touches exists on both platforms and the test
+    /// bundle is a macOS one. Behind the guard it would be the one part of this feature no
+    /// test could reach. Harmlessly unused on the Mac, the way `Hosts` used to be on the phone.
     static func preresolved(for export: ConfigExport, config: Config, unresolved: String) -> [ImportResolution] {
         var growing = config
         var invented = Set<UUID>()
@@ -657,7 +661,6 @@ extension ConfigImport {
         }
     }
 }
-#endif
 
 #if !os(iOS)
 extension ConfigImport {

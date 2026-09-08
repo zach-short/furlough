@@ -250,6 +250,11 @@ struct Rule: Codable, Hashable {
     /// Allowed at some minute of some day.
     var isEverAllowed: Bool { dailyBudgetMinutes > 0 && (isAllDay || windows.contains { !$0.days.isEmpty }) }
     var effectiveBudgetMinutes: Int { isEverAllowed ? dailyBudgetMinutes : 0 }
+    /// The daily limit, or nil when there is not really one. A whole day of budget is no
+    /// budget at all — `Rule.unrestricted` has always carried one — and on iOS a typed host
+    /// always does, because DeviceActivity counts only tokens and so nothing counts it. Read
+    /// this rather than `dailyBudgetMinutes` wherever a limit is being shown to a person.
+    var limitMinutes: Int? { dailyBudgetMinutes < Furlough.minutesPerDay ? dailyBudgetMinutes : nil }
     var sortedWindows: [TimeWindow] { windows.sorted() }
     /// Every window applies every day, so one list describes the whole week.
     var isSameEveryDay: Bool { windows.allSatisfy { $0.days == .all } }
@@ -338,6 +343,16 @@ enum TargetKind: Codable, Hashable {
     case application(ApplicationToken)
     case webDomain(WebDomainToken)
     case category(ActivityCategoryToken)
+    /// A website typed by name rather than minted by Apple's picker: "youtube.com", subdomains
+    /// too. Blocked through `WebContentSettings.blockedByFilter`, which takes a plain string,
+    /// so it needs no token and carries its own name from the moment it is added — unlike
+    /// `.webDomain`, which says nothing until the shield learns a name.
+    ///
+    /// It buys that with two things a picked site has. Nothing counts it: a DeviceActivity
+    /// budget event needs a token, so a typed host has windows and no daily budget. And iOS
+    /// draws its own "Website Not Allowed" page over it rather than Furlough's shield.
+    /// Verified on the phone 2026-09-08; see the note in `ShieldReconciler.apply`.
+    case host(String)
     #else
     /// A Mac app, by bundle identifier: "com.google.Chrome".
     case macApp(bundleID: String)
@@ -386,6 +401,8 @@ struct Target: Codable, Hashable, Identifiable {
         case .application: "This app"
         case .webDomain: "This website"
         case .category: "This category"
+        // A typed host is the one iOS kind that names itself: it was written down, not minted.
+        case .host(let host): host
         #else
         case .macApp(let bundleID): bundleID
         case .host(let host): host
@@ -508,16 +525,12 @@ struct SharedState: Codable, Equatable {
     var runtime = RuntimeState()
 }
 
-#if !os(iOS)
-// MARK: - Mac lookups
+// MARK: - Host lookups
 
-/// Finding a target by what the Mac calls it. Here rather than beside the Mac's model because
-/// the import reads them too, and `Shared/Core` is the only place both can see.
+/// Finding a target by its host. Both platforms have `.host` since 2026-09-08 — the Mac has
+/// only ever had it, and the phone gained typed sites alongside the picker's — so this is not
+/// Mac-only the way the bundle-identifier lookups below are.
 extension Config {
-    func target(bundleID: String) -> Target? {
-        targets.first { $0.kind == .macApp(bundleID: bundleID) }
-    }
-
     /// The target whose host is `host` or a parent domain of it: "m.youtube.com" matches "youtube.com".
     func target(host: String) -> Target? {
         let host = host.lowercased()
@@ -535,14 +548,27 @@ extension TargetKind {
 }
 
 extension Target {
-    var bundleID: String? {
-        if case .macApp(let id) = kind { return id }
-        return nil
-    }
-
     var host: String {
         if case .host(let h) = kind { return h }
         return ""
+    }
+}
+
+#if !os(iOS)
+// MARK: - Mac lookups
+
+/// Finding a Mac app by its bundle identifier. Here rather than beside the Mac's model because
+/// the import reads it too, and `Shared/Core` is the only place both can see.
+extension Config {
+    func target(bundleID: String) -> Target? {
+        targets.first { $0.kind == .macApp(bundleID: bundleID) }
+    }
+}
+
+extension Target {
+    var bundleID: String? {
+        if case .macApp(let id) = kind { return id }
+        return nil
     }
 }
 #endif

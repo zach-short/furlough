@@ -37,6 +37,9 @@ enum AppUtility {
         case .category:
             // Categories are always blocked, so there is no loosening to delay and nothing to warn about.
             return nil
+        case .host(let host):
+            // Typed, so the host is known from the start: the same answer the Mac gives.
+            return byHost(host)
         #else
         case .macApp(let bundleID):
             return byBundleID(bundleID) ?? byName(target.nickname)

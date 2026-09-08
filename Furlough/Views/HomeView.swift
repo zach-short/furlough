@@ -48,7 +48,7 @@ struct HomeView: View {
                         .popover(isPresented: $showAddChoice, arrowEdge: .top) {
                             AddChoicePopover(
                                 applicationCaption: "Apps and categories, from Apple's picker",
-                                websiteCaption: "A site from the same picker, three steps in"
+                                websiteCaption: "Type the address. Hours, but no daily limit"
                             ) { choice in
                                 showAddChoice = false
                                 addRequest = choice

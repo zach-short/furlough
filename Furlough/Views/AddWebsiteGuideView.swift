@@ -1,9 +1,12 @@
 import SwiftUI
 
-/// What Website means on the phone. iOS mints a web domain only inside Apple's picker, never
-/// from an address typed here, and the sites sit below the apps in every category — three
-/// levels down, where nobody finds them by accident. This says where to look before the
-/// picker opens; the picker's own footer says it again once you are in there.
+/// The long way to a website: the one that gets a daily limit and Furlough's own shield.
+///
+/// Reached from `AddSiteSheet` rather than straight from the + button since 2026-09-08, when
+/// typing became what Website means. Only a site iOS minted itself can be counted, and iOS
+/// mints one only in here — under the apps in every category, three levels down, where nobody
+/// finds it by accident. This says where to look before the picker opens; the picker's own
+/// footer says it again once you are in there.
 struct AddWebsiteGuideView: View {
     /// Hand over to Apple's picker. The sheet dismisses itself; the caller opens the picker
     /// once this one is fully gone.
@@ -34,11 +37,11 @@ struct AddWebsiteGuideView: View {
                         RoundedRectangle(cornerRadius: Ember.tileRadiusLarge, style: .continuous)
                             .strokeBorder(Ember.cardBorder, lineWidth: 1)
                     )
-                Text("Websites live inside Apple's picker")
+                Text("A site with a daily limit")
                     .emberDisplay(26)
                     .foregroundStyle(Ember.cream)
                     .padding(.top, 18)
-                Text("iOS hands out a website only through the same picker as the apps, so Furlough cannot take an address of its own. It is three steps in.")
+                Text("A site Furlough can count has to come from Apple's own picker, which hands them out alongside the apps. It is three steps in.")
                     .emberBody(14.5)
                     .foregroundStyle(Ember.muted)
                     .padding(.top, 10)

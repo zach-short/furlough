@@ -19,18 +19,25 @@ enum PickerCopy {
     }
 }
 
-/// The way to Apple's picker, from wherever the asking happened.
+/// The way to a new target, from wherever the asking happened.
 ///
-/// Website goes through `AddWebsiteGuideView` first, because the picker keeps sites three
-/// steps in and the footer alone read as a broken button. Everything is presented after a
-/// short wait: a sheet raised while a popover or the previous sheet is still leaving is
-/// dropped. Set `request` to start it; it is put back to nil as soon as it is read, so the
-/// same screen can ask again.
+/// Application goes straight to Apple's picker. Website lands on `AddSiteSheet` instead, where
+/// the address is typed — the fast path, and Zach's call on 2026-09-08 — and only the person
+/// who wants a daily limit on a site goes on from there to `AddWebsiteGuideView` and the
+/// picker, which keeps sites three steps in where the footer alone read as a broken button.
+///
+/// Everything is presented after a short wait: a sheet raised while a popover or the previous
+/// sheet is still leaving is dropped. Set `request` to start it; it is put back to nil as soon
+/// as it is read, so the same screen can ask again.
 struct AddTargetsFlow: ViewModifier {
     @Environment(AppModel.self) private var model
     @Binding var request: AddChoice?
     /// Which of the two the picker was opened for; it wears a matching header and footer.
     @State private var pickerFor: AddChoice = .application
+    /// Typing a host: what Website opens now.
+    @State private var showSiteSheet = false
+    /// Set by the site sheet's second option, read once that sheet has finished dismissing.
+    @State private var siteWantsPicker = false
     /// The three steps to a website, shown before the picker.
     @State private var showWebsiteGuide = false
     /// Set by the guide's button, read once the guide has finished dismissing.
@@ -64,6 +71,16 @@ struct AddTargetsFlow: ViewModifier {
                 Text(outcome.message)
             }
             .sheet(
+                isPresented: $showSiteSheet,
+                onDismiss: {
+                    guard siteWantsPicker else { return }
+                    siteWantsPicker = false
+                    afterDismissal { showWebsiteGuide = true }
+                }
+            ) {
+                AddSiteSheet { siteWantsPicker = true }
+            }
+            .sheet(
                 isPresented: $showWebsiteGuide,
                 onDismiss: {
                     guard guideWantsPicker else { return }
@@ -78,7 +95,7 @@ struct AddTargetsFlow: ViewModifier {
                 request = nil
                 switch asked {
                 case .application: openPicker(for: .application)
-                case .website: afterDismissal { showWebsiteGuide = true }
+                case .website: afterDismissal { showSiteSheet = true }
                 }
             }
     }

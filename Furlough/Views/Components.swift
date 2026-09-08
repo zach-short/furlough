@@ -2,6 +2,10 @@ import FamilyControls
 import SwiftUI
 
 /// Renders the system icon and name for an opaque Screen Time token.
+///
+/// A typed host has no token and no system artwork, so it draws itself: its own text and a
+/// globe. `TokenName` and `TokenTile` branch on it before they get here, because the sizing
+/// each of them does is calibrated to Apple's view and means nothing for ours.
 struct TokenLabel: View {
     let kind: TargetKind
 
@@ -10,6 +14,7 @@ struct TokenLabel: View {
         case .application(let token): Label(token)
         case .webDomain(let token): Label(token)
         case .category(let token): Label(token)
+        case .host(let host): Label(host, systemImage: TokenTile.hostSymbol)
         }
     }
 }
@@ -22,11 +27,31 @@ struct TokenName: View {
     var size: DynamicTypeSize = .xSmall
 
     var body: some View {
-        TokenLabel(kind: kind)
-            .labelStyle(.titleOnly)
-            .lineLimit(1)
-            .dynamicTypeSize(size)
-            .environment(\.legibilityWeight, .bold)
+        if case .host(let host) = kind {
+            // Ours to draw, so it is drawn at the size Apple's view would have come out at,
+            // in the system font it uses. A row holding both kinds has to look like one list.
+            Text(host)
+                .font(.system(size: Self.points(for: size), weight: .semibold))
+                .lineLimit(1)
+                .truncationMode(.middle)
+        } else {
+            TokenLabel(kind: kind)
+                .labelStyle(.titleOnly)
+                .lineLimit(1)
+                .dynamicTypeSize(size)
+                .environment(\.legibilityWeight, .bold)
+        }
+    }
+
+    /// What `Label(token)` measures at each of the three sizes this is asked for, from the
+    /// sizing lab run on the device on 2026-09-07.
+    static func points(for size: DynamicTypeSize) -> CGFloat {
+        switch size {
+        case .xSmall: 14
+        case .xLarge: 19
+        case .xxxLarge: 23
+        default: 16
+        }
     }
 }
 
@@ -38,15 +63,36 @@ struct TokenTile: View {
     var size: CGFloat = 34
     @State private var natural = CGSize.zero
     private static let artworkFraction: CGFloat = 0.655
+    /// A typed site has no artwork of its own, and this is the glyph the + button already uses
+    /// for Website, so the two say the same thing.
+    static let hostSymbol = "globe"
 
     var body: some View {
-        let longest = max(natural.width, natural.height)
-        let scale = longest > 0 ? size / (longest * Self.artworkFraction) : 1
-        TokenLabel(kind: kind)
-            .labelStyle(.iconOnly)
-            .onGeometryChange(for: CGSize.self) { $0.size } action: { natural = $0 }
-            .scaleEffect(scale)
-            .frame(width: size, height: size)
+        if case .host = kind {
+            // Our own tile, sized in proportion so it sits right at 26 in an import row and at
+            // 48 in the editor header. The scaling below is measured against Apple's artwork
+            // and would blow a symbol up to fill the frame edge to edge.
+            Image(systemName: Self.hostSymbol)
+                .font(.system(size: size * 0.48, weight: .semibold))
+                .foregroundStyle(Ember.amber)
+                .frame(width: size, height: size)
+                .background(
+                    Color.white.opacity(0.07),
+                    in: RoundedRectangle(cornerRadius: size * 0.26, style: .continuous)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: size * 0.26, style: .continuous)
+                        .strokeBorder(Ember.cardBorder, lineWidth: 1)
+                )
+        } else {
+            let longest = max(natural.width, natural.height)
+            let scale = longest > 0 ? size / (longest * Self.artworkFraction) : 1
+            TokenLabel(kind: kind)
+                .labelStyle(.iconOnly)
+                .onGeometryChange(for: CGSize.self) { $0.size } action: { natural = $0 }
+                .scaleEffect(scale)
+                .frame(width: size, height: size)
+        }
     }
 }
 

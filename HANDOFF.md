@@ -110,7 +110,11 @@ small codebase he fully understands over a fork. He is interactive: ask when a d
   (in-app scan of the tag's hardware identifier; no background tag reading, no writes).
   Personal use, Xcode installs.
 - Extras that are in scope: "5 minutes left" notification, Live Activity during a window,
-  home-screen widget. Websites are supported.
+  home-screen widget. Websites are supported, and since 2026-09-08 in two kinds on the phone:
+  one picked from Apple's picker, which is counted and wears Furlough's shield, and one typed
+  by name (`TargetKind.host`, blocked through `WebContentSettings.blockedByFilter`), which has
+  hours but no daily budget and wears iOS's own "Website Not Allowed" page. + → Website goes to
+  the typing sheet; the picker is one line further on. See step 20(c).
 
 ## Settled: the look ("Ember Glass")
 
@@ -177,7 +181,8 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   `ActivityNaming.swift`, `TimeFormat.swift` (`days`, `schedule`, `chip`, `nextOpen` with
   weekday names, + `ShieldText`; every function that renders a date takes a `calendar:`),
   `Hosts.swift` (`normalize`, `matches`; it lived in `MacModel.swift` until the tests wanted
-  it, and is harmlessly unused on iOS),
+  it, and was unused on iOS until the phone gained typed hosts on 2026-09-08 — it is now what
+  reads an address a person typed there too),
   `Companions.swift` (the table of things that are both an app and a site: `pair(forBundleID:name:)`,
   `pair(forHost:)`, and for the phone `missingHosts(forAppNamed:knownHosts:)` /
   `missingApp(forHost:knownAppNames:)` plus the `Half` they answer in; names carry their own
@@ -191,15 +196,19 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   `ConfigExport.swift` (a setup as a file: `ConfigExport`, `ExportedTarget`, `Tier`; the Anchor,
   the queue and the runtime are never written),
   `ConfigImport.swift` (the same file coming back in: `read` refuses one whole, `plan` decides,
-  `apply` performs, `matches(for:config:)` is the Mac's own resolver; see the section below),
+  `apply` performs, `matches(for:config:)` is the Mac's own resolver and `preresolved` is the
+  phone's, which answers only the website rows a host can be read from; see the section below),
   `PendingText.swift` (`Delta`, the old → new pair a pending card shows; pure, so the phone
   and the Mac cannot word it differently).
 - `Tests/Core` (target `FurloughCoreTests`, macOS, Swift Testing, no host app): `Support.swift`
   (the pinned calendar and the fixtures), `ModelsTests`, `PolicyStatusTests`,
   `PolicyPendingTests`, `PolicySummaryTests`, `NamingTests`, `DecodingTests`, `ClockTests`,
   `QuitGraceTests`, `PendingNotificationTests`, `UtilityTests`, `UtilityPlanTests`,
-  `ActivityLimitTests`, `PendingTextTests`, `CompanionsTests`, `ConfigImportTests`. 278 tests
-  in 37 suites.
+  `ActivityLimitTests`, `PendingTextTests`, `CompanionsTests`, `ConfigImportTests`,
+  `HostTargetTests`, `HostImportTests`. 305 tests in 40 suites. It builds for **macOS**, so it
+  reads the Mac's `TargetKind` and the Mac's `Decision`: the iOS `Decision.filteredHosts` and
+  `ShieldReconciler.apply` cannot be reached from any test, which is why the nil-when-empty
+  filter policy is a property of `Decision` rather than a line inside the reconciler.
 - `Shared/LiveActivity/FurloughActivityAttributes.swift` (app + widgets).
 - `Shared/UI/CompanionNudge.swift` (the phone's "you have one half of this" banner, on a
   named target whose other half is missing; the Mac asks at add time instead).
@@ -232,9 +241,12 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   so Home and a rule editor reach the same picker with the same copy (`PickerCopy`) — inside
   it everything is presented after a short wait, because a sheet presented while the popover
   or the previous sheet is still dismissing is dropped),
+  `AddSite` (`AddSiteSheet`, what + → Website opens since 2026-09-08: a text field, `addHost`,
+  and one line down to the picker for anyone who wants a daily limit),
   `AddWebsiteGuide` (a self-sizing sheet: measured `contentHeight` into a
-  `.height` detent, `StepRow`; the only way iOS mints a `WebDomainToken` is inside Apple's
-  picker, so there is no typed-host path on the phone the way there is on the Mac),
+  `.height` detent, `StepRow`; reached from `AddSiteSheet` rather than the + button now. Only a
+  site iOS minted itself can be counted, and iOS mints a `WebDomainToken` only inside Apple's
+  picker — but blocking one no longer needs a token, which is what typed hosts are),
   `Components` (`TokenLabel`, `TokenName`, `TokenTile`,
   `StatusChip`, `RowCopy`, `ProminentButton`, `GhostButton`, `SectionLabel`, `Footnote`,
   `CardDivider`), `RuleEditor` (`WindowRow` with `DayStrip`, `CopyRuleSheet`, `TimeChip`,
@@ -737,8 +749,7 @@ The plan for this stretch. Tick each phase off here as it lands.
     6.9-inch set, the phone is 6.3-inch, and Family Controls does not run in the Simulator, so the
     real screens have to be composed into full-size frames.
 
-20. **Both halves of the same thing.** Done 2026-09-08, both platforms; only (c) is left, and
-    it needs Zach's yes first.
+20. **Both halves of the same thing.** Done 2026-09-08, all three parts.
 
     (a) The Mac, at the moment of adding: adding the YouTube app offers youtube.com, adding
     youtube.com offers the YouTube app, one switch each in `CompanionSheet` (`MacSheets.swift`),
@@ -775,12 +786,87 @@ The plan for this stretch. Tick each phase off here as it lands.
     Zach to check (open a target the shield has already named, e.g. YouTube or Instagram, and
     look under the app's name at the top of its editor).
 
-    (c) Ask Zach first, not started: sites by name on the phone. `WebDomain(domain:)` is public
-    in ManagedSettings and `store.webContent.blockedByFilter = .auto([...])` blocks a host with
-    no token — but it switches the adult-content filter on system-wide, Safari shows its own
-    Restricted page rather than the shield, and with no token nothing is counted, so such a
-    target can have windows but no budget. That is a different product than the picker's
-    sites; do not start it without his yes.
+    (c) Sites by name on the phone. Done 2026-09-08 with Zach's yes, and **the cost is not
+    what this file said it was**. The old text named only `.auto`, which is Apple's automatic
+    adult-content filter *plus* the listed domains, and quoted its costs as the price of the
+    feature. `WebContentSettings.FilterPolicy` has four cases, not one — `.none`,
+    `.specific(Set<WebDomain>)`, `.auto(_:except:)`, `.all(except:)` (iOS 26.5 swiftinterface,
+    around line 576) — and `.specific` names exactly the domains to block and nothing else.
+
+    **What the phone actually did**, 2026-09-08, with a throwaway `ManagedSettingsStore` named
+    `weblab` so nothing real was touched: `.specific([WebDomain(domain: "example.com")])`
+    blocked example.com in Safari while amazon.com loaded normally. So the adult filter does
+    *not* go on, and the feature costs far less than Zach was told. Two of the old costs stand:
+    Safari shows **iOS's own page** — a blue circle-slash, "Website Not Allowed", "example.com
+    is a restricted website" — not Furlough's shield, which we cannot style or replace; and
+    with no token DeviceActivity counts nothing, so a typed host has windows and **no daily
+    budget**. `.auto` was never run and is not used anywhere in the code.
+
+    Not yet seen by a person: whether Screen Time > Content & Privacy Restrictions > Content
+    Restrictions shows anything different while `.specific` is applied. It was already on
+    before the test (Furlough's own shields turn it on), and no row in there was observed to
+    change, but nobody has photographed that screen with a host blocked. Chrome was not tried
+    either. Both are worth one look.
+
+    What landed: `TargetKind.host(String)` on iOS beside the picker's three, mirroring the
+    Mac's, with `defaultName` returning the host so it needs no learned name and a nickname
+    still wins. `Decision.filteredHosts` plus `webFilterHosts` (nil when empty — a property of
+    `Decision` rather than a line in `ShieldReconciler`, because that file imports
+    ManagedSettings and is excluded from the macOS test bundle, so this is the only way the
+    nil is testable); `Policy.decide` fills it from `.host` targets that are not allowed and
+    from `.host` kinds in the anchor. `ShieldReconciler.apply` writes
+    `store.webContent.blockedByFilter` and nils it when the set is empty, the same shape as
+    every other line there; `clearEverything` already removed it. A filter-blocked host
+    **counts** for `denyAppRemoval` (Zach's call): the flag stops Furlough itself being deleted
+    to escape, and that escape works against a filter as well as a shield.
+    `Monitoring.register` registers no budget event for a `.host`, but its spans are collected
+    by `ActivityLimit.spans`, which never switched on kind, so window edges still drive a
+    reconcile and hosts count against the 19. `Rule.limitMinutes` is new: a whole day of budget
+    is not a budget, so `TimeFormat.rule` drops the "/day" clause and the widget's budget line
+    goes quiet rather than offering "24 hours budget".
+
+    The way in, Zach's call after being shown the tap counts: **+ → Website goes straight to a
+    text box** (`AddSiteSheet`), which is two taps to a blocked site against the picker's six.
+    Under it, one line to `AddWebsiteGuideView` and Apple's picker for anyone who wants the
+    daily limit. The difference is stated on both screens rather than left to be discovered:
+    the sheet says a typed site gets hours and no limit, the editor replaces the budget card
+    with one Footnote saying why. A typed host is saved with a whole day of budget —
+    `savedBudget` in `RuleEditorView` forces it, so no other path into the draft ("Use windows
+    from another app", the week sheet) can give one a limit nothing would enforce; 0 would mean
+    blocked all day.
+
+    Two things fell out of it that are worth knowing. `applyPicker` reads a selection as the
+    whole truth and schedules a removal for every target absent from it — a typed host is
+    absent from every selection, so without the explicit `!target.kind.isHost` guard, one trip
+    through the picker would have queued the removal of every site added by name;
+    `setAnchorSelection` keeps `.host` kinds for the same reason. And the companion nudge got
+    better rather than merely compiling: the sites half now **adds outright**
+    (`AppModel.addHosts`) instead of routing to the picker, and it fires immediately on a typed
+    host, since that one carries its name from the moment it is added rather than waiting for
+    the shield to learn one — which is why `companion(for:)` no longer guards on `systemName`
+    up front.
+
+    Import is wired (Zach said now, not later): `ConfigImport.preresolved` answers a
+    `.website` row carrying a host with no picker step, matching an existing target through
+    `Config.target(host:)` (so "m.youtube.com" lands on "youtube.com") or creating one, and
+    refusing a second row for a site the file already listed. It is deliberately **not** behind
+    `#if os(iOS)` — everything it touches exists on both platforms, and behind the guard it
+    would be the one part of this feature no test could reach. So a Mac setup's websites now
+    arrive on the phone as real enforceable targets, which was the point.
+
+    Tests: `Tests/Core/HostTargetTests.swift` and `HostImportTests.swift`, plus
+    `TargetKindDecodingTests` in `DecodingTests.swift` pinning that a kind is stored under its
+    own case name, so adding a case leaves older stored state decoding exactly as it did. 305
+    tests in 40 suites. **The limit worth knowing:** `Tests/Core` builds for macOS, so it reads
+    the Mac's `TargetKind` and the Mac's `Decision`. The iOS `Decision.filteredHosts` and
+    `ShieldReconciler.apply` are not reachable from any test; `Config.target(host:)`,
+    `TargetKind.isHost` and `Target.host` were lifted out of the `#if !os(iOS)` block so both
+    platforms share them, and `makeTarget` in `Support.swift` has always built `.host` targets,
+    so the engine underneath is covered.
+
+    **Nobody has used this on the phone yet.** Installed 2026-09-08 for Zach: + → Website →
+    type a host → Add; then the rule editor, where the budget card should be a single line of
+    explanation; then Safari, to see iOS's page inside the blocked hours.
 
 21. **A setup as a file.** Export done 2026-09-08; import landed the same day in `48db063`,
     with the confirmation, the ceiling check and the provenance line following it.

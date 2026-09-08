@@ -261,13 +261,29 @@ final class AppModel {
     @discardableResult
     func addHost(_ raw: String) -> AddHostOutcome {
         guard let host = Hosts.normalize(raw) else { return .unreadable }
-        var current = SharedStore.load()
-        if let existing = current.config.target(host: host) { return .already(existing.displayName) }
-        current.config.targets.append(Target(kind: .host(host)))
-        SharedStore.save(current)
-        SharedStore.log("added site by name: \(host)")
-        enforce(reason: "add site by name")
+        if let existing = SharedStore.load().config.target(host: host) { return .already(existing.displayName) }
+        addHosts([host])
         return .added(host)
+    }
+
+    /// Several at once, in one save and one enforcement pass: the companion nudge offers every
+    /// site an app is also at, and adding four of them should not be four rounds of the whole
+    /// reconcile. Mirrors `MacModel.addHosts`, which the Mac's companion sheet has always used.
+    @discardableResult
+    func addHosts(_ raw: [String]) -> [Target] {
+        var current = SharedStore.load()
+        var added: [Target] = []
+        for one in raw {
+            guard let host = Hosts.normalize(one), current.config.target(host: host) == nil else { continue }
+            let target = Target(kind: .host(host))
+            current.config.targets.append(target)
+            added.append(target)
+        }
+        guard !added.isEmpty else { return [] }
+        SharedStore.save(current)
+        SharedStore.log("added site(s) by name: \(added.map(\.host).joined(separator: ", "))")
+        enforce(reason: "add sites by name")
+        return added
     }
 
     // MARK: Importing a setup

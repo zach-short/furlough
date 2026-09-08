@@ -60,11 +60,26 @@ struct Decision {
     var shieldedApps: Set<ApplicationToken> = []
     var shieldedWeb: Set<WebDomainToken> = []
     var categories: Set<ActivityCategoryToken> = []
+    /// Typed hosts to block through the web content filter rather than the shield. A `.host`
+    /// target has no token, so it cannot be shielded; `ShieldReconciler` writes these into
+    /// `store.webContent.blockedByFilter` instead. There is no allowed counterpart: the filter
+    /// takes the whole blocked list or nothing, and a host that is open right now is simply
+    /// absent from it.
+    var filteredHosts: Set<String> = []
     var statuses: [UUID: TargetStatus] = [:]
 
+    /// Counts a filter-blocked host. `denyAppRemoval` follows this, and Zach's call on
+    /// 2026-09-08 was that a host counts: the flag's job is stopping Furlough itself from
+    /// being deleted to escape, and deleting Furlough clears the filter exactly as it clears
+    /// a shield.
     var isAnythingShielded: Bool {
-        !shieldedApps.isEmpty || !shieldedWeb.isEmpty || !categories.isEmpty
+        !shieldedApps.isEmpty || !shieldedWeb.isEmpty || !categories.isEmpty || !filteredHosts.isEmpty
     }
+
+    /// What `blockedByFilter` should be set to, or nil when nothing is filtered. Kept here
+    /// rather than in `ShieldReconciler` so it can be tested: that file imports ManagedSettings
+    /// and is excluded from the test bundle, and nil-when-empty is the part worth pinning.
+    var webFilterHosts: Set<String>? { filteredHosts.isEmpty ? nil : filteredHosts }
 }
 #else
 /// What the Mac must enforce right now: apps by bundle identifier, websites by host.
@@ -259,6 +274,9 @@ enum Policy {
                 if status.isAllowed { decision.allowedWeb.insert(token) } else { decision.shieldedWeb.insert(token) }
             case .category(let token):
                 decision.categories.insert(token)
+            case .host(let host):
+                // No allowed set to put an open one in: the filter is the blocked list itself.
+                if !status.isAllowed { decision.filteredHosts.insert(host) }
             }
         }
         // The anchor can hold things that are not targets at all; while anchored they are all shielded.
@@ -273,6 +291,8 @@ enum Policy {
                     decision.shieldedWeb.insert(token)
                 case .category(let token):
                     decision.categories.insert(token)
+                case .host(let host):
+                    decision.filteredHosts.insert(host)
                 }
             }
         }
@@ -409,7 +429,9 @@ enum Policy {
         }
         func consider(_ date: Date, _ target: Target, exhausted: Bool) {
             let name = target.displayName
-            let budget = target.rule?.dailyBudgetMinutes
+            // nil where there is no real limit, so the widget says what is blocked instead of
+            // offering "24 hours budget" as if it were one.
+            let budget = target.rule?.limitMinutes
             if let current = soonest {
                 if date < current.date { soonest = (date, [name], budget, exhausted) }
                 else if date == current.date { soonest?.names.append(name) }

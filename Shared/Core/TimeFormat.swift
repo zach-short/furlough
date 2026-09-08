@@ -117,7 +117,9 @@ enum TimeFormat {
     static func rule(_ rule: Rule?, calendar: Calendar = .current) -> String {
         guard let rule else { return "Not configured yet" }
         guard rule.isEverAllowed else { return "Blocked all day" }
-        return "\(schedule(rule, calendar: calendar)) · \(budget(rule.dailyBudgetMinutes))/day"
+        let hours = schedule(rule, calendar: calendar)
+        guard let limit = rule.limitMinutes else { return hours }
+        return "\(hours) · \(budget(limit))/day"
     }
 
     /// The name of the day `daysAhead` days from now.

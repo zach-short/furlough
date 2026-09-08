@@ -3,12 +3,17 @@ import SwiftUI
 /// "You have one half of this." Shown on a target whose other half — the site an app is also
 /// at, or the app a site is also in — is not in Furlough.
 ///
-/// This is the phone's version of the Mac's `CompanionSheet`, and it has to be a nudge rather
-/// than an offer: a Screen Time token is minted inside Apple's picker and nowhere else, so all
-/// this can do is say what is missing and open the way there. It is also later — a token says
-/// nothing about what it is until the shield learns a name — which is why it lives on the
-/// target rather than at the moment of adding. Dismissed once is dismissed for good on that
-/// target: a nudge that comes back is a nag.
+/// This is the phone's version of the Mac's `CompanionSheet`. Which of the two halves is
+/// missing decides how much it can do. A missing **site** is added outright by its Add button,
+/// because since 2026-09-08 a site on the phone is a name like it is on the Mac. A missing
+/// **app** still has to be a nudge and not an offer: a Screen Time token is minted inside
+/// Apple's picker and nowhere else, so all this can do there is say what is missing and open
+/// the way to it.
+///
+/// It arrives late on a picked target — a token says nothing about what it is until the shield
+/// learns a name — which is why it lives on the target rather than at the moment of adding. On
+/// a typed host it arrives at once, because that one names itself. Dismissed once is dismissed
+/// for good on that target: a nudge that comes back is a nag.
 struct CompanionNudge: View {
     let companion: Companions.Half
     let onAdd: () -> Void

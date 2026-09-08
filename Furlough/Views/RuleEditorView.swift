@@ -66,7 +66,13 @@ struct RuleEditorView: View {
     private var target: Target? { model.state.config.target(id: targetID) }
     /// The rows as Furlough stores them: a night becomes its evening and the morning after.
     private var windows: [TimeWindow] { drafts.flatMap { $0.window.split } }
-    private var draft: Rule { Rule(windows: windows, dailyBudgetMinutes: budget) }
+    private var draft: Rule { Rule(windows: windows, dailyBudgetMinutes: savedBudget) }
+    /// A typed host is saved with a whole day of budget — the value `Rule.unrestricted` uses
+    /// for "no limit" — whatever the slider last held. Forced here rather than in `load()` so
+    /// that no other path into the draft can give one a limit that nothing would enforce:
+    /// "Use windows from another app" copies a budget, and the week sheet writes windows back
+    /// through the same binding. A budget of 0 would mean blocked all day, so it cannot be that.
+    private var savedBudget: Int { target?.kind.isHost == true ? Furlough.minutesPerDay : budget }
     private var trimmedNickname: String { nickname.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var hasChanges: Bool {
         guard let target else { return false }
@@ -146,7 +152,13 @@ struct RuleEditorView: View {
                     header(target)
                     if let companion = model.companion(for: target) {
                         CompanionNudge(companion: companion) {
-                            addRequest = companion.addChoice
+                            switch companion {
+                            // Sites need no picker any more: they are names, so they are added
+                            // on the spot. The nudge then goes on its own, because the hosts it
+                            // was offering are among the ones Furlough knows.
+                            case .sites(let hosts): model.addHosts(hosts)
+                            case .app: addRequest = .application
+                            }
                         } onDismiss: {
                             model.dismissCompanion(for: target.id)
                         }
@@ -160,8 +172,13 @@ struct RuleEditorView: View {
                             Footnote(text: Self.nightNote)
                                 .padding(.top, 8)
                         }
-                        SectionLabel(text: "Daily budget")
-                        budgetCard
+                        if target.kind.isHost {
+                            Footnote(text: Self.hostBudgetNote)
+                                .padding(.top, 14)
+                        } else {
+                            SectionLabel(text: "Daily budget")
+                            budgetCard
+                        }
                         SectionLabel(text: "How much it is worth")
                         UtilityPicker(
                             selection: $tier,
@@ -366,6 +383,10 @@ struct RuleEditorView: View {
         }
         .buttonStyle(.plain)
     }
+
+    /// Why a site added by name has hours and no limit. One line, said where the budget would
+    /// have been, rather than left for someone to notice as an absence.
+    private static let hostBudgetNote = "No daily budget: iOS counts a site only when it comes from Apple's picker, and this one was typed. Its hours are enforced."
 
     private var budgetCard: some View {
         VStack(alignment: .leading, spacing: 0) {
