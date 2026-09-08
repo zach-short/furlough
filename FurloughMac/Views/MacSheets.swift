@@ -463,6 +463,15 @@ struct SettingsSheet: View {
                     CardDivider()
                     row("Notifications", model.notificationsGranted == true ? "Allowed" : "Off")
                     CardDivider()
+                    // The phone shows this too. It matters more here: the desktop widget reads
+                    // the rules through the group, so without it the widget is simply blank,
+                    // with nothing anywhere to say why.
+                    row(
+                        "App Group",
+                        SharedStore.isAppGroupAvailable ? "OK" : "Missing",
+                        color: SharedStore.isAppGroupAvailable ? Ember.muted : Ember.ember
+                    )
+                    CardDivider()
                     row("Last enforcement", stamp(model.state.runtime.lastReconcile))
                     CardDivider()
                     CardAction(title: "Re-apply enforcement now") { model.enforce(reason: "manual") }
