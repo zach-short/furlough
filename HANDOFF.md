@@ -301,7 +301,20 @@ The plan for this stretch. Tick each phase off here as it lands.
    the whole Anchor flow (pair a tag, anchor, a wrong tag refused, weigh anchor, and whether
    the tag identifier is stable across two scans). On the Mac: the shield panel, the browser
    redirect and its one-time Automation prompt, budget counting, the login item, and the
-   desktop widget placed on the desktop. Record the results here. Also: does a web-domain shield reach Chrome on the
+   desktop widget placed on the desktop.
+   Sent to Zach on 2026-09-08 as two checklists; his report is outstanding. The Debug build
+   installed on the phone that day carries the rename and the clock guard. The Mac in
+   `/Applications` is still the 2026-09-07 build: it has to be replaced with README's
+   `xcodebuild … -scheme FurloughMac` + `ditto` lines, and Quit is refused while anything is
+   blocked, so it may need Force Quit first. Record the answers here.
+   The phone checklist: the Anchor card and the paired tag survived the rename; the shield's
+   copy and colours; a shield lifting by itself at a window's start; Delete App refused while
+   blocked; the widget; the Live Activity; pair a tag, anchor, a wrong tag refused, weigh
+   anchor, and whether the tag's identifier is the same across two scans; the clock held and
+   released with a pending change; and a blocked site opened in Chrome, for README's limits.
+   The Mac checklist: the shield panel, the browser redirect in Safari and Chrome with the
+   Automation prompt, a two-minute budget counting down to "Time's up", Open at login across a
+   restart, the desktop widget, and the clock banner in the Pending sheet. Record the results here. Also: does a web-domain shield reach Chrome on the
    phone? Put the answer in README's limits.
 4. **The clock cannot be an unblock button.** Done 2026-09-08. `ClockMark` (wall time plus the
    machine's count) lives in `RuntimeState`; `SharedStore.save` stamps it on every save, from
