@@ -36,8 +36,13 @@ small codebase he fully understands over a fork. He is interactive: ask when a d
 ## Settled: what Furlough is
 
 - Apps and websites chosen with `FamilyActivityPicker` are shielded by default. Each target
-  has allowed windows (same every day) and one daily minute budget. No windows means always
-  blocked. Categories are always-blocked containers; apps inside them that have their own
+  has allowed windows, each on a set of weekdays (`TimeWindow.days`, every day by default;
+  added 2026-09-07 so YouTube can end at midnight on school nights and later on weekends),
+  and one daily minute budget. Windows never cross midnight: a late weekend night is an
+  evening window plus an early-morning window on the next day. No windows means always
+  blocked. The rule editor has a "Same every day" toggle that hides or shows a day strip on
+  each window, and a "Use windows from another app" sheet that copies another target's
+  windows, days and budget into the draft. Categories are always-blocked containers; apps inside them that have their own
   windows are excepted.
 - Rule-based targets have no unblock action, and must never get one, not even for testing.
   The single exception is the Brick profile (`Config.brick`, decided 2026-09-07): a separate
@@ -97,13 +102,18 @@ a sizing lab run on the device, now applied:
 ## Code map
 
 - `Shared/Core` (compiled into all four targets, no SwiftUI):
-  `Models.swift` (TimeWindow, Rule, Target, BrickProfile, Config with a tolerant
-  `init(from:)`, PendingChange, RuntimeState, SharedState),
-  `Policy.swift` (pure engine: `status(of:config:)` returns `.bricked` first, `decide` adds
-  brick-only kinds to the shields, `applyDuePending`, `classify` tightening/loosening,
-  `summary` with `isBricked`/`brickedCount`, `nextTransition`), `SharedStore.swift` (App Group
-  UserDefaults JSON plus a capped activity log), `ShieldReconciler.swift` (idempotent shield
-  apply and `denyAppRemoval`), `ActivityNaming.swift`, `TimeFormat.swift` (+ `ShieldText`).
+  `Models.swift` (Weekdays bit set stored as a bare integer, TimeWindow with `days` and a
+  tolerant `init(from:)` that reads old rules as every day, Rule with per-weekday
+  `windows(on:)`/`allowedMask(on:)` and a 7-day `isTighterOrEqual`, Target, BrickProfile,
+  Config with a tolerant `init(from:)`, PendingChange, RuntimeState, SharedState),
+  `Policy.swift` (pure engine: `status(of:config:)` returns `.bricked` first and looks at
+  today's weekday, `nextOpen(in:afterWeekday:)` searches up to a week ahead, `NextOpen` carries
+  `daysAhead`, `decide` adds brick-only kinds to the shields, `applyDuePending`, `classify`
+  tightening/loosening, `summary` with `isBricked`/`brickedCount`, `nextTransition`),
+  `SharedStore.swift` (App Group UserDefaults JSON plus a capped activity log),
+  `ShieldReconciler.swift` (idempotent shield apply and `denyAppRemoval`),
+  `ActivityNaming.swift`, `TimeFormat.swift` (`days`, `schedule`, `chip`, `nextOpen` with
+  weekday names, + `ShieldText`).
 - `Shared/LiveActivity/FurloughActivityAttributes.swift` (app + widgets).
 - `Shared/UI/Theme.swift` (app + widgets).
 - `Furlough/` app: `Model/AppModel.swift` (`@MainActor @Observable`; `enforce()` folds in due
@@ -113,10 +123,11 @@ a sizing lab run on the device, now applied:
   async call; the identifier is read at detection, no connect), `Views/`: `Root` (dark scheme,
   ember tint), `Onboarding`, `Brick` (`BrickView`, `BrickCard` on Home, `BrickToggleButton`,
   `BrickGlyph`),
-  `Home` (`HomeContent`, `HomeGroups` for the five sections, `HeroView`, `Countdown`,
-  `TargetRow`), `Components` (`TokenLabel`, `TokenName`, `TokenTile`, `StatusChip`, `RowCopy`,
-  `ProminentButton`, `GhostButton`, `SectionLabel`, `Footnote`, `CardDivider`), `RuleEditor`
-  (`WindowRow`, `TimeChip`, `TimePickerSheet`, `EffectBanner`), `BudgetSlider` (piecewise
+  `Home` (`HomeContent`, `HomeGroups` for the sections including "Later this week",
+  `HeroView`, `Countdown`, `TargetRow`), `Components` (`TokenLabel`, `TokenName`, `TokenTile`,
+  `StatusChip`, `RowCopy`, `ProminentButton`, `GhostButton`, `SectionLabel`, `Footnote`,
+  `CardDivider`), `RuleEditor` (`WindowRow` with `DayStrip`, `CopyRuleSheet`, `TimeChip`,
+  `TimePickerSheet`, `EffectBanner`), `BudgetSlider` (piecewise
   linear over the 5/30/60/120/240 ticks), `PendingChanges`, `Settings` + `LogView`. Screens are
   `ScrollView`s over `EmberWall`, not `List`/`Form`; the iOS 26 toolbar supplies the glass.
 - `FurloughMonitor/MonitorExtension.swift`: every callback reconciles from shared state.
@@ -133,9 +144,12 @@ a sizing lab run on the device, now applied:
   Pending (not yet effective) rules are registered too, so a loosening that lands while the
   app is closed is still enforced. The monitor ignores a threshold smaller than the currently
   effective budget.
-- One repeating activity per distinct window, named `window:<start>-<end>` in minutes of day.
-  iOS allows 20 activities total, so at most 19 distinct windows; windows must be at least
-  15 minutes and cannot cross midnight (end is exclusive, 1440 means midnight).
+- One repeating activity per distinct span, named `window:<start>-<end>` in minutes of day,
+  whatever days the span applies on (`TimeWindow.span` drops the days before deduping). A
+  callback on a day the window is off just reconciles to the same shields. iOS allows 20
+  activities total, so at most 19 distinct spans across all targets and days; windows must
+  be at least 15 minutes and cannot cross midnight (end is exclusive, 1440 means midnight).
+  Do not register one activity per span per weekday: it would blow the limit fast.
 - Every monitor callback, every app activation, and every edit ends in
   `ShieldReconciler.reconcile`, which recomputes shields from persisted state. Nothing toggles
   state incrementally.

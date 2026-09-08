@@ -21,7 +21,11 @@ enum TargetStatus: Equatable {
 
 struct NextOpen: Equatable {
     var minuteOfDay: Int
-    var isTomorrow: Bool
+    /// 0 is today, 1 tomorrow, up to 7 for the same weekday next week.
+    var daysAhead: Int
+
+    var isToday: Bool { daysAhead == 0 }
+    var isTomorrow: Bool { daysAhead == 1 }
 }
 
 enum ChangeClass: Equatable {
@@ -55,13 +59,23 @@ enum Policy {
         return (c.hour ?? 0) * 60 + (c.minute ?? 0)
     }
 
+    /// Calendar's weekday number, 1 = Sunday … 7 = Saturday.
+    static func weekday(_ date: Date, calendar: Calendar = .current) -> Int {
+        calendar.component(.weekday, from: date)
+    }
+
+    /// Whole days from the start of `from`'s day to the start of `to`'s day.
+    static func daysAhead(of to: Date, from: Date, calendar: Calendar = .current) -> Int {
+        calendar.dateComponents([.day], from: calendar.startOfDay(for: from), to: calendar.startOfDay(for: to)).day ?? 0
+    }
+
     static func date(atMinute minute: Int, of day: Date, calendar: Calendar = .current) -> Date {
         let start = calendar.startOfDay(for: day)
         return calendar.date(byAdding: .minute, value: minute, to: start) ?? start
     }
 
     static func date(at next: NextOpen, from now: Date, calendar: Calendar = .current) -> Date {
-        let day = next.isTomorrow ? (calendar.date(byAdding: .day, value: 1, to: now) ?? now) : now
+        let day = calendar.date(byAdding: .day, value: next.daysAhead, to: now) ?? now
         return date(atMinute: next.minuteOfDay, of: day, calendar: calendar)
     }
 
@@ -115,18 +129,30 @@ enum Policy {
         guard let rule = target.rule else { return .unconfigured }
         guard rule.isEverAllowed else { return .blockedAllDay }
         let minute = minuteOfDay(now)
-        let windows = rule.sortedWindows
-        let firstTomorrow = windows.first.map { NextOpen(minuteOfDay: $0.startMinute, isTomorrow: true) }
+        let weekday = weekday(now)
         if runtime.isExhausted(target.id, dayKey: dayKey(now)) {
-            return .exhausted(nextOpen: firstTomorrow)
+            return .exhausted(nextOpen: nextOpen(in: rule, afterWeekday: weekday))
         }
-        if let current = rule.window(containing: minute) {
+        if let current = rule.window(containing: minute, on: weekday) {
             return .open(until: current.endMinute)
         }
-        if let next = windows.first(where: { $0.startMinute > minute }) {
-            return .closed(nextOpen: NextOpen(minuteOfDay: next.startMinute, isTomorrow: false))
+        if let next = rule.windows(on: weekday).first(where: { $0.startMinute > minute }) {
+            return .closed(nextOpen: NextOpen(minuteOfDay: next.startMinute, daysAhead: 0))
         }
-        return .closed(nextOpen: firstTomorrow ?? NextOpen(minuteOfDay: 0, isTomorrow: true))
+        return .closed(nextOpen: nextOpen(in: rule, afterWeekday: weekday) ?? NextOpen(minuteOfDay: 0, daysAhead: 1))
+    }
+
+    /// The first window on the nearest day after `weekday` that has one, up to a week out.
+    /// Nil only when the rule never allows anything.
+    static func nextOpen(in rule: Rule, afterWeekday weekday: Int) -> NextOpen? {
+        guard rule.isEverAllowed else { return nil }
+        for ahead in 1...7 {
+            let day = (weekday - 1 + ahead) % 7 + 1
+            if let first = rule.windows(on: day).first {
+                return NextOpen(minuteOfDay: first.startMinute, daysAhead: ahead)
+            }
+        }
+        return nil
     }
 
     static func decide(config: Config, runtime: RuntimeState, now: Date) -> Decision {
@@ -164,10 +190,11 @@ enum Policy {
     /// The next instant at which some status can change: a window edge later today, else midnight.
     static func nextTransition(config: Config, after now: Date, calendar: Calendar = .current) -> Date {
         let minute = minuteOfDay(now, calendar: calendar)
+        let weekday = weekday(now, calendar: calendar)
         var candidates: [Int] = []
         for target in config.targets {
             guard let rule = target.rule, rule.isEverAllowed else { continue }
-            for window in rule.windows {
+            for window in rule.windows(on: weekday) {
                 if window.startMinute > minute { candidates.append(window.startMinute) }
                 if window.endMinute > minute && window.endMinute < Furlough.minutesPerDay { candidates.append(window.endMinute) }
             }

@@ -83,8 +83,8 @@ struct StatusChip: View {
         switch status {
         case .bricked: "Bricked"
         case .open(let until): TimeFormat.minute(until)
-        case .closed(let next): TimeFormat.minute(next.minuteOfDay)
-        case .exhausted(let next): next.map { TimeFormat.minute($0.minuteOfDay) }
+        case .closed(let next): TimeFormat.chip(next)
+        case .exhausted(let next): next.map(TimeFormat.chip)
         case .unconfigured: "Set up"
         case .blockedAllDay: nil
         }
@@ -102,15 +102,18 @@ struct StatusChip: View {
 
 /// Short copy for rows and the hero.
 enum RowCopy {
-    /// The rule line under a row's name.
-    static func detail(target: Target, status: TargetStatus) -> String {
+    /// The rule line under a row's name. A rule that varies by day shows today's windows.
+    static func detail(target: Target, status: TargetStatus, now: Date = .now) -> String {
         if target.kind.isCategory { return "Everything in it" }
         guard let rule = target.rule else { return "Not enforced yet" }
         guard rule.isEverAllowed else { return "No windows" }
         let budget = TimeFormat.budget(rule.dailyBudgetMinutes)
         if case .exhausted = status { return "Used up today · \(budget)" }
-        let windows = rule.sortedWindows.map(TimeFormat.window).joined(separator: ", ")
-        return "\(windows) · \(budget)"
+        if rule.isSameEveryDay {
+            return "\(TimeFormat.schedule(rule)) · \(budget)"
+        }
+        let today = rule.windows(on: Policy.weekday(now)).map(TimeFormat.window)
+        return today.isEmpty ? "Not today · \(budget)" : "Today \(today.joined(separator: ", ")) · \(budget)"
     }
 
     static func pendingLine(_ change: PendingChange) -> String {

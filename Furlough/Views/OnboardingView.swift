@@ -19,7 +19,7 @@ struct OnboardingView: View {
                     .emberDisplay(34)
                     .foregroundStyle(Ember.cream)
                     .padding(.top, 6)
-                Text("Pick the apps that eat your time. Give each one daily windows and a minute budget. Outside the windows, or once the budget is spent, iOS shields the app.")
+                Text("Pick the apps that eat your time. Give each one allowed windows, the same every day or different on weekends, and a minute budget. Outside the windows, or once the budget is spent, iOS shields the app.")
                     .emberBody(15)
                     .foregroundStyle(Ember.muted)
                     .padding(.top, 14)

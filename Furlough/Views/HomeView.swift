@@ -104,7 +104,8 @@ struct HomeContent: View {
                             TargetRow(
                                 target: target,
                                 status: statuses[target.id] ?? .unconfigured,
-                                pending: state.pending.first { $0.targetID == target.id }
+                                pending: state.pending.first { $0.targetID == target.id },
+                                now: now
                             )
                         }
                         .buttonStyle(.plain)
@@ -116,8 +117,8 @@ struct HomeContent: View {
     }
 }
 
-/// The list order from the spec: Open now · Later today · Tomorrow · Always blocked · Needs a schedule,
-/// with Bricked first whenever the brick is on.
+/// The list order from the spec: Open now · Later today · Tomorrow · Later this week · Always blocked ·
+/// Needs a schedule, with Bricked first whenever the brick is on.
 struct HomeGroups {
     struct Section: Identifiable {
         let title: String
@@ -129,6 +130,8 @@ struct HomeGroups {
     var open: [(target: Target, until: Date, untilMinute: Int)] = []
     var laterToday: [(target: Target, at: Date)] = []
     var tomorrow: [(target: Target, at: Date?)] = []
+    /// Two or more days out: targets whose windows skip tomorrow.
+    var laterThisWeek: [(target: Target, at: Date)] = []
     var alwaysBlocked: [Target] = []
     var unconfigured: [Target] = []
 
@@ -140,13 +143,18 @@ struct HomeGroups {
             case .open(let until):
                 open.append((target, Policy.date(atMinute: until, of: now), until))
             case .closed(let next):
-                if next.isTomorrow {
-                    tomorrow.append((target, Policy.date(at: next, from: now)))
-                } else {
-                    laterToday.append((target, Policy.date(at: next, from: now)))
+                let at = Policy.date(at: next, from: now)
+                switch next.daysAhead {
+                case 0: laterToday.append((target, at))
+                case 1: tomorrow.append((target, at))
+                default: laterThisWeek.append((target, at))
                 }
             case .exhausted(let next):
-                tomorrow.append((target, next.map { Policy.date(at: $0, from: now) }))
+                if let next, next.daysAhead >= 2 {
+                    laterThisWeek.append((target, Policy.date(at: next, from: now)))
+                } else {
+                    tomorrow.append((target, next.map { Policy.date(at: $0, from: now) }))
+                }
             case .blockedAllDay:
                 alwaysBlocked.append(target)
             case .unconfigured:
@@ -156,11 +164,12 @@ struct HomeGroups {
         open.sort { $0.until < $1.until }
         laterToday.sort { $0.at < $1.at }
         tomorrow.sort { ($0.at ?? .distantFuture) < ($1.at ?? .distantFuture) }
+        laterThisWeek.sort { $0.at < $1.at }
     }
 
     var isEmpty: Bool {
-        bricked.isEmpty && open.isEmpty && laterToday.isEmpty && tomorrow.isEmpty && alwaysBlocked.isEmpty
-            && unconfigured.isEmpty
+        bricked.isEmpty && open.isEmpty && laterToday.isEmpty && tomorrow.isEmpty && laterThisWeek.isEmpty
+            && alwaysBlocked.isEmpty && unconfigured.isEmpty
     }
 
     var sections: [Section] {
@@ -169,6 +178,7 @@ struct HomeGroups {
             Section(title: "Open now", targets: open.map(\.target)),
             Section(title: "Later today", targets: laterToday.map(\.target)),
             Section(title: "Tomorrow", targets: tomorrow.map(\.target)),
+            Section(title: "Later this week", targets: laterThisWeek.map(\.target)),
             Section(title: "Always blocked", targets: alwaysBlocked),
             Section(title: "Needs a schedule", targets: unconfigured),
         ].filter { !$0.targets.isEmpty }
@@ -178,6 +188,7 @@ struct HomeGroups {
     var nextOpening: (target: Target, at: Date)? {
         if let soon = laterToday.first { return soon }
         if let soon = tomorrow.first(where: { $0.at != nil }), let at = soon.at { return (soon.target, at) }
+        if let soon = laterThisWeek.first { return soon }
         return nil
     }
 }
@@ -202,7 +213,7 @@ struct HeroView: View {
                     Eyebrow(text: "Next window", color: Ember.amber)
                     name(for: next.target)
                     Countdown(to: next.at)
-                    subline("opens \(TimeFormat.nextOpen(NextOpen(minuteOfDay: Policy.minuteOfDay(next.at), isTomorrow: !Calendar.current.isDate(next.at, inSameDayAs: now)))) · \(budgetLine(next.target, "a day"))")
+                    subline("opens \(TimeFormat.nextOpen(NextOpen(minuteOfDay: Policy.minuteOfDay(next.at), daysAhead: Policy.daysAhead(of: next.at, from: now)))) · \(budgetLine(next.target, "a day"))")
                 } else if groups.isEmpty {
                     Eyebrow(text: "Furlough", color: Ember.amber)
                     title("Nothing managed yet")
@@ -278,6 +289,7 @@ struct TargetRow: View {
     let target: Target
     let status: TargetStatus
     let pending: PendingChange?
+    var now: Date = .now
 
     var body: some View {
         HStack(spacing: 10) {
@@ -292,7 +304,7 @@ struct TargetRow: View {
                             .lineLimit(1)
                     }
                 }
-                Text(RowCopy.detail(target: target, status: status))
+                Text(RowCopy.detail(target: target, status: status, now: now))
                     .emberBody(11.5)
                     .foregroundStyle(Ember.muted)
                     .lineLimit(1)

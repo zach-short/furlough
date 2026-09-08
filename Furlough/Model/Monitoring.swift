@@ -5,6 +5,9 @@ import ManagedSettings
 /// Registers DeviceActivity schedules and budget events from persisted state.
 /// Pending (not yet effective) rules are registered too, so a loosening that becomes
 /// effective while the app is closed is still enforced by the monitor extension.
+/// Every distinct span repeats daily whatever days it applies on: a callback on a day the
+/// window is off just reconciles to the same shields, and it keeps the activity count at one
+/// per span rather than one per span per weekday.
 enum Monitoring {
     struct RegistrationError: LocalizedError {
         let message: String
@@ -20,7 +23,7 @@ enum Monitoring {
 
         func include(_ target: Target, _ rule: Rule) {
             guard rule.isEverAllowed else { return }
-            windows.formUnion(rule.windows)
+            windows.formUnion(rule.windows.map(\.span))
             let minutes = rule.dailyBudgetMinutes
             let name = DeviceActivityEvent.Name(ActivityNaming.budgetEvent(targetID: target.id, minutes: minutes))
             let threshold = DateComponents(hour: minutes / 60, minute: minutes % 60)

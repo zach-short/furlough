@@ -20,15 +20,81 @@ enum TimeFormat {
         return "\(minutes) min"
     }
 
+    /// "Every day", "Weekdays", "Weekends", or the days compressed into runs: "Mon–Thu, Sat".
+    static func days(_ days: Weekdays, calendar: Calendar = .current) -> String {
+        if days == .all { return "Every day" }
+        if days == .weekdays { return "Weekdays" }
+        if days == .weekend { return "Weekends" }
+        if days.isEmpty { return "No days" }
+        let symbols = calendar.shortStandaloneWeekdaySymbols
+        var runs: [[Int]] = []
+        var previousPosition: Int?
+        for (position, weekday) in Weekdays.ordered(calendar: calendar).enumerated() where days.contains(weekday: weekday) {
+            if let previousPosition, previousPosition == position - 1, !runs.isEmpty {
+                runs[runs.count - 1].append(weekday)
+            } else {
+                runs.append([weekday])
+            }
+            previousPosition = position
+        }
+        return runs.map { run in
+            let names = run.map { symbols[$0 - 1] }
+            guard run.count >= 3, let first = names.first, let last = names.last else {
+                return names.joined(separator: ", ")
+            }
+            return "\(first)–\(last)"
+        }.joined(separator: ", ")
+    }
+
+    /// The whole week's windows: one list when they are the same every day, else one clause
+    /// per group of days, broader groups first: "Every day 8:00 PM–midnight · Sat, Sun 12:00 AM–2:00 AM".
+    static func schedule(_ rule: Rule, calendar: Calendar = .current) -> String {
+        if rule.isSameEveryDay {
+            return rule.sortedWindows.map(window).joined(separator: ", ")
+        }
+        var groups: [(days: Weekdays, windows: [TimeWindow])] = []
+        for window in rule.sortedWindows {
+            if let index = groups.firstIndex(where: { $0.days == window.days }) {
+                groups[index].windows.append(window)
+            } else {
+                groups.append((window.days, [window]))
+            }
+        }
+        let order = Weekdays.ordered(calendar: calendar)
+        func firstPosition(_ days: Weekdays) -> Int { order.firstIndex { days.contains(weekday: $0) } ?? 7 }
+        groups.sort { a, b in
+            let (pa, pb) = (firstPosition(a.days), firstPosition(b.days))
+            return pa != pb ? pa < pb : a.days.count > b.days.count
+        }
+        return groups
+            .map { "\(days($0.days, calendar: calendar)) \($0.windows.map(window).joined(separator: ", "))" }
+            .joined(separator: " · ")
+    }
+
     static func rule(_ rule: Rule?) -> String {
         guard let rule else { return "Not configured yet" }
         guard rule.isEverAllowed else { return "Blocked all day" }
-        let windows = rule.sortedWindows.map(window).joined(separator: ", ")
-        return "\(windows) · \(budget(rule.dailyBudgetMinutes))/day"
+        return "\(schedule(rule)) · \(budget(rule.dailyBudgetMinutes))/day"
+    }
+
+    /// The name of the day `daysAhead` days from now.
+    static func weekdayName(daysAhead: Int, abbreviated: Bool = false, from now: Date = .now) -> String {
+        let date = Calendar.current.date(byAdding: .day, value: daysAhead, to: now) ?? now
+        return date.formatted(.dateTime.weekday(abbreviated ? .abbreviated : .wide))
     }
 
     static func nextOpen(_ next: NextOpen) -> String {
-        next.isTomorrow ? "tomorrow at \(minute(next.minuteOfDay))" : "at \(minute(next.minuteOfDay))"
+        switch next.daysAhead {
+        case 0: "at \(minute(next.minuteOfDay))"
+        case 1: "tomorrow at \(minute(next.minuteOfDay))"
+        case 7: "next \(weekdayName(daysAhead: 7)) at \(minute(next.minuteOfDay))"
+        default: "\(weekdayName(daysAhead: next.daysAhead)) at \(minute(next.minuteOfDay))"
+        }
+    }
+
+    /// The short form for a row's status chip: a time today or tomorrow, else the day.
+    static func chip(_ next: NextOpen) -> String {
+        next.daysAhead <= 1 ? minute(next.minuteOfDay) : weekdayName(daysAhead: next.daysAhead, abbreviated: true)
     }
 
     static func status(_ status: TargetStatus) -> String {

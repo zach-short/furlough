@@ -1,12 +1,60 @@
 import Foundation
 import ManagedSettings
 
-/// A span of minutes inside one calendar day. `endMinute` is exclusive and may be 1440 (midnight).
+/// Days of the week as a bit set. Bit 0 is Sunday, so bits line up with Calendar's weekday
+/// numbers (1 = Sunday … 7 = Saturday) whatever the user's first day of the week is.
+struct Weekdays: OptionSet, Hashable {
+    let rawValue: UInt8
+
+    init(rawValue: UInt8) { self.rawValue = rawValue & 0x7F }
+
+    /// `weekday` is Calendar's 1…7. Anything else is no day at all.
+    init(weekday: Int) {
+        self.init(rawValue: (1...7).contains(weekday) ? 1 << UInt8(weekday - 1) : 0)
+    }
+
+    static let sunday = Weekdays(weekday: 1)
+    static let monday = Weekdays(weekday: 2)
+    static let tuesday = Weekdays(weekday: 3)
+    static let wednesday = Weekdays(weekday: 4)
+    static let thursday = Weekdays(weekday: 5)
+    static let friday = Weekdays(weekday: 6)
+    static let saturday = Weekdays(weekday: 7)
+    static let all = Weekdays(rawValue: 0x7F)
+    static let weekdays: Weekdays = [.monday, .tuesday, .wednesday, .thursday, .friday]
+    static let weekend: Weekdays = [.saturday, .sunday]
+
+    var count: Int { rawValue.nonzeroBitCount }
+    func contains(weekday: Int) -> Bool { contains(Weekdays(weekday: weekday)) }
+    mutating func toggle(weekday: Int) { formSymmetricDifference(Weekdays(weekday: weekday)) }
+
+    /// Calendar weekday numbers in the order the user's calendar lays a week out.
+    static func ordered(calendar: Calendar = .current) -> [Int] {
+        (0..<7).map { (calendar.firstWeekday - 1 + $0) % 7 + 1 }
+    }
+}
+
+/// Stored as the bare integer, not `{"rawValue": n}`.
+extension Weekdays: Codable {
+    init(from decoder: any Decoder) throws {
+        self.init(rawValue: try decoder.singleValueContainer().decode(UInt8.self))
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
+}
+
+/// A span of minutes inside one calendar day, on the days of the week it applies.
+/// `endMinute` is exclusive and may be 1440 (midnight). A span never crosses midnight; an
+/// evening that runs late is an evening window plus an early-morning window on the next day.
 struct TimeWindow: Codable, Hashable, Identifiable, Comparable {
     var startMinute: Int
     var endMinute: Int
+    var days: Weekdays = .all
 
-    var id: String { "\(startMinute)-\(endMinute)" }
+    var id: String { "\(startMinute)-\(endMinute)-\(days.rawValue)" }
     var durationMinutes: Int { endMinute - startMinute }
 
     var isValid: Bool {
@@ -15,16 +63,38 @@ struct TimeWindow: Codable, Hashable, Identifiable, Comparable {
             && durationMinutes >= Furlough.minimumWindowMinutes
     }
 
+    /// The same span on every day. DeviceActivity is told about each distinct span once; the
+    /// rules engine decides per day.
+    var span: TimeWindow { TimeWindow(startMinute: startMinute, endMinute: endMinute) }
+
+    func applies(on weekday: Int) -> Bool { days.contains(weekday: weekday) }
+
     func contains(minuteOfDay minute: Int) -> Bool {
         minute >= startMinute && minute < endMinute
     }
 
+    /// Spans overlap in the day, whatever their days are.
     func overlaps(_ other: TimeWindow) -> Bool {
         startMinute < other.endMinute && other.startMinute < endMinute
     }
 
+    /// Spans overlap on at least one shared day.
+    func collides(with other: TimeWindow) -> Bool {
+        overlaps(other) && !days.isDisjoint(with: other.days)
+    }
+
     static func < (lhs: TimeWindow, rhs: TimeWindow) -> Bool {
-        (lhs.startMinute, lhs.endMinute) < (rhs.startMinute, rhs.endMinute)
+        (lhs.startMinute, lhs.endMinute, lhs.days.rawValue) < (rhs.startMinute, rhs.endMinute, rhs.days.rawValue)
+    }
+}
+
+extension TimeWindow {
+    /// `days` arrived after the first stored rules, so its absence means every day.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        startMinute = try container.decode(Int.self, forKey: .startMinute)
+        endMinute = try container.decode(Int.self, forKey: .endMinute)
+        days = try container.decodeIfPresent(Weekdays.self, forKey: .days) ?? .all
     }
 }
 
@@ -40,15 +110,23 @@ struct Rule: Codable, Hashable {
     )
     static let alwaysBlocked = Rule(windows: [], dailyBudgetMinutes: 0)
 
-    var isEverAllowed: Bool { !windows.isEmpty && dailyBudgetMinutes > 0 }
+    /// Allowed at some minute of some day.
+    var isEverAllowed: Bool { windows.contains { !$0.days.isEmpty } && dailyBudgetMinutes > 0 }
     var effectiveBudgetMinutes: Int { isEverAllowed ? dailyBudgetMinutes : 0 }
     var sortedWindows: [TimeWindow] { windows.sorted() }
+    /// Every window applies every day, so one list describes the whole week.
+    var isSameEveryDay: Bool { windows.allSatisfy { $0.days == .all } }
 
-    /// One flag per minute of the day; true where use is permitted.
-    var allowedMask: [Bool] {
+    /// The windows that apply on `weekday` (Calendar's 1…7), in order.
+    func windows(on weekday: Int) -> [TimeWindow] {
+        sortedWindows.filter { $0.applies(on: weekday) }
+    }
+
+    /// One flag per minute of `weekday`; true where use is permitted.
+    func allowedMask(on weekday: Int) -> [Bool] {
         var mask = [Bool](repeating: false, count: Furlough.minutesPerDay)
         guard isEverAllowed else { return mask }
-        for window in windows {
+        for window in windows(on: weekday) {
             let lower = max(0, window.startMinute)
             let upper = min(Furlough.minutesPerDay, window.endMinute)
             guard lower < upper else { continue }
@@ -57,17 +135,19 @@ struct Rule: Codable, Hashable {
         return mask
     }
 
-    func window(containing minute: Int) -> TimeWindow? {
+    func window(containing minute: Int, on weekday: Int) -> TimeWindow? {
         guard isEverAllowed else { return nil }
-        return windows.first { $0.contains(minuteOfDay: minute) }
+        return windows(on: weekday).first { $0.contains(minuteOfDay: minute) }
     }
 
-    /// True when this rule allows no minute that `other` forbids and has no larger budget.
+    /// True when this rule allows no minute of any day that `other` forbids and has no larger budget.
     func isTighterOrEqual(to other: Rule) -> Bool {
-        let mine = allowedMask
-        let theirs = other.allowedMask
-        for minute in 0..<Furlough.minutesPerDay where mine[minute] && !theirs[minute] {
-            return false
+        for weekday in 1...7 {
+            let mine = allowedMask(on: weekday)
+            let theirs = other.allowedMask(on: weekday)
+            for minute in 0..<Furlough.minutesPerDay where mine[minute] && !theirs[minute] {
+                return false
+            }
         }
         return effectiveBudgetMinutes <= other.effectiveBudgetMinutes
     }
@@ -77,9 +157,14 @@ struct Rule: Codable, Hashable {
         for window in windows where !window.isValid {
             return "Each window must be at least \(Furlough.minimumWindowMinutes) minutes and end after it starts."
         }
+        if windows.contains(where: { $0.days.isEmpty }) {
+            return "Each window needs at least one day."
+        }
         let sorted = sortedWindows
-        for (a, b) in zip(sorted, sorted.dropFirst()) where a.overlaps(b) {
-            return "Windows must not overlap."
+        for (index, a) in sorted.enumerated() {
+            for b in sorted[(index + 1)...] where a.collides(with: b) {
+                return "Windows on the same day must not overlap."
+            }
         }
         return nil
     }

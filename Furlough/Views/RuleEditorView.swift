@@ -9,6 +9,9 @@ struct RuleEditorView: View {
     @State private var drafts: [DraftWindow] = []
     @State private var budget = Furlough.defaultBudgetMinutes
     @State private var loaded = false
+    /// Whether each window shows its day strip. Off means every window applies every day.
+    @State private var byDay = false
+    @State private var showCopy = false
     @State private var result: ProposalResult?
     @State private var confirmRemove = false
     @FocusState private var nicknameFocused: Bool
@@ -26,6 +29,27 @@ struct RuleEditorView: View {
     private var hasChanges: Bool {
         guard let target else { return false }
         return target.rule != draft || target.nickname != trimmedNickname
+    }
+
+    /// Other apps and sites with windows worth copying.
+    private var copyCandidates: [Target] {
+        model.state.config.targets.filter {
+            $0.id != targetID && !$0.kind.isCategory && ($0.rule?.isEverAllowed ?? false)
+        }
+    }
+
+    private var sameEveryDay: Binding<Bool> {
+        Binding(
+            get: { !byDay },
+            set: { on in
+                withAnimation(.snappy) {
+                    byDay = !on
+                    if on {
+                        for index in drafts.indices { drafts[index].window.days = .all }
+                    }
+                }
+            }
+        )
     }
 
     var body: some View {
@@ -90,6 +114,11 @@ struct RuleEditorView: View {
                 result = model.removeTarget(id: targetID)
             }
         }
+        .sheet(isPresented: $showCopy) {
+            CopyRuleSheet(candidates: copyCandidates) { source in
+                if let rule = source.rule { adopt(rule) }
+            }
+        }
         .alert("Saved", isPresented: Binding(get: { result != nil }, set: { if !$0 { result = nil } }), presenting: result) { _ in
             Button("OK") {
                 result = nil
@@ -139,28 +168,48 @@ struct RuleEditorView: View {
 
     private var windowsCard: some View {
         VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Text("Same every day")
+                    .emberBody(13)
+                    .foregroundStyle(Ember.cream)
+                Spacer()
+                Toggle("Same every day", isOn: sameEveryDay)
+                    .labelsHidden()
+                    .tint(Ember.ember)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            CardDivider()
             ForEach($drafts) { $draft in
-                WindowRow(window: $draft.window) {
+                WindowRow(window: $draft.window, showsDays: byDay) {
                     drafts.removeAll { $0.id == draft.id }
                 }
                 CardDivider()
             }
-            Button { addWindow() } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 12, weight: .bold))
-                    Text("Add window")
-                        .emberBody(13, .semibold)
-                }
-                .foregroundStyle(Ember.ember)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 11)
-                .contentShape(Rectangle())
+            cardAction("Add window", symbol: "plus") { addWindow() }
+            if !copyCandidates.isEmpty {
+                CardDivider()
+                cardAction("Use windows from another app", symbol: "doc.on.doc") { showCopy = true }
             }
-            .buttonStyle(.plain)
         }
         .emberCard()
+    }
+
+    private func cardAction(_ title: String, symbol: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: symbol)
+                    .font(.system(size: 12, weight: .bold))
+                Text(title)
+                    .emberBody(13, .semibold)
+            }
+            .foregroundStyle(Ember.ember)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 11)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private var budgetCard: some View {
@@ -221,12 +270,24 @@ struct RuleEditorView: View {
             windows = [TimeWindow(startMinute: 20 * 60, endMinute: 22 * 60)]
         }
         drafts = windows.map { DraftWindow(window: $0) }
+        byDay = !rule.isSameEveryDay
     }
 
+    /// Replaces the draft with another target's rule. Nothing is saved until Save.
+    private func adopt(_ rule: Rule) {
+        withAnimation(.snappy) {
+            drafts = rule.sortedWindows.map { DraftWindow(window: $0) }
+            budget = rule.dailyBudgetMinutes > 0 ? rule.dailyBudgetMinutes : Furlough.defaultBudgetMinutes
+            byDay = !rule.isSameEveryDay
+        }
+    }
+
+    /// A new hour after the latest window, or from midnight once the evening is taken, so
+    /// "later on weekends" starts as the early-morning window it has to be.
     private func addWindow() {
-        let start = windows.map(\.endMinute).max() ?? 12 * 60
-        let clampedStart = min(start, Furlough.minutesPerDay - 60)
-        let window = TimeWindow(startMinute: clampedStart, endMinute: min(clampedStart + 60, Furlough.minutesPerDay))
+        var start = windows.map(\.endMinute).max() ?? 12 * 60
+        if start > Furlough.minutesPerDay - 60 { start = 0 }
+        let window = TimeWindow(startMinute: start, endMinute: min(start + 60, Furlough.minutesPerDay))
         withAnimation(.snappy) { drafts.append(DraftWindow(window: window)) }
     }
 
@@ -236,9 +297,11 @@ struct RuleEditorView: View {
     }
 }
 
-/// One allowed window: two glass time chips, an arrow, the duration, and a quiet remove button.
+/// One allowed window: two glass time chips, an arrow, the duration, a quiet remove button,
+/// and, when the rule varies by day, a strip of day toggles beneath.
 struct WindowRow: View {
     @Binding var window: TimeWindow
+    var showsDays = false
     let onRemove: () -> Void
     @State private var editing: WindowEdge?
 
@@ -248,30 +311,37 @@ struct WindowRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 8) {
-            GlassEffectContainer(spacing: 8) {
-                HStack(spacing: 8) {
-                    TimeChip(minute: window.startMinute) { editing = .start }
-                    Image(systemName: "arrow.right")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Ember.muted)
-                    TimeChip(minute: window.endMinute) { editing = .end }
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                GlassEffectContainer(spacing: 8) {
+                    HStack(spacing: 8) {
+                        TimeChip(minute: window.startMinute) { editing = .start }
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Ember.muted)
+                        TimeChip(minute: window.endMinute) { editing = .end }
+                    }
                 }
+                Spacer(minLength: 4)
+                Text(durationText(window.durationMinutes))
+                    .emberBody(11.5)
+                    .monospacedDigit()
+                    .foregroundStyle(window.isValid ? Ember.muted : Ember.ember)
+                Button(action: onRemove) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Ember.faint)
+                        .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Remove window")
             }
-            Spacer(minLength: 4)
-            Text(durationText(window.durationMinutes))
-                .emberBody(11.5)
-                .monospacedDigit()
-                .foregroundStyle(window.isValid ? Ember.muted : Ember.ember)
-            Button(action: onRemove) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(Ember.faint)
-                    .frame(width: 28, height: 28)
-                    .contentShape(Rectangle())
+            if showsDays {
+                DayStrip(days: $window.days)
+                    .padding(.top, 8)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Remove window")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -290,6 +360,115 @@ struct WindowRow: View {
         let rest = minutes % 60
         if hours == 0 { return "\(rest) min" }
         return rest == 0 ? "\(hours) h" : "\(hours) h \(rest) min"
+    }
+}
+
+/// Seven round day toggles in the calendar's order, amber when on, with the days named beside them.
+struct DayStrip: View {
+    @Binding var days: Weekdays
+    private let calendar = Calendar.current
+
+    var body: some View {
+        HStack(spacing: 5) {
+            ForEach(Weekdays.ordered(calendar: calendar), id: \.self) { weekday in
+                let on = days.contains(weekday: weekday)
+                Button {
+                    withAnimation(.snappy(duration: 0.2)) { days.toggle(weekday: weekday) }
+                } label: {
+                    Text(calendar.veryShortStandaloneWeekdaySymbols[weekday - 1])
+                        .font(EmberFont.label(10))
+                        .foregroundStyle(on ? Ember.ground : Ember.faint)
+                        .frame(width: 26, height: 26)
+                        .background(on ? Ember.amber : Color.white.opacity(0.07), in: Circle())
+                        .overlay(Circle().strokeBorder(on ? Color.clear : Ember.cardBorder, lineWidth: 1))
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(calendar.standaloneWeekdaySymbols[weekday - 1])
+                .accessibilityAddTraits(on ? .isSelected : [])
+            }
+            Spacer(minLength: 6)
+            Text(TimeFormat.days(days, calendar: calendar))
+                .emberBody(10.5)
+                .foregroundStyle(days.isEmpty ? Ember.ember : Ember.faint)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .sensoryFeedback(.selection, trigger: days)
+    }
+}
+
+/// Picks another app or site whose windows, days and budget replace the draft.
+struct CopyRuleSheet: View {
+    let candidates: [Target]
+    let onPick: (Target) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    VStack(spacing: 0) {
+                        ForEach(Array(candidates.enumerated()), id: \.element.id) { index, target in
+                            if index > 0 { CardDivider() }
+                            Button {
+                                onPick(target)
+                                dismiss()
+                            } label: {
+                                HStack(spacing: 10) {
+                                    TokenTile(kind: target.kind, size: 34)
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        HStack(alignment: .firstTextBaseline, spacing: 4) {
+                                            TokenName(kind: target.kind)
+                                            if !target.nickname.isEmpty {
+                                                Text(target.nickname)
+                                                    .emberBody(11.5)
+                                                    .foregroundStyle(Ember.muted)
+                                                    .lineLimit(1)
+                                            }
+                                        }
+                                        Text(TimeFormat.rule(target.rule))
+                                            .emberBody(11.5)
+                                            .foregroundStyle(Ember.muted)
+                                            .lineLimit(2)
+                                    }
+                                    Spacer(minLength: 8)
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(Ember.faint)
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 10)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .emberCard()
+                    Footnote(text: "Copies its windows, days and daily budget into this rule. Nothing changes until you tap Save.", alignment: .center)
+                        .padding(.top, 10)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 32)
+            }
+            .background(EmberWall())
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("Use windows from")
+                        .emberBody(15, .semibold)
+                        .foregroundStyle(Ember.cream)
+                }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                        .tint(Ember.cream)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Ember.ground)
     }
 }
 

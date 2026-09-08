@@ -69,12 +69,18 @@ plus on the right. Hero: hourglass image on the left with an ember glow beneath 
 eyebrow ("OPEN NOW · UNTIL 10:00 PM" in Moss when something is open, "NEXT WINDOW" in Amber
 otherwise), the app name in Display, the countdown in Geist Mono, and a sub line such as
 "30 min budget today". List sections in this order: Open now · Later today · Tomorrow ·
-Always blocked · Needs a schedule. Each row: tile, name (nickname small and muted beside
+Later this week · Always blocked · Needs a schedule. A row whose rule varies by day shows
+today's windows ("Today 8:00 PM–midnight"), and its chip shows the day ("Sat") when the next
+window is more than a day away. Each row: tile, name (nickname small and muted beside
 it), rule line; on the right a status chip with a lock or hourglass glyph and the next time.
 
 **Rule editor.** Header: large tile, name in Display, "Nickname shows on the shield and
-widget." Cards: Nickname (text field), Allowed windows (glass time chips with an arrow
-between, duration on the right, "+ Add window" in Ember), Daily budget (value in Geist Mono
+widget." Cards: Nickname (text field), Allowed windows (a "Same every day" row with an
+Ember-tinted toggle; glass time chips with an arrow between, duration on the right; when the
+toggle is off, a strip of seven 26 pt round day toggles under each window, Onest Bold 10 pt
+initials, Amber fill with Ground text when on, white 7% with a card border when off, and the
+days named in Faint on the right; "+ Add window" and "Use windows from another app" in
+Ember), Daily budget (value in Geist Mono
 with a small "MIN" label, hint "across all windows", slider 5–240 in steps of 5 with ticks at
 5 / 30 / 60 / 120 / 240, Ember-to-Amber fill, glass knob). Effect banner: Moss tint,
 "Tighter than now · applies immediately", or Pending tint with the effective date. Save is
