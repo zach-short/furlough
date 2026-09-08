@@ -95,18 +95,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         return item
     }
 
-    /// The way back to the window after a watchdog reopen has left it hidden.
+    /// The way to the window from the menu bar, where Furlough otherwise sits with none.
     @objc private func openFurlough() {
-        NSApp.activate()
-        if let window = MacAppDelegate.mainWindow {
-            window.makeKeyAndOrderFront(nil)
-        } else {
-            // Suppressed at launch, so there is no window to raise. Opening the bundle asks
-            // AppKit for the same reopen that clicking the Dock icon does, and SwiftUI builds
-            // the scene then.
-            NSWorkspace.shared.openApplication(
-                at: Bundle.main.bundleURL, configuration: NSWorkspace.OpenConfiguration()
-            )
-        }
+        MacAppDelegate.showWindow()
     }
 }

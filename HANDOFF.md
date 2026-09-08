@@ -498,9 +498,37 @@ The plan for this stretch. Tick each phase off here as it lands.
    exists for that — bump it on any plist change and `enableIfNeeded` unregisters and
    re-registers. Seen working: the log shows "watchdog off" then "watchdog on" on the first
    launch of the new build.
+   **Furlough is a menu bar app now** (Zach's call, 2026-09-08: "like the GitHub app or
+   Raycast"). A launch sets `.accessory` before anything can appear — no Dock icon, no window —
+   and Furlough goes to the menu bar and keeps enforcing. The window comes back on request and
+   the app turns `.regular` while it is up, which is **not cosmetic**: an accessory app has no
+   menu bar menus, and with them goes the Edit menu, so ⌘C and ⌘V would quietly stop working in
+   the nickname and host fields. It returns to `.accessory` when no titled window is left, and
+   `applicationShouldTerminateAfterLastWindowClosed` is `false` so closing the window puts
+   Furlough back in the menu bar rather than ending enforcement. A Mac that has not onboarded is
+   the exception and still opens the window, or a first run would be invisible.
+   **The mistake worth not repeating**: the first attempt used
+   `.defaultLaunchBehavior(.suppressed)`. A suppressed scene is never *built*, so there was no
+   window for AppKit to raise — reopening Furlough switched the activation policy and put
+   nothing on screen, which on a Mac with no menu bar item is an app with no way in at all.
+   Tested on the machine, which is the only reason it was caught. The window is now always built
+   and put away with `orderOut`, three times over the moments it can appear (SwiftUI's build,
+   AppKit's restore of the force-quit state, and a turn later), so there is always something to
+   raise.
+   **The way in that always exists**: opening Furlough again — double-click in `/Applications`,
+   or Spotlight — goes through `applicationShouldHandleReopen` and brings the window up. It
+   needs no Dock icon and no menu bar item, which on this Mac is the only way in at all. Verified
+   2026-09-08: launch leaves `ApplicationType=UIElement` with the window `onscreen=false`, and a
+   second `open` gives `onscreen=true`.
+   **Not yet verified by a person**: that closing the window drops the Dock icon and leaves
+   Furlough enforcing. The code says so; nobody has clicked the red button.
    **Still owed**: README's Mac table still says the Live Activity's counterpart is "a menu bar
-   item with the countdown". True of the code, false of this Mac, so it needs a sentence — left
+   item with the countdown", and now also needs to say Furlough lives in the menu bar with no
+   Dock icon. True of the code, false of this Mac, so it needs a sentence either way — left
    undone here only because `README.md` was being edited in the other session.
+   Moving `.accessory` into `LSUIElement` in `project.yml` would be tidier than setting it at
+   launch, and would remove any chance of a Dock icon flicker; not done because `project.yml`
+   was the other session's too.
    Record the rest here.
    The phone checklist: the Anchor card and the paired tag survived the rename; the shield's
    copy and colours; a shield lifting by itself at a window's start; Delete App refused while
