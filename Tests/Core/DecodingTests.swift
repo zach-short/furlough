@@ -107,6 +107,21 @@ struct DecodingTests {
         #expect(restored == original)
     }
 
+    @Test("a target written before Furlough learned names decodes")
+    func targetWithoutSystemName() throws {
+        var youTube = makeTarget("YouTube", rule: nil)
+        youTube.systemName = "YouTube"
+        let json = String(data: try encoder.encode(youTube), encoding: .utf8) ?? ""
+        #expect(json.contains("systemName"))
+        let older = json
+            .replacingOccurrences(of: #""systemName":"YouTube","#, with: "")
+            .replacingOccurrences(of: #","systemName":"YouTube""#, with: "")
+        #expect(!older.contains("systemName"))
+        let restored = try decode(Target.self, older)
+        #expect(restored.systemName == nil)
+        #expect(restored.displayName == "YouTube")
+    }
+
     @Test("a rule with no windows decodes as open all day")
     func ruleWithoutWindows() throws {
         let rule = try decode(Rule.self, #"{"windows":[],"dailyBudgetMinutes":30}"#)

@@ -4,6 +4,7 @@ import os
 /// App Group persistence shared by the app and its extensions.
 enum SharedStore {
     private static let stateKey = "furlough.state.v1"
+    private static let namesKey = "furlough.names.v1"
     private static let logKey = "furlough.log.v1"
     private static let maxLogEntries = 300
     private static let logger = Logger(subsystem: Furlough.bundleID, category: "shared")
@@ -37,11 +38,38 @@ enum SharedStore {
     static func load() -> SharedState {
         guard let data = defaults.data(forKey: stateKey) else { return SharedState() }
         do {
-            return try decoder.decode(SharedState.self, from: data)
+            var state = try decoder.decode(SharedState.self, from: data)
+            let names = learnedNames()
+            for index in state.config.targets.indices {
+                if let name = names[state.config.targets[index].id.uuidString], !name.isEmpty {
+                    state.config.targets[index].systemName = name
+                }
+            }
+            return state
         } catch {
             log("Failed to decode state: \(error)")
             return SharedState()
         }
+    }
+
+    /// The names Screen Time has told us, by target id. iOS says an app's name in one place
+    /// only — the shield, as it blocks it — and the shield must not write the state, so it
+    /// writes here instead and every `load` folds these into the targets. Everything that has
+    /// to render a name as text rather than as `Label(token)` reads them: the widget, the
+    /// notifications, the Live Activity.
+    static func learnedNames() -> [String: String] {
+        defaults.dictionary(forKey: namesKey) as? [String: String] ?? [:]
+    }
+
+    /// Writes down what iOS called a target. Returns true when this is news, so the caller can
+    /// reload the surfaces that were showing "This app".
+    @discardableResult
+    static func learnName(_ name: String, for id: UUID) -> Bool {
+        var names = learnedNames()
+        guard !name.isEmpty, names[id.uuidString] != name else { return false }
+        names[id.uuidString] = name
+        defaults.set(names, forKey: namesKey)
+        return true
     }
 
     /// Every save records both clocks, which is what lets Furlough keep its own time. The mark
@@ -58,8 +86,12 @@ enum SharedStore {
         return state
     }
 
-    /// Forgets every target, rule, pending change, and the Anchor. The activity log is kept.
-    static func reset() { defaults.removeObject(forKey: stateKey) }
+    /// Forgets every target, rule, pending change, the Anchor, and the names iOS gave us. The
+    /// activity log is kept.
+    static func reset() {
+        defaults.removeObject(forKey: stateKey)
+        defaults.removeObject(forKey: namesKey)
+    }
 
     @discardableResult
     static func mutate(_ body: (inout SharedState) -> Void) -> SharedState {

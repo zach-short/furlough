@@ -276,9 +276,16 @@ struct Target: Codable, Hashable, Identifiable {
     /// nil means "not configured yet": nothing is enforced until the first rule is saved.
     var rule: Rule?
     var addedAt = Date.now
+    /// The name iOS gave this one, learned from the shield the first time Furlough blocked it.
+    /// A Screen Time token is opaque: only `Label(token)`, drawn inside the app, ever shows a
+    /// name, so without this the widget, the notifications and the Live Activity have nothing
+    /// to call an app but "This app". Optional so state written before it existed still
+    /// decodes; `SharedStore` folds the learned names in on every load.
+    var systemName: String?
 
     var defaultName: String {
-        switch kind {
+        if let systemName, !systemName.isEmpty { return systemName }
+        return switch kind {
         #if os(iOS)
         case .application: "This app"
         case .webDomain: "This website"

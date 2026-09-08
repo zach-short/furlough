@@ -208,7 +208,8 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   linear over the 5/30/60/120/240 ticks), `PendingChanges`, `Settings` + `LogView`. Screens are
   `ScrollView`s over `EmberWall`, not `List`/`Form`; the iOS 26 toolbar supplies the glass.
 - `FurloughMonitor/MonitorExtension.swift`: every callback reconciles from shared state.
-- `FurloughShield/ShieldExtension.swift`: reads shared state, writes the copy via `ShieldText`.
+- `FurloughShield/ShieldExtension.swift`: reads shared state, writes the copy via `ShieldText`,
+  and records the name iOS gives the app it is covering (see the naming note below).
 - `FurloughWidgets/`: `StatusWidget.swift`, `WindowLiveActivity.swift`, bundle.
 - `design/`: `DESIGN.md`, `HOURGLASS.md` (the next brief), `icons/` (candidates);
   `scripts/make-icon.swift` (old placeholder), `scripts/make-noise.swift` (the wall grain).
@@ -240,7 +241,16 @@ table. Not yet seen on the phone: install, then check the test steps in the last
 - `SharedStore.save` stamps `runtime.clock` on every save and returns the stamped state. Do not
   bypass it by writing the defaults key directly, and do not advance the mark while the clock
   is untrusted: that is what makes a forward jump stick until it is undone.
-- The shield extension only reads. It folds due pending changes in memory for display.
+- The shield extension does not write the state. It folds due pending changes in memory for
+  display, and the only thing it writes is under a key of its own: the name Screen Time
+  gives the app it is covering (`SharedStore.learnName`, key `furlough.names.v1`, by target
+  id). A token is opaque everywhere else — only `Label(token)` draws a name, and only
+  inside the app, never in a widget — so the shield is the one place a name can be read as
+  text. `SharedStore.load` folds those names into `Target.systemName`, which `displayName`
+  prefers over "This app" and a nickname still beats, so the widget, the notifications and
+  the Live Activity say the app's name from the first time Furlough blocks it. Added
+  2026-09-08 because the widget only ever said "This app". A target added but never yet
+  blocked still has no name; set a nickname to name it sooner.
 - `Policy.decide` is the union of rule shields and, while anchored, every kind in the anchor.
   `allowedApps` never contains an anchored app, so category exceptions cannot leak one through.
   `AppModel.anchor()`, `unanchorWithTag()`, `pairTag()`, `setAnchorSelection()`, `unpairTag()`

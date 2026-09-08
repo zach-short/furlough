@@ -1,6 +1,7 @@
 import ManagedSettings
 import ManagedSettingsUI
 import UIKit
+import WidgetKit
 
 /// Draws the screen iOS shows over a blocked app or site.
 final class ShieldExtension: ShieldConfigurationDataSource {
@@ -26,9 +27,13 @@ final class ShieldExtension: ShieldConfigurationDataSource {
         let config = Policy.effectiveConfig(state, now: now)
 
         var target = kind.flatMap { config.target(kind: $0) }
+        // Whichever of the two matched is the one iOS has just named for us.
+        var learned = systemName
         if target == nil, let token = category?.token {
             target = config.target(kind: .category(token))
+            learned = category?.localizedDisplayName
         }
+        if let target, let learned { remember(learned, for: target) }
         let nickname = target?.nickname ?? ""
         let name = nickname.isEmpty ? (systemName ?? "This app") : nickname
         var status = target.map { Policy.status(of: $0, config: config, runtime: state.runtime, now: now) }
@@ -59,5 +64,15 @@ final class ShieldExtension: ShieldConfigurationDataSource {
             primaryButtonBackgroundColor: cream,
             secondaryButtonLabel: nil
         )
+    }
+
+    /// The shield is the one place Screen Time tells us what an app is called; everywhere else
+    /// a token is opaque. Write the name down — in its own key, never the state, which the
+    /// shield must not touch — so the widget, the notifications and the Live Activity can say
+    /// it instead of "This app".
+    private func remember(_ name: String, for target: Target) {
+        guard target.systemName != name, SharedStore.learnName(name, for: target.id) else { return }
+        SharedStore.log("learned a name from the shield: \(name)")
+        WidgetCenter.shared.reloadAllTimelines()
     }
 }

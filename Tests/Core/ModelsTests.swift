@@ -183,3 +183,18 @@ struct RuleTests {
         #expect(!a.isEquivalent(to: Rule(windows: b.windows, dailyBudgetMinutes: 31)))
     }
 }
+
+@Suite("Target")
+struct TargetTests {
+    /// A Screen Time token has no name until iOS says one on the shield, and that learned name
+    /// is what the widget and the notifications read. A nickname still wins over it.
+    @Test("a learned name stands in until a nickname is set")
+    func names() {
+        var target = Target(kind: .host("youtube.com"))
+        #expect(target.displayName == "youtube.com")
+        target.systemName = "YouTube"
+        #expect(target.displayName == "YouTube")
+        target.nickname = "Tube"
+        #expect(target.displayName == "Tube")
+    }
+}
