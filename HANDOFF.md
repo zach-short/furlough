@@ -51,8 +51,14 @@ small codebase he fully understands over a fork. He is interactive: ask when a d
 - Apps and websites chosen with `FamilyActivityPicker` are shielded by default. Each target
   has allowed windows, each on a set of weekdays (`TimeWindow.days`, every day by default;
   added 2026-09-07 so YouTube can end at midnight on school nights and later on weekends),
-  and one daily minute budget. Windows never cross midnight: a late weekend night is an
-  evening window plus an early-morning window on the next day. No windows means open all
+  and one daily minute budget. A stored window never crosses midnight: a late weekend night is
+  an evening window plus an early-morning window on the next day. Since 2026-09-08 the editors
+  take that night as one row — an end earlier than the start, marked "+1" — and `TimeWindow`
+  does the arithmetic: `split` turns a night into the pair that is stored, on days one apart
+  (`Weekdays.shifted(by:)`), and `folded` reads the pair back as the one row it was written as,
+  which is exact rather than a guess because the two allow the very same minutes. `TimeFormat`
+  and `Policy.status` see through the join, so nothing says a window shuts at midnight when it
+  does not. No windows means open all
   day, every day, up to the budget (decided 2026-09-07: a budget alone is the default rule,
   so the editor no longer pre-fills an 8–10 PM window and says "No windows. Open all day, up
   to the budget."); once a target has windows, a day none of them covers is blocked.
@@ -231,7 +237,8 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   whatever days the span applies on (`TimeWindow.span` drops the days before deduping). A
   callback on a day the window is off just reconciles to the same shields. iOS allows 20
   activities total, so at most 19 distinct spans across all targets and days; windows must
-  be at least 15 minutes and cannot cross midnight (end is exclusive, 1440 means midnight).
+  be at least 15 minutes and cannot cross midnight (end is exclusive, 1440 means midnight),
+  so a night costs two spans and each half needs its own 15 minutes (`isValidDraft`).
   Do not register one activity per span per weekday: it would blow the limit fast.
 - A rule without windows registers no window activity: the day activity's midnight callback
   resets it and its budget event limits it. `Policy.summary` lists such targets in
@@ -448,6 +455,26 @@ The plan for this stretch. Tick each phase off here as it lands.
    within the 60-second tick (the log's `reconcile (launch)` lines at 13:39:03 and 13:39:59,
    56 s apart), one enforcer left running, no crash report. That is step 7's one untested bet —
    that `open -g -b` hands off instead of racing a second enforcer — settled.
+   **The menu bar item does not appear, and it is not our code.** `FurloughMacApp` declares a
+   `MenuBarExtra` with `MenuBarLabel`, and nothing shows in the menu bar whether Furlough is
+   running or not. Traced 2026-09-08: there is no menu bar manager (no Ice, Bartender or
+   similar) hiding it, the menu bar has visible free space so it is not crowding, and Furlough
+   owns four `1512×33 @(0,0)` windows at layer 0, all `onscreen=false`, with nothing at the
+   status-item layer. Then the decisive one: a **twelve-line app whose whole body is
+   `MenuBarExtra { Text("test") } label: { Image(systemName: "hourglass") }`**, properly
+   bundled and signed, shows nothing either and produces the *identical* window signature. So
+   `MenuBarExtra` is not producing a visible status item on this Mac (macOS 26, MacBook Pro
+   Mac16,1) for any app, and no amount of work on `MenuBar.swift` will fix it. What could not
+   be settled: whether the item is created and invisible or never created at all — that needs
+   the accessibility API, and `osascript` here has no assistive access. **README claims the
+   Mac's answer to the Live Activity is "a menu bar item with the countdown", so that line is
+   false until this is decided.** The fix, if Zach wants one, is a hand-rolled `NSStatusItem`
+   in `MacAppDelegate`, which is in keeping — the shield is already an `NSPanel` and the
+   watchdog already `SMAppService`. Ask before writing it.
+   **The watchdog does not steal focus** (`open -g` works) **but it does restore a window.**
+   For a reopen whose only job is to resume enforcement, a window is more than is wanted; it
+   would matter less if the menu bar item existed, which is the other half of the same
+   decision.
    Record the rest here.
    The phone checklist: the Anchor card and the paired tag survived the rename; the shield's
    copy and colours; a shield lifting by itself at a window's start; Delete App refused while
@@ -677,13 +704,16 @@ name `Furlough`, macOS 26, non-sandboxed, hardened runtime with the
   `.requiresApproval`, so a user who switched the agent off in System Settings > General >
   Login Items is not asked again on every launch.
 - Views mirror the phone with a sidebar plus detail layout (`MacRootView`, `MacRuleEditor`,
-  `MacSheets`, `MacOnboardingView`, `MenuBar`). The sidebar's + button shows the shared
+  `MacSheets`, `MacOnboardingView`, `MenuBar` — but see step 3: the `MenuBarExtra` shows
+  nothing on this Mac, and a minimal app reproduces it, so `MenuBar.swift` is written, compiled
+  and dead until someone hand-rolls an `NSStatusItem`). The sidebar's + button shows the shared
   `AddChoicePopover` (an NSPopover), and Application or Website opens `AddAppSheet` or
   `AddSiteSheet`; seen working on this Mac on 2026-09-07. `MacComponents.swift` duplicates
   `ProminentButton`, `GhostButton`, `SectionLabel`, `Footnote`, `CardDivider`, `StatusChip`,
   `RowCopy` and `BudgetSlider` rather than moving them out of `Furlough/Views`, because that
   folder was being edited in another session at the time; unify into `Shared/UI` when quiet.
-  Times are `DatePicker` fields; an end of 12:00 AM means midnight (1440). `MacRuleEditor`
+  Times are `DatePicker` fields; an end of 12:00 AM means midnight (1440), and an end earlier
+  than the start is a night, marked "+1" beside the field. `MacRuleEditor`
   has the phone's "Use windows from another app" (a menu), "Apply these windows to other
   apps" (`ApplyRuleSheet` in `MacSheets.swift`, backed by `MacModel.apply`, same semantics as
   the phone's) and, since 2026-09-08, "Visualize windows": `MacWeekView.swift` is a copy of
