@@ -14,38 +14,39 @@ struct TokenLabel: View {
     }
 }
 
-/// The app's real name, styled. Apple renders the text; we only set the type.
+/// The app's real name. Apple renders the text and ignores fonts, weights and colours; it only
+/// follows Dynamic Type, so `size` is how rows (xSmall, about 14 pt), the editor header
+/// (xLarge, about 19 pt) and the hero (xxxLarge, about 23 pt) pick their size.
 struct TokenName: View {
     let kind: TargetKind
+    var size: DynamicTypeSize = .xSmall
 
     var body: some View {
         TokenLabel(kind: kind)
             .labelStyle(.titleOnly)
             .lineLimit(1)
+            .dynamicTypeSize(size)
+            .environment(\.legibilityWeight, .bold)
     }
 }
 
-/// The real app icon in a rounded tile. The system draws the icon at its own size, so the
-/// tile measures it and scales it to fill.
+/// The real app icon, scaled to fill `size`. The system view is always 32 pt and its artwork
+/// fills about two thirds of it, so the tile measures the view and scales past the padding.
+/// No frame of our own: the artwork brings its rounded square.
 struct TokenTile: View {
     let kind: TargetKind
     var size: CGFloat = 34
     @State private var natural = CGSize.zero
+    private static let artworkFraction: CGFloat = 0.655
 
     var body: some View {
         let longest = max(natural.width, natural.height)
-        let scale = longest > 0 ? size / longest : 1
-        let radius = size >= 44 ? Ember.tileRadiusLarge : Ember.tileRadius
+        let scale = longest > 0 ? size / (longest * Self.artworkFraction) : 1
         TokenLabel(kind: kind)
             .labelStyle(.iconOnly)
             .onGeometryChange(for: CGSize.self) { $0.size } action: { natural = $0 }
             .scaleEffect(scale)
             .frame(width: size, height: size)
-            .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: radius, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
-            )
     }
 }
 

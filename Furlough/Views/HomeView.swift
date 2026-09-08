@@ -224,11 +224,15 @@ struct HeroView: View {
         .padding(.bottom, 8)
     }
 
+    /// A nickname gets the display face; the system name can only be sized, not restyled.
+    @ViewBuilder
     private func name(for target: Target) -> some View {
-        TokenName(kind: target.kind)
-            .emberDisplay(24)
-            .foregroundStyle(Ember.cream)
-            .padding(.top, 4)
+        if target.nickname.isEmpty {
+            TokenName(kind: target.kind, size: .xxxLarge)
+                .padding(.top, 4)
+        } else {
+            title(target.nickname)
+        }
     }
 
     private func title(_ text: String) -> some View {
@@ -281,8 +285,6 @@ struct TargetRow: View {
             VStack(alignment: .leading, spacing: 1) {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     TokenName(kind: target.kind)
-                        .emberDisplaySmall(13.5)
-                        .foregroundStyle(Ember.cream)
                     if !target.nickname.isEmpty {
                         Text(target.nickname)
                             .emberBody(11.5)

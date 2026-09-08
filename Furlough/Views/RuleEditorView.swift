@@ -106,9 +106,7 @@ struct RuleEditorView: View {
         HStack(spacing: 12) {
             TokenTile(kind: target.kind, size: 48)
             VStack(alignment: .leading, spacing: 3) {
-                TokenName(kind: target.kind)
-                    .emberDisplay(19)
-                    .foregroundStyle(Ember.cream)
+                TokenName(kind: target.kind, size: .xLarge)
                 Text("Nickname shows on the shield and widget.")
                     .emberBody(11.5)
                     .foregroundStyle(Ember.muted)

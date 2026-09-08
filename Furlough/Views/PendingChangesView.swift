@@ -65,8 +65,6 @@ struct PendingCard: View {
                     VStack(alignment: .leading, spacing: 1) {
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
                             TokenName(kind: target.kind)
-                                .emberDisplaySmall(13.5)
-                                .foregroundStyle(Ember.cream)
                             if !target.nickname.isEmpty {
                                 Text(target.nickname)
                                     .emberBody(11.5)
