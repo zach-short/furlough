@@ -1,6 +1,6 @@
 # Furlough
 
-A personal iOS app blocker with no unblock button.
+A personal iOS and Mac app blocker with no unblock button.
 
 Pick the apps and websites that eat your time. Give each one a daily minute budget (say 30 minutes) and, if you want, allowed windows (say 8:00–10:00 PM), the same every day or different per day of the week (until midnight on school nights, until 2 AM on weekends). With no windows an app is open all day, up to its budget. Outside the windows, or once the budget is spent, iOS shields the app. The only way to loosen a rule is to wait: loosening edits take effect 24 hours after you make them, and you can cancel them in the meantime. Tightening edits apply instantly.
 
@@ -46,10 +46,40 @@ Rules for each app live in an App Group so all four processes read the same stat
 
 The one escape that always exists is Apple's own: **Settings > Screen Time > Apps with Screen Time Access > Furlough > off**. That revokes access and iOS clears every shield and the delete-protection flag. Furlough cannot prevent it, and it documents it on purpose.
 
+## Furlough on the Mac
+
+Apple's Screen Time API does not exist on the Mac: FamilyControls, ManagedSettings and DeviceActivity are marked unavailable for both native macOS and Mac Catalyst, so nothing built on them can shield anything there. `FurloughMac` is a native Mac app that shares the rules engine and the look and enforces on its own:
+
+| On the phone | On the Mac |
+|---|---|
+| An app is an opaque Screen Time token | An app is its bundle identifier, picked from the apps on the Mac |
+| A website is a token | A website is a host, typed in (`youtube.com` also covers `m.youtube.com`) |
+| iOS shields a blocked app | Furlough quits it the moment it launches or the window closes (force-quits if it lingers), and shows a floating card saying when it opens next |
+| iOS shields a blocked site | Furlough reads the front tab's address in Safari and the Chromium browsers (Chrome, Arc, Brave, Edge, Vivaldi, Opera, Dia) through Apple Events and sends the tab to its shield page |
+| iOS counts usage toward the budget | Furlough counts seconds while the app or site is in front and the Mac is not idle; "5 minutes left" and "Time's up" arrive as notifications |
+| Live Activity, widget, the Brick | A menu bar item with the countdown. No Brick: a Mac has no NFC reader |
+| Escape: Settings > Screen Time > turn Furlough off | Escape: Force Quit. Quit is refused while anything is blocked; logging out and shutting down are always allowed. Furlough opens at login |
+
+Windows per weekday, budgets, the pending list and the loosening delay are the same code as the phone. Rules are per device; nothing syncs.
+
+macOS asks once per browser whether Furlough may control it, the first time that browser is in front while a website has a rule. Refusing means that browser is not enforced; Settings > Browsers shows the status, and System Settings > Privacy & Security > Automation is where to change it. Firefox is not scriptable this way and is not enforced.
+
+Build and install from the command line:
+
+```bash
+xcodebuild -project Furlough.xcodeproj -scheme FurloughMac -configuration Release \
+  -destination 'platform=macOS,arch=arm64' -allowProvisioningUpdates \
+  -derivedDataPath build/DerivedDataMac build
+rm -rf /Applications/Furlough.app && ditto build/DerivedDataMac/Build/Products/Release/Furlough.app /Applications/Furlough.app
+open /Applications/Furlough.app
+```
+
+Or open the project in Xcode, pick the `FurloughMac` scheme and My Mac, and press Run. The app has to live in `/Applications` for the login item to point at it.
+
 ## Requirements
 
 - A paid Apple Developer account (Family Controls is not available to Personal Teams).
-- Xcode 26 or newer, a physical iPhone. The Screen Time API does not work in the Simulator.
+- Xcode 26 or newer, a physical iPhone. The Screen Time API does not work in the Simulator. The Mac app needs macOS 26.
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen): `brew install xcodegen`
 
 ## Install from Xcode

@@ -1,5 +1,7 @@
 import Foundation
+#if os(iOS)
 import ManagedSettings
+#endif
 
 enum TargetStatus: Equatable {
     /// Locked by the Brick profile. Only its paired tag lifts this.
@@ -36,6 +38,7 @@ enum ChangeClass: Equatable {
     case loosening
 }
 
+#if os(iOS)
 /// What the shields should look like right now.
 struct Decision {
     var allowedApps: Set<ApplicationToken> = []
@@ -49,6 +52,16 @@ struct Decision {
         !shieldedApps.isEmpty || !shieldedWeb.isEmpty || !categories.isEmpty
     }
 }
+#else
+/// What the Mac must enforce right now: apps by bundle identifier, websites by host.
+struct Decision {
+    var blockedApps: Set<String> = []
+    var blockedHosts: Set<String> = []
+    var statuses: [UUID: TargetStatus] = [:]
+
+    var isAnythingShielded: Bool { !blockedApps.isEmpty || !blockedHosts.isEmpty }
+}
+#endif
 
 /// Pure rules engine. No I/O; every function takes the state it needs.
 enum Policy {
@@ -167,6 +180,7 @@ enum Policy {
         return nil
     }
 
+    #if os(iOS)
     static func decide(config: Config, runtime: RuntimeState, now: Date) -> Decision {
         var decision = Decision()
         for target in config.targets {
@@ -198,6 +212,29 @@ enum Policy {
         }
         return decision
     }
+    #else
+    static func decide(config: Config, runtime: RuntimeState, now: Date) -> Decision {
+        var decision = Decision()
+        for target in config.targets {
+            let status = status(of: target, config: config, runtime: runtime, now: now)
+            decision.statuses[target.id] = status
+            guard !status.isAllowed else { continue }
+            switch target.kind {
+            case .macApp(let bundleID): decision.blockedApps.insert(bundleID)
+            case .host(let host): decision.blockedHosts.insert(host)
+            }
+        }
+        if config.brick.isBricked {
+            for kind in config.brick.kinds {
+                switch kind {
+                case .macApp(let bundleID): decision.blockedApps.insert(bundleID)
+                case .host(let host): decision.blockedHosts.insert(host)
+                }
+            }
+        }
+        return decision
+    }
+    #endif
 
     /// The next instant at which some status can change: a window edge later today, else midnight.
     static func nextTransition(config: Config, after now: Date, calendar: Calendar = .current) -> Date {

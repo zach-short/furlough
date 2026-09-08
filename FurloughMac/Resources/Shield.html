@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Blocked by Furlough</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { color-scheme: dark; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: #0F0D0B;
+    color: #F5EFE6;
+    font: 16px/1.5 -apple-system, "Onest", system-ui, sans-serif;
+    display: grid; place-items: center;
+    overflow: hidden;
+  }
+  .wall {
+    position: fixed; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(70vw 42vh at 28vw 104vh, rgba(229,86,61,.6), transparent 62%),
+      radial-gradient(60vw 40vh at 90vw -4vh, rgba(245,158,74,.14), transparent 60%);
+  }
+  main { position: relative; text-align: center; max-width: 34rem; padding: 2rem; }
+  .glass {
+    width: 64px; height: 84px; margin: 0 auto 2rem;
+    border: 1.5px solid rgba(255,255,255,.35); border-radius: 12px 12px 12px 12px;
+    position: relative; background: rgba(255,255,255,.05);
+    clip-path: polygon(0 0, 100% 0, 60% 50%, 100% 100%, 0 100%, 40% 50%);
+    box-shadow: 0 0 40px rgba(229,86,61,.35);
+  }
+  .glass::after {
+    content: ""; position: absolute; left: 10px; right: 10px; bottom: 8px; height: 22px;
+    background: linear-gradient(#F59E4A, #E5563D); border-radius: 50% 50% 4px 4px / 60% 60% 4px 4px;
+  }
+  .eyebrow { color: #F59E4A; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+  h1 { font-size: 30px; line-height: 1.15; letter-spacing: -.02em; margin: .5rem 0 .6rem; font-weight: 700; }
+  p { color: #B8AFA3; margin: 0; }
+  .foot { color: #7E766B; font-size: 12px; margin-top: 2.2rem; }
+</style>
+</head>
+<body>
+<div class="wall"></div>
+<main>
+  <div class="glass"></div>
+  <div class="eyebrow">Furlough</div>
+  <h1 id="t">Blocked by Furlough</h1>
+  <p id="s">This site is outside its window.</p>
+  <p class="foot">No unblock button. The window opens by itself.</p>
+</main>
+<script>
+  const q = new URLSearchParams(location.search);
+  if (q.get("t")) document.getElementById("t").textContent = q.get("t");
+  if (q.get("s")) document.getElementById("s").textContent = q.get("s");
+</script>
+</body>
+</html>

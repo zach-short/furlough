@@ -8,11 +8,17 @@ enum SharedStore {
     private static let maxLogEntries = 300
     private static let logger = Logger(subsystem: Furlough.bundleID, category: "shared")
 
+    #if os(iOS)
     static var isAppGroupAvailable: Bool { UserDefaults(suiteName: Furlough.appGroupID) != nil }
 
     static var defaults: UserDefaults {
         UserDefaults(suiteName: Furlough.appGroupID) ?? .standard
     }
+    #else
+    /// The Mac has no extensions to share with, so the app's own defaults are the store.
+    static var isAppGroupAvailable: Bool { true }
+    static var defaults: UserDefaults { .standard }
+    #endif
 
     static func load() -> SharedState {
         guard let data = defaults.data(forKey: stateKey) else { return SharedState() }

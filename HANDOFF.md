@@ -265,3 +265,52 @@ table. Not yet seen on the phone: install, then check the test steps in the last
 Swift 6 language mode with approachable concurrency, SwiftUI, `@Observable`, async/await, no
 third-party dependencies. Keep it small: one app target plus the three extensions. Shared
 code that the monitor extension uses must not import SwiftUI (memory limits).
+
+## The Mac (added 2026-09-07)
+
+Zach asked for windows, app blocking and website blocking on his Mac; NFC was explicitly
+optional. Apple's Screen Time API is out: in the macOS 26.5 SDK, `AuthorizationCenter`,
+`FamilyActivityPicker`, `FamilyActivitySelection`, `ManagedSettingsStore`, `ShieldSettings`,
+`Token`, `DeviceActivityCenter` and `DeviceActivitySchedule` are all `@available(macOS,
+unavailable)`, and FamilyControls is `@available(macCatalyst, unavailable)` too, so neither
+a native nor a Catalyst build can shield anything. Running the iOS build on the Mac
+("Designed for iPhone") would launch but could not enforce. So the Mac has its own
+enforcement in a native target, `FurloughMac` (bundle `com.zachshort.furlough.mac`, product
+name `Furlough`, macOS 26, non-sandboxed, hardened runtime with the
+`com.apple.security.automation.apple-events` entitlement).
+
+- Shared code compiles for both: `TargetKind` is `#if os(iOS)` tokens `#else`
+  `.macApp(bundleID:)` / `.host(String)`; `Decision`/`Policy.decide` have a Mac variant
+  (`blockedApps`, `blockedHosts` by string); `SharedStore.defaults` is `.standard` on the Mac.
+  `ShieldReconciler.swift` and `ActivityNaming.swift` are excluded from the Mac target in
+  `project.yml`. `Shared/UI` (Theme, Hourglass) compiles unchanged. Fonts ship as a folder
+  reference under `Resources/Fonts` with `ATSApplicationFontsPath: Fonts`; the activity log's
+  first line says whether they loaded.
+- `FurloughMac/Model/Enforcer.swift` ticks every second and on app launch/activate: applies due
+  pending changes, decides, quits any running blocked app (`terminate()`, then
+  `forceTerminate()` after 2 s) and shows `ShieldPanel` (a floating NSPanel with the iOS
+  `ShieldText` copy), reads the front browser's tab through `Browsers` (NSAppleScript,
+  `tell application id`, Safari `current tab`, Chromium `active tab`) only when some host
+  has a rule, and redirects a blocked tab to `Resources/Shield.html?t=&s=`. Usage is counted
+  in `UsageLedger` (`furlough.mac.usage.v1`, seconds per target per day) while the app or
+  site is in front and the Mac has had input in the last 2 minutes; exhaustion and the
+  5-minute warning set `runtime.exhausted`/`warned` exactly as the iOS monitor does, and post
+  `UNUserNotification`s. `AppCatalog` lists apps in the usual folders plus running ones and
+  excludes Finder, Dock, System Settings and Furlough itself.
+- `MacAppDelegate` refuses Quit while `Enforcer.lastDecision.isAnythingShielded`, unless the
+  quit Apple Event's `kAEQuitReason` says log out, restart or shut down. `SMAppService.mainApp`
+  is registered when onboarding finishes (Settings toggle "Open at login"). Force Quit is the
+  documented escape. A launchd KeepAlive agent would be the next hardening; it was not done
+  because launchd and a user launch would race to start two instances.
+- Views mirror the phone with a sidebar plus detail layout (`MacRootView`, `MacRuleEditor`,
+  `MacSheets`, `MacOnboardingView`, `MenuBar`). `MacComponents.swift` duplicates
+  `ProminentButton`, `GhostButton`, `SectionLabel`, `Footnote`, `CardDivider`, `StatusChip`,
+  `RowCopy` and `BudgetSlider` rather than moving them out of `Furlough/Views`, because that
+  folder was being edited in another session at the time; unify into `Shared/UI` when quiet.
+  Times are `DatePicker` fields; an end of 12:00 AM means midnight (1440).
+- Verified on this Mac (2026-09-07): Release build clean, installed to `/Applications`,
+  a target blocked all day was quit within a second of launching and logged. Not yet seen by
+  a person: the window itself, the shield panel, the browser redirect (it needs the one-time
+  Automation prompt), budget counting and the login item. Ask Zach.
+- Build check for the Mac: the README's `xcodebuild … -scheme FurloughMac` line; keep it
+  warning-free like the phone.

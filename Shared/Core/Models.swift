@@ -1,5 +1,7 @@
 import Foundation
+#if os(iOS)
 import ManagedSettings
+#endif
 
 /// Days of the week as a bit set. Bit 0 is Sunday, so bits line up with Calendar's weekday
 /// numbers (1 = Sunday … 7 = Saturday) whatever the user's first day of the week is.
@@ -244,13 +246,24 @@ struct Rule: Codable, Hashable {
     }
 }
 
+/// What a target is. On iOS these are the opaque Screen Time tokens; on the Mac, where there
+/// is no Screen Time API, an app is its bundle identifier and a website is its host.
 enum TargetKind: Codable, Hashable {
+    #if os(iOS)
     case application(ApplicationToken)
     case webDomain(WebDomainToken)
     case category(ActivityCategoryToken)
+    #else
+    /// A Mac app, by bundle identifier: "com.google.Chrome".
+    case macApp(bundleID: String)
+    /// A website, by host: "youtube.com". Subdomains match too.
+    case host(String)
+    #endif
 
     var isCategory: Bool {
+        #if os(iOS)
         if case .category = self { return true }
+        #endif
         return false
     }
 }
@@ -266,9 +279,14 @@ struct Target: Codable, Hashable, Identifiable {
 
     var defaultName: String {
         switch kind {
+        #if os(iOS)
         case .application: "This app"
         case .webDomain: "This website"
         case .category: "This category"
+        #else
+        case .macApp(let bundleID): bundleID
+        case .host(let host): host
+        #endif
         }
     }
 
