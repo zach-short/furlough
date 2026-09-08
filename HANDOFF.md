@@ -422,11 +422,20 @@ The plan for this stretch. Tick each phase off here as it lands.
    the tag identifier is stable across two scans). On the Mac: the shield panel, the browser
    redirect and its one-time Automation prompt, budget counting, the login item, and the
    desktop widget placed on the desktop.
-   Sent to Zach on 2026-09-08 as two checklists; his report is outstanding. The Debug build
-   installed on the phone that day carries the rename and the clock guard. The Mac in
-   `/Applications` is still the 2026-09-07 build: it has to be replaced with README's
-   `xcodebuild … -scheme FurloughMac` + `ditto` lines, and Quit is refused while anything is
-   blocked, so it may need Force Quit first. Record the answers here.
+   Sent to Zach on 2026-09-08 as two checklists; the rest of his report is outstanding.
+   **The Mac in `/Applications` is now a Debug build of `2851824`**, replaced 2026-09-08 with
+   his go-ahead: SIGTERM to the running copy (not an Apple Event, so the "Quit refused while
+   blocked" guard does not apply and it flushes cleanly), then `rm -rf` + `ditto` + `open`.
+   The App Group state survived untouched, as it must — the rules live in the container, not
+   the bundle — and the watchdog agent re-registered from the new bundle. It is **Debug**
+   deliberately, for `Settings > Testing > Reset everything` during the pass; that leaves the
+   split `Furlough.debug.dylib` shape in `/Applications`, so put README's Release line back
+   when the pass is done. Note the file it replaced was a *single* binary, so the Mac had been
+   Release, not the Debug this file claimed.
+   **First result in, 2026-09-08: the pending card's old → new pair reads right on the Mac**
+   (a queued `setRule` on `example.com`, "Now 12:00 AM–11:59 PM · 5 min/day" over "Becomes
+   All day · 5 min/day"). That is `PendingText`/`PendingDeltaView` seen by a person; the phone
+   draws the same two views, so only its layout is still unwitnessed. Record the rest here.
    The phone checklist: the Anchor card and the paired tag survived the rename; the shield's
    copy and colours; a shield lifting by itself at a window's start; Delete App refused while
    blocked; the widget; the Live Activity; pair a tag, anchor, a wrong tag refused, weigh
@@ -688,6 +697,7 @@ name `Furlough`, macOS 26, non-sandboxed, hardened runtime with the
   person: the shield panel, the browser redirect (it needs the one-time Automation prompt),
   budget counting, the login item, and the widget itself placed on the desktop (nothing here
   can click Edit Widgets; `pluginkit -m -i com.zachshort.furlough.mac.widgets` shows it is
-  registered). Ask Zach.
+  registered). Ask Zach. Seen by a person 2026-09-08: the Pending sheet's cards, including
+  the old → new pair.
 - Build check for the Mac: the README's `xcodebuild … -scheme FurloughMac` line; keep it
   warning-free like the phone.
