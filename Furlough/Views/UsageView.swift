@@ -31,11 +31,28 @@ struct UsageView: View {
     /// its mark even if the fortnight is fetched again underneath it.
     @State private var states: [String: UsageCardState] = [:]
     @State private var busy: String?
-    /// A naming pass is in flight; see `nameApps`.
-    @State private var naming = false
-    /// How many times to ask Screen Time for the names before leaving it to a tap. Three, a
-    /// second apart, is far less than the time it takes to read the first card.
+    /// Where Path A has got to; see `Phase`.
+    @State private var phase = Phase.reading
+    /// How many times to ask Screen Time for the names before giving up on them. Three, a
+    /// second apart: long enough to ride out a query that simply did not answer, short enough
+    /// that nobody sits watching an hourglass wondering whether it is stuck.
     private static let namingAttempts = 3
+
+    /// What the page is doing where the app reads the numbers itself. Nothing is shown until
+    /// the names are in hand: an app the card cannot name is one nobody can judge and one no
+    /// rule can be written on, so a card for it would be furniture.
+    private enum Phase: Equatable {
+        /// Reading the fortnight out of Screen Time.
+        case reading
+        /// The hours are in; Screen Time has not yet said what the apps are called.
+        case naming
+        /// Cards.
+        case ready
+        /// Screen Time would not hand the hours over at all.
+        case failed(String)
+        /// The hours came and the names never did, so there is nothing worth drawing.
+        case nameless
+    }
     /// Path B: which card the tour is showing, 1…`UsageAnalysis.rankLimit`.
     @State private var position = 1
     @State private var showPicker = false
@@ -114,14 +131,24 @@ struct UsageView: View {
 
     @ViewBuilder
     private var suggestions: some View {
-        if let failure {
-            VStack(alignment: .leading, spacing: 6) {
-                Eyebrow(text: "Screen Time said no", color: Ember.ember)
-                Text(failure).emberBody(13).foregroundStyle(Ember.muted)
-            }
-            .padding(16)
-            .emberCard()
-        } else if let summary {
+        switch phase {
+        case .reading:
+            waiting("Reading the last \(UsageReader.days) days…")
+        case .naming:
+            waiting("Asking Screen Time what these apps are called…")
+        case .failed(let reason):
+            problem(
+                eyebrow: "Screen Time said no",
+                body: reason,
+                hint: "Nothing was read, so nothing has changed."
+            )
+        case .nameless:
+            problem(
+                eyebrow: "Could not read your Screen Time",
+                body: "Furlough got the hours but Screen Time would not say what the apps are called, and a card that cannot name the app is not one anybody can judge.",
+                hint: "Choose the apps you want to manage by hand instead."
+            )
+        case .ready:
             if advice.isEmpty {
                 Text("Nothing on this phone passes \(Int(UsageAnalysis.minimumDailyMinutes)) minutes a day. There is nothing here worth a rule.")
                     .emberBody(13)
@@ -129,19 +156,56 @@ struct UsageView: View {
                     .padding(16)
                     .emberCard()
             }
-            ForEach(advice) { item in
-                if let entry = summary.entry(for: item) {
-                    card(item, entry, days: summary.totalDays)
+            if let summary {
+                ForEach(advice) { item in
+                    if let entry = summary.entry(for: item) {
+                        card(item, entry, days: summary.totalDays)
+                    }
                 }
             }
-            if unnamed > 0 { namingFailure }
-        } else {
-            Text("Reading the last \(UsageReader.days) days…")
+        }
+    }
+
+    /// The hourglass, running, while Screen Time is being asked something.
+    private func waiting(_ line: String) -> some View {
+        VStack(spacing: 16) {
+            LivingHourglass(state: .open(level: 0.55, warned: false))
+                .compositingGroup()
+                .frame(width: 52, height: 70)
+                .shadow(color: Ember.amber.opacity(0.4), radius: 18)
+            Text(line)
                 .emberBody(13)
                 .foregroundStyle(Ember.muted)
-                .padding(16)
-                .emberCard()
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 30)
+        .padding(.horizontal, 16)
+        .emberCard()
+    }
+
+    /// Screen Time would not do its half. Says so plainly, then offers the way round it: the
+    /// picker, which needs nothing from Screen Time's history at all.
+    private func problem(eyebrow: String, body: String, hint: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Eyebrow(text: eyebrow, color: Ember.ember)
+            Text(body)
+                .emberBody(13)
+                .foregroundStyle(Ember.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(hint)
+                .emberBody(13)
+                .foregroundStyle(Ember.cream)
+                .fixedSize(horizontal: false, vertical: true)
+            ProminentButton(title: "Choose apps by hand") {
+                selection = model.pickerSelection
+                showPicker = true
+            }
+            GhostButton(title: "Try again", color: Ember.amber) { Task { await restart() } }
+        }
+        .padding(16)
+        .emberCard()
     }
 
     @ViewBuilder
@@ -163,26 +227,6 @@ struct UsageView: View {
                 undo: { undo(item) }
             )
         }
-    }
-
-    /// Screen Time would not say what these apps are called. Worth saying out loud rather than
-    /// leaving a card reading "This app" as though that were the app's name.
-    private var namingFailure: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(unnamed == 1
-                ? "Screen Time did not say what one of these apps is called."
-                : "Screen Time did not say what \(unnamed) of these apps are called.")
-                .emberBody(12)
-                .foregroundStyle(Ember.muted)
-                .fixedSize(horizontal: false, vertical: true)
-            Button(naming ? "Asking…" : "Ask again") { Task { await nameApps() } }
-                .emberBody(13, .semibold)
-                .foregroundStyle(Ember.amber)
-                .buttonStyle(.plain)
-                .disabled(naming)
-        }
-        .padding(16)
-        .emberCard()
     }
 
     /// The ask, for a phone allowed the old way. `requestAuthorization` shows the new prompt
@@ -308,53 +352,66 @@ struct UsageView: View {
     // MARK: Doing it
 
     private func load() async {
-        guard #available(iOS 26.4, *), hasDataAccess else { return }
-        if summary == nil {
-            do {
-                let read = try await UsageReader.summary()
-                advice = read.recommendations
-                summary = read
-                failure = nil
-                SharedStore.log("usage: \(read.entries.count) entries, \(advice.count) worth a rule")
-            } catch {
-                failure = error.localizedDescription
-                return
-            }
+        guard #available(iOS 26.4, *), hasDataAccess, summary == nil else { return }
+        phase = .reading
+        do {
+            let read = try await UsageReader.summary()
+            advice = read.recommendations
+            summary = read
+            SharedStore.log("usage: \(read.entries.count) entries, \(advice.count) worth a rule")
+        } catch {
+            phase = .failed(error.localizedDescription)
+            return
         }
         await nameApps()
     }
 
-    /// Puts Apple's names and icons back on the cards, and keeps asking while any of them is
-    /// still nameless.
+    /// Throws the fortnight away and reads it again, for the button on a failure.
+    private func restart() async {
+        summary = nil
+        advice = []
+        await load()
+    }
+
+    /// Puts Apple's names and icons on the suggestions before any of them is drawn.
     ///
     /// Data access names an app by its bundle identifier alone, so the only name that exists
     /// comes from a token, and the only way to a token is a query into Screen Time's own store
-    /// (`UsageReader.fillingTokens`). That query is not reliable: it answers, or it comes back
-    /// with nothing, or it throws, and which one is not something the app can tell in advance.
-    /// One attempt is therefore not a design — a single empty answer is what left every card
-    /// saying "This app" until the screen was left and opened again. So it is asked again, a
-    /// second apart, and only while something it should have named is still unnamed.
+    /// (`UsageReader.fillingTokens`). That query is not reliable: it answers, it comes back with
+    /// nothing, or it throws, and the app cannot tell which in advance. So it is asked again, a
+    /// second apart, until Screen Time answers — an answer holding nothing is a failed query
+    /// worth repeating, while an answer that named only some is Screen Time working, and asking
+    /// twice more would only take longer to say the same thing.
+    ///
+    /// Whatever is still nameless at the end is dropped rather than drawn: it has no name to
+    /// show and no token to write a rule on, so its card would be furniture. An app used in the
+    /// last fortnight and since deleted is exactly that, and it must not be able to wedge the
+    /// page for good.
     private func nameApps() async {
         guard #available(iOS 26.4, *) else { return }
-        naming = true
-        defer { naming = false }
+        phase = .naming
         for attempt in 1...Self.namingAttempts {
-            guard let read = summary, unnamed > 0 else { return }
+            guard let read = summary else { return }
             do {
-                let named = try await UsageReader.fillingTokens(in: read)
-                summary = named
-                SharedStore.log("usage: naming attempt \(attempt) left \(unnamed) of \(advice.count) unnamed")
-                if unnamed == 0 { return }
+                let pass = try await UsageReader.fillingTokens(in: read)
+                summary = pass.summary
+                SharedStore.log("usage: naming attempt \(attempt) \(pass.answered ? "answered" : "came back empty"), \(unnamed) of \(advice.count) unnamed")
+                if pass.answered { break }
             } catch {
                 SharedStore.log("usage: naming attempt \(attempt) failed: \(error.localizedDescription)")
             }
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, attempt < Self.namingAttempts else { break }
             try? await Task.sleep(for: .seconds(1))
         }
+        guard !Task.isCancelled else { return }
+        let named = advice.filter { summary?.entry(for: $0)?.targetKind != nil }
+        // Suggestions existed and not one of them could be named: Screen Time did not do its
+        // half, and there is nothing to show. An honestly empty fortnight is not this.
+        phase = (!advice.isEmpty && named.isEmpty) ? .nameless : .ready
+        advice = named
     }
 
-    /// Suggestions Screen Time has still not handed a token for, so the card can only call the
-    /// app "This app".
+    /// Suggestions Screen Time has still handed no token for.
     private var unnamed: Int {
         guard let summary else { return 0 }
         return advice.filter { summary.entry(for: $0)?.targetKind == nil }.count

@@ -63,6 +63,16 @@ enum UsageReader {
         )
     }
 
+    /// What one pass at naming found.
+    struct Naming: Sendable {
+        var summary: UsageSummary
+        /// Screen Time answered at all. An answer holding nothing is a failed query, not a
+        /// phone with no apps on it, and is worth asking again; an answer that named some but
+        /// not others is Screen Time working, and the rest are simply not installed under
+        /// those identifiers any more, so asking again would only take longer to say so.
+        var answered: Bool
+    }
+
     /// The fortnight with its tokens filled in.
     ///
     /// Data access hands over minutes and a bundle identifier and nothing else: no
@@ -71,12 +81,12 @@ enum UsageReader {
     /// be written on, so without this every card says "This app" over a blank tile and Apply
     /// has nothing to write on. Matching each key against what is installed puts both back.
     ///
-    /// One walk of the installed list for the whole summary, not one per entry. Entries Screen
-    /// Time counted that are not installed under that identifier any more keep their empty
-    /// token and draw as themselves.
+    /// One walk of the installed list for the whole summary, not one per entry.
     @available(iOS 26.4, *)
-    static func fillingTokens(in summary: UsageSummary) async throws -> UsageSummary {
-        guard summary.entries.contains(where: { $0.targetKind == nil }) else { return summary }
+    static func fillingTokens(in summary: UsageSummary) async throws -> Naming {
+        guard summary.entries.contains(where: { $0.targetKind == nil }) else {
+            return Naming(summary: summary, answered: true)
+        }
         let kinds = try await encodedKinds()
         let decoder = JSONDecoder()
         var filled = summary
@@ -91,7 +101,7 @@ enum UsageReader {
             }
             return found
         }
-        return filled
+        return Naming(summary: filled, answered: !kinds.isEmpty)
     }
 
     /// Everything installed and everything visited, keyed the way `UsageCollector` keys an
