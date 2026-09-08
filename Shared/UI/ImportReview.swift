@@ -81,9 +81,9 @@ struct ImportReviewList: View {
                 Text(item.name)
                     .emberDisplaySmall(13.5)
                     .foregroundStyle(Ember.cream)
-                // A row's name is the app; what part of it this line is about is the label,
-                // and a target being added needs no second word for it.
-                if item.subject != .target {
+                // A row's name is the app; what part of it this line is about is the label.
+                // A target being added and the delay are already named by the row itself.
+                if item.subject.isWorthNaming {
                     Text(item.subject.label)
                         .emberBody(11)
                         .foregroundStyle(Ember.faint)

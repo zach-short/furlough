@@ -202,6 +202,11 @@ struct ImportPlan: Equatable {
             case .delay: "Loosening delay"
             }
         }
+
+        /// Whether the label says anything the row's name has not already said. A target and
+        /// the delay each carry their own name; a rule, a tier and a nickname are one part of
+        /// a row that can have three, so those say which part they are.
+        var isWorthNaming: Bool { self == .rule || self == .tier || self == .name }
     }
 
     enum Outcome: Equatable {
