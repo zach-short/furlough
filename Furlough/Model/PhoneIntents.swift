@@ -76,7 +76,10 @@ struct FurloughShortcuts: AppShortcutsProvider {
                 "Lock my apps with \(.applicationName)"
             ],
             shortTitle: "Drop Anchor",
-            systemImageName: "cube.fill"
+            // Not a system image: SF Symbols has no anchor, and a shortcut takes a name and
+            // nothing else, so the app ships one custom symbol drawn from the same path as
+            // the mark in the app. See scripts/make-anchor-symbol.swift.
+            systemImageName: "anchor"
         )
         AppShortcut(
             intent: WeighAnchorIntent(),

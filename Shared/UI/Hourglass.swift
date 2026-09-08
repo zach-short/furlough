@@ -38,7 +38,7 @@ struct HourglassState: Equatable {
     var pulse: Pulse = .none
     /// A grain falls now and then: the window opens within ten minutes.
     var dropsGrain = false
-    var showsCube = false
+    var showsAnchor = false
 
     /// True when something moves from frame to frame.
     var isAnimated: Bool { isRunning || pulse != .none || dropsGrain }
@@ -64,9 +64,9 @@ struct HourglassState: Equatable {
     static let alwaysBlocked = HourglassState(moundLevel: 0.55, glass: .grey, sand: .grey, mound: .grey)
     /// An empty glass with a pending outline.
     static let unconfigured = HourglassState(glass: .pending)
-    /// Sand frozen mid-stream under an ember glow, with the cube at the base.
+    /// Sand frozen mid-stream under an ember glow, with the anchor at the base.
     static let anchored = HourglassState(
-        sandLevel: 0.55, moundLevel: 0.4, isFrozen: true, glow: Ember.ember, glowStrength: 0.9, showsCube: true
+        sandLevel: 0.55, moundLevel: 0.4, isFrozen: true, glow: Ember.ember, glowStrength: 0.9, showsAnchor: true
     )
 
     /// Direction C for one target right now.
@@ -301,12 +301,10 @@ struct HourglassView: View {
                 if !mini, state.glass != .ink {
                     HourglassPartShape(part: .highlight)
                         .stroke(Color.white.opacity(0.55), style: StrokeStyle(lineWidth: 2 * scale, lineCap: .round))
-                    if state.showsCube {
-                        HourglassPartShape(part: .cube)
+                    if state.showsAnchor {
+                        HourglassPartShape(part: .anchor)
                             .fill(Ember.ember)
-                        HourglassPartShape(part: .cube)
-                            .stroke(Ember.cream.opacity(0.7), style: StrokeStyle(lineWidth: 1 * scale, lineJoin: .round))
-                        HourglassPartShape(part: .cubeEdges)
+                        HourglassPartShape(part: .anchor)
                             .stroke(Ember.cream.opacity(0.7), style: StrokeStyle(lineWidth: 1 * scale, lineJoin: .round))
                     }
                 }
@@ -376,8 +374,7 @@ enum HourglassPart {
     case body
     case cap(top: Bool, height: Double)
     case highlight
-    case cube
-    case cubeEdges
+    case anchor
 
     func path() -> Path {
         var p = Path()
@@ -401,20 +398,9 @@ enum HourglassPart {
         case .highlight:
             p.move(to: CGPoint(x: 31, y: 20))
             p.addCurve(to: CGPoint(x: 45, y: 50), control1: CGPoint(x: 31, y: 34), control2: CGPoint(x: 37, y: 42))
-        case .cube:
-            p.move(to: CGPoint(x: 60, y: 138))
-            p.addLine(to: CGPoint(x: 67, y: 142))
-            p.addLine(to: CGPoint(x: 67, y: 150))
-            p.addLine(to: CGPoint(x: 60, y: 154))
-            p.addLine(to: CGPoint(x: 53, y: 150))
-            p.addLine(to: CGPoint(x: 53, y: 142))
-            p.closeSubpath()
-        case .cubeEdges:
-            p.move(to: CGPoint(x: 53, y: 142))
-            p.addLine(to: CGPoint(x: 60, y: 146))
-            p.addLine(to: CGPoint(x: 67, y: 142))
-            p.move(to: CGPoint(x: 60, y: 146))
-            p.addLine(to: CGPoint(x: 60, y: 154))
+        case .anchor:
+            // Standing on the base, half in the pile: the mark for a glass that has stopped.
+            p = AnchorMark.fit(in: CGRect(x: 50, y: 130, width: 20, height: 25))
         }
         return p
     }

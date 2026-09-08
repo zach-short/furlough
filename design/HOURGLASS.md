@@ -12,7 +12,7 @@ direction and variation live against one demo day, all seven status colours per 
 and the three header layouts as working phones. Built the same day:
 
 - `Shared/UI/Hourglass.swift`: `HourglassState` (sand level, mound level, running, frozen,
-  glass tint, sand and mound tones, glow colour and strength, pulse, grain, cube) with the
+  glass tint, sand and mound tones, glow colour and strength, pulse, grain, anchor) with the
   presets `open(level:warned:)`, `comingSoon(inMinutes:)`, `doneForToday`, `usedUp`,
   `alwaysBlocked`, `unconfigured`, `anchored`, and `HourglassState.of(target, status:,
   runtime:, now:)` mapping a `TargetStatus` to Direction C. `HourglassView(state:phase:)` is a
@@ -125,7 +125,7 @@ Both facts in one object, each at the precision the API allows.
 | Used up today (opens tomorrow) | Ember glow, dim | All sand in the bottom | Still |
 | Always blocked | Faint grey, no glow | Grey sand in the bottom, or no sand | Still |
 | Needs a schedule | Pending yellow outline | Empty glass | Still; outline pulses once on appear |
-| Anchored | Ember glow | Sand frozen mid-stream (the stream stops dead) | Still. A cube glyph at the base |
+| Anchored | Ember glow | Sand frozen mid-stream (the stream stops dead) | Still. An anchor at the base |
 | 5 minutes left | Amber | Last grains | Pulse quickens to about 1.2 s |
 
 Reduce Motion: no pulse, no stream particles, levels still change with a plain crossfade.

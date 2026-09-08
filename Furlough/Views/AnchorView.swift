@@ -326,16 +326,16 @@ struct AnchorCard: View {
     }
 }
 
-/// A cube in a tile, ember while anchored.
+/// The anchor in a tile, ember while anchored.
 struct AnchorGlyph: View {
     let isAnchored: Bool
     var size: CGFloat = 34
 
     var body: some View {
         let radius = size >= 44 ? Ember.tileRadiusLarge : Ember.tileRadius
-        Image(systemName: "cube.fill")
-            .font(.system(size: size * 0.46, weight: .semibold))
-            .foregroundStyle(isAnchored ? Ember.ember : Ember.muted)
+        AnchorShape()
+            .fill(isAnchored ? Ember.ember : Ember.muted)
+            .frame(width: size * 0.52, height: size * 0.52)
             .frame(width: size, height: size)
             .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: radius, style: .continuous))
             .overlay(
