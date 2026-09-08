@@ -904,14 +904,49 @@ The plan for this stretch. Tick each phase off here as it lands.
     ever runs on the developer's device. Two taps that inherit the rule is as good as Apple
     allows for a US install, and it behaves the same for everyone.
 
-    **Open question for whoever ships this.** The `com.apple.developer.family-controls.app-and-website-usage`
-    entitlement is in the app target (`b3562cb`) and feeds the Usage screen's in-app path. A
-    developer-forum report says that with that capability enabled the Screen Time approval
-    prompt becomes all-or-nothing — approve full data access or nothing. That was **not**
-    confirmed against Apple's documentation on 2026-09-08 and it should be, because if it is
-    true a US release pays a worse consent prompt for an API its users cannot reach. Do not rip
-    the entitlement out without checking what the Usage screen loses: it belongs to the session
-    that added it.
+    **The entitlement and the consent prompt: settled 2026-09-08, keep it.** The worry was that
+    `com.apple.developer.family-controls.app-and-website-usage` (`b3562cb`) makes the Screen
+    Time approval all-or-nothing — forum thread 820283: "as soon as we add the Family Controls
+    App and Website Usage capability, then anyone on iOS 26.4 and above can either only approve
+    full access or no access at all." True, but **it is gated on eligibility, not on the
+    entitlement**, so it does not reach a US customer.
+
+    Two pieces of evidence. Apple's `approvedWithDataAccess` page: "On devices outside the EU,
+    `authorizationStatus` never returns `approvedWithDataAccess`, and any attempt to access
+    `FamilyActivityData` properties fails." And `FamilyControlsAgent` itself
+    (`FamilyControls.framework/FamilyControlsAgent` in the iOS 26.5 simulator runtime) carries
+    these log strings, which are the branch:
+
+    > Requested authorization for record identifier: %s already approved with data access, but
+    > is **not eligible** for data access, resetting and attempting authorization for
+    > **non-data access**
+
+    > Requested authorization for record identifier: %s already approved, but **is eligible**
+    > for data access, attempting authentication for data access
+
+    > Failed to get eligibility result, **treating as not eligible**
+
+    The same binary references both the entitlement and `com.apple.os-eligibility-domain.change.radium`.
+    So the agent asks the eligibility daemon first, falls back to the ordinary non-data-access
+    authorization when the answer is no, and defaults to "not eligible" when it cannot tell —
+    the safe direction.
+
+    **What this means in practice: the all-or-nothing prompt is a developer-only symptom.**
+    Apple's docs say a dev build on an Apple-provided provisioning profile is eligible *in every
+    region*, which is exactly the configuration the forum reporter — and Zach — test in. So
+    expect the full-access prompt on Xcode installs here and the ordinary one on a US App Store
+    install. Do not "fix" it by removing the entitlement: it feeds the Usage screen's in-app
+    path and belongs to the session that added it.
+
+    Not proved by running it: nobody has installed a distribution build on a US retail device,
+    and a dev profile cannot tell the two apart by construction. If it ever matters, TestFlight
+    is the first build that would show it.
+
+    One more thing from the same page, worth knowing before shipping to the EU: "Only one app
+    at a time can hold this authorization status on a given device. If a person grants data
+    access to a different app, your app's status reverts to `approved`." So the in-app usage
+    path can be taken away by any other Screen Time app the person installs, and
+    `UsageReader.hasDataAccess` has to keep being consulted at runtime rather than once.
 
     Installed 2026-09-08, unseen by anyone: open a site's rule editor, tap Add the app on the
     nudge, pick one, and it should land with the site's hours and the nudge should go.
