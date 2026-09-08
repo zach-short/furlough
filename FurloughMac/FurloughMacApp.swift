@@ -19,15 +19,10 @@ struct FurloughMacApp: App {
         .commands {
             CommandGroup(replacing: .newItem) {}
         }
-
-        MenuBarExtra {
-            MenuBarContent()
-                .environment(model)
-        } label: {
-            MenuBarLabel()
-                .environment(model)
-        }
-        .menuBarExtraStyle(.menu)
+        // A reopen by the watchdog exists to resume enforcement, so it brings back no window.
+        // The menu bar item is the status surface for that case, and clicking the Dock icon
+        // or "Open Furlough" brings the window back. A launch by a person is unchanged.
+        .defaultLaunchBehavior(MacAppDelegate.isWatchdogLaunch ? .suppressed : .presented)
     }
 }
 
@@ -35,9 +30,47 @@ struct FurloughMacApp: App {
 /// to quit while something is blocked. Logging out, restarting and shutting down are always
 /// allowed; Force Quit always works too, and is the Mac's documented escape.
 final class MacAppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
+    /// Built in `applicationDidFinishLaunching` rather than here: the delegate is not
+    /// `@MainActor`, so a property initialiser cannot reach `MacModel.shared`.
+    private var menuBar: MenuBarController?
+    private var restoreWatcher: NSObjectProtocol?
+
+    /// The watchdog agent passes `--background`, so a reopen it caused can be told from a
+    /// person double-clicking Furlough. Nothing else passes it.
+    static var isWatchdogLaunch: Bool { CommandLine.arguments.contains(Watchdog.backgroundFlag) }
+
+    /// The `Window` scene's window, for the menu bar's way back to it. Matched on the scene id
+    /// SwiftUI stamps on it, falling back to the one titled window that is not the shield.
+    @MainActor
+    static var mainWindow: NSWindow? {
+        NSApp.windows.first { $0.identifier?.rawValue.contains("main") == true }
+            ?? NSApp.windows.first { !($0 is NSPanel) && $0.styleMask.contains(.titled) }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         UNUserNotificationCenter.current().delegate = self
         MacModel.shared.start()
+        let menuBar = MenuBarController(model: MacModel.shared)
+        menuBar.install()
+        self.menuBar = menuBar
+        if Self.isWatchdogLaunch { putTheWindowAway() }
+    }
+
+    /// `.defaultLaunchBehavior(.suppressed)` keeps SwiftUI from opening the window, but AppKit
+    /// still restores the one it saved when Furlough was last force-quit — which is exactly the
+    /// case the watchdog exists for — so it has to be put away again after restoration. Asked
+    /// twice on purpose: once now for the window restoration may already have built, and once
+    /// when AppKit says it has finished, since the two orders are not guaranteed.
+    @MainActor
+    private func putTheWindowAway() {
+        Self.mainWindow?.orderOut(nil)
+        restoreWatcher = NotificationCenter.default.addObserver(
+            forName: NSApplication.didFinishRestoringWindowsNotification, object: nil, queue: .main
+        ) { _ in
+            // Captures nothing: the delegate is not Sendable, and the notification fires once
+            // per launch anyway, so there is nothing to tear down.
+            MainActor.assumeIsolated { Self.mainWindow?.orderOut(nil) }
+        }
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {

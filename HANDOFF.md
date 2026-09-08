@@ -468,13 +468,39 @@ The plan for this stretch. Tick each phase off here as it lands.
    be settled: whether the item is created and invisible or never created at all — that needs
    the accessibility API, and `osascript` here has no assistive access. **README claims the
    Mac's answer to the Live Activity is "a menu bar item with the countdown", so that line is
-   false until this is decided.** The fix, if Zach wants one, is a hand-rolled `NSStatusItem`
-   in `MacAppDelegate`, which is in keeping — the shield is already an `NSPanel` and the
-   watchdog already `SMAppService`. Ask before writing it.
-   **The watchdog does not steal focus** (`open -g` works) **but it does restore a window.**
-   For a reopen whose only job is to resume enforcement, a window is more than is wanted; it
-   would matter less if the menu bar item existed, which is the other half of the same
-   decision.
+   false until this is decided.** **Both decided and done, 2026-09-08.**
+   Zach chose the hand-rolled `NSStatusItem`, and `MenuBar.swift` is now AppKit: a
+   `MenuBarController` owning the item, an `NSMenu` rebuilt on `menuNeedsUpdate` so the
+   statuses are current, the hourglass and a monospaced-digit countdown off the same
+   `Policy.summary` the widget reads, and `MacAppDelegate` building it in
+   `applicationDidFinishLaunching` rather than a property initialiser — the delegate is not
+   `@MainActor`, so it cannot reach `MacModel.shared` there.
+   **And it still does not show, because nothing does on this Mac.** The rewrite was tested on
+   the machine: a raw `NSStatusItem` from a twenty-line AppKit app, bundled and signed, does not
+   appear either, with a title or icon-only. So it is not `MenuBarExtra`, not SwiftUI, not our
+   label, and not width — this Mac draws no third-party menu bar item at all as of 2026-09-08.
+   The item reports `isVisible=true` and gets a button, which is why the log now carries one
+   line at install: it is the only way to tell "Furlough never added it" from "macOS did not
+   draw it". The likely remedy is restarting the menu bar host or a logout; Zach has not tried
+   it. **Keep the AppKit version regardless**: it is the correct API, it is verified to run, and
+   it is what will work the moment the Mac does.
+   **The watchdog reopen brings back no window**, done the same day and verified on the machine.
+   The agent passes `--args --background` (`Watchdog.backgroundFlag`), the scene takes
+   `.defaultLaunchBehavior(.suppressed)` on such a launch, and — the part that is not obvious —
+   the delegate *also* puts the window away on `didFinishRestoringWindows`, because suppressing
+   the scene does not stop AppKit restoring the window it saved when Furlough was last force
+   quit, which is exactly the case the watchdog exists for. Verified both ways: `open -g -b …
+   --args --background` leaves the main window `onscreen=false` with enforcement ticking, and a
+   plain `open` still shows it.
+   **The trap worth knowing**: `SMAppService` hands launchd a copy of the agent's job at
+   registration and does not re-read the plist when the app is replaced, so changing the plist
+   in a new build changes nothing until the agent is registered again. `Watchdog.plistVersion`
+   exists for that — bump it on any plist change and `enableIfNeeded` unregisters and
+   re-registers. Seen working: the log shows "watchdog off" then "watchdog on" on the first
+   launch of the new build.
+   **Still owed**: README's Mac table still says the Live Activity's counterpart is "a menu bar
+   item with the countdown". True of the code, false of this Mac, so it needs a sentence — left
+   undone here only because `README.md` was being edited in the other session.
    Record the rest here.
    The phone checklist: the Anchor card and the paired tag survived the rename; the shield's
    copy and colours; a shield lifting by itself at a window's start; Delete App refused while

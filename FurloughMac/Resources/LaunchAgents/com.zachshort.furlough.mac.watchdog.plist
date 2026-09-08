@@ -6,13 +6,18 @@
 	<key>Label</key>
 	<string>com.zachshort.furlough.mac.watchdog</string>
 	<!-- `open` hands off to a running copy instead of starting a second enforcer; -g leaves it
-	     in the background so a reopen never steals focus. -->
+	     in the background so a reopen never steals focus. `--background` reaches the app as a
+	     launch argument (Watchdog.backgroundFlag) and tells it this reopen is the agent's, not
+	     a person's, so it comes back with no window. Bump Watchdog.plistVersion on any change
+	     here, or an agent registered by an older build keeps running the old command. -->
 	<key>ProgramArguments</key>
 	<array>
 		<string>/usr/bin/open</string>
 		<string>-g</string>
 		<string>-b</string>
 		<string>com.zachshort.furlough.mac</string>
+		<string>--args</string>
+		<string>--background</string>
 	</array>
 	<key>RunAtLoad</key>
 	<true/>
