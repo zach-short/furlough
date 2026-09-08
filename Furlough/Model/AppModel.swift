@@ -350,4 +350,19 @@ final class AppModel {
         enforce(reason: "delay edit")
         return result
     }
+
+    #if DEBUG
+    // MARK: Testing
+
+    /// Wipes every target, rule, pending change, the Brick and its tag, lifts every shield, and
+    /// enforces the empty state so the app matches a fresh install. Compiled into Debug builds
+    /// only: a Release build keeps its promise of no unblock button.
+    func resetEverything() {
+        SharedStore.reset()
+        ShieldReconciler.clearEverything()
+        SharedStore.log("reset everything (Debug build)")
+        lastError = nil
+        enforce(reason: "reset")
+    }
+    #endif
 }

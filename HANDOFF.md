@@ -57,8 +57,14 @@ small codebase he fully understands over a fork. He is interactive: ask when a d
   across days back into one window, so edits in the sheet land in the editor's draft
   through one binding and the Same every day toggle follows. Categories are always-blocked containers; apps inside them that have their own
   windows are excepted.
-- Rule-based targets have no unblock action, and must never get one, not even for testing.
-  The single exception is the Brick profile (`Config.brick`, decided 2026-09-07): a separate
+- Rule-based targets have no unblock action in a Release build, and must never get one.
+  Debug builds carry **Settings > Testing > Reset everything** (`AppModel.resetEverything`,
+  behind `#if DEBUG`; Zach asked for it on 2026-09-07 after a week-long delay and a
+  five-minute FaceTime budget locked him out mid-test): after a confirmation it removes the
+  stored state, clears the managed settings, and enforces the empty state, so the app matches
+  a fresh install with Screen Time access still granted. Keep it behind `#if DEBUG`; the
+  commands in this file build Debug, so it is present on the phone until Zach switches to
+  `-configuration Release`. The one exception in every build is the Brick profile (`Config.brick`, decided 2026-09-07): a separate
   set of kinds that "Brick" shields instantly without a tag, and that only scanning the paired
   NFC tag in the app can unbrick. While bricked, the list and the tag are locked. Bricking is
   refused until a tag is paired. When the brick is off, apps fall back to their rules.
@@ -134,7 +140,8 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   `daysAhead`, `decide` adds brick-only kinds to the shields, `applyDuePending`, `classify`
   tightening/loosening, `windowFraction`, `summary` with `isBricked`/`brickedCount` and
   `openStart`/`openWarned`/`nextOpenIsExhausted` for the widget's glass, `nextTransition`),
-  `SharedStore.swift` (App Group UserDefaults JSON plus a capped activity log),
+  `SharedStore.swift` (App Group UserDefaults JSON plus a capped activity log; `reset()`
+  drops the state and keeps the log),
   `ShieldReconciler.swift` (idempotent shield apply and `denyAppRemoval`),
   `ActivityNaming.swift`, `TimeFormat.swift` (`days`, `schedule`, `chip`, `nextOpen` with
   weekday names, + `ShieldText`).

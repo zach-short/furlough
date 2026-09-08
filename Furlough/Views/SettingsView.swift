@@ -5,6 +5,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var delayHours = Furlough.defaultLoosenDelayHours
     @State private var result: ProposalResult?
+    @State private var confirmReset = false
 
     var body: some View {
         NavigationStack {
@@ -85,6 +86,16 @@ struct SettingsView: View {
                         .emberBody(12)
                         .foregroundStyle(Ember.muted)
                         .padding(.horizontal, 8)
+
+                    #if DEBUG
+                    SectionLabel(text: "Testing")
+                    VStack(spacing: 0) {
+                        action("Reset everything") { confirmReset = true }
+                    }
+                    .emberCard()
+                    Footnote(text: "Debug builds only. Forgets every app, rule, pending change and the Brick, and lifts all shields.")
+                        .padding(.top, 8)
+                    #endif
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 48)
@@ -108,6 +119,16 @@ struct SettingsView: View {
             } message: { result in
                 Text(result.message)
             }
+            #if DEBUG
+            .confirmationDialog("Reset everything?", isPresented: $confirmReset, titleVisibility: .visible) {
+                Button("Reset everything", role: .destructive) {
+                    model.resetEverything()
+                    dismiss()
+                }
+            } message: {
+                Text("Every app, rule, pending change and the Brick are forgotten and all shields lift. Screen Time access is kept.")
+            }
+            #endif
         }
         .presentationBackground(Ember.ground)
     }

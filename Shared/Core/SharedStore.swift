@@ -32,6 +32,9 @@ enum SharedStore {
         }
     }
 
+    /// Forgets every target, rule, pending change, and the Brick. The activity log is kept.
+    static func reset() { defaults.removeObject(forKey: stateKey) }
+
     @discardableResult
     static func mutate(_ body: (inout SharedState) -> Void) -> SharedState {
         var state = load()

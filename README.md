@@ -112,6 +112,10 @@ Limits to know about:
 2. Check **Settings > Activity log** to see what the monitor extension has been doing.
 3. If that does not help: **Settings > Screen Time > Apps with Screen Time Access**, turn Furlough off, then reopen Furlough and allow access again. Your rules are kept; only the shields are reset.
 
+## Testing builds
+
+Debug builds, which is what Xcode and the commands above produce, add **Settings > Testing > Reset everything**. After a confirmation it forgets every app, rule, pending change and the Brick with its tag, lifts every shield, and leaves the app as it was right after allowing Screen Time access. Use it to start over after trying a week-long delay or a five-minute budget. It is compiled out of Release builds (`-configuration Release`), so a build you mean to live with keeps its promise of no unblock button.
+
 ## Known limits of the Screen Time API
 
 - Windows must be at least 15 minutes and cannot cross midnight (split them in two).
