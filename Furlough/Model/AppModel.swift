@@ -105,15 +105,21 @@ final class AppModel {
         state = SharedStore.load()
     }
 
+    /// Furlough's own time and how far the device's clock is from it. Every view that shows a
+    /// countdown reads it through here, so a device clock moved forward changes nothing but the
+    /// banner on the Pending screen.
+    var clock: Clock.Reading { state.clock() }
+
     /// Re-derives everything from persisted state: folds in due pending changes, re-registers
     /// DeviceActivity schedules, and re-applies shields. Safe to call at any time.
     func enforce(reason: String) {
         var current = SharedStore.load()
-        let trust = current.clockTrust()
-        if case .movedForward(let drift) = trust {
-            SharedStore.log("clock is \(Clock.describe(drift)) ahead: loosening changes are held")
+        let clock = current.clock()
+        if !clock.isTrusted {
+            let direction = clock.drift > 0 ? "ahead" : "behind"
+            SharedStore.log("device clock is \(Clock.describe(clock.drift)) \(direction); running on Furlough's own time")
         }
-        if Policy.applyDuePending(&current, now: .now, trust: trust) {
+        if Policy.applyDuePending(&current, now: clock.now) {
             SharedStore.log("applied due pending changes (\(reason))")
         }
         do {
@@ -127,6 +133,9 @@ final class AppModel {
         }
         SharedStore.save(current)
         ShieldReconciler.reconcile(reason: reason)
+        // The warning before a loosening lands is the last chance to cancel it, so it is
+        // rescheduled from the saved state on every enforce rather than only when queued.
+        PendingNotifications.sync(state: current, now: clock.now, drift: clock.drift)
         WidgetCenter.shared.reloadAllTimelines()
         reload()
         LiveActivityManager.sync(state: state)
@@ -186,7 +195,7 @@ final class AppModel {
         selected.formUnion(selection.webDomainTokens.map(TargetKind.webDomain))
         selected.formUnion(selection.categoryTokens.map(TargetKind.category))
 
-        let effectiveAt = Date.now.addingTimeInterval(current.config.loosenDelay)
+        let effectiveAt = current.now.addingTimeInterval(current.config.loosenDelay)
         for target in current.config.targets where !selected.contains(target.kind) {
             if target.rule == nil {
                 current.config.targets.removeAll { $0.id == target.id }
@@ -287,7 +296,7 @@ final class AppModel {
             state.config.targets[index].rule = rule
             return .appliedNow
         }
-        let effectiveAt = Date.now.addingTimeInterval(state.config.loosenDelay)
+        let effectiveAt = state.now.addingTimeInterval(state.config.loosenDelay)
         state.pending.append(PendingChange(kind: .setRule(targetID: id, rule: rule), effectiveAt: effectiveAt))
         return .scheduled(effectiveAt)
     }
@@ -301,7 +310,7 @@ final class AppModel {
             current.pending.removeAll { $0.targetID == id }
             result = .appliedNow
         } else if !current.pending.contains(where: { $0.kind == .removeTarget(targetID: id) }) {
-            let effectiveAt = Date.now.addingTimeInterval(current.config.loosenDelay)
+            let effectiveAt = current.now.addingTimeInterval(current.config.loosenDelay)
             current.pending.append(PendingChange(kind: .removeTarget(targetID: id), effectiveAt: effectiveAt))
             result = .scheduled(effectiveAt)
         }
@@ -351,7 +360,7 @@ final class AppModel {
             return current.config.anchor.isAnchored ? .anchored : .failed("Choose apps and pair a tag first.")
         }
         current.config.anchor.isAnchored = true
-        current.config.anchor.anchoredAt = .now
+        current.config.anchor.anchoredAt = current.now
         SharedStore.save(current)
         SharedStore.log("anchored \(current.config.anchor.count) item(s)")
         enforce(reason: "anchor")
@@ -359,7 +368,7 @@ final class AppModel {
     }
 
     /// The only unblock in Furlough: scans the paired tag and, if it matches, lifts the anchor.
-    func weighAnchorWithTag() async -> AnchorOutcome {
+    func unanchorWithTag() async -> AnchorOutcome {
         let scanned: Data
         do {
             scanned = try await scanner.scan(prompt: "Hold your iPhone to the Furlough tag to weigh anchor.")
@@ -382,7 +391,7 @@ final class AppModel {
 
     /// Pairs (or replaces) the tag. Refused while anchored, or any tag could become the key.
     func pairTag() async -> AnchorOutcome {
-        guard !state.config.anchor.isAnchored else { return .failed("Weigh anchor first.") }
+        guard !state.config.anchor.isAnchored else { return .failed("Unanchor first.") }
         let scanned: Data
         do {
             scanned = try await scanner.scan(prompt: "Hold your iPhone to the tag you want to pair.")
@@ -390,7 +399,7 @@ final class AppModel {
             return outcome(for: error)
         }
         var current = SharedStore.load()
-        guard !current.config.anchor.isAnchored else { return .failed("Weigh anchor first.") }
+        guard !current.config.anchor.isAnchored else { return .failed("Unanchor first.") }
         current.config.anchor.tagID = scanned
         SharedStore.save(current)
         SharedStore.log("paired an anchor tag")
@@ -428,7 +437,7 @@ final class AppModel {
             current.config.loosenDelayHours = clamped
             result = .appliedNow
         } else {
-            let effectiveAt = Date.now.addingTimeInterval(current.config.loosenDelay)
+            let effectiveAt = current.now.addingTimeInterval(current.config.loosenDelay)
             current.pending.append(PendingChange(kind: .setDelay(hours: clamped), effectiveAt: effectiveAt))
             result = .scheduled(effectiveAt)
         }

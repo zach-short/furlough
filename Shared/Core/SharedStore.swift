@@ -44,8 +44,8 @@ enum SharedStore {
         }
     }
 
-    /// Every save records both clocks, which is what lets a wall clock moved forward be seen.
-    /// The mark only advances while the clock is trusted; see `Clock`.
+    /// Every save records both clocks, which is what lets Furlough keep its own time. The mark
+    /// only advances while the device's clock agrees with it; see `Clock`.
     @discardableResult
     static func save(_ state: SharedState) -> SharedState {
         var state = state

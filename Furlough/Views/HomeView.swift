@@ -17,7 +17,7 @@ struct HomeView: View {
         NavigationStack {
             TimelineView(.everyMinute) { context in
                 ScrollView {
-                    HomeContent(now: context.date)
+                    HomeContent(now: model.clock.honest(context.date))
                         .padding(.horizontal, 16)
                         .padding(.bottom, 48)
                 }
@@ -284,6 +284,7 @@ struct HeroPager: View {
 /// One page: the living hourglass, eyebrow, name, the big line and a sub line for one
 /// target's status. Ticks once a second so the sand and the countdown share a clock.
 struct HeroPage: View {
+    @Environment(AppModel.self) private var model
     let target: Target
     let status: TargetStatus
     let runtime: RuntimeState
@@ -304,7 +305,7 @@ struct HeroPage: View {
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
-            let now = context.date
+            let now = model.clock.honest(context.date)
             let glass = HourglassState.of(target, status: status, runtime: runtime, now: now)
             let line = line(now: now)
             HStack(alignment: .center, spacing: 14) {
@@ -404,7 +405,7 @@ struct HeroPage: View {
                 eyebrow: since.map { "Anchored · since \($0.formatted(date: .omitted, time: .shortened))" } ?? "Anchored",
                 color: Ember.ember,
                 big: since.map { .countUp(from: $0) } ?? .quiet("locked"),
-                sub: "Weigh anchor with your tag · \(RowCopy.detail(target: target, status: status, now: now))"
+                sub: "Unanchor with your tag · \(RowCopy.detail(target: target, status: status, now: now))"
             )
         case .blockedAllDay:
             return Line(

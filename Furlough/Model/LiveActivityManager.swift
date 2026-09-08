@@ -9,9 +9,13 @@ extension Activity: @retroactive @unchecked Sendable {}
 /// iOS only lets the foreground app start one. ActivityKit objects are not Sendable, so all
 /// of the work happens off the main actor with only value data passed in.
 enum LiveActivityManager {
+    /// The system draws the activity's timer against its own clock, so the summary is computed
+    /// on Furlough's time and then moved onto the device's before ActivityKit sees it.
     @MainActor
-    static func sync(state: SharedState, now: Date = .now) {
-        let summary = Policy.summary(state: state, now: now)
+    static func sync(state: SharedState) {
+        let clock = state.clock()
+        let summary = Policy.summary(state: state, now: clock.now).shifted(by: clock.drift)
+        let now = clock.device(clock.now)
         Task.detached {
             await apply(summary: summary, now: now)
         }

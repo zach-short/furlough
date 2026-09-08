@@ -23,12 +23,16 @@ struct StatusProvider: TimelineProvider {
     /// Entries are free; only reloads count against the widget budget.
     func getTimeline(in context: Context, completion: @escaping (Timeline<StatusEntry>) -> Void) {
         let state = SharedStore.load()
+        let clock = state.clock()
         var entries: [StatusEntry] = []
-        var cursor = Date.now
+        // The cursor runs on Furlough's own time, because that is what decides the timeline;
+        // each entry is then dated on the device's clock, because that is what WidgetKit
+        // compares against, and its summary moved with it so the countdowns read right.
+        var cursor = clock.now
         let horizon = cursor.addingTimeInterval(36 * 3600)
         while entries.count < 200, cursor < horizon {
             let summary = Policy.summary(state: state, now: cursor)
-            entries.append(StatusEntry(date: cursor, summary: summary))
+            entries.append(StatusEntry(date: clock.device(cursor), summary: summary.shifted(by: clock.drift)))
             let config = Policy.effectiveConfig(state, now: cursor)
             let next = Policy.nextTransition(config: config, after: cursor)
             guard next > cursor else { break }

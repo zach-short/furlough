@@ -270,8 +270,9 @@ struct PendingSheet: View {
         SheetFrame(title: "Pending", width: 520, height: 520) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
-                    if !model.state.clockTrust().isTrusted {
-                        ClockBanner()
+                    let clock = model.state.clock()
+                    if !clock.isTrusted {
+                        ClockBanner(drift: clock.drift)
                     }
                     if pending.isEmpty {
                         VStack(spacing: 8) {
@@ -442,6 +443,22 @@ struct SettingsSheet: View {
                         Text("Open at login").emberBody(13).foregroundStyle(Ember.cream)
                         Spacer()
                         Toggle("Open at login", isOn: Binding(get: { model.launchesAtLogin }, set: { model.setLaunchAtLogin($0) }))
+                            .labelsHidden()
+                            .toggleStyle(.switch)
+                            .tint(Ember.ember)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    CardDivider()
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Reopen after a Force Quit").emberBody(13).foregroundStyle(Ember.cream)
+                            Text("Force Quit still lifts every block. This brings Furlough back within a minute.")
+                                .emberBody(11.5)
+                                .foregroundStyle(Ember.muted)
+                        }
+                        Spacer()
+                        Toggle("Reopen after a Force Quit", isOn: Binding(get: { model.watchdogIsOn }, set: { model.setWatchdog($0) }))
                             .labelsHidden()
                             .toggleStyle(.switch)
                             .tint(Ember.ember)

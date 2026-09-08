@@ -13,7 +13,7 @@ Built on Apple's Screen Time API (FamilyControls, ManagedSettings, DeviceActivit
 | Piece | What it does |
 |---|---|
 | `Furlough` (app) | Screen Time authorization, the app picker, per-app rules, the pending-change queue. On every launch it re-registers DeviceActivity schedules and re-applies shields from persisted state, so nothing can drift. |
-| `FurloughMonitor` | A DeviceActivity monitor extension. iOS wakes it at window edges, at midnight, and when an app's daily usage reaches its budget. Each callback re-derives the shields from shared state. It also posts the "5 minutes left" and "Time's up" notifications. |
+| `FurloughMonitor` | A DeviceActivity monitor extension. iOS wakes it at window edges, at midnight, and when an app's daily usage reaches its budget. Each callback re-derives the shields from shared state. It also posts the "Window opened", "Window closing", "5 minutes left" and "Time's up" notifications. |
 | `FurloughShield` | Draws the block screen: why the app is blocked and when it opens next. |
 | `FurloughWidgets` | Home-screen widget and the Live Activity shown while a window is open. |
 | `Shared/Core` | Models, the pure rules engine (`Policy`), App Group persistence, and the shield reconciler. Compiled into every target. |
@@ -21,6 +21,10 @@ Built on Apple's Screen Time API (FamilyControls, ManagedSettings, DeviceActivit
 The home screen pages through every managed app. Each page has a living hourglass: the top bulb is the app's current window and drains with the countdown, and the mound turns amber at the "5 minutes left" warning and ember once the budget is spent. The glass is coloured by status everywhere it appears: in the rows, the widget, the Live Activity and the Dynamic Island.
 
 Rules for each app live in an App Group so all four processes read the same state. Apple never tells the app which apps you picked; the tokens are opaque. SwiftUI can still render each app's real icon and name, and you can give each one a nickname that shows on the shield, the widget, and notifications.
+
+Furlough notifies you when a window opens, five minutes before it closes, five minutes before a
+budget runs out, and when it is spent. A queued loosening gets two more: one an hour before it
+lands, while there is still time to cancel it, and one when it lands.
 
 ### The commitment device
 
@@ -41,7 +45,7 @@ Rules for each app live in an App Group so all four processes read the same stat
 
 - The Anchor holds its own list of apps, sites, and categories, chosen with the same picker. An app can be in the Anchor and have windows too.
 - Tap **Anchor** in the app and everything in the list is shielded immediately, no tag needed. Anchoring is tightening.
-- **Weigh anchor** opens the NFC reader; only the tag you paired lifts the anchor, instantly. This is the one unblock in Furlough, and it exists only for the Anchor. Rule-based targets never get one.
+- **Unanchor** opens the NFC reader; only the tag you paired releases the anchor, instantly. This is the one unblock in Furlough, and it exists only for the Anchor. Rule-based targets never get one.
 - While anchored, the list and the paired tag cannot be changed, so nothing can loosen under the lock. Anchoring is refused until a tag is paired, so there is always a way back.
 - **Forget tag** on the Anchor screen unpairs the tag after a confirmation. It is only offered while the anchor is off; forgetting the tag while anchored would leave no way back, so the button is hidden and the model refuses it. Anchoring stays refused until a new tag is paired.
 - When the anchor is off, each app falls back to its windows and budget, or to nothing if it has no rule. Anchoring an app that is already outside its window changes nothing visible.
@@ -57,19 +61,19 @@ Apple's Screen Time API does not exist on the Mac: FamilyControls, ManagedSettin
 |---|---|
 | An app is an opaque Screen Time token | An app is its bundle identifier, picked from the apps on the Mac |
 | A website is a token | A website is a host, typed in (`youtube.com` also covers `m.youtube.com`) |
-| iOS shields a blocked app | Furlough quits it the moment it launches or the window closes (force-quits if it lingers), and shows a floating card saying when it opens next |
-| iOS shields a blocked site | Furlough reads the front tab's address in Safari and the Chromium browsers (Chrome, Arc, Brave, Edge, Vivaldi, Opera, Dia) through Apple Events and sends the tab to its shield page |
+| iOS shields a blocked app | Furlough asks it to quit the moment it launches or the window closes, and shows a floating card saying when it opens next. An app that has been open a while gets 45 seconds to answer a "Save changes?" dialog, counted down on the card, before it is force-quit; one that has only just launched has nothing to save and goes at once, so relaunching does not buy more time |
+| iOS shields a blocked site | Furlough reads every window's front tab in Safari and the Chromium browsers (Chrome, Arc, Brave, Edge, Vivaldi, Opera, Dia) through Apple Events and sends each one showing a blocked site to its shield page — every running browser, not just the one in front |
 | iOS counts usage toward the budget | Furlough counts seconds while the app or site is in front and the Mac is not idle; "5 minutes left" and "Time's up" arrive as notifications |
 | The home-screen widget | A desktop widget with the same card: **Edit Widgets** on the desktop or in Notification Center, then add Furlough |
 | The Live Activity and Dynamic Island | A menu bar item with the countdown. ActivityKit does not exist on the Mac |
 | The Anchor | Nothing: a Mac has no NFC reader |
-| Escape: Settings > Screen Time > turn Furlough off | Escape: Force Quit. Quit is refused while anything is blocked; logging out and shutting down are always allowed. Furlough opens at login |
+| Escape: Settings > Screen Time > turn Furlough off | Escape: Force Quit. Quit is refused while anything is blocked; logging out and shutting down are always allowed. Force Quit lifts every block at once, but a launchd agent reopens Furlough within a minute, so it does not buy the rest of the day. Furlough opens at login |
 
 Windows per weekday, budgets, the pending list and the loosening delay are the same code as the phone, and so are **Visualize windows**, **Use windows from another app** and **Apply these windows to other apps**. The selected app's page opens with the phone's hero: the living hourglass, the countdown, and how much of today's budget is used, which the Mac knows because it counts the minutes itself. The sidebar groups apps the way the phone's home screen does. Rules are per device; nothing syncs.
 
 The Mac keeps its rules in an App Group container shared with the widget (`X9V4L6HR2R.com.zachshort.furlough`, under `~/Library/Group Containers`). The first launch of a build that has the widget moves the older store there; nothing is lost.
 
-macOS asks once per browser whether Furlough may control it, the first time that browser is in front while a website has a rule. Refusing means that browser is not enforced; Settings > Browsers shows the status, and System Settings > Privacy & Security > Automation is where to change it. Firefox is not scriptable this way and is not enforced.
+macOS asks once per browser whether Furlough may control it, the first time Furlough reads that browser while a website has a rule. Refusing means that browser is not enforced; Settings > Browsers shows the status, and System Settings > Privacy & Security > Automation is where to change it. Firefox is not scriptable this way and is not enforced.
 
 Build and install from the command line:
 
@@ -100,7 +104,7 @@ open Furlough.xcodeproj
 2. Signing is automatic under team `X9V4L6HR2R`. Xcode registers the four bundle IDs and enables Family Controls (development), App Groups, and NFC Tag Reading on first build.
 3. Press Run. On the phone, tap **Allow Screen Time access**, then **Allow** on the iOS prompt.
 4. Tap **+** to pick apps and websites. Open each one and set its budget, and windows if you want them; with no windows it is open all day, up to the budget. Turn off **Same every day** to give each window its own days. Save.
-5. For the Anchor, open the Anchor card, choose apps, and pair a tag by holding the phone to it. Then **Anchor** locks and **Weigh anchor** asks for the tag.
+5. For the Anchor, open the Anchor card, choose apps, and pair a tag by holding the phone to it. Then **Anchor** locks and **Unanchor** asks for the tag.
 
 Or from the command line, with the phone connected:
 
@@ -164,4 +168,4 @@ xcodebuild test -project Furlough.xcodeproj -scheme FurloughCoreTests -destinati
 - Windows must be at least 15 minutes and cannot cross midnight (split them in two).
 - At most 19 distinct windows across all apps (iOS allows 20 monitored activities, and one is the daily budget tracker).
 - The monitor extension can fire a few minutes late, and threshold callbacks occasionally fire twice. Every callback is idempotent, so this is harmless.
-- Distributing outside Xcode (TestFlight, App Store) needs the Family Controls distribution entitlement, requested per bundle ID, which can take weeks.
+- Distributing outside Xcode (TestFlight, App Store) needs the Family Controls distribution entitlement, requested per bundle ID, which can take weeks. `DEPLOYMENT.md` has the request, and everything else the App Store wants.

@@ -183,7 +183,7 @@ enum ShieldText {
         let budget = rule.map { TimeFormat.budget($0.dailyBudgetMinutes) } ?? ""
         switch status {
         case .anchored:
-            return ("\(name) is anchored", "Weigh anchor with your tag in Furlough.")
+            return ("\(name) is anchored", "Unanchor with your tag in Furlough.")
         case .unconfigured:
             return ("Not enforced yet", "Open Furlough and set a schedule for \(name).")
         case .blockedAllDay:

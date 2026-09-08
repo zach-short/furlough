@@ -7,17 +7,19 @@ struct ClockMark: Codable, Equatable {
     var uptime: TimeInterval
 }
 
-/// Furlough's whole loosening rule is "wait", so the clock is part of the lock. Turning off
-/// "Set Automatically" and moving the date forward a day would otherwise land every queued
-/// loosening at once, on both platforms. Every save records the two clocks together; a later
-/// reading whose wall time has run further ahead than the machine has been up says the wall
-/// clock was moved, and the queue freezes until it is put back.
+/// Furlough keeps its own time, because its whole loosening rule is "wait" and the device's
+/// clock is a setting. Every save records the two clocks together. Later, the mark plus the
+/// seconds the machine has counted since says what the time really is; while the device agrees
+/// with that, Furlough uses the device's clock, and when it does not, Furlough uses its own.
+/// So turning off "Set Automatically" and moving the date forward a day changes nothing at all:
+/// no window opens early, no budget resets, no queued loosening lands.
 ///
-/// The hole that is left: a reboot resets the machine's count, so a reboot followed by a clock
-/// change looks like an ordinary first reading. That is documented in README on purpose.
+/// The hole that is left: a reboot starts the machine's count again from zero, so a reboot
+/// followed by a clock change looks like an ordinary first reading. It is documented in README,
+/// and it doubles as the way out for a device whose clock was genuinely wrong.
 enum Clock {
     /// Small corrections — an NTP step, a manual nudge of a few minutes — are not worth
-    /// freezing the queue for.
+    /// leaving the device's clock over.
     static let tolerance: TimeInterval = 10 * 60
 
     /// Seconds since boot, counting the time the machine spent asleep. `ProcessInfo`'s
@@ -30,52 +32,73 @@ enum Clock {
 
     static var mark: ClockMark { ClockMark(wall: .now, uptime: uptime) }
 
-    enum Trust: Equatable {
-        case trusted
-        /// The wall clock has run this far ahead of the machine's own count.
-        case movedForward(by: TimeInterval)
+    /// What Furlough believes the time is, and how far the device's clock is from it.
+    struct Reading: Equatable {
+        /// The time to judge everything against: windows, days, budgets, pending changes.
+        var now: Date
+        /// How far the device's clock is ahead (positive) or behind (negative). Zero while the
+        /// two agree, which is every day of normal use.
+        var drift: TimeInterval
 
-        var isTrusted: Bool { self == .trusted }
+        var isTrusted: Bool { drift == 0 }
+
+        /// A Furlough time on the device's clock. Anything the system renders for itself — a
+        /// Live Activity's timer, a widget timeline entry — has to be given one of these.
+        func device(_ date: Date) -> Date { drift == 0 ? date : date.addingTimeInterval(drift) }
+
+        /// The Furlough time behind a device time.
+        func honest(_ date: Date) -> Date { drift == 0 ? date : date.addingTimeInterval(-drift) }
     }
 
-    /// Trusted when there is no mark to compare against (the first reading), after a reboot
-    /// (uptime went backwards, so the two are no longer comparable), and whenever the wall
-    /// clock has advanced no further than uptime has, give or take the tolerance. A clock moved
-    /// *backwards* is trusted too: it only delays pending changes, which is what holding them
-    /// would do anyway.
-    static func isTrusted(
-        now: Date,
-        uptime: TimeInterval,
+    /// The device's clock is taken at its word when there is no mark to check it against (the
+    /// first reading), after a reboot (the machine's count started again, so the two are no
+    /// longer comparable), and while it agrees with the mark's projection to within the
+    /// tolerance. Otherwise Furlough runs on the projection, in either direction: a clock moved
+    /// back would hold everything up just as surely as one moved forward lets it go.
+    static func read(
+        wall: Date = .now,
+        uptime: TimeInterval = Clock.uptime,
         mark: ClockMark?,
         tolerance: TimeInterval = Clock.tolerance
-    ) -> Trust {
-        guard let mark, uptime >= mark.uptime else { return .trusted }
-        let drift = now.timeIntervalSince(mark.wall) - (uptime - mark.uptime)
-        return drift > tolerance ? .movedForward(by: drift) : .trusted
+    ) -> Reading {
+        guard let mark, uptime >= mark.uptime else { return Reading(now: wall, drift: 0) }
+        let projected = mark.wall.addingTimeInterval(uptime - mark.uptime)
+        let drift = wall.timeIntervalSince(projected)
+        return abs(drift) <= tolerance ? Reading(now: wall, drift: 0) : Reading(now: projected, drift: drift)
     }
 
-    /// The mark to store with this reading. A trusted reading replaces the mark; while the wall
-    /// clock is ahead, the old mark is kept, so only putting the clock back restores trust.
+    /// The mark to store with this reading. A reading Furlough trusts replaces the mark; while
+    /// the device's clock is off, the old mark is kept, because it is the only thing left that
+    /// knows what the time really is.
     static func stamp(
         _ mark: ClockMark?,
-        now: Date = .now,
+        wall: Date = .now,
         uptime: TimeInterval = Clock.uptime
     ) -> ClockMark {
-        let fresh = ClockMark(wall: now, uptime: uptime)
-        guard let mark else { return fresh }
-        return isTrusted(now: now, uptime: uptime, mark: mark).isTrusted ? fresh : mark
+        let fresh = ClockMark(wall: wall, uptime: uptime)
+        guard mark != nil else { return fresh }
+        return read(wall: wall, uptime: uptime, mark: mark).isTrusted ? fresh : mark ?? fresh
     }
 
-    /// "2 h 5 min", for the log.
+    /// "40 min", "3 h 5 min", "1 day", "2 d 4 h". Unsigned; the caller says which way.
     static func describe(_ drift: TimeInterval) -> String {
-        let minutes = Int((drift / 60).rounded())
-        return minutes >= 60 ? "\(minutes / 60) h \(minutes % 60) min" : "\(minutes) min"
+        let total = Int(abs(drift).rounded())
+        let (days, hours, minutes) = (total / 86_400, (total % 86_400) / 3600, (total % 3600) / 60)
+        if days > 0 {
+            if hours > 0 { return "\(days) d \(hours) h" }
+            return days == 1 ? "1 day" : "\(days) days"
+        }
+        if hours > 0 { return "\(hours) h \(minutes) min" }
+        return "\(minutes) min"
     }
 }
 
 extension SharedState {
-    /// What this machine's clock looks like against the mark the last save left behind.
-    func clockTrust(now: Date = .now, uptime: TimeInterval = Clock.uptime) -> Clock.Trust {
-        Clock.isTrusted(now: now, uptime: uptime, mark: runtime.clock)
+    /// What Furlough makes of this machine's clock, against the mark the last save left behind.
+    func clock(wall: Date = .now, uptime: TimeInterval = Clock.uptime) -> Clock.Reading {
+        Clock.read(wall: wall, uptime: uptime, mark: runtime.clock)
     }
+
+    /// The time Furlough runs on. Use this, never `Date.now`, for anything the rules touch.
+    var now: Date { clock().now }
 }

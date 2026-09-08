@@ -34,6 +34,8 @@ targets:
       - path: Shared/Core
       - path: Shared/LiveActivity
       - path: Shared/UI
+      - path: Shared/PrivacyInfo.xcprivacy
+        buildPhase: resources
     entitlements:
       path: Furlough/Furlough.entitlements
       properties:
@@ -90,6 +92,8 @@ targets:
     sources:
       - path: FurloughMonitor
       - path: Shared/Core
+      - path: Shared/PrivacyInfo.xcprivacy
+        buildPhase: resources
     entitlements:
       path: FurloughMonitor/FurloughMonitor.entitlements
       properties:
@@ -115,6 +119,8 @@ targets:
     sources:
       - path: FurloughShield
       - path: Shared/Core
+      - path: Shared/PrivacyInfo.xcprivacy
+        buildPhase: resources
     entitlements:
       path: FurloughShield/FurloughShield.entitlements
       properties:
@@ -143,6 +149,8 @@ targets:
       - path: Shared/LiveActivity
       - path: Shared/UI
       - path: Furlough/Fonts
+        buildPhase: resources
+      - path: Shared/PrivacyInfo.xcprivacy
         buildPhase: resources
     entitlements:
       path: FurloughWidgets/FurloughWidgets.entitlements
@@ -185,6 +193,9 @@ targets:
       - path: Shared/Core
         excludes:
           - ShieldReconciler.swift
+      # The Mac's force-quit grace is pure and decides whether an app is killed under a save
+      # dialog, so it is tested here rather than left to the device pass.
+      - path: FurloughMac/Model/QuitGrace.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.zachshort.furlough.coretests
@@ -209,6 +220,13 @@ targets:
       - path: Furlough/Fonts
         type: folder
         buildPhase: resources
+      # The watchdog agent. SMAppService.agent looks for it at this exact path inside the
+      # bundle, and its Label must match the file name; see FurloughMac/Model/Watchdog.swift.
+      - path: FurloughMac/Resources/LaunchAgents/com.zachshort.furlough.mac.watchdog.plist
+        buildPhase:
+          copyFiles:
+            destination: wrapper
+            subpath: Contents/Library/LaunchAgents
     entitlements:
       path: FurloughMac/FurloughMac.entitlements
       properties:

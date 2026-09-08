@@ -24,7 +24,7 @@ struct AnchorView: View {
                 SectionLabel(text: "Apps")
                 appsCard
                 Footnote(text: anchor.isAnchored
-                    ? "Weigh anchor with your tag to change the list."
+                    ? "Unanchor with your tag to change the list."
                     : "Anything here is blocked while anchored. Windows and budgets still apply the rest of the time.")
                     .padding(.top, 8)
                 SectionLabel(text: "Tag")
@@ -206,7 +206,7 @@ struct AnchorView: View {
     }
 }
 
-/// Anchor when free, Weigh anchor (scan the tag) when anchored. Alerts explain a wrong tag or failure.
+/// Anchor when free, Unanchor (scan the tag to release it) when anchored. Alerts explain a wrong tag or failure.
 struct AnchorToggleButton: View {
     @Environment(AppModel.self) private var model
     @State private var busy = false
@@ -218,9 +218,9 @@ struct AnchorToggleButton: View {
         Group {
             if anchor.isAnchored {
                 Button {
-                    Task { await weighAnchor() }
+                    Task { await unanchor() }
                 } label: {
-                    Label("Weigh anchor", systemImage: "wave.3.right")
+                    Label("Unanchor", systemImage: "wave.3.right")
                         .emberBody(13, .bold)
                         .foregroundStyle(Ember.cream)
                 }
@@ -250,10 +250,10 @@ struct AnchorToggleButton: View {
         }
     }
 
-    private func weighAnchor() async {
+    private func unanchor() async {
         busy = true
         defer { busy = false }
-        switch await model.weighAnchorWithTag() {
+        switch await model.unanchorWithTag() {
         case .wrongTag: message = "That is not the paired tag."
         case .failed(let reason): message = reason
         default: break
@@ -261,7 +261,7 @@ struct AnchorToggleButton: View {
     }
 }
 
-/// The home-screen entry to the Anchor profile, with its state and the Anchor / Weigh anchor button.
+/// The home-screen entry to the Anchor profile, with its state and the Anchor / Unanchor button.
 struct AnchorCard: View {
     let anchor: AnchorProfile
 

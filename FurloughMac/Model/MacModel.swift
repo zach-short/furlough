@@ -31,6 +31,8 @@ final class MacModel {
     var notificationsGranted: Bool?
     var isOnboarded = SharedStore.defaults.bool(forKey: MacModel.onboardedKey)
     var launchesAtLogin = SMAppService.mainApp.status == .enabled
+    /// Whether the launchd agent that reopens Furlough after a Force Quit is registered.
+    var watchdogIsOn = Watchdog.isOn
     /// Which browsers are running and whether Furlough may read their address bar.
     var browserAccess: [BrowserAccess] = []
     let enforcer = Enforcer.shared
@@ -55,6 +57,8 @@ final class MacModel {
         reload()
         Task { await refreshNotificationStatus() }
         refreshBrowserAccess()
+        // Force Quit is still the way out, but it should not last until the next login.
+        if isOnboarded { Watchdog.enableIfNeeded() }
         enforce(reason: "launch")
     }
 
@@ -62,6 +66,7 @@ final class MacModel {
         SharedStore.defaults.set(true, forKey: Self.onboardedKey)
         isOnboarded = true
         setLaunchAtLogin(true)
+        setWatchdog(true)
     }
 
     func requestNotifications() async {
@@ -92,20 +97,37 @@ final class MacModel {
         launchesAtLogin = SMAppService.mainApp.status == .enabled
     }
 
+    /// The watchdog is part of enforcement rather than a convenience, so turning it off is a
+    /// loosening — but it is deliberately not held behind the delay: System Settings can
+    /// switch the agent off anyway, and a toggle that lied about that would be worse.
+    func setWatchdog(_ on: Bool) {
+        if !Watchdog.set(on) {
+            lastError = "Could not change the watchdog. System Settings > General > Login Items has the final say."
+        }
+        watchdogIsOn = Watchdog.isOn
+    }
+
     func reload() {
         state = SharedStore.load()
     }
+
+    /// Furlough's own time and how far this Mac's clock is from it. Every view that shows a
+    /// countdown reads it through here; see `Clock`.
+    var clock: Clock.Reading { state.clock() }
 
     /// Re-derives everything from persisted state: folds in due pending changes and makes
     /// the Mac match the rules. Safe to call at any time.
     func enforce(reason: String) {
         var current = SharedStore.load()
-        if Policy.applyDuePending(&current, now: .now) {
+        let clock = current.clock()
+        let now = clock.now
+        if Policy.applyDuePending(&current, now: now) {
             SharedStore.log("applied due pending changes (\(reason))")
         }
-        current.runtime.lastRegistration = .now
+        current.runtime.lastRegistration = now
         SharedStore.save(current)
         enforcer.reconcile(reason: reason)
+        PendingNotifications.sync(state: current, now: now, drift: clock.drift)
         WidgetCenter.shared.reloadAllTimelines()
         reload()
     }
@@ -242,7 +264,7 @@ final class MacModel {
             state.config.targets[index].rule = rule
             return .appliedNow
         }
-        let effectiveAt = Date.now.addingTimeInterval(state.config.loosenDelay)
+        let effectiveAt = state.now.addingTimeInterval(state.config.loosenDelay)
         state.pending.append(PendingChange(kind: .setRule(targetID: id, rule: rule), effectiveAt: effectiveAt))
         return .scheduled(effectiveAt)
     }
@@ -256,7 +278,7 @@ final class MacModel {
             current.pending.removeAll { $0.targetID == id }
             result = .appliedNow
         } else if !current.pending.contains(where: { $0.kind == .removeTarget(targetID: id) }) {
-            let effectiveAt = Date.now.addingTimeInterval(current.config.loosenDelay)
+            let effectiveAt = current.now.addingTimeInterval(current.config.loosenDelay)
             current.pending.append(PendingChange(kind: .removeTarget(targetID: id), effectiveAt: effectiveAt))
             result = .scheduled(effectiveAt)
         }
@@ -281,7 +303,7 @@ final class MacModel {
             current.config.loosenDelayHours = clamped
             result = .appliedNow
         } else {
-            let effectiveAt = Date.now.addingTimeInterval(current.config.loosenDelay)
+            let effectiveAt = current.now.addingTimeInterval(current.config.loosenDelay)
             current.pending.append(PendingChange(kind: .setDelay(hours: clamped), effectiveAt: effectiveAt))
             result = .scheduled(effectiveAt)
         }

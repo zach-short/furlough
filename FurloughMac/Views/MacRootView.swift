@@ -50,7 +50,7 @@ struct MacHomeView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .onReceive(clock) { now = $0 }
+        .onReceive(clock) { now = model.clock.honest($0) }
         .sheet(isPresented: $showAddApp) {
             AddAppSheet { app in
                 let outcome = model.addApp(bundleID: app.bundleID, name: app.name)

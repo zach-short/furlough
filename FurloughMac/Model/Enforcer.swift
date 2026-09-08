@@ -5,9 +5,10 @@ import UserNotifications
 
 /// Enforces the rules on the Mac, where there is no Screen Time API to do it. Once a second
 /// it re-derives everything from persisted state: a blocked app that is running is asked to
-/// quit (and force-quit if it lingers), a blocked website in the front browser is sent to the
-/// shield page, and time spent in an open app or site counts against its daily budget. The
-/// 5-minute warning and "Time's up" arrive as notifications, as on the phone.
+/// quit and force-quit when its grace runs out (`QuitGrace`), every window of every running
+/// browser showing a blocked site is sent to the shield page, and time spent in an open app or
+/// site counts against its daily budget. The 5-minute warning and "Time's up" arrive as
+/// notifications, as on the phone.
 @MainActor
 final class Enforcer {
     static let shared = Enforcer()
@@ -20,16 +21,18 @@ final class Enforcer {
     private var observers: [any NSObjectProtocol] = []
     private var ledger = UsageLedger.load()
     private var lastTick = Date.now
-    /// Apps asked to quit and when, so a lingering one is force-quit a moment later.
-    private var quitting: [pid_t: Date] = [:]
+    /// Apps asked to quit, and how long each has left before it is forced.
+    private var grace = QuitGrace()
     /// When each target's shield was last shown, so a relaunch loop does not flash it.
     private var lastShield: [UUID: Date] = [:]
     /// Window ends already warned about today, per target.
     private var windowWarned: [UUID: Int] = [:]
-    /// Whether the wall clock was ahead at the last tick, so the log gets one line per change.
-    private var clockAhead = false
+    /// Whether the device's clock disagreed at the last tick, so the log gets one line per
+    /// crossing rather than one a second.
+    private var clockOff = false
+    /// Furlough's own time as of the last tick, for the parts of the UI that ask outside one.
+    private(set) var now = Date.now
     private let shield = ShieldPanel()
-    private static let forceQuitAfter: TimeInterval = 2
     private static let idleAfter: TimeInterval = 120
 
     func start() {
@@ -57,9 +60,10 @@ final class Enforcer {
 
     /// Logs and applies everything. Call it after any edit.
     @discardableResult
-    func reconcile(now: Date = .now, reason: String) -> Decision {
+    func reconcile(now requested: Date? = nil, reason: String) -> Decision {
         var state = SharedStore.load()
-        if Policy.applyDuePending(&state, now: now, trust: clockTrust(state, now: now)) {
+        let now = requested ?? readClock(state)
+        if Policy.applyDuePending(&state, now: now) {
             SharedStore.log("applied due pending changes during reconcile")
         }
         let decision = apply(&state, now: now, elapsed: 0)
@@ -72,45 +76,49 @@ final class Enforcer {
         return decision
     }
 
-    /// Reads the clock and logs the first tick on each side of the line, so the log shows both
-    /// when the wall clock moved forward and when it came back.
-    private func clockTrust(_ state: SharedState, now: Date) -> Clock.Trust {
-        let trust = state.clockTrust(now: now)
-        if case .movedForward(let drift) = trust {
-            if !clockAhead {
-                clockAhead = true
-                SharedStore.log("clock is \(Clock.describe(drift)) ahead: loosening changes are held")
+    /// Furlough's own time, logging the first tick on each side of the line so the log shows
+    /// both when the device's clock went wrong and when it came back.
+    @discardableResult
+    private func readClock(_ state: SharedState) -> Date {
+        let clock = state.clock()
+        if !clock.isTrusted {
+            if !clockOff {
+                clockOff = true
+                let direction = clock.drift > 0 ? "ahead" : "behind"
+                SharedStore.log("device clock is \(Clock.describe(clock.drift)) \(direction); running on Furlough's own time")
             }
-        } else if clockAhead {
-            clockAhead = false
-            SharedStore.log("clock is back: pending changes can land again")
+        } else if clockOff {
+            clockOff = false
+            SharedStore.log("device clock agrees again")
         }
-        return trust
+        now = clock.now
+        return clock.now
     }
 
     func usedSeconds(for id: UUID) -> Int {
-        ledger.dayKey == Policy.dayKey(.now) ? Int(ledger.seconds[id] ?? 0) : 0
+        ledger.dayKey == Policy.dayKey(now) ? Int(ledger.seconds[id] ?? 0) : 0
     }
 
     #if DEBUG
     /// Forgets today's counted usage and warnings, for Settings > Testing > Reset everything.
     func resetUsage() {
-        ledger = UsageLedger(dayKey: Policy.dayKey(.now))
+        ledger = UsageLedger(dayKey: Policy.dayKey(now))
         ledger.save()
         windowWarned = [:]
         lastShield = [:]
+        grace.forgetAll()
     }
     #endif
 
     // MARK: The tick
 
     private func tick(reason: String?) {
-        let now = Date.now
+        var state = SharedStore.load()
+        let now = readClock(state)
         let elapsed = reason == nil ? min(max(0, now.timeIntervalSince(lastTick)), 5) : 0
         if reason == nil { lastTick = now }
-        var state = SharedStore.load()
         let before = state
-        if Policy.applyDuePending(&state, now: now, trust: clockTrust(state, now: now)) {
+        if Policy.applyDuePending(&state, now: now) {
             SharedStore.log("applied due pending changes")
         }
         apply(&state, now: now, elapsed: elapsed)
@@ -143,14 +151,22 @@ final class Enforcer {
                 state.runtime.exhausted[used.id.uuidString] = dayKey
                 SharedStore.log("budget spent: \(used.displayName)")
                 let next = Policy.nextOpen(in: rule, afterWeekday: Policy.weekday(now)).map { "Opens \(TimeFormat.nextOpen($0))." } ?? ""
-                Notifier.post(title: "Time's up", body: "You used your \(TimeFormat.budget(budget)) for \(used.displayName). \(next)")
+                Notifier.post(
+                    id: "exhausted-\(used.id.uuidString)",
+                    title: "Time's up",
+                    body: "You used your \(TimeFormat.budget(budget)) for \(used.displayName). \(next)"
+                )
                 decision = Policy.decide(config: state.config, runtime: state.runtime, now: now)
             } else if budget > Furlough.warningMinutes,
                       seconds >= Double((budget - Furlough.warningMinutes) * 60),
                       !state.runtime.wasWarned(used.id, dayKey: dayKey) {
                 state.runtime.warned[used.id.uuidString] = dayKey
                 SharedStore.log("5 minutes of budget left: \(used.displayName)")
-                Notifier.post(title: "5 minutes left", body: "\(used.displayName) has \(Furlough.warningMinutes) minutes of budget left today.")
+                Notifier.post(
+                    id: "warning-\(used.id.uuidString)",
+                    title: "5 minutes left",
+                    body: "\(used.displayName) has \(Furlough.warningMinutes) minutes of budget left today."
+                )
             }
         }
 
@@ -160,54 +176,70 @@ final class Enforcer {
             guard case .open(let until) = decision.statuses[target.id], until - minute == Furlough.warningMinutes,
                   windowWarned[target.id] != until else { continue }
             windowWarned[target.id] = until
-            Notifier.post(title: "5 minutes left", body: "\(target.displayName) closes at \(TimeFormat.minute(until)).")
+            Notifier.post(
+                id: "closing-\(target.id.uuidString)-\(until)",
+                title: "5 minutes left",
+                body: "\(target.displayName) closes at \(TimeFormat.minute(until))."
+            )
         }
 
         enforceApps(decision: decision, config: state.config, now: now)
-        enforceBrowser(front: front, decision: decision, config: state.config, now: now)
+        enforceBrowser(decision: decision, config: state.config)
         lastDecision = decision
         return decision
     }
 
     private func enforceApps(decision: Decision, config: Config, now: Date) {
         let running = NSWorkspace.shared.runningApplications
-        let alive = Set(running.map(\.processIdentifier))
-        quitting = quitting.filter { alive.contains($0.key) }
+        grace.forget(except: Set(running.map(\.processIdentifier)))
         for app in running {
             guard let bundleID = app.bundleIdentifier, bundleID != Bundle.main.bundleIdentifier,
                   decision.blockedApps.contains(bundleID) else { continue }
-            let pid = app.processIdentifier
-            if let asked = quitting[pid] {
-                if now.timeIntervalSince(asked) >= Self.forceQuitAfter {
-                    app.forceTerminate()
-                    quitting[pid] = nil
-                    SharedStore.log("force quit \(app.localizedName ?? bundleID)")
-                }
-                continue
-            }
-            quitting[pid] = now
-            app.terminate()
             let target = config.target(bundleID: bundleID)
             let name = target?.displayName ?? app.localizedName ?? bundleID
-            let status = target.flatMap { decision.statuses[$0.id] }
-            SharedStore.log("quit \(name): \(status.map { TimeFormat.status($0) } ?? "in the anchor")")
-            if let target, now.timeIntervalSince(lastShield[target.id] ?? .distantPast) > 8 {
-                lastShield[target.id] = now
-                let text = ShieldText.text(name: name, status: status, rule: target.rule)
-                shield.show(name: name, title: text.title, subtitle: text.subtitle, icon: AppInfo.icon(for: bundleID))
+            let age = now.timeIntervalSince(app.launchDate ?? now)
+            switch grace.step(pid: app.processIdentifier, age: age, now: now) {
+            case .ask(let deadline):
+                app.terminate()
+                let status = target.flatMap { decision.statuses[$0.id] }
+                SharedStore.log("asked \(name) to quit: \(status.map { TimeFormat.status($0) } ?? "in the anchor")")
+                if let target, now.timeIntervalSince(lastShield[target.id] ?? .distantPast) > 8 {
+                    lastShield[target.id] = now
+                    let text = ShieldText.text(name: name, status: status, rule: target.rule)
+                    shield.show(
+                        name: name, title: text.title, subtitle: text.subtitle,
+                        icon: AppInfo.icon(for: bundleID), grace: deadline.timeIntervalSince(now)
+                    )
+                }
+            case .wait:
+                // Inside its grace: the save dialog is the user's to answer.
+                continue
+            case .force(let first):
+                app.forceTerminate()
+                if first { SharedStore.log("force quit \(name)") }
             }
         }
     }
 
-    private func enforceBrowser(front: Front, decision: Decision, config: Config, now: Date) {
-        guard case .browser(let bundleID, let kind, let url) = front, let url,
-              let host = url.host()?.lowercased(), let target = config.target(host: host) else { return }
-        let status = decision.statuses[target.id]
-        let blocked = status.map { !$0.isAllowed } ?? decision.blockedHosts.contains(target.host)
-        guard blocked else { return }
-        let text = ShieldText.text(name: target.displayName, status: status, rule: target.rule)
-        browsers.redirect(bundleID, kind: kind, to: ShieldPage.url(title: text.title, subtitle: text.subtitle))
-        SharedStore.log("blocked \(host) in \(AppInfo.name(for: bundleID) ?? bundleID)")
+    /// Sends every window showing a blocked site to the shield page, in every running browser —
+    /// not only the browser in front, and not only its front window. A blocked site left playing
+    /// behind the window you are looking at is still a blocked site.
+    private func enforceBrowser(decision: Decision, config: Config) {
+        guard config.targets.contains(where: { $0.kind.isHost }) else { return }
+        for browser in browsers.snapshots() {
+            for tab in browser.tabs {
+                guard let host = tab.url.host()?.lowercased(), let target = config.target(host: host) else { continue }
+                let status = decision.statuses[target.id]
+                let blocked = status.map { !$0.isAllowed } ?? decision.blockedHosts.contains(target.host)
+                guard blocked else { continue }
+                let text = ShieldText.text(name: target.displayName, status: status, rule: target.rule)
+                browsers.redirect(
+                    browser.bundleID, kind: browser.kind, window: tab.window,
+                    to: ShieldPage.url(title: text.title, subtitle: text.subtitle)
+                )
+                SharedStore.log("blocked \(host) in \(AppInfo.name(for: browser.bundleID) ?? browser.bundleID)")
+            }
+        }
     }
 
     /// No keyboard or mouse for two minutes: nothing is being used, whatever is in front.
@@ -265,19 +297,6 @@ struct UsageLedger: Codable {
     func save() {
         if let data = try? JSONEncoder().encode(self) {
             SharedStore.defaults.set(data, forKey: Self.key)
-        }
-    }
-}
-
-enum Notifier {
-    static func post(title: String, body: String) {
-        let content = UNMutableNotificationContent()
-        content.title = title
-        content.body = body
-        content.sound = .default
-        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error { SharedStore.log("notification failed: \(error.localizedDescription)") }
         }
     }
 }

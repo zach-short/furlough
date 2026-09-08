@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Furlough collects nothing and has no network code: no URLSession, no analytics, no third-party
+  dependencies. Rules, tokens and the activity log never leave the device. Both entries below are
+  "required reason" APIs, declared per Apple's list.
+
+  Shared by the app and all three iOS extensions; each bundle needs its own copy at its root, so
+  project.yml lists this file as a resource on all four targets.
+-->
+<plist version="1.0">
+<dict>
+    <key>NSPrivacyTracking</key>
+    <false/>
+    <key>NSPrivacyTrackingDomains</key>
+    <array/>
+    <key>NSPrivacyCollectedDataTypes</key>
+    <array/>
+    <key>NSPrivacyAccessedAPITypes</key>
+    <array>
+        <dict>
+            <!-- SharedStore: the App Group suite read and written by the app, monitor, shield and
+                 widgets; plus UserDefaults.standard for the app's own furlough.wasAuthorized flag. -->
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>1C8F.1</string>
+                <string>CA92.1</string>
+            </array>
+        </dict>
+        <dict>
+            <!-- Clock.uptime: clock_gettime_nsec_np(CLOCK_MONOTONIC), compared against the stored
+                 wall-clock mark so moving the clock forward cannot release a queued loosening.
+                 Measures elapsed time between events in the app; never sent off device. -->
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategorySystemBootTime</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>35F9.1</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>

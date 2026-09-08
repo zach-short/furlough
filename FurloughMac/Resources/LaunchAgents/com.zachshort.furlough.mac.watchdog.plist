@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Must match the file name, and Watchdog.label. -->
+	<key>Label</key>
+	<string>com.zachshort.furlough.mac.watchdog</string>
+	<!-- `open` hands off to a running copy instead of starting a second enforcer; -g leaves it
+	     in the background so a reopen never steals focus. -->
+	<key>ProgramArguments</key>
+	<array>
+		<string>/usr/bin/open</string>
+		<string>-g</string>
+		<string>-b</string>
+		<string>com.zachshort.furlough.mac</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>StartInterval</key>
+	<integer>60</integer>
+	<key>ProcessType</key>
+	<string>Background</string>
+</dict>
+</plist>

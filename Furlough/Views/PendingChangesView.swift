@@ -9,8 +9,9 @@ struct PendingChangesView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
-                    if !model.state.clockTrust().isTrusted {
-                        ClockBanner()
+                    let clock = model.state.clock()
+                    if !clock.isTrusted {
+                        ClockBanner(drift: clock.drift)
                     }
                     if pending.isEmpty {
                         VStack(spacing: 8) {

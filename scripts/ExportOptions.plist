@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Export options for a TestFlight / App Store upload. See DEPLOYMENT.md.
+
+  manageAppVersionAndBuildNumber is false on purpose: left on, Xcode rewrites the build number
+  during export, and the number that lands in App Store Connect stops matching the one in the
+  archive and in git. Pass CURRENT_PROJECT_VERSION to xcodebuild instead.
+-->
+<plist version="1.0">
+<dict>
+    <key>method</key>
+    <string>app-store-connect</string>
+    <key>teamID</key>
+    <string>X9V4L6HR2R</string>
+    <key>signingStyle</key>
+    <string>automatic</string>
+    <key>uploadSymbols</key>
+    <true/>
+    <key>manageAppVersionAndBuildNumber</key>
+    <false/>
+</dict>
+</plist>

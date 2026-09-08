@@ -117,7 +117,7 @@ struct MacRuleEditor: View {
             .frame(maxWidth: 620, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
-        .onReceive(clock) { now = $0 }
+        .onReceive(clock) { now = model.clock.honest($0) }
         .onAppear(perform: load)
         .confirmationDialog("Remove from Furlough?", isPresented: $confirmRemove, titleVisibility: .visible) {
             Button("Remove", role: .destructive) { saved = model.removeTarget(id: targetID).message }
@@ -301,7 +301,7 @@ struct MacRuleEditor: View {
         if !hasChanges { return .noChanges }
         if target.rule?.isEquivalent(to: draft) ?? false { return .nicknameOnly }
         if Policy.classify(newRule: draft, against: target) == .tightening { return .tightening }
-        return .loosening(Date.now.addingTimeInterval(model.state.config.loosenDelay))
+        return .loosening(model.clock.now.addingTimeInterval(model.state.config.loosenDelay))
     }
 
     private func effectBanner(for target: Target) -> some View {

@@ -8,13 +8,12 @@ enum ShieldReconciler {
     }
 
     @discardableResult
-    static func reconcile(now: Date = .now, reason: String) -> Decision {
+    /// `now` is Furlough's own time; it defaults to reading it, so no caller can hand the
+    /// shields a device clock that was moved forward.
+    static func reconcile(now: Date? = nil, reason: String) -> Decision {
         var state = SharedStore.load()
-        let trust = state.clockTrust(now: now)
-        if case .movedForward(let drift) = trust {
-            SharedStore.log("clock is \(Clock.describe(drift)) ahead: loosening changes are held")
-        }
-        if Policy.applyDuePending(&state, now: now, trust: trust) {
+        let now = now ?? state.now
+        if Policy.applyDuePending(&state, now: now) {
             SharedStore.log("applied due pending changes during reconcile")
         }
         let decision = Policy.decide(config: state.config, runtime: state.runtime, now: now)

@@ -16,7 +16,7 @@ struct MenuBarLabel: View {
                 Text(TimeFormat.countdown(from: now, to: until)).monospacedDigit()
             }
         }
-        .onReceive(clock) { now = $0 }
+        .onReceive(clock) { now = model.clock.honest($0) }
     }
 }
 
@@ -25,7 +25,7 @@ struct MenuBarContent: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        let now = Date.now
+        let now = model.clock.now
         let targets = model.state.config.targets
         if targets.isEmpty {
             Text("Nothing in Furlough yet")

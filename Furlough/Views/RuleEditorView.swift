@@ -326,7 +326,7 @@ struct RuleEditorView: View {
         if !hasChanges { return .noChanges }
         if target.rule?.isEquivalent(to: draft) ?? false { return .nicknameOnly }
         if Policy.classify(newRule: draft, against: target) == .tightening { return .tightening }
-        return .loosening(Date.now.addingTimeInterval(model.state.config.loosenDelay))
+        return .loosening(model.clock.now.addingTimeInterval(model.state.config.loosenDelay))
     }
 
     private func removalNote(_ target: Target) -> String {

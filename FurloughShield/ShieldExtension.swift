@@ -21,8 +21,8 @@ final class ShieldExtension: ShieldConfigurationDataSource {
     }
 
     private func make(kind: TargetKind?, systemName: String?, category: ActivityCategory?) -> ShieldConfiguration {
-        let now = Date.now
         let state = SharedStore.load()
+        let now = state.now
         let config = Policy.effectiveConfig(state, now: now)
 
         var target = kind.flatMap { config.target(kind: $0) }

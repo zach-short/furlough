@@ -1,7 +1,8 @@
 # Handoff: Furlough
 
 You are picking up Furlough, a personal iOS Screen Time blocker for Zach. Read this file,
-then `README.md` and `design/DESIGN.md`, before touching code. Do not re-ask anything under
+then `README.md` and `design/DESIGN.md`, before touching code (and `DEPLOYMENT.md` if the
+work is about shipping). Do not re-ask anything under
 "Settled". Zach is a web developer (Next.js, Vercel), comfortable with Xcode, and prefers a
 small codebase he fully understands over a fork. He is interactive: ask when a decision is his.
 
@@ -27,7 +28,8 @@ small codebase he fully understands over a fork. He is interactive: ask when a d
   Keep the project free of warnings in our own code.
 - Test check (the rules engine has a macOS test bundle: `Tests/Core`, Swift Testing, no host
   app; `Shared/Core` is compiled into it with `ShieldReconciler.swift` excluded because it
-  imports ManagedSettings). Run it after every change to `Shared/Core`:
+  imports ManagedSettings, plus `FurloughMac/Model/QuitGrace.swift`, which is pure and decides
+  whether a Mac app is killed under a save dialog). Run it after every change to `Shared/Core`:
   ```bash
   xcodebuild test -project Furlough.xcodeproj -scheme FurloughCoreTests \
     -destination 'platform=macOS,arch=arm64' -derivedDataPath build/DerivedDataTests \
@@ -166,10 +168,13 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   `ActivityNaming.swift`, `TimeFormat.swift` (`days`, `schedule`, `chip`, `nextOpen` with
   weekday names, + `ShieldText`; every function that renders a date takes a `calendar:`),
   `Hosts.swift` (`normalize`, `matches`; it lived in `MacModel.swift` until the tests wanted
-  it, and is harmlessly unused on iOS).
+  it, and is harmlessly unused on iOS),
+  `PendingNotifications.swift` (`PlannedNotification`, the pure `plan`, `sync`, and the one
+  `Notifier` both platforms post through).
 - `Tests/Core` (target `FurloughCoreTests`, macOS, Swift Testing, no host app): `Support.swift`
   (the pinned calendar and the fixtures), `ModelsTests`, `PolicyStatusTests`,
-  `PolicyPendingTests`, `PolicySummaryTests`, `NamingTests`, `DecodingTests`. 71 tests.
+  `PolicyPendingTests`, `PolicySummaryTests`, `NamingTests`, `DecodingTests`, `ClockTests`,
+  `QuitGraceTests`, `PendingNotificationTests`. 110 tests in 17 suites.
 - `Shared/LiveActivity/FurloughActivityAttributes.swift` (app + widgets).
 - `Shared/UI/Theme.swift` (app + widgets), `Shared/UI/Hourglass.swift` (`HourglassState`
   with its presets and `of(target:status:runtime:now:)`, `HourglassView(state:phase:)` pure,
@@ -232,7 +237,7 @@ table. Not yet seen on the phone: install, then check the test steps in the last
 - The shield extension only reads. It folds due pending changes in memory for display.
 - `Policy.decide` is the union of rule shields and, while anchored, every kind in the anchor.
   `allowedApps` never contains an anchored app, so category exceptions cannot leak one through.
-  `AppModel.anchor()`, `weighAnchorWithTag()`, `pairTag()`, `setAnchorSelection()`, `unpairTag()`
+  `AppModel.anchor()`, `unanchorWithTag()`, `pairTag()`, `setAnchorSelection()`, `unpairTag()`
   are the only writers of `Config.anchor`; the last three refuse while anchored.
 
 ## Known API facts and quirks
@@ -276,6 +281,60 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   a regular in-process SwiftUI view, so `.labelStyle`, `.font` and `.foregroundStyle` should
   apply; unverified until step 2.
 
+## Where the 2026-09-08 review landed
+
+Zach reviewed the whole repo on 2026-09-08 and listed what was unfinished, what could be
+improved and what he would add. Each item is below with where it went, so nobody re-derives
+the list. The numbers point at "Next work, in order".
+
+Done:
+
+- **A test target for the rules engine** — step 1. `Tests/Core`, 100 tests in 16 suites,
+  `xcodebuild test -scheme FurloughCoreTests` on the Mac with no phone. Covers
+  `isTighterOrEqual`, `TimeWindow.joined`, `nextFree`, `nextOpen`, `applyDuePending`,
+  `Policy.status`/`decide`/`summary`/`classify`/`nextTransition`, `Hosts`, `Clock`, older
+  stored JSON, and `QuitGrace`. **Not** covered: `WeekDraft`, which lives in
+  `Furlough/Views/WeekView.swift` and so is outside the Core-only bundle; moving it into
+  `Shared/Core` would make it testable and is worth doing when step 16 unifies the views.
+- **The rename** — step 2. Brick became Anchor. Zach confirmed the name in the same review and
+  wrote it as "Anchor/Unanchor". Confirmed the same day and done: the verb is **Unanchor**
+  everywhere the user sees it, and prose says the tag *releases* the anchor. `weighAnchorWithTag()`
+  became `unanchorWithTag()`; `AnchorOutcome.released` already read correctly.
+- **The clock cannot be an unblock button** — step 4. `ClockMark`, `Clock.read`, and pending
+  changes held while the device's clock disagrees.
+- **The Mac force-quitting two seconds after asking** — step 7, and the reason `QuitGrace`
+  exists. A blocked editor with unsaved work no longer loses it.
+- **The Mac reading only the front tab of the front window** — step 7. Every window of every
+  running browser is read and redirected now.
+- **The Mac having no watchdog** — step 7. Zach said yes on 2026-09-08: `SMAppService.agent`,
+  `open -g -b` once a minute. Force Quit still lifts every block; it just stops buying the
+  rest of the day.
+
+Open, and where each one lives:
+
+- Nothing tested on the device beyond the basics → step 3, the two checklists. Zach's report
+  is still outstanding, and it is the gate on a lot of this file.
+- Third-party iOS browsers (does a web-domain shield reach Chrome on the phone?) → step 3; the
+  answer goes in README's limits either way.
+- The Live Activity only starting if the app is opened during a window → step 10.
+- The shield icon still being the SF hourglass → step 17.
+- The duplicated Mac UI (`MacComponents.swift`, `MacWeekView.swift`, two `Notifier`s) → step 16.
+- Safari web apps in the Dock bypassing host rules → step 7. No web app on this Mac to test.
+- The 19-window limit only being checked after Save → step 6, `Policy.distinctSpans`.
+- Window start lagging by minutes with no way to hurry it → step 6/step 3; the shield extension
+  has the App Group and the entitlement, so it may be able to reconcile itself on `.open`.
+- Categories only being blockable all day → step 12. Ask Zach first.
+- Pending cards showing the new rule rather than old → new → step 6.
+- `widgetURL` and the `furlough://target/<id>` scheme, and iPad → step 6.
+- Anchor from anywhere (App Intents, Siri, Control Center, the Action button) → step 8.
+- Real usage on the phone (`DeviceActivityReport`) → step 9.
+- Pending-change notifications → **done**, step 5.
+- Per-weekday budgets → step 11.
+- Anchor everything except an allowlist → step 13.
+- A second tag → step 14.
+- A longer delay for the worst apps → step 15.
+- iCloud sync of the Anchor → step 18. Rules cannot sync: tokens versus bundle ids.
+
 ## Next work, in order
 
 The plan for this stretch. Tick each phase off here as it lands.
@@ -285,9 +344,10 @@ The plan for this stretch. Tick each phase off here as it lands.
    classify, summary), `ActivityNaming`, `Hosts` and decoding older stored JSON. Every later
    phase that touches `Shared/Core` adds tests for what it changes.
 2. **The rename: Brick became Anchor.** Done 2026-09-08, because "Brick" is another product's
-   name. Lock is Anchor, the state is Anchored, release with the tag is Weigh anchor.
+   name. Lock is Anchor, the state is Anchored, release with the tag is Unanchor (the verb was
+   Weigh anchor until 2026-09-08, when Zach chose Unanchor).
    Identifiers follow the UI: `AnchorProfile`, `Config.anchor`, `isAnchored`, `anchoredAt`,
-   `canAnchor`, `AppModel.anchor()`, `weighAnchorWithTag()`, `anchorSelection`/
+   `canAnchor`, `AppModel.anchor()`, `unanchorWithTag()`, `anchorSelection`/
    `setAnchorSelection`, `AnchorOutcome` (`.anchored`, `.released`, `.paired`, `.wrongTag`,
    `.cancelled`, `.failed`), `TargetStatus.anchored`, `HourglassState.anchored`,
    `Policy.Summary.isAnchored`/`anchoredCount`, `HomeGroups.anchored`, and
@@ -331,14 +391,39 @@ The plan for this stretch. Tick each phase off here as it lands.
    **Still open, ask Zach**: windows themselves are still read off the wall clock, so setting
    the clock to 9 PM opens an 8–10 PM window. Making an untrusted clock close every window
    would fix it and is a tightening, but it blocks everything until the clock is right.
-5. **Notifications**: "Window opened" from the monitor at a window's start, and "lands in an
-   hour" / "landed" for pending changes, through one `PendingNotifications` helper in Core.
+5. **Notifications.** Done 2026-09-08. `Shared/Core/PendingNotifications.swift` holds the lot.
+   `plan(state:now:drift:calendar:)` is pure and tested (`Tests/Core/PendingNotificationTests`):
+   for every change still queued it returns a warning an hour before (`lead`) and one when it
+   lands, skipping the warning for a change queued with less than an hour to run, since it would
+   fire at the same moment as the landing and say the opposite thing. `sync` makes the system
+   agree with the plan — stale identifiers withdrawn so a cancelled change stops announcing
+   itself, already-correct ones left alone — and is called from `AppModel.enforce` and
+   `MacModel.enforce`, so the warning is rescheduled from saved state rather than only when the
+   change is queued. Identifiers are `furlough.pending.<change id>.warning|landed`.
+   Fire dates are moved onto the device's clock with `Clock.Reading.drift`, because the system
+   fires them against its own clock while Furlough runs on its own; which changes are *due* is
+   still judged on Furlough's time. Triggers are `UNCalendarNotificationTrigger` including
+   seconds, so "landed" does not arrive at the top of the minute before it lands.
+   "Window opened" is `MonitorExtension.announceOpening` at `intervalDidStart`, matching targets
+   by the span's end minute the way `intervalWillEndWarning` already did, so a window activity
+   firing on a day none of its targets use posts nothing.
+   `Notifier` now lives in Core with an `id:` on every post; the copies in
+   `MonitorExtension.swift` and `Enforcer.swift` are gone, and the Mac's three posts have stable
+   identifiers instead of a fresh UUID each time. Nobody has seen any of these on a device.
 6. **Small fixes**: the 19-span limit checked in the editors (`Policy.distinctSpans`), pending
    cards showing old rule → new rule, `widgetURL` and the `furlough://target/<id>` scheme,
    the Mac browser poll at two seconds, and iPad (ask Zach).
-7. **Mac hardening**: 45-second grace before force quit with a countdown on the panel, every
-   window rather than only the front one, Safari web apps in the Dock, and a `SMAppService`
-   LaunchAgent watchdog. Confirm the watchdog with Zach first.
+7. **Mac hardening**: the 45-second grace before force quit with a countdown on the panel, and
+   every window of every running browser rather than only the front one, are both done
+   2026-09-08 (`QuitGrace.swift`, `Browsers.snapshots()`, `Tests/Core/QuitGraceTests.swift`;
+   the read script was run against Chrome on this Mac and the Safari variant compiles, but
+   neither has been seen working by a person — they are on the Mac checklist in step 3).
+   The `SMAppService` watchdog is done too (`FurloughMac/Model/Watchdog.swift`), after Zach
+   said yes on 2026-09-08. Still open here: Safari web apps saved to the Dock, which run under
+   their own `com.apple.Safari.WebApp.<uuid>` bundle id and so bypass host rules entirely —
+   there is no web app on this Mac to test against, so it needs one before it is worth writing.
+   Nobody has yet watched the watchdog actually reopen Furlough after a Force Quit; that goes
+   on the Mac checklist in step 3, along with checking that it does not steal focus.
 8. **Anchor from anywhere**: `AnchorIntent`, `AppShortcutsProvider`, a Control Center
    `ControlWidget`, a `Button(intent:)` on the medium widget. Anchoring is tightening, so every
    surface is safe; release stays in the app behind the tag.
@@ -362,6 +447,17 @@ The plan for this stretch. Tick each phase off here as it lands.
     shield icon and the hero, an onboarding hero, and short README clips.
 18. **Sync the Anchor across devices** through CloudKit or the key-value store. Rules cannot
     sync (tokens versus bundle ids). Ask Zach whether he wants it at all.
+19. **TestFlight, then the App Store.** Started 2026-09-08; `DEPLOYMENT.md` is the map and the
+    status table. Done so far: `Shared/PrivacyInfo.xcprivacy` (Data Not Collected; the two
+    required-reason APIs are UserDefaults `1C8F.1`/`CA92.1` and system boot time `35F9.1` for
+    `Clock.uptime`), carried as a resource by all four iOS targets and verified at the root of
+    the app and each `.appex`; `scripts/ExportOptions.plist`; and a check that the Release
+    configuration still compiles clean. **Blocked on Zach**: the Family Controls *distribution*
+    entitlement is not yet requested, and it gates every upload, so it goes first. Also missing:
+    an Apple Distribution certificate (this Mac has only the development one), the App Store
+    Connect record, and a privacy-policy and support URL. Note for screenshots: the store wants a
+    6.9-inch set, the phone is 6.3-inch, and Family Controls does not run in the Simulator, so the
+    real screens have to be composed into full-size frames.
 
 ## Style rules
 
@@ -400,11 +496,19 @@ name `Furlough`, macOS 26, non-sandboxed, hardened runtime with the
   reference under `Resources/Fonts` with `ATSApplicationFontsPath: Fonts`; the activity log's
   first line says whether they loaded.
 - `FurloughMac/Model/Enforcer.swift` ticks every second and on app launch/activate: applies due
-  pending changes, decides, quits any running blocked app (`terminate()`, then
-  `forceTerminate()` after 2 s) and shows `ShieldPanel` (a floating NSPanel with the iOS
-  `ShieldText` copy), reads the front browser's tab through `Browsers` (NSAppleScript,
-  `tell application id`, Safari `current tab`, Chromium `active tab`) only when some host
-  has a rule, and redirects a blocked tab to `Resources/Shield.html?t=&s=`. Usage is counted
+  pending changes, decides, asks any running blocked app to quit and shows `ShieldPanel` (a
+  floating NSPanel with the iOS `ShieldText` copy), reads the browsers through `Browsers`
+  (NSAppleScript, `tell application id`, Safari `current tab`, Chromium `active tab`) only when
+  some host has a rule, and redirects a blocked tab to `Resources/Shield.html?t=&s=`.
+  `QuitGrace` (its own file, and tested) holds the pause between asking and forcing: 45 seconds
+  for a process that has been running at least a minute, so a "Save changes?" sheet can be
+  answered, and the old 2 seconds for one that has only just launched, so quitting and
+  relaunching a blocked app cannot buy another 45 seconds. The panel counts the grace down;
+  it is handed a duration rather than a date, because the card is drawn against the device's
+  clock while Furlough runs on its own. `Browsers` reads *every* window of *every* running
+  known browser, not just the front window of the front app, and redirects each window that
+  is showing a blocked site; it caches each browser's read for `Browsers.pollInterval` (2 s)
+  against `Clock.uptime`, so the extra windows do not cost an Apple Event round trip a second. Usage is counted
   in `UsageLedger` (`furlough.mac.usage.v1`, seconds per target per day) while the app or
   site is in front and the Mac has had input in the last 2 minutes; exhaustion and the
   5-minute warning set `runtime.exhausted`/`warned` exactly as the iOS monitor does, and post
@@ -413,8 +517,17 @@ name `Furlough`, macOS 26, non-sandboxed, hardened runtime with the
 - `MacAppDelegate` refuses Quit while `Enforcer.lastDecision.isAnythingShielded`, unless the
   quit Apple Event's `kAEQuitReason` says log out, restart or shut down. `SMAppService.mainApp`
   is registered when onboarding finishes (Settings toggle "Open at login"). Force Quit is the
-  documented escape. A launchd KeepAlive agent would be the next hardening; it was not done
-  because launchd and a user launch would race to start two instances.
+  documented escape, and stays one — but since 2026-09-08 it no longer lasts until the next
+  login: `Watchdog` registers `SMAppService.agent` from
+  `Contents/Library/LaunchAgents/com.zachshort.furlough.mac.watchdog.plist` (copied in by a
+  copy-files phase in `project.yml`), which runs `open -g -b com.zachshort.furlough.mac` every
+  60 seconds. `open` hands off to a running copy instead of starting a second one, which is
+  what a plain `KeepAlive` agent could not do — launchd and a user launch would race and leave
+  two enforcers ticking against one store — and `-g` keeps the reopen out of the user's face.
+  It is registered at `finishOnboarding` and again at every `start()` when onboarded, and
+  Settings > Enforcement has "Reopen after a Force Quit". `Watchdog.isRefusedByUser` reads
+  `.requiresApproval`, so a user who switched the agent off in System Settings > General >
+  Login Items is not asked again on every launch.
 - Views mirror the phone with a sidebar plus detail layout (`MacRootView`, `MacRuleEditor`,
   `MacSheets`, `MacOnboardingView`, `MenuBar`). The sidebar's + button shows the shared
   `AddChoicePopover` (an NSPopover), and Application or Website opens `AddAppSheet` or
@@ -431,6 +544,8 @@ name `Furlough`, macOS 26, non-sandboxed, hardened runtime with the
   `LogView`) instead of pushing. The Mac's `DraftWindow` has the phone's `sorted`/`tidy`;
   rows are joined at Save and when Apply to other days runs, not as time fields change,
   because the fields commit as you type and a row that moved mid-edit would leave the cursor.
+  `Watchdog.swift` (the login agent) and `QuitGrace.swift` (the pause before a force quit,
+  tested in `Tests/Core/QuitGraceTests.swift`) are their own files, out of `Enforcer.swift`.
   `MacHero.swift` holds `TargetHero` (the phone's `HeroPage` for the selected app, at the top
   of the editor, with "n of m min used today" from `MacModel.usedSeconds`) and a copy of the
   phone's `HomeGroups` (no Anchored section) that the sidebar uses.
