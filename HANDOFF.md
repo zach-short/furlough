@@ -444,6 +444,10 @@ The plan for this stretch. Tick each phase off here as it lands.
    which is the whole point of `Browsers.snapshots()`. The old code read only the front tab of
    the front window, so a redirect working in the front window proves nothing about the sweep.
    Ask specifically.
+   **The watchdog reopens Furlough after a Force Quit**: two force quits, back both times
+   within the 60-second tick (the log's `reconcile (launch)` lines at 13:39:03 and 13:39:59,
+   56 s apart), one enforcer left running, no crash report. That is step 7's one untested bet —
+   that `open -g -b` hands off instead of racing a second enforcer — settled.
    Record the rest here.
    The phone checklist: the Anchor card and the paired tag survived the rename; the shield's
    copy and colours; a shield lifting by itself at a window's start; Delete App refused while
@@ -523,8 +527,12 @@ The plan for this stretch. Tick each phase off here as it lands.
    said yes on 2026-09-08. Still open here: Safari web apps saved to the Dock, which run under
    their own `com.apple.Safari.WebApp.<uuid>` bundle id and so bypass host rules entirely —
    there is no web app on this Mac to test against, so it needs one before it is worth writing.
-   Nobody has yet watched the watchdog actually reopen Furlough after a Force Quit; that goes
-   on the Mac checklist in step 3, along with checking that it does not steal focus.
+   The watchdog was watched working on 2026-09-08: Zach force-quit Furlough twice and it came
+   back both times, inside the agent's 60-second tick, with one enforcer running afterwards and
+   no crash report. So `SMAppService.agent` plus `open -g -b` does hand off rather than race a
+   second copy, which was the design's one real bet. Whether `-g` actually keeps the reopen out
+   of the user's face is still unconfirmed — he did not say either way, and he was looking at
+   the app at the time, which is the worst case for noticing.
 8. **Anchor from anywhere**: `AnchorIntent`, `AppShortcutsProvider`, a Control Center
    `ControlWidget`, a `Button(intent:)` on the medium widget. Anchoring is tightening, so every
    surface is safe; release stays in the app behind the tag.
