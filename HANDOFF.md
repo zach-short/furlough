@@ -432,10 +432,19 @@ The plan for this stretch. Tick each phase off here as it lands.
    split `Furlough.debug.dylib` shape in `/Applications`, so put README's Release line back
    when the pass is done. Note the file it replaced was a *single* binary, so the Mac had been
    Release, not the Debug this file claimed.
-   **First result in, 2026-09-08: the pending card's old → new pair reads right on the Mac**
+   **Results in so far, 2026-09-08.** The pending card's old → new pair reads right on the Mac
    (a queued `setRule` on `example.com`, "Now 12:00 AM–11:59 PM · 5 min/day" over "Becomes
    All day · 5 min/day"). That is `PendingText`/`PendingDeltaView` seen by a person; the phone
-   draws the same two views, so only its layout is still unwitnessed. Record the rest here.
+   draws the same two views, so only its layout is still unwitnessed.
+   **The browser redirect works in both Safari and Chrome**, with the activity log to prove it
+   rather than only an eye: `13:46:54 blocked members.upswingpoker.com in Google Chrome`,
+   `13:47:32 … in Safari`. So `Browsers`, the Apple Event round trip and the one-time
+   Automation prompt are all real. **Still unwitnessed in that lane**: the part that is
+   actually new — a blocked site in a *second window* and in a browser that is not in front,
+   which is the whole point of `Browsers.snapshots()`. The old code read only the front tab of
+   the front window, so a redirect working in the front window proves nothing about the sweep.
+   Ask specifically.
+   Record the rest here.
    The phone checklist: the Anchor card and the paired tag survived the rename; the shield's
    copy and colours; a shield lifting by itself at a window's start; Delete App refused while
    blocked; the widget; the Live Activity; pair a tag, anchor, a wrong tag refused, weigh
