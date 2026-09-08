@@ -46,6 +46,11 @@ targets:
       path: Furlough/Furlough.entitlements
       properties:
         com.apple.developer.family-controls: true
+        # iOS 26.4 data access: lets the app read Screen Time's numbers itself and apply a
+        # suggested rule in one tap (UsageReader, UsageView). Costs, decided 2026-09-08: the
+        # Screen Time prompt becomes all-or-nothing, and Apple honours data access for App
+        # Store customers only in the EU. Development builds work anywhere.
+        com.apple.developer.family-controls.app-and-website-usage: true
         com.apple.developer.nfc.readersession.formats:
           - TAG
         com.apple.security.application-groups:
