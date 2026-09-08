@@ -18,12 +18,26 @@ struct WeekDraft: Equatable {
         spans[weekday] = hours.map(\.span).sorted()
     }
 
-    /// Gives every day in `days` exactly the hours of `source`, replacing what it had.
+    /// Adds the hours of `source` to every day in `days`, on top of what each already had.
+    /// Spans that overlap or touch are joined into one.
     mutating func apply(from source: Int, to days: Weekdays) {
         let hours = spans(on: source)
         for weekday in 1...7 where weekday != source && days.contains(weekday: weekday) {
-            spans[weekday] = hours
+            spans[weekday] = Self.joined(spans(on: weekday) + hours)
         }
+    }
+
+    /// Sorted spans with any that overlap or touch merged into one.
+    static func joined(_ spans: [TimeWindow]) -> [TimeWindow] {
+        var result: [TimeWindow] = []
+        for span in spans.map(\.span).sorted() {
+            if let last = result.last, span.startMinute <= last.endMinute {
+                result[result.count - 1].endMinute = max(last.endMinute, span.endMinute)
+            } else {
+                result.append(span)
+            }
+        }
+        return result
     }
 
     /// One window per distinct span, on every day that has it.
@@ -124,7 +138,7 @@ struct WeekGrid: View {
             }
             HStack(alignment: .top, spacing: 0) {
                 hourLabels
-                    .frame(width: gutter, height: gridHeight)
+                    .frame(width: gutter, height: gridHeight, alignment: .topLeading)
                 ZStack(alignment: .top) {
                     hourLines
                     HStack(spacing: 0) {
@@ -148,14 +162,15 @@ struct WeekGrid: View {
         }
     }
 
+    /// Each label centred on its hour line, right-aligned with a gap before the columns.
     private var hourLabels: some View {
-        ZStack(alignment: .topTrailing) {
+        ZStack(alignment: .topLeading) {
             ForEach(Array(stride(from: 0, through: 21, by: 3)), id: \.self) { hour in
                 Text(TimeFormat.shortMinute(hour * 60))
                     .font(EmberFont.numerals(8.5))
                     .foregroundStyle(Ember.faint)
                     .lineLimit(1)
-                    .frame(width: gutter - 6, alignment: .trailing)
+                    .frame(width: gutter - 8, alignment: .trailing)
                     .offset(y: CGFloat(hour) * hourHeight - 5)
             }
         }
@@ -300,7 +315,7 @@ struct DayEditor: View {
                 ProminentButton(title: applyTitle) { apply() }
                     .disabled(applyTo.isEmpty || error != nil)
                     .padding(.top, 10)
-                Footnote(text: appliedNote ?? "Gives those days exactly \(name)'s hours, replacing what they had.", alignment: .center)
+                Footnote(text: appliedNote ?? "Adds \(name)'s hours to those days, on top of what they have.", alignment: .center)
                     .padding(.top, 8)
             }
             .padding(.horizontal, 16)
@@ -347,7 +362,7 @@ struct DayEditor: View {
         week.apply(from: weekday, to: days)
         applied += 1
         applyTo = []
-        appliedNote = "\(TimeFormat.days(days, calendar: calendar)) now \(days.count == 1 ? "has" : "have") \(name)'s hours."
+        appliedNote = "\(TimeFormat.days(days, calendar: calendar)) now \(days.count == 1 ? "has" : "have") \(name)'s hours too."
     }
 }
 

@@ -44,8 +44,9 @@ small codebase he fully understands over a fork. He is interactive: ask when a d
   each window, a "Use windows from another app" sheet that copies another target's
   windows, days and budget into the draft, and a "Visualize windows" sheet
   (`Views/WeekView.swift`): a seven-column 24-hour grid, a per-day editor reached by
-  tapping a column, and "Apply to other days" which gives chosen days exactly that day's
-  hours. `WeekDraft` is the bridge: per-day span lists both ways, merging identical spans
+  tapping a column, and "Apply to other days" which adds that day's hours to the chosen
+  days on top of what they have, joining spans that overlap or touch (Zach's call,
+  2026-09-07: merge, not replace). `WeekDraft` is the bridge: per-day span lists both ways, merging identical spans
   across days back into one window, so edits in the sheet land in the editor's draft
   through one binding and the Same every day toggle follows. Categories are always-blocked containers; apps inside them that have their own
   windows are excepted.

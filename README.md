@@ -29,7 +29,7 @@ Rules for each app live in an App Group so all four processes read the same stat
 - Extending a window, adding a window, adding a day to a window, raising a budget, or removing an app is queued for the loosening delay (24 hours by default). Pending changes are listed in the app and can be cancelled.
 - Windows never cross midnight. "Until 2 AM on Saturday night" is an evening window plus a 12:00–2:00 AM window on Sunday, and the budget still resets at midnight.
 - When setting up an app, **Use windows from another app** copies another app's windows, days and budget into the editor, so a second app can get the same rule in two taps.
-- **Visualize windows** opens the week as a seven-column, 24-hour grid. Tap a day to see just its hours, change them, and **Apply to other days** to give any other days exactly the same hours.
+- **Visualize windows** opens the week as a seven-column, 24-hour grid. Tap a day to see just its hours, change them, and **Apply to other days** to add the same hours to any other days, on top of what they have.
 - Raising the delay is instant. Lowering it waits out the current delay.
 - While anything is shielded, iOS is told to deny deleting apps, so the app cannot be removed as a shortcut.
 
