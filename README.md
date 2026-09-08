@@ -4,7 +4,7 @@ A personal iOS and Mac app blocker with no unblock button.
 
 Pick the apps and websites that eat your time. Give each one a daily minute budget (say 30 minutes) and, if you want, allowed windows (say 8:00–10:00 PM), the same every day or different per day of the week (until midnight on school nights, until 2 AM on weekends). With no windows an app is open all day, up to its budget. Outside the windows, or once the budget is spent, iOS shields the app. The only way to loosen a rule is to wait: loosening edits take effect 24 hours after you make them, and you can cancel them in the meantime. Tightening edits apply instantly.
 
-There is also a Brick: a second set of apps you lock in one tap, from anywhere, and can only unlock by holding your phone to a physical NFC tag you paired. Leave the tag at home and your phone stays bricked until you are back.
+There is also the Anchor: a second set of apps you lock in one tap, from anywhere, and can only unlock by holding your phone to a physical NFC tag you paired. Leave the tag at home and your phone stays anchored until you are back.
 
 Built on Apple's Screen Time API (FamilyControls, ManagedSettings, DeviceActivity) and Core NFC. Swift, SwiftUI, no third-party dependencies.
 
@@ -36,15 +36,15 @@ Rules for each app live in an App Group so all four processes read the same stat
 - Raising the delay is instant. Lowering it waits out the current delay.
 - While anything is shielded, iOS is told to deny deleting apps, so the app cannot be removed as a shortcut.
 
-### The Brick
+### The Anchor
 
-- The Brick holds its own list of apps, sites, and categories, chosen with the same picker. An app can be in the Brick and have windows too.
-- Tap **Brick** in the app and everything in the list is shielded immediately, no tag needed. Bricking is tightening.
-- **Unbrick** opens the NFC reader; only the tag you paired lifts the brick, instantly. This is the one unblock in Furlough, and it exists only for the Brick. Rule-based targets never get one.
-- While bricked, the list and the paired tag cannot be changed, so nothing can loosen under the lock. Bricking is refused until a tag is paired, so there is always a way back.
-- **Forget tag** on the Brick screen unpairs the tag after a confirmation. It is only offered while the brick is off; forgetting the tag while bricked would leave no way back, so the button is hidden and the model refuses it. Bricking stays refused until a new tag is paired.
-- When the brick is off, each app falls back to its windows and budget, or to nothing if it has no rule. Bricking an app that is already outside its window changes nothing visible.
-- Pairing reads the tag's hardware identifier; nothing is written, so any NTAG sticker or an existing Brick device works.
+- The Anchor holds its own list of apps, sites, and categories, chosen with the same picker. An app can be in the Anchor and have windows too.
+- Tap **Anchor** in the app and everything in the list is shielded immediately, no tag needed. Anchoring is tightening.
+- **Weigh anchor** opens the NFC reader; only the tag you paired lifts the anchor, instantly. This is the one unblock in Furlough, and it exists only for the Anchor. Rule-based targets never get one.
+- While anchored, the list and the paired tag cannot be changed, so nothing can loosen under the lock. Anchoring is refused until a tag is paired, so there is always a way back.
+- **Forget tag** on the Anchor screen unpairs the tag after a confirmation. It is only offered while the anchor is off; forgetting the tag while anchored would leave no way back, so the button is hidden and the model refuses it. Anchoring stays refused until a new tag is paired.
+- When the anchor is off, each app falls back to its windows and budget, or to nothing if it has no rule. Anchoring an app that is already outside its window changes nothing visible.
+- Pairing reads the tag's hardware identifier; nothing is written, so any NTAG sticker works, or the tag from a Brick if you already own one.
 
 The one escape that always exists is Apple's own: **Settings > Screen Time > Apps with Screen Time Access > Furlough > off**. That revokes access and iOS clears every shield and the delete-protection flag. Furlough cannot prevent it, and it documents it on purpose.
 
@@ -61,7 +61,7 @@ Apple's Screen Time API does not exist on the Mac: FamilyControls, ManagedSettin
 | iOS counts usage toward the budget | Furlough counts seconds while the app or site is in front and the Mac is not idle; "5 minutes left" and "Time's up" arrive as notifications |
 | The home-screen widget | A desktop widget with the same card: **Edit Widgets** on the desktop or in Notification Center, then add Furlough |
 | The Live Activity and Dynamic Island | A menu bar item with the countdown. ActivityKit does not exist on the Mac |
-| The Brick | Nothing: a Mac has no NFC reader |
+| The Anchor | Nothing: a Mac has no NFC reader |
 | Escape: Settings > Screen Time > turn Furlough off | Escape: Force Quit. Quit is refused while anything is blocked; logging out and shutting down are always allowed. Furlough opens at login |
 
 Windows per weekday, budgets, the pending list and the loosening delay are the same code as the phone, and so are **Visualize windows**, **Use windows from another app** and **Apply these windows to other apps**. The selected app's page opens with the phone's hero: the living hourglass, the countdown, and how much of today's budget is used, which the Mac knows because it counts the minutes itself. The sidebar groups apps the way the phone's home screen does. Rules are per device; nothing syncs.
@@ -99,7 +99,7 @@ open Furlough.xcodeproj
 2. Signing is automatic under team `X9V4L6HR2R`. Xcode registers the four bundle IDs and enables Family Controls (development), App Groups, and NFC Tag Reading on first build.
 3. Press Run. On the phone, tap **Allow Screen Time access**, then **Allow** on the iOS prompt.
 4. Tap **+** to pick apps and websites. Open each one and set its budget, and windows if you want them; with no windows it is open all day, up to the budget. Turn off **Same every day** to give each window its own days. Save.
-5. For the Brick, open the Brick card, choose apps, and pair a tag by holding the phone to it. Then **Brick** locks and **Unbrick** asks for the tag.
+5. For the Anchor, open the Anchor card, choose apps, and pair a tag by holding the phone to it. Then **Anchor** locks and **Weigh anchor** asks for the tag.
 
 Or from the command line, with the phone connected:
 
@@ -150,7 +150,7 @@ Limits to know about:
 
 ## Testing builds
 
-Debug builds, which is what Xcode and the commands above produce, add **Settings > Testing > Reset everything**. After a confirmation it forgets every app, rule, pending change and the Brick with its tag, lifts every shield, and leaves the app as it was right after allowing Screen Time access. Use it to start over after trying a week-long delay or a five-minute budget. It is compiled out of Release builds (`-configuration Release`), so a build you mean to live with keeps its promise of no unblock button. A Debug build of the Mac app has the same button; there it also forgets today's counted minutes, and the app stays set up and running.
+Debug builds, which is what Xcode and the commands above produce, add **Settings > Testing > Reset everything**. After a confirmation it forgets every app, rule, pending change and the Anchor with its tag, lifts every shield, and leaves the app as it was right after allowing Screen Time access. Use it to start over after trying a week-long delay or a five-minute budget. It is compiled out of Release builds (`-configuration Release`), so a build you mean to live with keeps its promise of no unblock button. A Debug build of the Mac app has the same button; there it also forgets today's counted minutes, and the app stays set up and running.
 
 The rules engine has its own tests. `Shared/Core` is plain Foundation and builds for macOS, so the whole of it — windows, budgets, per-weekday days, tightening versus loosening, the pending queue, the widget's summary, and decoding state written by older builds — is tested on the Mac with no phone and no host app:
 

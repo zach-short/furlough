@@ -46,7 +46,7 @@ targets:
       path: Furlough/Info.plist
       properties:
         CFBundleDisplayName: Furlough
-        NFCReaderUsageDescription: Furlough reads your tag to unbrick your apps.
+        NFCReaderUsageDescription: Furlough reads your tag to weigh anchor and let your apps back in.
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen:

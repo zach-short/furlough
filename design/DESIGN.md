@@ -79,12 +79,12 @@ eyebrow, the app name in Display, the big line in Geist Mono, and a sub line. Pe
 DAY" in Moss with a countdown to midnight and "30 min budget · resets at midnight" for a rule
 without windows; "OPEN NOW ·
 5 MIN LEFT" in Amber after the budget warning; "NEXT WINDOW" in Amber with a countdown to the
-opening; "USED UP TODAY" in Ember with a countdown to the next opening; "BRICKED · SINCE
+opening; "USED UP TODAY" in Ember with a countdown to the next opening; "ANCHORED · SINCE
 6:12 PM" in Ember counting up; "ALWAYS BLOCKED" in Muted and "NEEDS A SCHEDULE" in Pending
 with a quiet word ("all day", "not enforced") in place of the countdown. Under the pages, a
 row of 11 pt status hourglasses is the page indicator, the current one at 135 %; the strip
 is a status summary in itself. Tapping a page opens its rule editor. List sections in this
-order: Bricked · Open now · Later today · Tomorrow · Later this week · Always blocked · Needs
+order: Anchored · Open now · Later today · Tomorrow · Later this week · Always blocked · Needs
 a schedule. A row whose rule varies by day shows today's windows ("Today 8:00 PM–midnight"),
 and its chip shows the day ("Sat") when the next window is more than a day away. Each row:
 tile, name (nickname small and muted beside it), rule line; on the right a status chip with
@@ -104,7 +104,7 @@ allows: sand while there is plenty, Amber after the 5-minute warning, Ember once
 | Used up today | Dim glass, Ember glow at 45 % | All in the bottom, Ember | Still |
 | Always blocked | Grey glass, no glow | Grey, a low mound | Still |
 | Needs a schedule | Pending outline, no glow | Empty | Outline fades up once on appear |
-| Bricked | Cream glass, Ember glow at 90 % | Frozen mid-stream, an Ember cube at the base | Still |
+| Anchored | Cream glass, Ember glow at 90 % | Frozen mid-stream, an Ember cube at the base | Still |
 
 Reduce Motion: no pulse, no grains (the stream is a solid line), levels still change.
 

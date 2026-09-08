@@ -16,14 +16,14 @@ struct PolicyStatusTests {
         )
     }
 
-    @Test("the brick comes before every rule")
-    func bricked() {
+    @Test("the anchor comes before every rule")
+    func anchored() {
         let youTube = makeTarget("YouTube", rule: Rule(windows: [window(0, 1440)], dailyBudgetMinutes: 240))
         var config = makeConfig([youTube])
-        config.brick.kinds = [youTube.kind]
-        config.brick.isBricked = true
-        #expect(status(youTube, config: config) == .bricked)
-        config.brick.isBricked = false
+        config.anchor.kinds = [youTube.kind]
+        config.anchor.isAnchored = true
+        #expect(status(youTube, config: config) == .anchored)
+        config.anchor.isAnchored = false
         #expect(status(youTube, config: config) == .open(until: 1440))
     }
 
@@ -106,7 +106,7 @@ struct PolicyStatusTests {
     func allowed() {
         #expect(TargetStatus.open(until: 600).isAllowed)
         #expect(TargetStatus.unconfigured.isAllowed)
-        #expect(!TargetStatus.bricked.isAllowed)
+        #expect(!TargetStatus.anchored.isAllowed)
         #expect(!TargetStatus.blockedAllDay.isAllowed)
         #expect(!TargetStatus.exhausted(nextOpen: nil).isAllowed)
         #expect(!TargetStatus.closed(nextOpen: NextOpen(minuteOfDay: 0, daysAhead: 1)).isAllowed)
@@ -130,12 +130,12 @@ struct PolicyDecideTests {
         #expect(decision.statuses[open.id] == .open(until: 1440))
     }
 
-    @Test("the brick blocks things that are not targets at all")
-    func brickAddsKinds() {
+    @Test("the anchor blocks things that are not targets at all")
+    func anchorAddsKinds() {
         let open = makeTarget("Mail", rule: Rule(windows: [], dailyBudgetMinutes: 30))
         var config = makeConfig([open])
-        config.brick.kinds = [open.kind, .macApp(bundleID: "com.apple.Safari")]
-        config.brick.isBricked = true
+        config.anchor.kinds = [open.kind, .macApp(bundleID: "com.apple.Safari")]
+        config.anchor.isAnchored = true
         let decision = Policy.decide(config: config, runtime: RuntimeState(), now: at(8, 12, 30), calendar: cal)
         #expect(decision.blockedHosts == ["mail.com"])
         #expect(decision.blockedApps == ["com.apple.Safari"])

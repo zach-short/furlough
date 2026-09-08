@@ -52,7 +52,7 @@ enum SharedStore {
         }
     }
 
-    /// Forgets every target, rule, pending change, and the Brick. The activity log is kept.
+    /// Forgets every target, rule, pending change, and the Anchor. The activity log is kept.
     static func reset() { defaults.removeObject(forKey: stateKey) }
 
     @discardableResult

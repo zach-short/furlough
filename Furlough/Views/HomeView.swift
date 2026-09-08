@@ -28,8 +28,8 @@ struct HomeView: View {
             .navigationDestination(for: UUID.self) { id in
                 RuleEditorView(targetID: id)
             }
-            .navigationDestination(for: BrickRoute.self) { _ in
-                BrickView()
+            .navigationDestination(for: AnchorRoute.self) { _ in
+                AnchorView()
             }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -135,8 +135,8 @@ struct HomeContent: View {
         let groups = HomeGroups(targets: config.targets, statuses: statuses, now: now)
 
         VStack(alignment: .leading, spacing: 0) {
-            HeroPager(groups: groups, statuses: statuses, glasses: glasses, runtime: state.runtime, brick: config.brick, featured: $featured)
-            BrickCard(brick: config.brick)
+            HeroPager(groups: groups, statuses: statuses, glasses: glasses, runtime: state.runtime, anchor: config.anchor, featured: $featured)
+            AnchorCard(anchor: config.anchor)
                 .padding(.top, 10)
             ForEach(groups.sections) { section in
                 SectionLabel(text: section.title)
@@ -162,7 +162,7 @@ struct HomeContent: View {
 }
 
 /// The list order from the spec: Open now · Later today · Tomorrow · Later this week · Always blocked ·
-/// Needs a schedule, with Bricked first whenever the brick is on.
+/// Needs a schedule, with Anchored first whenever the anchor is on.
 struct HomeGroups {
     struct Section: Identifiable {
         let title: String
@@ -170,7 +170,7 @@ struct HomeGroups {
         var id: String { title }
     }
 
-    var bricked: [Target] = []
+    var anchored: [Target] = []
     var open: [(target: Target, until: Date, untilMinute: Int)] = []
     var laterToday: [(target: Target, at: Date)] = []
     var tomorrow: [(target: Target, at: Date?)] = []
@@ -182,8 +182,8 @@ struct HomeGroups {
     init(targets: [Target], statuses: [UUID: TargetStatus], now: Date) {
         for target in targets {
             switch statuses[target.id] ?? .unconfigured {
-            case .bricked:
-                bricked.append(target)
+            case .anchored:
+                anchored.append(target)
             case .open(let until):
                 open.append((target, Policy.date(atMinute: until, of: now), until))
             case .closed(let next):
@@ -212,13 +212,13 @@ struct HomeGroups {
     }
 
     var isEmpty: Bool {
-        bricked.isEmpty && open.isEmpty && laterToday.isEmpty && tomorrow.isEmpty && laterThisWeek.isEmpty
+        anchored.isEmpty && open.isEmpty && laterToday.isEmpty && tomorrow.isEmpty && laterThisWeek.isEmpty
             && alwaysBlocked.isEmpty && unconfigured.isEmpty
     }
 
     var sections: [Section] {
         [
-            Section(title: "Bricked", targets: bricked),
+            Section(title: "Anchored", targets: anchored),
             Section(title: "Open now", targets: open.map(\.target)),
             Section(title: "Later today", targets: laterToday.map(\.target)),
             Section(title: "Tomorrow", targets: tomorrow.map(\.target)),
@@ -241,7 +241,7 @@ struct HeroPager: View {
     let statuses: [UUID: TargetStatus]
     let glasses: [UUID: HourglassState]
     let runtime: RuntimeState
-    let brick: BrickProfile
+    let anchor: AnchorProfile
     @Binding var featured: UUID?
 
     private var pages: [Target] { groups.ordered }
@@ -256,7 +256,7 @@ struct HeroPager: View {
                     LazyHStack(spacing: 0) {
                         ForEach(pages) { target in
                             NavigationLink(value: target.id) {
-                                HeroPage(target: target, status: statuses[target.id] ?? .unconfigured, runtime: runtime, brick: brick)
+                                HeroPage(target: target, status: statuses[target.id] ?? .unconfigured, runtime: runtime, anchor: anchor)
                                     .padding(.horizontal, 22)
                             }
                             .buttonStyle(.plain)
@@ -287,7 +287,7 @@ struct HeroPage: View {
     let target: Target
     let status: TargetStatus
     let runtime: RuntimeState
-    let brick: BrickProfile
+    let anchor: AnchorProfile
 
     private struct Line {
         enum Big {
@@ -398,13 +398,13 @@ struct HeroPage: View {
                 )
             }
             return Line(eyebrow: "Used up today", color: Ember.ember, big: .quiet("spent"), sub: "\(budget) a day")
-        case .bricked:
-            let since = brick.brickedAt
+        case .anchored:
+            let since = anchor.anchoredAt
             return Line(
-                eyebrow: since.map { "Bricked · since \($0.formatted(date: .omitted, time: .shortened))" } ?? "Bricked",
+                eyebrow: since.map { "Anchored · since \($0.formatted(date: .omitted, time: .shortened))" } ?? "Anchored",
                 color: Ember.ember,
                 big: since.map { .countUp(from: $0) } ?? .quiet("locked"),
-                sub: "Unbrick with your tag · \(RowCopy.detail(target: target, status: status, now: now))"
+                sub: "Weigh anchor with your tag · \(RowCopy.detail(target: target, status: status, now: now))"
             )
         case .blockedAllDay:
             return Line(

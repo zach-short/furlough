@@ -38,22 +38,57 @@ struct DecodingTests {
         #expect(String(data: try encoder.encode(window.days), encoding: .utf8) == "5")
     }
 
-    @Test("a config written before the brick and the schema version decodes")
-    func configWithoutBrick() throws {
+    @Test("a config written before the anchor and the schema version decodes")
+    func configWithoutAnchor() throws {
         let config = try decode(Config.self, #"{"targets":[],"loosenDelayHours":24}"#)
-        #expect(config.brick == BrickProfile())
-        #expect(!config.brick.isBricked)
-        #expect(config.brick.tagID == nil)
+        #expect(config.anchor == AnchorProfile())
+        #expect(!config.anchor.isAnchored)
+        #expect(config.anchor.tagID == nil)
         #expect(config.schemaVersion == 1)
         #expect(config.loosenDelayHours == 24)
     }
 
-    @Test("a stored brick comes back whole")
-    func configWithBrick() throws {
-        let json = #"{"targets":[],"loosenDelayHours":48,"schemaVersion":1,"brick":{"kinds":[],"isBricked":true}}"#
+    @Test("a stored anchor comes back whole")
+    func configWithAnchor() throws {
+        let json = #"{"targets":[],"loosenDelayHours":48,"schemaVersion":1,"anchor":{"kinds":[],"isAnchored":true}}"#
         let config = try decode(Config.self, json)
-        #expect(config.brick.isBricked)
+        #expect(config.anchor.isAnchored)
         #expect(config.loosenDelayHours == 48)
+    }
+
+    @Test("state written before the rename still reads: brick becomes anchor")
+    func legacyBrickKey() throws {
+        let json = #"""
+        {"targets":[],"loosenDelayHours":24,"schemaVersion":1,
+         "brick":{"kinds":[],"isBricked":true,"brickedAt":"2026-09-08T18:12:00Z","tagID":"AQIDBA=="}}
+        """#
+        let config = try decode(Config.self, json)
+        #expect(config.anchor.isAnchored)
+        #expect(config.anchor.anchoredAt == at(8, 18, 12))
+        #expect(config.anchor.tagID == Data([1, 2, 3, 4]))
+        #expect(config.anchor.isPaired)
+    }
+
+    @Test("the new keys win when both are somehow present")
+    func newKeyWins() throws {
+        let json = #"""
+        {"targets":[],"loosenDelayHours":24,
+         "anchor":{"kinds":[],"isAnchored":false},"brick":{"kinds":[],"isBricked":true}}
+        """#
+        #expect(try decode(Config.self, json).anchor.isAnchored == false)
+    }
+
+    @Test("an anchor is written back under the new names")
+    func encodesNewKeys() throws {
+        var config = Config()
+        config.anchor.isAnchored = true
+        config.anchor.anchoredAt = at(8, 18, 12)
+        let json = String(data: try encoder.encode(config), encoding: .utf8) ?? ""
+        #expect(json.contains("\"anchor\""))
+        #expect(json.contains("\"isAnchored\""))
+        #expect(!json.contains("brick"))
+        // And it reads back.
+        #expect(try decode(Config.self, json).anchor.anchoredAt == at(8, 18, 12))
     }
 
     @Test("a whole state survives a round trip")
@@ -62,10 +97,10 @@ struct DecodingTests {
         var original = makeState([youTube], pending: [
             PendingChange(kind: .setRule(targetID: youTube.id, rule: .unrestricted), createdAt: at(7), effectiveAt: at(9)),
         ])
-        original.config.brick.kinds = [.macApp(bundleID: "com.apple.Safari")]
-        original.config.brick.isBricked = true
-        original.config.brick.brickedAt = at(8)
-        original.config.brick.tagID = Data([1, 2, 3, 4])
+        original.config.anchor.kinds = [.macApp(bundleID: "com.apple.Safari")]
+        original.config.anchor.isAnchored = true
+        original.config.anchor.anchoredAt = at(8)
+        original.config.anchor.tagID = Data([1, 2, 3, 4])
         original.runtime.exhausted["x"] = "2026-09-08"
 
         let restored = try decoder.decode(SharedState.self, from: encoder.encode(original))

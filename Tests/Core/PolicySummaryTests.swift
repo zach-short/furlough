@@ -88,15 +88,15 @@ struct SummaryTests {
         #expect(result.pendingCount == 1)
     }
 
-    @Test("the brick is counted whole, targets or not")
-    func bricked() {
+    @Test("the anchor is counted whole, targets or not")
+    func anchored() {
         let youTube = makeTarget("YouTube", rule: Rule(windows: [], dailyBudgetMinutes: 30))
         var state = makeState([youTube])
-        state.config.brick.kinds = [youTube.kind, .macApp(bundleID: "com.apple.Safari")]
-        state.config.brick.isBricked = true
+        state.config.anchor.kinds = [youTube.kind, .macApp(bundleID: "com.apple.Safari")]
+        state.config.anchor.isAnchored = true
         let result = summary(state)
-        #expect(result.isBricked)
-        #expect(result.brickedCount == 2)
+        #expect(result.isAnchored)
+        #expect(result.anchoredCount == 2)
         #expect(result.blockedCount == 1)
         #expect(result.openNames.isEmpty)
     }

@@ -26,7 +26,7 @@ struct HourglassState: Equatable {
     /// How tall the bottom mound is, 0…1.
     var moundLevel: Double = 0
     var isRunning = false
-    /// The stream stopped dead: the Brick.
+    /// The stream stopped dead: the Anchor.
     var isFrozen = false
     var glass: Glass = .cream
     var sand: Tone = .sand
@@ -63,15 +63,15 @@ struct HourglassState: Equatable {
     /// An empty glass with a pending outline.
     static let unconfigured = HourglassState(glass: .pending)
     /// Sand frozen mid-stream under an ember glow, with the cube at the base.
-    static let bricked = HourglassState(
+    static let anchored = HourglassState(
         sandLevel: 0.55, moundLevel: 0.4, isFrozen: true, glow: Ember.ember, glowStrength: 0.9, showsCube: true
     )
 
     /// Direction C for one target right now.
     static func of(_ target: Target, status: TargetStatus, runtime: RuntimeState, now: Date) -> HourglassState {
         switch status {
-        case .bricked:
-            return .bricked
+        case .anchored:
+            return .anchored
         case .unconfigured:
             return .unconfigured
         case .blockedAllDay:

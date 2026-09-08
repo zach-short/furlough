@@ -74,7 +74,7 @@ struct StatusChip: View {
 
     private var text: String? {
         switch status {
-        case .bricked: "Bricked"
+        case .anchored: "Anchored"
         case .open(let until): allDay ? "All day" : TimeFormat.minute(until)
         case .closed(let next): TimeFormat.chip(next)
         case .exhausted(let next): next.map { TimeFormat.chip($0) }
@@ -85,7 +85,7 @@ struct StatusChip: View {
 
     private var color: Color {
         switch status {
-        case .bricked: Ember.ember
+        case .anchored: Ember.ember
         case .open: Ember.moss
         case .unconfigured: Ember.pending
         default: Ember.muted

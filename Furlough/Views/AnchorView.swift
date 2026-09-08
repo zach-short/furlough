@@ -1,20 +1,20 @@
 import FamilyControls
 import SwiftUI
 
-enum BrickRoute: Hashable {
+enum AnchorRoute: Hashable {
     case editor
 }
 
-/// The Brick profile: apps locked behind a physical tag. Brick from here or from the home
-/// card; unbrick only by scanning the paired tag.
-struct BrickView: View {
+/// The Anchor profile: apps locked behind a physical tag. Anchor from here or from the home
+/// card; weigh anchor only by scanning the paired tag.
+struct AnchorView: View {
     @Environment(AppModel.self) private var model
     @State private var showPicker = false
     @State private var selection = FamilyActivitySelection(includeEntireCategory: true)
     @State private var message: String?
     @State private var confirmForget = false
 
-    private var brick: BrickProfile { model.state.config.brick }
+    private var anchor: AnchorProfile { model.state.config.anchor }
 
     var body: some View {
         ScrollView {
@@ -23,13 +23,13 @@ struct BrickView: View {
                 stateCard
                 SectionLabel(text: "Apps")
                 appsCard
-                Footnote(text: brick.isBricked
-                    ? "Unbrick with your tag to change the list."
-                    : "Anything here is blocked while bricked. Windows and budgets still apply the rest of the time.")
+                Footnote(text: anchor.isAnchored
+                    ? "Weigh anchor with your tag to change the list."
+                    : "Anything here is blocked while anchored. Windows and budgets still apply the rest of the time.")
                     .padding(.top, 8)
                 SectionLabel(text: "Tag")
                 tagCard
-                Footnote(text: "Bricking works without the tag. Unbricking needs it, so keep the tag somewhere that makes you think.")
+                Footnote(text: "Anchoring works without the tag. Weighing anchor needs it, so keep the tag somewhere that makes you think.")
                     .padding(.top, 8)
             }
             .padding(.horizontal, 16)
@@ -40,22 +40,22 @@ struct BrickView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) {
-                Text("Brick")
+                Text("Anchor")
                     .emberBody(15, .semibold)
                     .foregroundStyle(Ember.cream)
             }
         }
         .familyActivityPicker(
-            headerText: "Choose what the brick locks",
+            headerText: "Choose what the anchor holds",
             footerText: "Picking a category locks every app in it.",
             isPresented: $showPicker,
             selection: $selection
         )
         .onChange(of: showPicker) { _, presented in
             guard !presented else { return }
-            model.setBrickSelection(selection)
+            model.setAnchorSelection(selection)
         }
-        .alert("Brick", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
+        .alert("Anchor", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
             Button("OK") { message = nil }
         } message: {
             Text(message ?? "")
@@ -67,9 +67,9 @@ struct BrickView: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            BrickGlyph(isBricked: brick.isBricked, size: 48)
+            AnchorGlyph(isAnchored: anchor.isAnchored, size: 48)
             VStack(alignment: .leading, spacing: 3) {
-                Text("Brick")
+                Text("Anchor")
                     .emberDisplay(19)
                     .foregroundStyle(Ember.cream)
                 Text("One tap to lock. The tag to unlock.")
@@ -85,13 +85,13 @@ struct BrickView: View {
     private var stateCard: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
-                Eyebrow(text: brick.isBricked ? "Bricked" : "Free", color: brick.isBricked ? Ember.ember : Ember.moss)
+                Eyebrow(text: anchor.isAnchored ? "Anchored" : "Free", color: anchor.isAnchored ? Ember.ember : Ember.moss)
                 Text(stateLine)
                     .emberBody(13)
                     .foregroundStyle(Ember.cream)
             }
             Spacer(minLength: 8)
-            BrickToggleButton()
+            AnchorToggleButton()
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 12)
@@ -99,17 +99,17 @@ struct BrickView: View {
     }
 
     private var stateLine: String {
-        if brick.isBricked, let since = brick.brickedAt {
-            return "\(count(brick.count)) since \(since.formatted(date: .omitted, time: .shortened))"
+        if anchor.isAnchored, let since = anchor.anchoredAt {
+            return "\(count(anchor.count)) since \(since.formatted(date: .omitted, time: .shortened))"
         }
-        if brick.kinds.isEmpty { return "Nothing chosen yet" }
-        if !brick.isPaired { return "\(count(brick.count)) · pair a tag to enable" }
-        return "\(count(brick.count)) ready"
+        if anchor.kinds.isEmpty { return "Nothing chosen yet" }
+        if !anchor.isPaired { return "\(count(anchor.count)) · pair a tag to enable" }
+        return "\(count(anchor.count)) ready"
     }
 
     private var appsCard: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if brick.kinds.isEmpty {
+            if anchor.kinds.isEmpty {
                 Text("No apps yet.")
                     .emberBody(13)
                     .foregroundStyle(Ember.muted)
@@ -117,22 +117,22 @@ struct BrickView: View {
                     .padding(.vertical, 11)
             } else {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 6), spacing: 10) {
-                    ForEach(Array(brick.kinds.enumerated()), id: \.offset) { _, kind in
+                    ForEach(Array(anchor.kinds.enumerated()), id: \.offset) { _, kind in
                         TokenTile(kind: kind, size: 44)
                     }
                 }
                 .padding(12)
             }
-            if !brick.isBricked {
+            if !anchor.isAnchored {
                 CardDivider()
                 Button {
-                    selection = model.brickSelection
+                    selection = model.anchorSelection
                     showPicker = true
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "plus")
                             .font(.system(size: 12, weight: .bold))
-                        Text(brick.kinds.isEmpty ? "Choose apps" : "Change apps")
+                        Text(anchor.kinds.isEmpty ? "Choose apps" : "Change apps")
                             .emberBody(13, .semibold)
                     }
                     .foregroundStyle(Ember.ember)
@@ -154,14 +154,14 @@ struct BrickView: View {
                     .emberBody(13)
                     .foregroundStyle(Ember.cream)
                 Spacer()
-                Text(brick.tagID.map(tagLabel) ?? "None")
+                Text(anchor.tagID.map(tagLabel) ?? "None")
                     .emberBody(13)
                     .monospacedDigit()
-                    .foregroundStyle(brick.isPaired ? Ember.moss : Ember.muted)
+                    .foregroundStyle(anchor.isPaired ? Ember.moss : Ember.muted)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 11)
-            if !brick.isBricked {
+            if !anchor.isAnchored {
                 CardDivider()
                 Button {
                     Task { await pair() }
@@ -169,7 +169,7 @@ struct BrickView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "wave.3.right")
                             .font(.system(size: 12, weight: .bold))
-                        Text(brick.isPaired ? "Replace tag" : "Pair a tag")
+                        Text(anchor.isPaired ? "Replace tag" : "Pair a tag")
                             .emberBody(13, .semibold)
                     }
                     .foregroundStyle(Ember.ember)
@@ -179,7 +179,7 @@ struct BrickView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                if brick.isPaired {
+                if anchor.isPaired {
                     CardDivider()
                     GhostButton(title: "Forget tag") { confirmForget = true }
                 }
@@ -190,7 +190,7 @@ struct BrickView: View {
 
     private func pair() async {
         switch await model.pairTag() {
-        case .paired: message = "Tag paired. Bricking is ready."
+        case .paired: message = "Tag paired. Anchoring is ready."
         case .failed(let reason): message = reason
         default: break
         }
@@ -206,54 +206,54 @@ struct BrickView: View {
     }
 }
 
-/// Brick when free, Unbrick (scan the tag) when bricked. Alerts explain a wrong tag or failure.
-struct BrickToggleButton: View {
+/// Anchor when free, Weigh anchor (scan the tag) when anchored. Alerts explain a wrong tag or failure.
+struct AnchorToggleButton: View {
     @Environment(AppModel.self) private var model
     @State private var busy = false
     @State private var message: String?
 
-    private var brick: BrickProfile { model.state.config.brick }
+    private var anchor: AnchorProfile { model.state.config.anchor }
 
     var body: some View {
         Group {
-            if brick.isBricked {
+            if anchor.isAnchored {
                 Button {
-                    Task { await unbrick() }
+                    Task { await weighAnchor() }
                 } label: {
-                    Label("Unbrick", systemImage: "wave.3.right")
+                    Label("Weigh anchor", systemImage: "wave.3.right")
                         .emberBody(13, .bold)
                         .foregroundStyle(Ember.cream)
                 }
                 .buttonStyle(.glass)
             } else {
                 Button {
-                    switch model.brick() {
+                    switch model.anchor() {
                     case .failed(let reason): message = reason
                     default: break
                     }
                 } label: {
-                    Text("Brick")
+                    Text("Anchor")
                         .emberBody(13, .bold)
                         .foregroundStyle(Ember.cream)
                         .padding(.horizontal, 6)
                 }
                 .buttonStyle(.glassProminent)
                 .tint(Ember.ember)
-                .disabled(!brick.canBrick)
+                .disabled(!anchor.canAnchor)
             }
         }
         .disabled(busy)
-        .alert("Brick", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
+        .alert("Anchor", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
             Button("OK") { message = nil }
         } message: {
             Text(message ?? "")
         }
     }
 
-    private func unbrick() async {
+    private func weighAnchor() async {
         busy = true
         defer { busy = false }
-        switch await model.unbrickWithTag() {
+        switch await model.weighAnchorWithTag() {
         case .wrongTag: message = "That is not the paired tag."
         case .failed(let reason): message = reason
         default: break
@@ -261,21 +261,21 @@ struct BrickToggleButton: View {
     }
 }
 
-/// The home-screen entry to the Brick profile, with its state and the Brick / Unbrick button.
-struct BrickCard: View {
-    let brick: BrickProfile
+/// The home-screen entry to the Anchor profile, with its state and the Anchor / Weigh anchor button.
+struct AnchorCard: View {
+    let anchor: AnchorProfile
 
     var body: some View {
         HStack(spacing: 12) {
-            NavigationLink(value: BrickRoute.editor) {
+            NavigationLink(value: AnchorRoute.editor) {
                 HStack(spacing: 10) {
-                    BrickGlyph(isBricked: brick.isBricked, size: 34)
+                    AnchorGlyph(isAnchored: anchor.isAnchored, size: 34)
                     VStack(alignment: .leading, spacing: 1) {
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            Text("Brick")
+                            Text("Anchor")
                                 .emberDisplaySmall(13.5)
                                 .foregroundStyle(Ember.cream)
-                            Eyebrow(text: brick.isBricked ? "Bricked" : "Free", color: brick.isBricked ? Ember.ember : Ember.moss, size: 9)
+                            Eyebrow(text: anchor.isAnchored ? "Anchored" : "Free", color: anchor.isAnchored ? Ember.ember : Ember.moss, size: 9)
                         }
                         Text(subtitle)
                             .emberBody(11.5)
@@ -287,7 +287,7 @@ struct BrickCard: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            BrickToggleButton()
+            AnchorToggleButton()
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
@@ -295,32 +295,32 @@ struct BrickCard: View {
     }
 
     private var subtitle: String {
-        let items = "\(brick.count) \(brick.count == 1 ? "item" : "items")"
-        if brick.kinds.isEmpty { return "Tap to choose apps and pair a tag" }
-        if !brick.isPaired { return "\(items) · pair a tag to enable" }
-        if brick.isBricked, let since = brick.brickedAt {
+        let items = "\(anchor.count) \(anchor.count == 1 ? "item" : "items")"
+        if anchor.kinds.isEmpty { return "Tap to choose apps and pair a tag" }
+        if !anchor.isPaired { return "\(items) · pair a tag to enable" }
+        if anchor.isAnchored, let since = anchor.anchoredAt {
             return "\(items) · since \(since.formatted(date: .omitted, time: .shortened))"
         }
         return "\(items) · ready"
     }
 }
 
-/// A cube in a tile, ember while bricked.
-struct BrickGlyph: View {
-    let isBricked: Bool
+/// A cube in a tile, ember while anchored.
+struct AnchorGlyph: View {
+    let isAnchored: Bool
     var size: CGFloat = 34
 
     var body: some View {
         let radius = size >= 44 ? Ember.tileRadiusLarge : Ember.tileRadius
         Image(systemName: "cube.fill")
             .font(.system(size: size * 0.46, weight: .semibold))
-            .foregroundStyle(isBricked ? Ember.ember : Ember.muted)
+            .foregroundStyle(isAnchored ? Ember.ember : Ember.muted)
             .frame(width: size, height: size)
             .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: radius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
                     .strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
             )
-            .shadow(color: isBricked ? Ember.ember.opacity(0.35) : .clear, radius: 10)
+            .shadow(color: isAnchored ? Ember.ember.opacity(0.35) : .clear, radius: 10)
     }
 }

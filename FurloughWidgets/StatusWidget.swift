@@ -66,7 +66,7 @@ extension HourglassState {
             return .open(level: level, warned: summary.allDayWarned)
         }
         if summary.isEmpty { return .unconfigured }
-        return summary.isBricked ? .bricked : .alwaysBlocked
+        return summary.isAnchored ? .anchored : .alwaysBlocked
     }
 }
 
@@ -139,8 +139,8 @@ struct StatusWidgetView: View {
                     .foregroundStyle(Ember.moss)
                     .lineLimit(1)
             }
-            if summary.isBricked {
-                Text("\(summary.brickedCount) bricked")
+            if summary.isAnchored {
+                Text("\(summary.anchoredCount) anchored")
                     .emberBody(10.5, .semibold)
                     .foregroundStyle(Ember.ember)
             }

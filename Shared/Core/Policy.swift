@@ -4,8 +4,8 @@ import ManagedSettings
 #endif
 
 enum TargetStatus: Equatable {
-    /// Locked by the Brick profile. Only its paired tag lifts this.
-    case bricked
+    /// Locked by the Anchor profile. Only its paired tag lifts this.
+    case anchored
     case unconfigured
     case blockedAllDay
     /// Inside a window with budget remaining. `until` is the window's end minute, midnight
@@ -156,7 +156,7 @@ enum Policy {
         now: Date,
         calendar: Calendar = .current
     ) -> TargetStatus {
-        if config.isBricked(target) { return .bricked }
+        if config.isAnchored(target) { return .anchored }
         guard let rule = target.rule else { return .unconfigured }
         guard rule.isEverAllowed else { return .blockedAllDay }
         let minute = minuteOfDay(now, calendar: calendar)
@@ -201,9 +201,9 @@ enum Policy {
                 decision.categories.insert(token)
             }
         }
-        // The brick can hold things that are not targets at all; while bricked they are all shielded.
-        if config.brick.isBricked {
-            for kind in config.brick.kinds {
+        // The anchor can hold things that are not targets at all; while anchored they are all shielded.
+        if config.anchor.isAnchored {
+            for kind in config.anchor.kinds {
                 switch kind {
                 case .application(let token):
                     decision.allowedApps.remove(token)
@@ -230,8 +230,8 @@ enum Policy {
             case .host(let host): decision.blockedHosts.insert(host)
             }
         }
-        if config.brick.isBricked {
-            for kind in config.brick.kinds {
+        if config.anchor.isAnchored {
+            for kind in config.anchor.kinds {
                 switch kind {
                 case .macApp(let bundleID): decision.blockedApps.insert(bundleID)
                 case .host(let host): decision.blockedHosts.insert(host)
@@ -285,13 +285,13 @@ enum Policy {
         var exhaustedCount = 0
         var unconfiguredCount = 0
         var pendingCount = 0
-        var isBricked = false
-        /// Everything the brick holds, targets or not, while bricked.
-        var brickedCount = 0
+        var isAnchored = false
+        /// Everything the anchor holds, targets or not, while anchored.
+        var anchoredCount = 0
 
         var isEmpty: Bool {
             openNames.isEmpty && allDayNames.isEmpty && nextOpenAt == nil && blockedCount == 0
-                && unconfiguredCount == 0 && brickedCount == 0
+                && unconfiguredCount == 0 && anchoredCount == 0
         }
     }
 
@@ -299,8 +299,8 @@ enum Policy {
         let config = effectiveConfig(state, now: now)
         var summary = Summary()
         summary.pendingCount = state.pending.filter { $0.effectiveAt > now }.count
-        summary.isBricked = config.brick.isBricked
-        summary.brickedCount = config.brick.isBricked ? config.brick.count : 0
+        summary.isAnchored = config.anchor.isAnchored
+        summary.anchoredCount = config.anchor.isAnchored ? config.anchor.count : 0
         let minute = minuteOfDay(now, calendar: calendar)
         let weekday = weekday(now, calendar: calendar)
         var soonestOpen: (until: Int, start: Int, warned: Bool)?
@@ -308,7 +308,7 @@ enum Policy {
 
         for target in config.targets {
             switch status(of: target, config: config, runtime: state.runtime, now: now, calendar: calendar) {
-            case .bricked:
+            case .anchored:
                 summary.blockedCount += 1
             case .unconfigured:
                 summary.unconfiguredCount += 1

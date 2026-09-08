@@ -78,10 +78,16 @@ small codebase he fully understands over a fork. He is interactive: ask when a d
   stored state, clears the managed settings, and enforces the empty state, so the app matches
   a fresh install with Screen Time access still granted. Keep it behind `#if DEBUG`; the
   commands in this file build Debug, so it is present on the phone until Zach switches to
-  `-configuration Release`. The one exception in every build is the Brick profile (`Config.brick`, decided 2026-09-07): a separate
-  set of kinds that "Brick" shields instantly without a tag, and that only scanning the paired
-  NFC tag in the app can unbrick. While bricked, the list and the tag are locked. Bricking is
-  refused until a tag is paired. When the brick is off, apps fall back to their rules.
+  `-configuration Release`. The one exception in every build is the Anchor profile (`Config.anchor`, decided 2026-09-07): a separate
+  set of kinds that "Anchor" shields instantly without a tag, and that only scanning the paired
+  NFC tag in the app can weigh anchor. While anchored, the list and the tag are locked. Anchoring is
+  refused until a tag is paired. When the anchor is off, apps fall back to their rules.
+  It was called the Brick until 2026-09-08 and was renamed because that is another product's
+  name. Stored state keeps working: `Config.init(from:)` reads `anchor` and falls back to the
+  old `brick` key, and `AnchorProfile.init(from:)` reads `isAnchored`/`anchoredAt` and falls
+  back to `isBricked`/`brickedAt`. Encoding always writes the new names, so the fallback is
+  read-once in practice. Do not drop it: it is the only thing standing between a reinstall and
+  a lost pairing. The glyph is still `cube.fill`; SF Symbols has no anchor.
 - Tightening edits apply instantly. Loosening edits (longer or more windows, bigger budget,
   removing a target, lowering the delay) queue for the loosening delay (24 h default) and can
   be cancelled from the pending list. A target's first rule is always instant because the
@@ -89,7 +95,7 @@ small codebase he fully understands over a fork. He is interactive: ask when a d
 - `denyAppRemoval` is on whenever anything is shielded and cleared otherwise.
 - The only escape is Settings > Screen Time > Apps with Screen Time Access > Furlough off.
   It is documented on purpose in the app and README.
-- No emergency unblocks, no schedules beyond the windows. NFC exists only for the Brick tag
+- No emergency unblocks, no schedules beyond the windows. NFC exists only for the Anchor tag
   (in-app scan of the tag's hardware identifier; no background tag reading, no writes).
   Personal use, Xcode installs.
 - Extras that are in scope: "5 minutes left" notification, Live Activity during a window,
@@ -147,12 +153,12 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   `Models.swift` (Weekdays bit set stored as a bare integer, TimeWindow with `days` and a
   tolerant `init(from:)` that reads old rules as every day, Rule with `isAllDay` and
   per-weekday `windows(on:)`/`allowedMask(on:)` that answer `Rule.allDay` when there are no
-  windows, and a 7-day `isTighterOrEqual`, Target, BrickProfile,
+  windows, and a 7-day `isTighterOrEqual`, Target, AnchorProfile,
   Config with a tolerant `init(from:)`, PendingChange, RuntimeState, SharedState),
-  `Policy.swift` (pure engine: `status(of:config:)` returns `.bricked` first and looks at
+  `Policy.swift` (pure engine: `status(of:config:)` returns `.anchored` first and looks at
   today's weekday, `nextOpen(in:afterWeekday:)` searches up to a week ahead, `NextOpen` carries
-  `daysAhead`, `decide` adds brick-only kinds to the shields, `applyDuePending`, `classify`
-  tightening/loosening, `windowFraction`, `summary` with `isBricked`/`brickedCount` and
+  `daysAhead`, `decide` adds anchor-only kinds to the shields, `applyDuePending`, `classify`
+  tightening/loosening, `windowFraction`, `summary` with `isAnchored`/`anchoredCount` and
   `openStart`/`openWarned`/`nextOpenIsExhausted` for the widget's glass, `nextTransition`),
   `SharedStore.swift` (App Group UserDefaults JSON plus a capped activity log; `reset()`
   drops the state and keeps the log),
@@ -175,8 +181,8 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   async call; the identifier is read at detection, no connect), `Views/`: `Root` (dark scheme,
   ember tint, holds the launch screen for a returning user and dissolves between launch,
   onboarding and home), `Launch` (`LaunchView`, the `Launch` timings,
-  `HourglassState.launching`), `Onboarding`, `Brick` (`BrickView`, `BrickCard` on Home, `BrickToggleButton`,
-  `BrickGlyph`),
+  `HourglassState.launching`), `Onboarding`, `Anchor` (`AnchorView`, `AnchorCard` on Home, `AnchorToggleButton`,
+  `AnchorGlyph`),
   `Home` (`HomeContent` holds the featured page id, `HomeGroups` for the sections including
   "Later this week" and `ordered` for the page order, `HeroPager`, `HeroPage` ticking once a
   second, `HeroIndicator`, `EmptyHero`, `TargetRow`; the + button shows `AddChoicePopover`
@@ -221,10 +227,10 @@ table. Not yet seen on the phone: install, then check the test steps in the last
 - Exhaustion is keyed by target id and day (`yyyy-MM-dd`), so a missed midnight callback
   still resets.
 - The shield extension only reads. It folds due pending changes in memory for display.
-- `Policy.decide` is the union of rule shields and, while bricked, every kind in the brick.
-  `allowedApps` never contains a bricked app, so category exceptions cannot leak one through.
-  `AppModel.brick()`, `unbrickWithTag()`, `pairTag()`, `setBrickSelection()`, `unpairTag()`
-  are the only writers of `Config.brick`; the last three refuse while bricked.
+- `Policy.decide` is the union of rule shields and, while anchored, every kind in the anchor.
+  `allowedApps` never contains an anchored app, so category exceptions cannot leak one through.
+  `AppModel.anchor()`, `weighAnchorWithTag()`, `pairTag()`, `setAnchorSelection()`, `unpairTag()`
+  are the only writers of `Config.anchor`; the last three refuse while anchored.
 
 ## Known API facts and quirks
 
@@ -275,13 +281,16 @@ The plan for this stretch. Tick each phase off here as it lands.
    `Weekdays`, `TimeWindow`, `Rule`, `Policy` (status, decide, nextTransition, pending,
    classify, summary), `ActivityNaming`, `Hosts` and decoding older stored JSON. Every later
    phase that touches `Shared/Core` adds tests for what it changes.
-2. **The rename: Brick becomes Anchor.** "Brick" is another product's name. Lock is Anchor,
-   the state is Anchored, release with the tag is Weigh anchor. Identifiers follow the UI
-   (`AnchorProfile`, `Config.anchor`, `isAnchored`, `anchoredAt`, `canAnchor`, `anchor()`,
-   `weighAnchorWithTag()`, `AnchorOutcome`, `TargetStatus.anchored`, `HourglassState.anchored`,
-   `HomeGroups.anchored`, `AnchorView`/`AnchorCard`/…). `Config.init(from:)` decodes `anchor`
-   and falls back to `brick`; encoding writes `anchor`, so Zach's saved state survives.
-   Every doc changes too.
+2. **The rename: Brick became Anchor.** Done 2026-09-08, because "Brick" is another product's
+   name. Lock is Anchor, the state is Anchored, release with the tag is Weigh anchor.
+   Identifiers follow the UI: `AnchorProfile`, `Config.anchor`, `isAnchored`, `anchoredAt`,
+   `canAnchor`, `AppModel.anchor()`, `weighAnchorWithTag()`, `anchorSelection`/
+   `setAnchorSelection`, `AnchorOutcome` (`.anchored`, `.released`, `.paired`, `.wrongTag`,
+   `.cancelled`, `.failed`), `TargetStatus.anchored`, `HourglassState.anchored`,
+   `Policy.Summary.isAnchored`/`anchoredCount`, `HomeGroups.anchored`, and
+   `AnchorView`/`AnchorCard`/`AnchorToggleButton`/`AnchorGlyph` in
+   `Furlough/Views/AnchorView.swift`. The only place "Brick" survives is `TagScanner`'s comment
+   and README, where it names the physical product whose tag also works.
 3. **The device test pass.** One checklist for the phone and one for the Mac. Nobody has yet
    seen, on the phone: the shield copy and colours, a shield lifting by itself at a window's
    start, app deletion denied while blocked, the widget, the Live Activity, the living
@@ -397,7 +406,7 @@ name `Furlough`, macOS 26, non-sandboxed, hardened runtime with the
   because the fields commit as you type and a row that moved mid-edit would leave the cursor.
   `MacHero.swift` holds `TargetHero` (the phone's `HeroPage` for the selected app, at the top
   of the editor, with "n of m min used today" from `MacModel.usedSeconds`) and a copy of the
-  phone's `HomeGroups` (no Bricked section) that the sidebar uses.
+  phone's `HomeGroups` (no Anchored section) that the sidebar uses.
 - Debug builds carry Settings > Testing > Reset everything (`MacModel.resetEverything`,
   `Enforcer.resetUsage`, both `#if DEBUG`), like the phone.
 - The desktop widget: target `FurloughMacWidgets` (bundle `com.zachshort.furlough.mac.widgets`,

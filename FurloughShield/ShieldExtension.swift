@@ -33,10 +33,10 @@ final class ShieldExtension: ShieldConfigurationDataSource {
         let name = nickname.isEmpty ? (systemName ?? "This app") : nickname
         var status = target.map { Policy.status(of: $0, config: config, runtime: state.runtime, now: now) }
         if status == nil {
-            // Things the brick holds that are not targets, directly or through their category.
-            let brickedDirectly = kind.map(config.brick.blocks) ?? false
-            let brickedByCategory = category?.token.map { config.brick.blocks(.category($0)) } ?? false
-            if brickedDirectly || brickedByCategory { status = .bricked }
+            // Things the anchor holds that are not targets, directly or through their category.
+            let anchoredDirectly = kind.map(config.anchor.blocks) ?? false
+            let anchoredByCategory = category?.token.map { config.anchor.blocks(.category($0)) } ?? false
+            if anchoredDirectly || anchoredByCategory { status = .anchored }
         }
         let text = ShieldText.text(name: name, status: status, rule: target?.rule)
 

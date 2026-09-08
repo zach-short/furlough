@@ -14,13 +14,13 @@ and the three header layouts as working phones. Built the same day:
 - `Shared/UI/Hourglass.swift`: `HourglassState` (sand level, mound level, running, frozen,
   glass tint, sand and mound tones, glow colour and strength, pulse, grain, cube) with the
   presets `open(level:warned:)`, `comingSoon(inMinutes:)`, `doneForToday`, `usedUp`,
-  `alwaysBlocked`, `unconfigured`, `bricked`, and `HourglassState.of(target, status:,
+  `alwaysBlocked`, `unconfigured`, `anchored`, and `HourglassState.of(target, status:,
   runtime:, now:)` mapping a `TargetStatus` to Direction C. `HourglassView(state:phase:)` is a
   pure drawing driven by a clock value; `TopSandShape` and `MoundShape` take the level (both
   `Animatable`); under 40 pt it switches to a bolder chip drawing. `LivingHourglass` wraps it
   in `TimelineView(.animation)` at 30 fps, pauses two seconds after the state goes still, and
   under Reduce Motion drops the pulse and the grains but keeps the level.
-- Home: `HeroPager` pages one `HeroPage` per target in the list's order (Bricked, Open now,
+- Home: `HeroPager` pages one `HeroPage` per target in the list's order (Anchored, Open now,
   Later today, Tomorrow, Later this week, Always blocked, Needs a schedule), lands on the
   first open app, and `HeroIndicator` is the strip of 11 pt status hourglasses; tapping one
   turns to that page, tapping a page opens the rule editor. Each page ticks once a second and
@@ -45,7 +45,7 @@ The design has to be honest about the Screen Time API.
 | Fact | Known? | How |
 |---|---|---|
 | Window start and end, remaining window time | Exactly, every second | `Rule.windows`, `Policy.status(of:)` gives `.open(until:)`, `Countdown` already ticks |
-| Whether the app is open now, closed, exhausted, blocked all day, unconfigured, bricked | Exactly | `TargetStatus` |
+| Whether the app is open now, closed, exhausted, blocked all day, unconfigured, anchored | Exactly | `TargetStatus` |
 | Budget used so far | No | DeviceActivity only fires threshold callbacks. Today there are two per target: the 5-minute warning (`eventWillReachThresholdWarning`) and exhaustion. |
 | Budget used, in quarters | Possible | Register three more events per target at 25 / 50 / 75 % of the budget (a new name scheme such as `mark:<uuid>:<quarter>`, so the monitor's "stale threshold" guard is not confused), record `quarters[targetID] = n` in `RuntimeState` keyed by day. Cost: 3 events per target on the one "day" activity; callbacks can arrive minutes late or twice, which the day-keyed state absorbs. |
 | Budget used, exact minutes | Only inside a `DeviceActivityReport` extension view | The data never reaches the app; the report view is slow to appear and cannot be styled from outside. Not for the hero. Fine for a later "today" detail card if ever wanted. |
@@ -90,7 +90,7 @@ Both facts in one object, each at the precision the API allows.
 | Used up today (opens tomorrow) | Ember glow, dim | All sand in the bottom | Still |
 | Always blocked | Faint grey, no glow | Grey sand in the bottom, or no sand | Still |
 | Needs a schedule | Pending yellow outline | Empty glass | Still; outline pulses once on appear |
-| Bricked | Ember glow | Sand frozen mid-stream (the stream stops dead) | Still. A cube glyph at the base |
+| Anchored | Ember glow | Sand frozen mid-stream (the stream stops dead) | Still. A cube glyph at the base |
 | 5 minutes left | Amber | Last grains | Pulse quickens to about 1.2 s |
 
 Reduce Motion: no pulse, no stream particles, levels still change with a plain crossfade.
@@ -121,7 +121,7 @@ Reduce Motion: no pulse, no stream particles, levels still change with a plain c
 - For B or C's quarters: `Monitoring.register` adds the events; `MonitorExtension` handles
   the new name; `RuntimeState` gains the day-keyed quarter map; `Policy.status` or a sibling
   exposes it. Keep the invariant that every callback is idempotent.
-- Bricked, blocked-all-day and unconfigured pages still get the full hourglass treatment so
+- Anchored, blocked-all-day and unconfigured pages still get the full hourglass treatment so
   paging never shows an empty page.
 - Fonts: the system app name cannot be set in Bricolage (see HANDOFF, "Known API facts"), so
   the page title is the nickname in the display face when one exists, else the system name at

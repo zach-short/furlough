@@ -93,7 +93,7 @@ struct SettingsView: View {
                         action("Reset everything") { confirmReset = true }
                     }
                     .emberCard()
-                    Footnote(text: "Debug builds only. Forgets every app, rule, pending change and the Brick, and lifts all shields.")
+                    Footnote(text: "Debug builds only. Forgets every app, rule, pending change and the Anchor, and lifts all shields.")
                         .padding(.top, 8)
                     #endif
                 }
@@ -126,7 +126,7 @@ struct SettingsView: View {
                     dismiss()
                 }
             } message: {
-                Text("Every app, rule, pending change and the Brick are forgotten and all shields lift. Screen Time access is kept.")
+                Text("Every app, rule, pending change and the Anchor are forgotten and all shields lift. Screen Time access is kept.")
             }
             #endif
         }

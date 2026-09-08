@@ -119,9 +119,9 @@ struct TargetHero: View {
                 )
             }
             return Line(eyebrow: "Used up today", color: Ember.ember, big: .quiet("spent"), sub: "\(budget) a day")
-        case .bricked:
-            // Only the phone can brick, and rules are per device, so this never shows on a Mac.
-            return Line(eyebrow: "Bricked", color: Ember.ember, big: .quiet("locked"), sub: RowCopy.detail(target: target, status: status, now: now))
+        case .anchored:
+            // Only the phone can anchor, and rules are per device, so this never shows on a Mac.
+            return Line(eyebrow: "Anchored", color: Ember.ember, big: .quiet("locked"), sub: RowCopy.detail(target: target, status: status, now: now))
         case .blockedAllDay:
             return Line(eyebrow: "Always blocked", color: Ember.muted, big: .quiet("all day"), sub: "No budget · set one below")
         case .unconfigured:
@@ -134,8 +134,8 @@ struct TargetHero: View {
 }
 
 /// The list order from the phone: Open now · Later today · Tomorrow · Later this week ·
-/// Always blocked · Needs a schedule. There is no Bricked section: a Mac has no NFC reader,
-/// so nothing is ever bricked here.
+/// Always blocked · Needs a schedule. There is no Anchored section: a Mac has no NFC reader,
+/// so nothing is ever anchored here.
 struct HomeGroups {
     struct Section: Identifiable {
         let title: String
@@ -169,7 +169,7 @@ struct HomeGroups {
                 } else {
                     tomorrow.append((target, next.map { Policy.date(at: $0, from: now) }))
                 }
-            case .blockedAllDay, .bricked:
+            case .blockedAllDay, .anchored:
                 alwaysBlocked.append(target)
             case .unconfigured:
                 unconfigured.append(target)

@@ -293,47 +293,70 @@ struct Target: Codable, Hashable, Identifiable {
     var displayName: String { nickname.isEmpty ? defaultName : nickname }
 }
 
-/// A set of apps, sites, or categories locked behind a physical NFC tag. Bricking is instant
-/// from the app; unbricking needs the paired tag. This is the only unblock path in Furlough,
-/// and it exists only here: rule-based targets never get one. While bricked, the list and the
+/// A set of apps, sites, or categories locked behind a physical NFC tag. Anchoring is instant
+/// from the app; weighing anchor needs the paired tag. This is the only unblock path in Furlough,
+/// and it exists only here: rule-based targets never get one. While anchored, the list and the
 /// tag cannot be changed.
-struct BrickProfile: Codable, Equatable {
+struct AnchorProfile: Codable, Equatable {
     var kinds: [TargetKind] = []
-    var isBricked = false
-    var brickedAt: Date?
+    var isAnchored = false
+    var anchoredAt: Date?
     /// Hardware identifier of the paired tag, read over NFC.
     var tagID: Data?
 
     var isPaired: Bool { tagID != nil }
     var count: Int { kinds.count }
-    /// Ready to brick: something to lock and a tag to unlock it with.
-    var canBrick: Bool { !kinds.isEmpty && isPaired && !isBricked }
+    /// Ready to anchor: something to lock and a tag to unlock it with.
+    var canAnchor: Bool { !kinds.isEmpty && isPaired && !isAnchored }
     func contains(_ kind: TargetKind) -> Bool { kinds.contains(kind) }
-    /// True when `kind` is blocked by the brick right now.
-    func blocks(_ kind: TargetKind) -> Bool { isBricked && contains(kind) }
+    /// True when `kind` is blocked by the anchor right now.
+    func blocks(_ kind: TargetKind) -> Bool { isAnchored && contains(kind) }
+}
+
+extension AnchorProfile {
+    /// The anchor was called the Brick until 2026-09-08, and the state on the phone still says
+    /// so. Read the old names when the new ones are missing; encoding always writes the new.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let legacy = try decoder.container(keyedBy: LegacyKeys.self)
+        kinds = try container.decodeIfPresent([TargetKind].self, forKey: .kinds) ?? []
+        isAnchored = try container.decodeIfPresent(Bool.self, forKey: .isAnchored)
+            ?? legacy.decodeIfPresent(Bool.self, forKey: .isBricked) ?? false
+        anchoredAt = try container.decodeIfPresent(Date.self, forKey: .anchoredAt)
+            ?? legacy.decodeIfPresent(Date.self, forKey: .brickedAt)
+        tagID = try container.decodeIfPresent(Data.self, forKey: .tagID)
+    }
+
+    private enum LegacyKeys: String, CodingKey { case isBricked, brickedAt }
 }
 
 struct Config: Codable, Equatable {
     var targets: [Target] = []
     var loosenDelayHours: Int = Furlough.defaultLoosenDelayHours
-    var brick = BrickProfile()
+    var anchor = AnchorProfile()
     var schemaVersion = 1
 
     init() {}
 
-    /// `brick` arrived after the first stored states, so its absence must decode cleanly.
+    /// The anchor arrived after the first stored states, so its absence must decode cleanly,
+    /// and it was stored under `brick` until the rename, so that key still reads.
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        let legacy = try decoder.container(keyedBy: LegacyKeys.self)
         targets = try container.decode([Target].self, forKey: .targets)
         loosenDelayHours = try container.decode(Int.self, forKey: .loosenDelayHours)
-        brick = try container.decodeIfPresent(BrickProfile.self, forKey: .brick) ?? BrickProfile()
+        anchor = try container.decodeIfPresent(AnchorProfile.self, forKey: .anchor)
+            ?? legacy.decodeIfPresent(AnchorProfile.self, forKey: .brick)
+            ?? AnchorProfile()
         schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
     }
 
+    private enum LegacyKeys: String, CodingKey { case brick }
+
     var loosenDelay: TimeInterval { TimeInterval(loosenDelayHours) * 3600 }
 
-    /// Whether `target` is locked by the brick right now.
-    func isBricked(_ target: Target) -> Bool { brick.blocks(target.kind) }
+    /// Whether `target` is locked by the anchor right now.
+    func isAnchored(_ target: Target) -> Bool { anchor.blocks(target.kind) }
 
     func target(id: UUID) -> Target? { targets.first { $0.id == id } }
     func target(kind: TargetKind) -> Target? { targets.first { $0.kind == kind } }

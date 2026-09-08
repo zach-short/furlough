@@ -2,7 +2,7 @@ import CoreNFC
 import Foundation
 
 /// Reads one NFC tag's hardware identifier as a single async call, on top of CoreNFC's
-/// delegate API. The identifier is what the Brick profile pairs with; any NTAG sticker or an
+/// delegate API. The identifier is what the Anchor profile pairs with; any NTAG sticker or an
 /// existing Brick device works, and nothing is written to the tag.
 final class TagScanner: NSObject, NFCTagReaderSessionDelegate, @unchecked Sendable {
     enum ScanError: LocalizedError, Equatable {

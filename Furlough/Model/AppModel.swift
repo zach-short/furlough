@@ -306,15 +306,15 @@ final class AppModel {
         return result
     }
 
-    // MARK: Brick
+    // MARK: Anchor
 
-    enum BrickOutcome: Equatable {
-        case bricked, unbricked, paired, wrongTag, cancelled, failed(String)
+    enum AnchorOutcome: Equatable {
+        case anchored, released, paired, wrongTag, cancelled, failed(String)
     }
 
-    var brickSelection: FamilyActivitySelection {
+    var anchorSelection: FamilyActivitySelection {
         var selection = FamilyActivitySelection(includeEntireCategory: true)
-        for kind in state.config.brick.kinds {
+        for kind in state.config.anchor.kinds {
             switch kind {
             case .application(let token): selection.applicationTokens.insert(token)
             case .webDomain(let token): selection.webDomainTokens.insert(token)
@@ -324,61 +324,61 @@ final class AppModel {
         return selection
     }
 
-    /// Replaces what the brick holds. Refused while bricked, so nothing loosens under a lock.
-    func setBrickSelection(_ selection: FamilyActivitySelection) {
+    /// Replaces what the anchor holds. Refused while anchored, so nothing loosens under a lock.
+    func setAnchorSelection(_ selection: FamilyActivitySelection) {
         var current = SharedStore.load()
-        guard !current.config.brick.isBricked else { return }
+        guard !current.config.anchor.isAnchored else { return }
         var kinds: [TargetKind] = []
         kinds += selection.applicationTokens.map(TargetKind.application)
         kinds += selection.webDomainTokens.map(TargetKind.webDomain)
         kinds += selection.categoryTokens.map(TargetKind.category)
-        guard kinds != current.config.brick.kinds else { return }
-        current.config.brick.kinds = kinds
+        guard kinds != current.config.anchor.kinds else { return }
+        current.config.anchor.kinds = kinds
         SharedStore.save(current)
-        SharedStore.log("brick: now holds \(kinds.count) item(s)")
-        enforce(reason: "brick edit")
+        SharedStore.log("anchor: now holds \(kinds.count) item(s)")
+        enforce(reason: "anchor edit")
     }
 
-    /// Bricking is tightening, so it needs no tag. It does need a paired tag to exist, or there
+    /// Anchoring is tightening, so it needs no tag. It does need a paired tag to exist, or there
     /// would be no way back.
-    func brick() -> BrickOutcome {
+    func anchor() -> AnchorOutcome {
         var current = SharedStore.load()
-        guard current.config.brick.canBrick else {
-            return current.config.brick.isBricked ? .bricked : .failed("Choose apps and pair a tag first.")
+        guard current.config.anchor.canAnchor else {
+            return current.config.anchor.isAnchored ? .anchored : .failed("Choose apps and pair a tag first.")
         }
-        current.config.brick.isBricked = true
-        current.config.brick.brickedAt = .now
+        current.config.anchor.isAnchored = true
+        current.config.anchor.anchoredAt = .now
         SharedStore.save(current)
-        SharedStore.log("bricked \(current.config.brick.count) item(s)")
-        enforce(reason: "brick")
-        return .bricked
+        SharedStore.log("anchored \(current.config.anchor.count) item(s)")
+        enforce(reason: "anchor")
+        return .anchored
     }
 
-    /// The only unblock in Furlough: scans the paired tag and, if it matches, lifts the brick.
-    func unbrickWithTag() async -> BrickOutcome {
+    /// The only unblock in Furlough: scans the paired tag and, if it matches, lifts the anchor.
+    func weighAnchorWithTag() async -> AnchorOutcome {
         let scanned: Data
         do {
-            scanned = try await scanner.scan(prompt: "Hold your iPhone to the Furlough tag to unbrick.")
+            scanned = try await scanner.scan(prompt: "Hold your iPhone to the Furlough tag to weigh anchor.")
         } catch {
             return outcome(for: error)
         }
         var current = SharedStore.load()
-        guard current.config.brick.isBricked else { return .unbricked }
-        guard let paired = current.config.brick.tagID, paired == scanned else {
-            SharedStore.log("unbrick refused: not the paired tag")
+        guard current.config.anchor.isAnchored else { return .released }
+        guard let paired = current.config.anchor.tagID, paired == scanned else {
+            SharedStore.log("refused to weigh anchor: not the paired tag")
             return .wrongTag
         }
-        current.config.brick.isBricked = false
-        current.config.brick.brickedAt = nil
+        current.config.anchor.isAnchored = false
+        current.config.anchor.anchoredAt = nil
         SharedStore.save(current)
-        SharedStore.log("unbricked with the paired tag")
-        enforce(reason: "unbrick")
-        return .unbricked
+        SharedStore.log("weighed anchor with the paired tag")
+        enforce(reason: "weigh anchor")
+        return .released
     }
 
-    /// Pairs (or replaces) the tag. Refused while bricked, or any tag could become the key.
-    func pairTag() async -> BrickOutcome {
-        guard !state.config.brick.isBricked else { return .failed("Unbrick first.") }
+    /// Pairs (or replaces) the tag. Refused while anchored, or any tag could become the key.
+    func pairTag() async -> AnchorOutcome {
+        guard !state.config.anchor.isAnchored else { return .failed("Weigh anchor first.") }
         let scanned: Data
         do {
             scanned = try await scanner.scan(prompt: "Hold your iPhone to the tag you want to pair.")
@@ -386,24 +386,24 @@ final class AppModel {
             return outcome(for: error)
         }
         var current = SharedStore.load()
-        guard !current.config.brick.isBricked else { return .failed("Unbrick first.") }
-        current.config.brick.tagID = scanned
+        guard !current.config.anchor.isAnchored else { return .failed("Weigh anchor first.") }
+        current.config.anchor.tagID = scanned
         SharedStore.save(current)
-        SharedStore.log("paired a brick tag")
+        SharedStore.log("paired an anchor tag")
         reload()
         return .paired
     }
 
     func unpairTag() {
         SharedStore.mutate { state in
-            guard !state.config.brick.isBricked else { return }
-            state.config.brick.tagID = nil
+            guard !state.config.anchor.isAnchored else { return }
+            state.config.anchor.tagID = nil
         }
-        SharedStore.log("forgot the brick tag")
+        SharedStore.log("forgot the anchor tag")
         reload()
     }
 
-    private func outcome(for error: any Error) -> BrickOutcome {
+    private func outcome(for error: any Error) -> AnchorOutcome {
         if let scan = error as? TagScanner.ScanError, scan == .cancelled { return .cancelled }
         return .failed(error.localizedDescription)
     }
@@ -436,7 +436,7 @@ final class AppModel {
     #if DEBUG
     // MARK: Testing
 
-    /// Wipes every target, rule, pending change, the Brick and its tag, lifts every shield, and
+    /// Wipes every target, rule, pending change, the Anchor and its tag, lifts every shield, and
     /// enforces the empty state so the app matches a fresh install. Compiled into Debug builds
     /// only: a Release build keeps its promise of no unblock button.
     func resetEverything() {

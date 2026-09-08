@@ -164,13 +164,13 @@
   .pager { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
   .pager::-webkit-scrollbar { display: none; }
   .pager .page { flex: 0 0 100%; scroll-snap-align: start; }
-  .brickcard { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
-  .brickcard .cube { width: 34px; height: 34px; border-radius: 9px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14); display: grid; place-items: center; box-shadow: 0 0 10px rgba(229,86,61,.35); }
-  .brickcard .cube svg { width: 16px; height: 16px; }
-  .brickcard .n { font-family: var(--display); font-variation-settings: "opsz" 24; font-weight: 600; font-size: 13.5px; display: flex; align-items: baseline; gap: 6px; }
-  .brickcard .n .eyebrow { font-size: 9px; }
-  .brickcard .r { font-size: 11.5px; color: var(--muted); }
-  .brickcard .gbtn { margin-left: auto; height: 32px; font-size: 12.5px; }
+  .anchorcard { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
+  .anchorcard .cube { width: 34px; height: 34px; border-radius: 9px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14); display: grid; place-items: center; box-shadow: 0 0 10px rgba(229,86,61,.35); }
+  .anchorcard .cube svg { width: 16px; height: 16px; }
+  .anchorcard .n { font-family: var(--display); font-variation-settings: "opsz" 24; font-weight: 600; font-size: 13.5px; display: flex; align-items: baseline; gap: 6px; }
+  .anchorcard .n .eyebrow { font-size: 9px; }
+  .anchorcard .r { font-size: 11.5px; color: var(--muted); }
+  .anchorcard .gbtn { margin-left: auto; height: 32px; font-size: 12.5px; }
   .seclabel { padding: 12px 8px 6px; }
   .rows { display: flex; flex-direction: column; }
   .row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
@@ -264,7 +264,7 @@
         <thead><tr><th>Fact</th><th>Known</th><th>How</th></tr></thead>
         <tbody>
           <tr><td>Window start, end, time remaining</td><td class="k"><span class="pill yes">Exactly, every second</span></td><td><span class="mono">Rule.windows</span> and <span class="mono">Policy.status</span> give <span class="mono">.open(until:)</span>; the countdown already ticks on this.</td></tr>
-          <tr><td>Open, closed, used up, always blocked, unconfigured, bricked</td><td class="k"><span class="pill yes">Exactly</span></td><td><span class="mono">TargetStatus</span>, recomputed from persisted state on every callback.</td></tr>
+          <tr><td>Open, closed, used up, always blocked, unconfigured, anchored</td><td class="k"><span class="pill yes">Exactly</span></td><td><span class="mono">TargetStatus</span>, recomputed from persisted state on every callback.</td></tr>
           <tr><td>Budget: 5 minutes left, budget spent</td><td class="k"><span class="pill yes">At the callback</span></td><td>Two threshold events per target today. They can land a few minutes late, occasionally twice; the day-keyed state absorbs both.</td></tr>
           <tr><td>Budget used, in quarters</td><td class="k"><span class="pill maybe">Possible</span></td><td>Three more events per target at 25 / 50 / 75 % (<span class="mono">mark:&lt;uuid&gt;:&lt;quarter&gt;</span>), recorded day-keyed in <span class="mono">RuntimeState</span>. Same lateness. Not yet verified that DeviceActivity accepts that many events on one activity.</td></tr>
           <tr><td>Budget used, exact minutes</td><td class="k"><span class="pill no">Never in the app</span></td><td>Only inside a <span class="mono">DeviceActivityReport</span> view, which is slow, unstyleable from outside, and cannot pass data back. Not for the hero.</td></tr>
@@ -341,7 +341,7 @@
         <div class="eyebrow">Colour by status</div>
         <h2>Every status, in every direction</h2>
       </div>
-      <p>The colour system is the same everywhere; what differs is what the sand does while the app is open and during the last five minutes. Bricked, always-blocked and unscheduled pages get the full glass too, so paging never shows an empty page.</p>
+      <p>The colour system is the same everywhere; what differs is what the sand does while the app is open and during the last five minutes. Anchored, always-blocked and unscheduled pages get the full glass too, so paging never shows an empty page.</p>
     </div>
     <div class="statuses" id="statusRows"></div>
     <div class="card elsewhere">
@@ -358,7 +358,7 @@
         <div class="eyebrow">Header layouts</div>
         <h2>Three ways to page through the apps</h2>
       </div>
-      <p>Six managed apps in the list's own order: Bricked, Open now, Later today, Tomorrow, Always blocked, Needs a schedule. The phones are live: swipe the pager, tap the strip, tap a bar in the deck. The list below the hero stays in every layout.</p>
+      <p>Six managed apps in the list's own order: Anchored, Open now, Later today, Tomorrow, Always blocked, Needs a schedule. The phones are live: swipe the pager, tap the strip, tap a bar in the deck. The list below the hero stays in every layout.</p>
     </div>
     <div class="headers">
       <div class="layout">
@@ -555,7 +555,7 @@
     used:    { label: 'Used up today', sub: 'ember, dim, still', color: C.ember },
     always:  { label: 'Always blocked', sub: 'grey, no glow', color: C.faint },
     needs:   { label: 'Needs a schedule', sub: 'pending outline, empty', color: C.pending },
-    bricked: { label: 'Bricked', sub: 'ember, stream frozen, cube', color: C.ember },
+    anchored: { label: 'Anchored', sub: 'ember, stream frozen, cube', color: C.ember },
   };
   function statusGlass(status, dir, extra = {}) {
     const base = {
@@ -565,7 +565,7 @@
       used:    { top: 0, bottom: 1, glass: 'dim', glow: C.ember, glowStrength: .45, pulse: 'none' },
       always:  { top: 0, bottom: .55, sand: 'grey', glass: 'grey', glow: null },
       needs:   { top: 0, bottom: 0, glass: 'pending', glow: null },
-      bricked: { top: .55, bottom: .4, frozen: true, glass: 'cream', glow: C.ember, glowStrength: .9, pulse: 'none', cube: true },
+      anchored: { top: .55, bottom: .4, frozen: true, glass: 'cream', glow: C.ember, glowStrength: .9, pulse: 'none', cube: true },
     }[status];
     const o = { ...base };
     if (dir === 'A') { if (status === 'five') { o.top = .3; o.bottom = .7; } if (extra.ticks) o.ticks = 1; }
@@ -712,21 +712,21 @@
 
   // ---------- Phones ----------
   const APPS = [
-    { name: 'Reddit', status: 'bricked', tile: '#FF4500', i: 'R', rule: '9:00–10:00 PM · 20 min', chip: 'Bricked', eyebrow: ['Bricked · since 6:12 PM', 'ember'], count: () => fmtCountdown(108), sub: 'tag to unbrick · falls back to 9:00–10:00 PM' },
+    { name: 'Reddit', status: 'anchored', tile: '#FF4500', i: 'R', rule: '9:00–10:00 PM · 20 min', chip: 'Anchored', eyebrow: ['Anchored · since 6:12 PM', 'ember'], count: () => fmtCountdown(108), sub: 'tag to weigh anchor · falls back to 9:00–10:00 PM' },
     { name: 'TikTok', status: 'open', tile: '#161616', i: 'T', rule: '8:00–10:00 PM · 30 min', chip: '10:00 PM', eyebrow: ['Open now · until 10:00 PM', 'moss'], count: () => fmtCountdown(103), sub: '30 min budget today' },
     { name: 'Instagram', status: 'soon', tile: '#C13584', i: 'I', rule: '9:00–10:30 PM · 20 min', chip: '9:00 PM', eyebrow: ['Next window', 'amber'], count: () => fmtCountdown(43), sub: 'opens at 9:00 PM · 20 min a day' },
     { name: 'YouTube', status: 'used', tile: '#E62117', i: 'Y', rule: 'Used up today · 45 min', chip: '7:00 PM', eyebrow: ['Used up today', 'ember'], count: () => fmtCountdown(1363), sub: 'opens tomorrow at 7:00 PM · 45 min a day' },
     { name: 'X', status: 'always', tile: '#000', i: 'X', rule: 'No windows', chip: '', eyebrow: ['Always blocked', 'muted'], count: () => 'all day', sub: 'No allowed windows · tap to add one', quiet: true },
     { name: 'Snapchat', status: 'needs', tile: '#FFFC00', i: 'S', rule: 'Not enforced yet', chip: 'Set up', eyebrow: ['Needs a schedule', 'pending'], count: () => 'not enforced', sub: 'Tap to set windows and a budget', quiet: true, dark: true },
   ];
-  const SECTIONS = [['Bricked', ['Reddit']], ['Open now', ['TikTok']], ['Later today', ['Instagram']], ['Tomorrow', ['YouTube']], ['Always blocked', ['X']], ['Needs a schedule', ['Snapchat']]];
+  const SECTIONS = [['Anchored', ['Reddit']], ['Open now', ['TikTok']], ['Later today', ['Instagram']], ['Tomorrow', ['YouTube']], ['Always blocked', ['X']], ['Needs a schedule', ['Snapchat']]];
   const ICON = { gear: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 5.2a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 0 0 0-5.6Zm6.2 3.6-.9-.5.1-.6v-.4l.9-.5c.2-.1.3-.4.2-.6l-1.1-1.9a.5.5 0 0 0-.6-.2l-1 .4a5 5 0 0 0-.9-.5l-.2-1.1a.5.5 0 0 0-.5-.4H7.8a.5.5 0 0 0-.5.4l-.2 1.1a5 5 0 0 0-.9.5l-1-.4a.5.5 0 0 0-.6.2L3.5 6.2c-.1.2 0 .5.2.6l.9.5v1l-.9.5c-.2.1-.3.4-.2.6l1.1 1.9c.1.2.4.3.6.2l1-.4c.3.2.6.4.9.5l.2 1.1c0 .2.3.4.5.4h2.4c.2 0 .5-.2.5-.4l.2-1.1c.3-.1.6-.3.9-.5l1 .4c.2.1.5 0 .6-.2l1.1-1.9c.1-.2 0-.5-.2-.6Z"/></svg>',
     plus: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg>',
     cube: '<svg viewBox="0 0 16 16" fill="#E5563D"><path d="M8 1.5 14 5v6l-6 3.5L2 11V5l6-3.5Z"/></svg>' };
   const app = n => APPS.find(a => a.name === n);
   function tileHTML(a) { return `<div class="tile" style="background:${a.tile};${a.dark ? 'color:#111;' : ''}${a.tile === '#000' || a.tile === '#161616' ? 'border:1px solid rgba(255,255,255,.18);' : ''}">${a.i}</div>`; }
   function listHTML() {
-    return `<div class="card brickcard"><div class="cube">${ICON.cube}</div><div><div class="n">Brick <span class="eyebrow ember">Bricked</span></div><div class="r">1 item · since 6:12 PM</div></div><div class="gbtn">Unbrick</div></div>` +
+    return `<div class="card anchorcard"><div class="cube">${ICON.cube}</div><div><div class="n">Anchor <span class="eyebrow ember">Anchored</span></div><div class="r">1 item · since 6:12 PM</div></div><div class="gbtn">Weigh anchor</div></div>` +
       SECTIONS.map(([title, names]) => `<div class="eyebrow seclabel">${title}</div><div class="card rows">${names.map(n => { const a = app(n); return `<div class="row">${tileHTML(a)}<div><div class="n">${a.name}</div><div class="r">${a.rule}</div></div><div class="chip" style="color:${STATUS[a.status].color}"><div class="glass-wrap" data-rowmini="${a.status}"></div>${a.chip}</div></div>`; }).join('')}</div>`).join('');
   }
   function phoneShell(inner) {
@@ -768,7 +768,7 @@
   let deckOrder = ['TikTok', 'Instagram', 'YouTube', 'Reddit', 'X', 'Snapchat'];
   function deckHTML() {
     const front = app(deckOrder[0]);
-    return `<div class="deck"><div class="front" id="deckFront">${pageHeroHTML(front)}</div><div class="bars" id="bars">${deckOrder.slice(1).map(n => { const a = app(n); return `<button class="bar" data-app="${a.name}"><div class="glass-wrap" data-bar="${a.status}"></div><b>${a.name}</b><span>${a.status === 'open' ? 'open · until 10:00 PM' : a.status === 'soon' ? 'opens 9:00 PM' : a.status === 'used' ? 'used up · tomorrow' : a.status === 'bricked' ? 'bricked' : a.status === 'always' ? 'always blocked' : 'needs a schedule'}</span></button>`; }).join('')}</div><div class="hint">tap a bar to bring it forward · drag down on the phone</div></div>`;
+    return `<div class="deck"><div class="front" id="deckFront">${pageHeroHTML(front)}</div><div class="bars" id="bars">${deckOrder.slice(1).map(n => { const a = app(n); return `<button class="bar" data-app="${a.name}"><div class="glass-wrap" data-bar="${a.status}"></div><b>${a.name}</b><span>${a.status === 'open' ? 'open · until 10:00 PM' : a.status === 'soon' ? 'opens 9:00 PM' : a.status === 'used' ? 'used up · tomorrow' : a.status === 'anchored' ? 'anchored' : a.status === 'always' ? 'always blocked' : 'needs a schedule'}</span></button>`; }).join('')}</div><div class="hint">tap a bar to bring it forward · drag down on the phone</div></div>`;
   }
   function mountDeck() {
     const old = h3.querySelector('#deckFront .count'); if (old) { const idx = liveCounts.findIndex(l => l.el === old); if (idx >= 0) liveCounts.splice(idx, 1); }

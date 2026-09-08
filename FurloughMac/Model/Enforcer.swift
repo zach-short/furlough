@@ -165,7 +165,7 @@ final class Enforcer {
             let target = config.target(bundleID: bundleID)
             let name = target?.displayName ?? app.localizedName ?? bundleID
             let status = target.flatMap { decision.statuses[$0.id] }
-            SharedStore.log("quit \(name): \(status.map { TimeFormat.status($0) } ?? "in the brick")")
+            SharedStore.log("quit \(name): \(status.map { TimeFormat.status($0) } ?? "in the anchor")")
             if let target, now.timeIntervalSince(lastShield[target.id] ?? .distantPast) > 8 {
                 lastShield[target.id] = now
                 let text = ShieldText.text(name: name, status: status, rule: target.rule)
