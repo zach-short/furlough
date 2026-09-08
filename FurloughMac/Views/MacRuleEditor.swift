@@ -1,4 +1,3 @@
-import Combine
 import SwiftUI
 
 /// The rule for one app or site: nickname, allowed windows with their days, daily budget.
@@ -23,8 +22,9 @@ struct MacRuleEditor: View {
     /// The tier in the draft, saved through `MacModel.setUtility`.
     @State private var tier = Utility.unset
     @State private var confirmBlockEssential = false
-    @State private var now = Date.now
-    private let clock = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    /// The window's clock. It has to be the model's: the window rebuilds this editor on every
+    /// tick of its own, which would restart a timer kept here before it could fire.
+    private var now: Date { model.now }
 
     struct DraftWindow: Identifiable {
         let id = UUID()
@@ -171,7 +171,6 @@ struct MacRuleEditor: View {
             .frame(maxWidth: 620, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
-        .onReceive(clock) { now = model.clock.honest($0) }
         .onAppear(perform: load)
         .confirmationDialog("Remove from Furlough?", isPresented: $confirmRemove, titleVisibility: .visible) {
             Button("Remove", role: .destructive) { saved = model.removeTarget(id: targetID).message }

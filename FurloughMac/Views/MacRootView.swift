@@ -1,4 +1,3 @@
-import Combine
 import SwiftUI
 
 struct MacRootView: View {
@@ -36,8 +35,8 @@ struct MacHomeView: View {
     @State private var showAddSite = false
     @State private var showPending = false
     @State private var showSettings = false
-    @State private var now = Date.now
-    private let clock = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    /// The window's clock, kept on the model so the sidebar and the detail pane count in step.
+    private var now: Date { model.now }
 
     var body: some View {
         ZStack {
@@ -50,7 +49,6 @@ struct MacHomeView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .onReceive(clock) { now = model.clock.honest($0) }
         .sheet(isPresented: $showAddApp) {
             AddAppSheet { app in
                 let outcome = model.addApp(bundleID: app.bundleID, name: app.name)

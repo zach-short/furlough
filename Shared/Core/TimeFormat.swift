@@ -33,6 +33,12 @@ enum TimeFormat {
         return date.formatted(style(calendar).hour(.defaultDigits(amPM: .abbreviated)).minute())
     }
 
+    /// A time of day read off a date, for the places that already hold one rather than a
+    /// minute of the day: `Policy.Summary` carries Dates, and the spoken status is built from it.
+    static func clock(_ date: Date, calendar: Calendar = .current) -> String {
+        date.formatted(style(calendar, date: .omitted, time: .shortened))
+    }
+
     /// When an open window ends. 1440 is midnight tonight; past it is a night's morning, so
     /// 1680 is 4:00 AM tomorrow. Anything less is an ordinary time today.
     static func until(_ minute: Int, calendar: Calendar = .current) -> String {

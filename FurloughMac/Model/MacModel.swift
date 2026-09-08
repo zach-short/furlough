@@ -36,8 +36,15 @@ final class MacModel {
     /// Which browsers are running and whether Furlough may read their address bar.
     var browserAccess: [BrowserAccess] = []
     let enforcer = Enforcer.shared
+    /// Furlough's own time, re-read once a second. Every countdown and every used-today line
+    /// in the window reads it from here rather than keeping a timer of its own: the detail
+    /// pane is rebuilt on every tick of the window's clock, and a timer owned by a view that
+    /// is rebuilt that often is re-subscribed before it can ever fire, so anything counting on
+    /// it stands still until the view is made again.
+    private(set) var now = Date.now
 
     private static let onboardedKey = "furlough.mac.onboarded"
+    @ObservationIgnored private var ticker: Timer?
 
     // MARK: Lifecycle
 
@@ -54,6 +61,7 @@ final class MacModel {
             WidgetCenter.shared.reloadAllTimelines()
         }
         enforcer.start()
+        startTicking()
         reload()
         Task { await refreshNotificationStatus() }
         refreshBrowserAccess()
@@ -114,6 +122,23 @@ final class MacModel {
     /// Furlough's own time and how far this Mac's clock is from it. Every view that shows a
     /// countdown reads it through here; see `Clock`.
     var clock: Clock.Reading { state.clock() }
+
+    /// The window's second hand. The same shape as the enforcer's tick and the menu bar's:
+    /// built by hand and added to the common mode, so the countdowns keep moving while a menu
+    /// is open or a window is being dragged.
+    private func startTicking() {
+        guard ticker == nil else { return }
+        now = clock.now
+        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.now = self.clock.now
+            }
+        }
+        timer.tolerance = 0.2
+        RunLoop.main.add(timer, forMode: .common)
+        ticker = timer
+    }
 
     /// Re-derives everything from persisted state: folds in due pending changes and makes
     /// the Mac match the rules. Safe to call at any time.
