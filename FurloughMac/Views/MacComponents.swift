@@ -190,7 +190,7 @@ struct StatusChip: View {
         case .bricked: "Bricked"
         case .open(let until): allDay ? "All day" : TimeFormat.minute(until)
         case .closed(let next): TimeFormat.chip(next)
-        case .exhausted(let next): next.map(TimeFormat.chip)
+        case .exhausted(let next): next.map { TimeFormat.chip($0) }
         case .unconfigured: "Set up"
         case .blockedAllDay: nil
         }
@@ -216,7 +216,7 @@ enum RowCopy {
         if rule.isSameEveryDay {
             return "\(TimeFormat.schedule(rule)) · \(budget)"
         }
-        let today = rule.windows(on: Policy.weekday(now)).map(TimeFormat.window)
+        let today = rule.windows(on: Policy.weekday(now)).map { TimeFormat.window($0) }
         return today.isEmpty ? "Not today · \(budget)" : "Today \(today.joined(separator: ", ")) · \(budget)"
     }
 }

@@ -25,13 +25,24 @@ small codebase he fully understands over a fork. He is interactive: ask when a d
     grep -E "error:|warning:|BUILD SUCCEEDED|BUILD FAILED" build/build.log | grep -v appintentsmetadata | sort -u
   ```
   Keep the project free of warnings in our own code.
+- Test check (the rules engine has a macOS test bundle: `Tests/Core`, Swift Testing, no host
+  app; `Shared/Core` is compiled into it with `ShieldReconciler.swift` excluded because it
+  imports ManagedSettings). Run it after every change to `Shared/Core`:
+  ```bash
+  xcodebuild test -project Furlough.xcodeproj -scheme FurloughCoreTests \
+    -destination 'platform=macOS,arch=arm64' -derivedDataPath build/DerivedDataTests \
+    > build/test.log 2>&1; grep -E "error:|✘|Test run" build/test.log | sort -u
+  ```
+  Tests pin a calendar (`fixedCalendar()` in `Tests/Core/Support.swift`: GMT, en_US_POSIX,
+  a chosen first weekday), so nothing depends on this Mac's clock, time zone or locale.
+  `Policy.status`, `Policy.decide`, `Policy.summary` and every `TimeFormat` function that
+  renders a date take a `calendar:` parameter defaulting to `.current` for that reason.
 - Install on the phone once connected: build with `-destination 'platform=iOS,id=<UDID>'`,
   then `xcrun devicectl device install app --device <UDID> build/DerivedData/Build/Products/Debug-iphoneos/Furlough.app`
   and `xcrun devicectl device process launch --device <UDID> com.zachshort.furlough`. You cannot
   see the phone. After each phase, tell Zach exactly what to test and what he should see, then
   wait for his report.
-- Commit at the end of each phase. Commit messages end with
-  `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
+- Commit at the end of each phase, with the `Co-Authored-By` line your harness gives you.
 
 ## Settled: what Furlough is
 
@@ -147,7 +158,12 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   drops the state and keeps the log),
   `ShieldReconciler.swift` (idempotent shield apply and `denyAppRemoval`),
   `ActivityNaming.swift`, `TimeFormat.swift` (`days`, `schedule`, `chip`, `nextOpen` with
-  weekday names, + `ShieldText`).
+  weekday names, + `ShieldText`; every function that renders a date takes a `calendar:`),
+  `Hosts.swift` (`normalize`, `matches`; it lived in `MacModel.swift` until the tests wanted
+  it, and is harmlessly unused on iOS).
+- `Tests/Core` (target `FurloughCoreTests`, macOS, Swift Testing, no host app): `Support.swift`
+  (the pinned calendar and the fixtures), `ModelsTests`, `PolicyStatusTests`,
+  `PolicyPendingTests`, `PolicySummaryTests`, `NamingTests`, `DecodingTests`. 71 tests.
 - `Shared/LiveActivity/FurloughActivityAttributes.swift` (app + widgets).
 - `Shared/UI/Theme.swift` (app + widgets), `Shared/UI/Hourglass.swift` (`HourglassState`
   with its presets and `of(target:status:runtime:now:)`, `HourglassView(state:phase:)` pure,
@@ -253,29 +269,63 @@ table. Not yet seen on the phone: install, then check the test steps in the last
 
 ## Next work, in order
 
-1. **The living hourglass hero**: built (see "Settled: the living hourglass"). Waiting on
-   Zach's report from the phone; fix what he finds. The widget timeline now carries an entry
-   every three minutes during an open window, which is unverified on the device.
-2. **Finish the device test plan.** Verified on 2026-09-07 from screenshots: onboarding, the
-   picker, the rule editor, home grouping, the countdown, a budget exhausting (TikTok showed
-   "Used up today" under Tomorrow). Not yet reported: the shield copy and colours, the shield
-   lifting by itself at window start, app deletion denied while blocked, the widget, the Live
-   Activity, and the whole Brick flow (pair a tag, brick, wrong tag refused, unbrick, and
-   whether the tag identifier is stable across two scans). Fix what Zach reports. The shield
-   icon is still the SF hourglass in Amber until step 4 generates art.
-3. **Live Activity at window start** without opening the app (see the quirk above). Zach
-   asked whether widgets and the Dynamic Island exist: they do (small, medium, lock-screen
-   rectangle; compact, minimal and expanded island); this step is only about starting the
-   activity without the app in the foreground.
-4. **Imagery with the Higgsfield MCP, only with Zach's go-ahead per item, conserving credits**
-   (balance was about 413 after spending about 5). Preflight every call with `get_cost: true`.
-   Reference the icon jobs by id as `image_references`: original `27b1c254-594f-46fe-9b3e-232c38a9e9d2`,
-   toned-down (the one in use) `fd975516-80d9-4941-b0c4-6cd7be8fd92a`. Planned: a
-   transparent-background hourglass for the shield icon and the home hero (Seedream 5.0 Pro
-   with `remove_bg: true`), an onboarding hero and empty-state illustration in the same style,
-   and short README clips via `generate_video` (image-to-video: sand pouring, ember pulse).
-   Recraft V4.1 accepts a `colors` palette and `background_color`; use the Ember hexes.
-5. Keep `README.md` current (install steps, escape path) and commit each phase.
+The plan for this stretch. Tick each phase off here as it lands.
+
+1. **A test target for the rules engine.** Done 2026-09-08: `FurloughCoreTests`, 71 tests over
+   `Weekdays`, `TimeWindow`, `Rule`, `Policy` (status, decide, nextTransition, pending,
+   classify, summary), `ActivityNaming`, `Hosts` and decoding older stored JSON. Every later
+   phase that touches `Shared/Core` adds tests for what it changes.
+2. **The rename: Brick becomes Anchor.** "Brick" is another product's name. Lock is Anchor,
+   the state is Anchored, release with the tag is Weigh anchor. Identifiers follow the UI
+   (`AnchorProfile`, `Config.anchor`, `isAnchored`, `anchoredAt`, `canAnchor`, `anchor()`,
+   `weighAnchorWithTag()`, `AnchorOutcome`, `TargetStatus.anchored`, `HourglassState.anchored`,
+   `HomeGroups.anchored`, `AnchorView`/`AnchorCard`/…). `Config.init(from:)` decodes `anchor`
+   and falls back to `brick`; encoding writes `anchor`, so Zach's saved state survives.
+   Every doc changes too.
+3. **The device test pass.** One checklist for the phone and one for the Mac. Nobody has yet
+   seen, on the phone: the shield copy and colours, a shield lifting by itself at a window's
+   start, app deletion denied while blocked, the widget, the Live Activity, the living
+   hourglass hero (built 2026-09-07, the widget timeline's three-minute entries included), and
+   the whole Anchor flow (pair a tag, anchor, a wrong tag refused, weigh anchor, and whether
+   the tag identifier is stable across two scans). On the Mac: the shield panel, the browser
+   redirect and its one-time Automation prompt, budget counting, the login item, and the
+   desktop widget placed on the desktop. Record the results here. Also: does a web-domain shield reach Chrome on the
+   phone? Put the answer in README's limits.
+4. **The clock cannot be an unblock button.** A `ClockMark` in `RuntimeState` (wall time plus
+   `systemUptime`), a pure `Clock.isTrusted(now:uptime:mark:tolerance:)` in `Shared/Core`, and
+   `Policy.applyDuePending` holding loosening changes on an untrusted clock while tightening
+   still applies. The Mac enforcer listens for `NSSystemClockDidChange`.
+5. **Notifications**: "Window opened" from the monitor at a window's start, and "lands in an
+   hour" / "landed" for pending changes, through one `PendingNotifications` helper in Core.
+6. **Small fixes**: the 19-span limit checked in the editors (`Policy.distinctSpans`), pending
+   cards showing old rule → new rule, `widgetURL` and the `furlough://target/<id>` scheme,
+   the Mac browser poll at two seconds, and iPad (ask Zach).
+7. **Mac hardening**: 45-second grace before force quit with a countdown on the panel, every
+   window rather than only the front one, Safari web apps in the Dock, and a `SMAppService`
+   LaunchAgent watchdog. Confirm the watchdog with Zach first.
+8. **Anchor from anywhere**: `AnchorIntent`, `AppShortcutsProvider`, a Control Center
+   `ControlWidget`, a `Button(intent:)` on the medium widget. Anchoring is tightening, so every
+   surface is safe; release stays in the app behind the tag.
+9. **Real usage on the phone**: a `FurloughReport` DeviceActivity report extension with a
+   `budget` scene on the hero and in the rule editor, a `week` scene behind a History link, and
+   quarter-mark threshold events if DeviceActivity accepts four events per target.
+10. **Live Activity at window start**, if the iOS 26 ActivityKit swiftinterface has a
+    scheduled-start `Activity.request`. If not, document the widget and the notification as
+    the coverage and move on.
+11. **Per-weekday budgets**: `budgetByWeekday: [Int]?`, `Rule.budget(on:)`, a "Same budget every
+    day" toggle, one `budget:` event per distinct value, the monitor filtering by today's.
+12. **Rules for categories** instead of always-blocked. Ask Zach first.
+13. **Anchor the whole phone**: a scope on `AnchorProfile`, `.all(except:)` with an allowlist.
+14. **A second tag**: `AnchorProfile.tagIDs`, pairing another queues as loosening.
+15. **A longer delay for the worst apps**: `Target.loosenDelayHours`. Ask Zach first.
+16. **Unify the Mac duplicates** into `Shared/UI`, only while `Furlough/Views` is quiet.
+17. **Imagery** with the Higgsfield MCP, only with Zach's go-ahead per item, preflighting every
+    cost (balance was about 413). Reference the icon jobs by id: original
+    `27b1c254-594f-46fe-9b3e-232c38a9e9d2`, toned-down (in use)
+    `fd975516-80d9-4941-b0c4-6cd7be8fd92a`. Planned: a transparent-background hourglass for the
+    shield icon and the hero, an onboarding hero, and short README clips.
+18. **Sync the Anchor across devices** through CloudKit or the key-value store. Rules cannot
+    sync (tokens versus bundle ids). Ask Zach whether he wants it at all.
 
 ## Style rules
 

@@ -173,7 +173,7 @@ struct WeekGrid: View {
         if week.isAllDay { return "All day" }
         let spans = week.spans(on: weekday)
         guard !spans.isEmpty else { return "No windows" }
-        return spans.map(TimeFormat.window).joined(separator: ", ")
+        return spans.map { TimeFormat.window($0) }.joined(separator: ", ")
     }
 }
 
@@ -408,6 +408,6 @@ struct DayBar: View {
         }
         .accessibilityElement()
         .accessibilityLabel("Hours")
-        .accessibilityValue(spans.isEmpty ? "No windows" : spans.map(TimeFormat.window).joined(separator: ", "))
+        .accessibilityValue(spans.isEmpty ? "No windows" : spans.map { TimeFormat.window($0) }.joined(separator: ", "))
     }
 }

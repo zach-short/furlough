@@ -149,13 +149,19 @@ enum Policy {
 
     // MARK: Status
 
-    static func status(of target: Target, config: Config, runtime: RuntimeState, now: Date) -> TargetStatus {
+    static func status(
+        of target: Target,
+        config: Config,
+        runtime: RuntimeState,
+        now: Date,
+        calendar: Calendar = .current
+    ) -> TargetStatus {
         if config.isBricked(target) { return .bricked }
         guard let rule = target.rule else { return .unconfigured }
         guard rule.isEverAllowed else { return .blockedAllDay }
-        let minute = minuteOfDay(now)
-        let weekday = weekday(now)
-        if runtime.isExhausted(target.id, dayKey: dayKey(now)) {
+        let minute = minuteOfDay(now, calendar: calendar)
+        let weekday = weekday(now, calendar: calendar)
+        if runtime.isExhausted(target.id, dayKey: dayKey(now, calendar: calendar)) {
             return .exhausted(nextOpen: nextOpen(in: rule, afterWeekday: weekday))
         }
         if let current = rule.window(containing: minute, on: weekday) {
@@ -181,10 +187,10 @@ enum Policy {
     }
 
     #if os(iOS)
-    static func decide(config: Config, runtime: RuntimeState, now: Date) -> Decision {
+    static func decide(config: Config, runtime: RuntimeState, now: Date, calendar: Calendar = .current) -> Decision {
         var decision = Decision()
         for target in config.targets {
-            let status = status(of: target, config: config, runtime: runtime, now: now)
+            let status = status(of: target, config: config, runtime: runtime, now: now, calendar: calendar)
             decision.statuses[target.id] = status
             switch target.kind {
             case .application(let token):
@@ -213,10 +219,10 @@ enum Policy {
         return decision
     }
     #else
-    static func decide(config: Config, runtime: RuntimeState, now: Date) -> Decision {
+    static func decide(config: Config, runtime: RuntimeState, now: Date, calendar: Calendar = .current) -> Decision {
         var decision = Decision()
         for target in config.targets {
-            let status = status(of: target, config: config, runtime: runtime, now: now)
+            let status = status(of: target, config: config, runtime: runtime, now: now, calendar: calendar)
             decision.statuses[target.id] = status
             guard !status.isAllowed else { continue }
             switch target.kind {
@@ -289,19 +295,19 @@ enum Policy {
         }
     }
 
-    static func summary(state: SharedState, now: Date) -> Summary {
+    static func summary(state: SharedState, now: Date, calendar: Calendar = .current) -> Summary {
         let config = effectiveConfig(state, now: now)
         var summary = Summary()
         summary.pendingCount = state.pending.filter { $0.effectiveAt > now }.count
         summary.isBricked = config.brick.isBricked
         summary.brickedCount = config.brick.isBricked ? config.brick.count : 0
-        let minute = minuteOfDay(now)
-        let weekday = weekday(now)
+        let minute = minuteOfDay(now, calendar: calendar)
+        let weekday = weekday(now, calendar: calendar)
         var soonestOpen: (until: Int, start: Int, warned: Bool)?
         var soonest: (date: Date, names: [String], budget: Int?, exhausted: Bool)?
 
         for target in config.targets {
-            switch status(of: target, config: config, runtime: state.runtime, now: now) {
+            switch status(of: target, config: config, runtime: state.runtime, now: now, calendar: calendar) {
             case .bricked:
                 summary.blockedCount += 1
             case .unconfigured:
@@ -309,7 +315,7 @@ enum Policy {
             case .blockedAllDay:
                 summary.blockedCount += 1
             case .open(let until):
-                let warned = state.runtime.wasWarned(target.id, dayKey: dayKey(now))
+                let warned = state.runtime.wasWarned(target.id, dayKey: dayKey(now, calendar: calendar))
                 if target.rule?.isAllDay ?? false {
                     summary.allDayNames.append(target.displayName)
                     summary.allDayWarned = summary.allDayWarned || warned
@@ -323,10 +329,10 @@ enum Policy {
             case .exhausted(let next):
                 summary.exhaustedCount += 1
                 summary.blockedCount += 1
-                if let next { consider(date(at: next, from: now), target, exhausted: true) }
+                if let next { consider(date(at: next, from: now, calendar: calendar), target, exhausted: true) }
             case .closed(let next):
                 summary.blockedCount += 1
-                consider(date(at: next, from: now), target, exhausted: false)
+                consider(date(at: next, from: now, calendar: calendar), target, exhausted: false)
             }
         }
         func consider(_ date: Date, _ target: Target, exhausted: Bool) {
@@ -340,8 +346,8 @@ enum Policy {
             }
         }
         if let soonestOpen {
-            summary.openUntil = date(atMinute: soonestOpen.until, of: now)
-            summary.openStart = date(atMinute: soonestOpen.start, of: now)
+            summary.openUntil = date(atMinute: soonestOpen.until, of: now, calendar: calendar)
+            summary.openStart = date(atMinute: soonestOpen.start, of: now, calendar: calendar)
             summary.openWarned = soonestOpen.warned
         }
         summary.nextOpenAt = soonest?.date

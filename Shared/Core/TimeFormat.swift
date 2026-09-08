@@ -1,23 +1,40 @@
 import Foundation
 
 enum TimeFormat {
-    static func minute(_ minute: Int) -> String {
+    /// Every date here is rendered through the calendar it was given, so a pinned calendar
+    /// pins the time zone and the locale too and the output does not depend on the machine.
+    private static func style(
+        _ calendar: Calendar,
+        date: Date.FormatStyle.DateStyle? = nil,
+        time: Date.FormatStyle.TimeStyle? = nil
+    ) -> Date.FormatStyle {
+        Date.FormatStyle(
+            date: date,
+            time: time,
+            locale: calendar.locale ?? .autoupdatingCurrent,
+            calendar: calendar,
+            timeZone: calendar.timeZone
+        )
+    }
+
+    static func minute(_ minute: Int, calendar: Calendar = .current) -> String {
         if minute >= Furlough.minutesPerDay { return "midnight" }
-        return Policy.date(atMinute: minute, of: .now).formatted(date: .omitted, time: .shortened)
+        return Policy.date(atMinute: minute, of: .now, calendar: calendar)
+            .formatted(style(calendar, date: .omitted, time: .shortened))
     }
 
     /// "8 PM", "8:30 PM", "12 AM" for midnight either end; follows the locale's clock.
-    static func shortMinute(_ minute: Int) -> String {
+    static func shortMinute(_ minute: Int, calendar: Calendar = .current) -> String {
         let wrapped = minute % Furlough.minutesPerDay
-        let date = Policy.date(atMinute: wrapped, of: .now)
+        let date = Policy.date(atMinute: wrapped, of: .now, calendar: calendar)
         if wrapped % 60 == 0 {
-            return date.formatted(.dateTime.hour(.defaultDigits(amPM: .abbreviated)))
+            return date.formatted(style(calendar).hour(.defaultDigits(amPM: .abbreviated)))
         }
-        return date.formatted(.dateTime.hour(.defaultDigits(amPM: .abbreviated)).minute())
+        return date.formatted(style(calendar).hour(.defaultDigits(amPM: .abbreviated)).minute())
     }
 
-    static func window(_ window: TimeWindow) -> String {
-        "\(minute(window.startMinute))–\(minute(window.endMinute))"
+    static func window(_ window: TimeWindow, calendar: Calendar = .current) -> String {
+        "\(minute(window.startMinute, calendar: calendar))–\(minute(window.endMinute, calendar: calendar))"
     }
 
     static func budget(_ minutes: Int) -> String {
@@ -61,7 +78,7 @@ enum TimeFormat {
     static func schedule(_ rule: Rule, calendar: Calendar = .current) -> String {
         if rule.isAllDay { return "All day" }
         if rule.isSameEveryDay {
-            return rule.sortedWindows.map(window).joined(separator: ", ")
+            return rule.sortedWindows.map { window($0, calendar: calendar) }.joined(separator: ", ")
         }
         var groups: [(days: Weekdays, windows: [TimeWindow])] = []
         for window in rule.sortedWindows {
@@ -73,47 +90,61 @@ enum TimeFormat {
         }
         groups.sort { $0.days.groupOrder(calendar: calendar) < $1.days.groupOrder(calendar: calendar) }
         return groups
-            .map { "\(days($0.days, calendar: calendar)) \($0.windows.map(window).joined(separator: ", "))" }
+            .map { group in
+                let hours = group.windows.map { window($0, calendar: calendar) }.joined(separator: ", ")
+                return "\(days(group.days, calendar: calendar)) \(hours)"
+            }
             .joined(separator: " · ")
     }
 
-    static func rule(_ rule: Rule?) -> String {
+    static func rule(_ rule: Rule?, calendar: Calendar = .current) -> String {
         guard let rule else { return "Not configured yet" }
         guard rule.isEverAllowed else { return "Blocked all day" }
-        return "\(schedule(rule)) · \(budget(rule.dailyBudgetMinutes))/day"
+        return "\(schedule(rule, calendar: calendar)) · \(budget(rule.dailyBudgetMinutes))/day"
     }
 
     /// The name of the day `daysAhead` days from now.
-    static func weekdayName(daysAhead: Int, abbreviated: Bool = false, from now: Date = .now) -> String {
-        let date = Calendar.current.date(byAdding: .day, value: daysAhead, to: now) ?? now
-        return date.formatted(.dateTime.weekday(abbreviated ? .abbreviated : .wide))
+    static func weekdayName(
+        daysAhead: Int,
+        abbreviated: Bool = false,
+        from now: Date = .now,
+        calendar: Calendar = .current
+    ) -> String {
+        let date = calendar.date(byAdding: .day, value: daysAhead, to: now) ?? now
+        return date.formatted(style(calendar).weekday(abbreviated ? .abbreviated : .wide))
     }
 
-    static func nextOpen(_ next: NextOpen) -> String {
+    static func nextOpen(_ next: NextOpen, from now: Date = .now, calendar: Calendar = .current) -> String {
         if next.isMidnight { return "at midnight" }
+        let at = minute(next.minuteOfDay, calendar: calendar)
         return switch next.daysAhead {
-        case 0: "at \(minute(next.minuteOfDay))"
-        case 1: "tomorrow at \(minute(next.minuteOfDay))"
-        case 7: "next \(weekdayName(daysAhead: 7)) at \(minute(next.minuteOfDay))"
-        default: "\(weekdayName(daysAhead: next.daysAhead)) at \(minute(next.minuteOfDay))"
+        case 0: "at \(at)"
+        case 1: "tomorrow at \(at)"
+        case 7: "next \(weekdayName(daysAhead: 7, from: now, calendar: calendar)) at \(at)"
+        default: "\(weekdayName(daysAhead: next.daysAhead, from: now, calendar: calendar)) at \(at)"
         }
     }
 
     /// The short form for a row's status chip: a time today or tomorrow, else the day.
-    static func chip(_ next: NextOpen) -> String {
+    static func chip(_ next: NextOpen, from now: Date = .now, calendar: Calendar = .current) -> String {
         if next.isMidnight { return "midnight" }
-        return next.daysAhead <= 1 ? minute(next.minuteOfDay) : weekdayName(daysAhead: next.daysAhead, abbreviated: true)
+        if next.daysAhead <= 1 { return minute(next.minuteOfDay, calendar: calendar) }
+        return weekdayName(daysAhead: next.daysAhead, abbreviated: true, from: now, calendar: calendar)
     }
 
-    static func status(_ status: TargetStatus) -> String {
+    static func status(_ status: TargetStatus, calendar: Calendar = .current) -> String {
         switch status {
         case .bricked: "Bricked"
         case .unconfigured: "Not enforced until you set a schedule"
         case .blockedAllDay: "Blocked all day"
-        case .open(let until): "Open until \(minute(until))"
+        case .open(let until): "Open until \(minute(until, calendar: calendar))"
         case .exhausted(let next):
-            if let next { "Used up for today · opens \(nextOpen(next))" } else { "Used up for today" }
-        case .closed(let next): "Opens \(nextOpen(next))"
+            if let next {
+                "Used up for today · opens \(nextOpen(next, calendar: calendar))"
+            } else {
+                "Used up for today"
+            }
+        case .closed(let next): "Opens \(nextOpen(next, calendar: calendar))"
         }
     }
 
@@ -140,7 +171,12 @@ enum TimeFormat {
 
 /// Copy for the shield shown over a blocked app or site.
 enum ShieldText {
-    static func text(name: String, status: TargetStatus?, rule: Rule?) -> (title: String, subtitle: String) {
+    static func text(
+        name: String,
+        status: TargetStatus?,
+        rule: Rule?,
+        calendar: Calendar = .current
+    ) -> (title: String, subtitle: String) {
         guard let status else {
             return ("Blocked by Furlough", "This is part of a blocked category.")
         }
@@ -155,10 +191,10 @@ enum ShieldText {
         case .open:
             return ("Opening…", "Furlough is lifting the shield. Try again in a moment.")
         case .exhausted(let next):
-            let when = next.map { "Opens \(TimeFormat.nextOpen($0))." } ?? ""
+            let when = next.map { "Opens \(TimeFormat.nextOpen($0, calendar: calendar))." } ?? ""
             return ("Time's up for today", "You used your \(budget) for \(name). \(when)")
         case .closed(let next):
-            return ("\(name) opens \(TimeFormat.nextOpen(next))", "You get \(budget) per day.")
+            return ("\(name) opens \(TimeFormat.nextOpen(next, calendar: calendar))", "You get \(budget) per day.")
         }
     }
 }
