@@ -181,7 +181,7 @@ struct BrickView: View {
                 .buttonStyle(.plain)
                 if brick.isPaired {
                     CardDivider()
-                    GhostButton(title: "Forget tag", color: Ember.muted) { confirmForget = true }
+                    GhostButton(title: "Forget tag") { confirmForget = true }
                 }
             }
         }
