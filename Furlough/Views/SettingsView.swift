@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
@@ -6,6 +7,9 @@ struct SettingsView: View {
     @State private var delayHours = Furlough.defaultLoosenDelayHours
     @State private var result: ProposalResult?
     @State private var confirmReset = false
+    @State private var setupFile: SetupDocument?
+    @State private var setupName = ""
+    @State private var exportError: String?
 
     var body: some View {
         NavigationStack {
@@ -81,6 +85,14 @@ struct SettingsView: View {
                     }
                     .emberCard()
 
+                    SectionLabel(text: "Your setup")
+                    VStack(spacing: 0) {
+                        action("Download my setup") { exportSetup() }
+                    }
+                    .emberCard()
+                    Footnote(text: "Saves your rules, budgets, tiers and delay as a JSON file you can keep or send to another device. Screen Time names an app with a token that means nothing off this iPhone, so the file records what each app is called rather than the app itself. The Anchor is not included.")
+                        .padding(.top, 8)
+
                     SectionLabel(text: "If something gets stuck")
                     Text("Furlough has no unblock button by design. If a shield ever refuses to lift when it should, open Settings > Screen Time > Apps with Screen Time Access, turn off Furlough, and all shields and the delete-protection flag are cleared by iOS. Reopen Furlough to re-enable.")
                         .emberBody(12)
@@ -118,6 +130,25 @@ struct SettingsView: View {
                 Button("OK") { result = nil }
             } message: { result in
                 Text(result.message)
+            }
+            .fileExporter(
+                isPresented: Binding(get: { setupFile != nil }, set: { if !$0 { setupFile = nil } }),
+                document: setupFile,
+                contentType: .json,
+                defaultFilename: setupName
+            ) { outcome in
+                setupFile = nil
+                if case .failure(let error) = outcome {
+                    exportError = error.localizedDescription
+                    SharedStore.log("export failed: \(error)")
+                } else {
+                    SharedStore.log("exported setup")
+                }
+            }
+            .alert("Download my setup", isPresented: Binding(get: { exportError != nil }, set: { if !$0 { exportError = nil } }), presenting: exportError) { _ in
+                Button("OK") { exportError = nil }
+            } message: { error in
+                Text(error)
             }
             #if DEBUG
             .confirmationDialog("Reset everything?", isPresented: $confirmReset, titleVisibility: .visible) {
@@ -163,6 +194,20 @@ struct SettingsView: View {
 
     private func stamp(_ date: Date?) -> String {
         date?.formatted(date: .abbreviated, time: .shortened) ?? "Never"
+    }
+
+    /// Builds the file and opens the save panel. Reading the store is the whole of it: an
+    /// export changes nothing, so alone among the buttons on this screen it needs no delay,
+    /// no confirmation and no enforcement pass afterwards.
+    private func exportSetup() {
+        do {
+            let export = ConfigExport.current()
+            setupFile = SetupDocument(data: try export.json())
+            setupName = export.suggestedFilename
+        } catch {
+            exportError = error.localizedDescription
+            SharedStore.log("export failed: \(error)")
+        }
     }
 }
 

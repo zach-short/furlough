@@ -1,6 +1,7 @@
 import AppKit
 import ServiceManagement
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Every app on this Mac, searchable. Picking one adds it.
 struct AddAppSheet: View {
@@ -478,6 +479,9 @@ struct SettingsSheet: View {
     @State private var result: ProposalResult?
     @State private var showLog = false
     @State private var confirmReset = false
+    @State private var setupFile: SetupDocument?
+    @State private var setupName = ""
+    @State private var exportError: String?
 
     var body: some View {
         SheetFrame(title: showLog ? "Activity log" : "Settings", width: 560, height: 640) {
@@ -495,6 +499,25 @@ struct SettingsSheet: View {
             Button("OK") { result = nil }
         } message: { result in
             Text(result.message)
+        }
+        .fileExporter(
+            isPresented: Binding(get: { setupFile != nil }, set: { if !$0 { setupFile = nil } }),
+            document: setupFile,
+            contentType: .json,
+            defaultFilename: setupName
+        ) { outcome in
+            setupFile = nil
+            if case .failure(let error) = outcome {
+                exportError = error.localizedDescription
+                SharedStore.log("export failed: \(error)")
+            } else {
+                SharedStore.log("exported setup")
+            }
+        }
+        .alert("Download my setup", isPresented: Binding(get: { exportError != nil }, set: { if !$0 { exportError = nil } }), presenting: exportError) { _ in
+            Button("OK") { exportError = nil }
+        } message: { error in
+            Text(error)
         }
         #if DEBUG
         .confirmationDialog("Reset everything?", isPresented: $confirmReset, titleVisibility: .visible) {
@@ -609,6 +632,15 @@ struct SettingsSheet: View {
                 }
                 .emberCard()
 
+                SectionLabel(text: "Your setup")
+                VStack(spacing: 0) {
+                    CardAction(title: "Download my setup", symbol: "square.and.arrow.down", color: Ember.cream) { exportSetup() }
+                }
+                .emberCard()
+                Footnote(text: "Saves your apps, websites, rules, budgets, tiers and delay as a JSON file. Mac targets are bundle identifiers and hosts, so this file is the whole setup and another Mac can take it as it stands.")
+                    .padding(.top, 8)
+                    .padding(.bottom, 20)
+
                 SectionLabel(text: "The one escape")
                 Text("Furlough has no unblock button. On the Mac it enforces by quitting blocked apps and sending blocked tabs to its shield page, so it has to keep running: Quit is refused while anything is blocked. Force Quit (Option-Command-Escape) ends enforcement until Furlough is opened again, the way turning off Screen Time access does on the phone. It is documented on purpose.")
                     .emberBody(12)
@@ -653,6 +685,20 @@ struct SettingsSheet: View {
 
     private func stamp(_ date: Date?) -> String {
         date?.formatted(date: .abbreviated, time: .shortened) ?? "Never"
+    }
+
+    /// Builds the file and opens the save panel. Reading the store is the whole of it: an
+    /// export changes nothing, so alone among the buttons on this screen it needs no delay,
+    /// no confirmation and no enforcement pass afterwards.
+    private func exportSetup() {
+        do {
+            let export = ConfigExport.current()
+            setupFile = SetupDocument(data: try export.json())
+            setupName = export.suggestedFilename
+        } catch {
+            exportError = error.localizedDescription
+            SharedStore.log("export failed: \(error)")
+        }
     }
 }
 
