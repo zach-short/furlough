@@ -191,10 +191,16 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   `Home` (`HomeContent` holds the featured page id, `HomeGroups` for the sections including
   "Later this week" and `ordered` for the page order, `HeroPager`, `HeroPage` ticking once a
   second, `HeroIndicator`, `EmptyHero`, `TargetRow`; the + button shows `AddChoicePopover`
-  from `Shared/UI/AddChoice.swift`, Application or Website, added 2026-09-07; both open the
+  from `Shared/UI/AddChoice.swift`, Application or Website, added 2026-09-07; both end at the
   one `FamilyActivityPicker`, which holds websites under each category as "Add Website", so
-  the choice only sets the picker's header and footer, and the picker is presented after a
-  short wait because a sheet presented while the popover is still dismissing is dropped), `Components` (`TokenLabel`, `TokenName`, `TokenTile`,
+  the choice sets the picker's header and footer, and Website first opens
+  `AddWebsiteGuideView` (added 2026-09-08) with the three steps to a site, because the footer
+  alone read as a broken button; everything is presented through `openAfterDismissal`, a short
+  wait, because a sheet presented while the popover or the previous sheet is still dismissing
+  is dropped), `AddWebsiteGuide` (a self-sizing sheet: measured `contentHeight` into a
+  `.height` detent, `StepRow`; the only way iOS mints a `WebDomainToken` is inside Apple's
+  picker, so there is no typed-host path on the phone the way there is on the Mac),
+  `Components` (`TokenLabel`, `TokenName`, `TokenTile`,
   `StatusChip`, `RowCopy`, `ProminentButton`, `GhostButton`, `SectionLabel`, `Footnote`,
   `CardDivider`), `RuleEditor` (`WindowRow` with `DayStrip`, `CopyRuleSheet`, `TimeChip`,
   `TimePickerSheet`, `EffectBanner`), `WeekView` (`WeekDraft`, `WeekSheet`, `WeekGrid`,

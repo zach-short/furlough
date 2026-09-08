@@ -7,6 +7,10 @@ struct HomeView: View {
     @State private var showAddChoice = false
     /// Which of the two the picker was opened for; it wears a matching header and footer.
     @State private var pickerFor: AddChoice = .application
+    /// The three steps to a website, shown before the picker.
+    @State private var showWebsiteGuide = false
+    /// Set by the guide's button, read once the guide has finished dismissing.
+    @State private var guideWantsPicker = false
     @State private var showPicker = false
     @State private var selection = FamilyActivitySelection(includeEntireCategory: true)
     @State private var pickerOutcome: AppModel.PickerOutcome?
@@ -52,10 +56,13 @@ struct HomeView: View {
                         .popover(isPresented: $showAddChoice, arrowEdge: .top) {
                             AddChoicePopover(
                                 applicationCaption: "Apps and categories, from Apple's picker",
-                                websiteCaption: "Any site by its address, from the same picker"
+                                websiteCaption: "A site from the same picker, three steps in"
                             ) { choice in
                                 showAddChoice = false
-                                openPicker(for: choice)
+                                switch choice {
+                                case .application: openPicker(for: .application)
+                                case .website: openAfterDismissal { showWebsiteGuide = true }
+                                }
                             }
                             .presentationCompactAdaptation(.popover)
                         }
@@ -83,13 +90,23 @@ struct HomeView: View {
             } message: { outcome in
                 Text(outcome.message)
             }
+            .sheet(
+                isPresented: $showWebsiteGuide,
+                onDismiss: {
+                    guard guideWantsPicker else { return }
+                    guideWantsPicker = false
+                    openPicker(for: .website)
+                }
+            ) {
+                AddWebsiteGuideView { guideWantsPicker = true }
+            }
             .sheet(isPresented: $showPending) { PendingChangesView() }
             .sheet(isPresented: $showSettings) { SettingsView() }
         }
     }
 
     /// Apple's one picker holds apps, categories and websites alike; Website only changes what
-    /// it says on the way in. Sites are inside each category, after its apps, as Add Website.
+    /// it says on the way in, after `AddWebsiteGuideView` has said where the sites are.
     private var pickerHeader: String {
         switch pickerFor {
         case .application: "Choose apps and categories"
@@ -104,14 +121,19 @@ struct HomeView: View {
         }
     }
 
-    /// Opens the picker once the popover has gone. A sheet presented while the popover is
-    /// still on its way out is dropped, so this waits out the dismissal first.
+    /// Opens the picker once whatever came before it has gone.
     private func openPicker(for choice: AddChoice) {
         pickerFor = choice
         selection = model.pickerSelection
+        openAfterDismissal { showPicker = true }
+    }
+
+    /// A sheet presented while the popover is still on its way out, or in the same breath as
+    /// another sheet's dismissal, is dropped; this waits that out first.
+    private func openAfterDismissal(_ present: @escaping @MainActor () -> Void) {
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(350))
-            showPicker = true
+            present()
         }
     }
 }
