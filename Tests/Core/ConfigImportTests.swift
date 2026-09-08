@@ -463,5 +463,124 @@ struct ConfigImportTests {
         let plan = plan(file([exported(.app, "com.google.Chrome", nickname: "The bad one", utility: .hazard, rule: target.rule)]), state([target]))
         #expect(plan.isEmpty)
         #expect(plan.headline.contains("nothing in this file"))
+        #expect(plan.confirmation.contains("nothing changed"))
+    }
+
+    // MARK: Pressing the button twice
+
+    /// The one place import diverges from `assign`, and the reason the divergence is worth it:
+    /// a file is applied whole and is easy to press twice, and every press used to restart the
+    /// clock on every loosening in it. The activity log for 8 Sep 2026 has three of these
+    /// inside two minutes.
+    @Test("applying the same file twice does not push its loosenings further out")
+    func pressingApplyTwiceCostsNothing() {
+        var before = state([chrome()])
+        let setup = file([exported(.app, "com.google.Chrome", rule: .unrestricted)])
+        ConfigImport.apply(plan(setup, before), to: &before, now: now)
+        #expect(before.pending.count == 1)
+        let landed = before.pending[0].effectiveAt
+
+        let twoMinutesLater = now.addingTimeInterval(120)
+        let again = ConfigImport.plan(
+            setup,
+            matches: ConfigImport.matches(for: setup, config: before.config),
+            state: before,
+            now: twoMinutesLater
+        )
+        ConfigImport.apply(again, to: &before, now: twoMinutesLater)
+
+        #expect(before.pending.count == 1)
+        #expect(before.pending[0].effectiveAt == landed)
+    }
+
+    /// And the divergence stops there. Anything that differs in the least is a decision, and a
+    /// decision supersedes what was queued on the new clock, exactly as the rule editor does.
+    @Test("a file that differs from what is queued still supersedes it on the new clock")
+    func adifferentFileStillRestartsTheClock() {
+        var before = state([chrome()])
+        ConfigImport.apply(plan(file([exported(.app, "com.google.Chrome", rule: .unrestricted)]), before), to: &before, now: now)
+        let first = before.pending[0].effectiveAt
+
+        let later = now.addingTimeInterval(120)
+        let other = file([exported(.app, "com.google.Chrome", rule: Rule(windows: [window(600, 1140)], dailyBudgetMinutes: 120))])
+        ConfigImport.apply(
+            ConfigImport.plan(other, matches: ConfigImport.matches(for: other, config: before.config), state: before, now: later),
+            to: &before,
+            now: later
+        )
+
+        #expect(before.pending.count == 1)
+        #expect(before.pending[0].effectiveAt == first.addingTimeInterval(120))
+    }
+
+    // MARK: What it says afterwards
+
+    /// Every other mutation ends in a sentence. An import that closed in silence was the one
+    /// change in the app that said nothing, and it is the largest one.
+    @Test("the confirmation says what is in force now and when the rest lands")
+    func whatItSaysAfterwards() {
+        let plan = plan(
+            file([
+                exported(.app, "com.apple.Safari", name: "Safari", rule: Rule(windows: [window(540, 600)], dailyBudgetMinutes: 20)),
+                exported(.app, "com.google.Chrome", rule: .unrestricted),
+            ]),
+            state([chrome()])
+        )
+        let said = plan.confirmation
+        #expect(said.hasPrefix("1 app or website is now managed and 1 loosening is waiting out the delay."))
+        let when = try! #require(plan.lastEffectiveAt).formatted(date: .abbreviated, time: .shortened)
+        #expect(said.hasSuffix("It takes effect \(when)."))
+        // The review's own sentence is the same shape in the future tense, and the two must not
+        // drift into two vocabularies for one import.
+        #expect(plan.headline.hasPrefix("1 app or website is new and 1 loosens your rules"))
+    }
+
+    @Test("several queued changes are counted together and the last one is dated")
+    func theLastOneLands() {
+        let a = makeTarget("A", rule: Rule(windows: [window(600, 660)], dailyBudgetMinutes: 30))
+        let b = makeTarget("B", rule: Rule(windows: [window(600, 660)], dailyBudgetMinutes: 30))
+        let plan = plan(
+            file([
+                exported(.website, "a.com", rule: .unrestricted),
+                exported(.website, "b.com", rule: .unrestricted),
+            ]),
+            state([a, b])
+        )
+        #expect(plan.confirmation.contains("2 loosenings are waiting out the delay"))
+        #expect(plan.confirmation.contains("The last of them takes effect"))
+    }
+
+    // MARK: Where the file came from
+
+    /// Decoded since the first version and ignored by the UI until now. A setup file is worth
+    /// keeping and worth sending, so the one from March and the one from last night are the
+    /// same two lines in a Downloads folder.
+    @Test("the plan carries when the file was written and by which build")
+    func provenanceTravels() {
+        let plan = plan(file([exported(.app, "com.google.Chrome")]), state([chrome()]))
+        #expect(plan.exportedAt == at(8))
+        #expect(plan.appVersion == "1.0")
+    }
+
+    // MARK: What the button is allowed to do
+
+    @Test("a plan with changes can be applied, and an empty one cannot")
+    func emptyCannotBeApplied() {
+        let target = chrome()
+        let looser = plan(file([exported(.app, "com.google.Chrome", rule: .unrestricted)]), state([target]))
+        #expect(looser.canApply)
+        let same = plan(file([exported(.app, "com.google.Chrome", nickname: "The bad one", utility: .hazard, rule: target.rule)]), state([target]))
+        #expect(!same.canApply)
+    }
+
+    /// An import iOS will not register is worse than one that does not happen: the rules land,
+    /// registration throws, `enforce` saves anyway, and nothing at all is monitored.
+    @Test("a plan over the ceiling cannot be applied even though it has changes")
+    func overTheCeilingCannotBeApplied() {
+        var plan = plan(file([exported(.app, "com.google.Chrome", rule: .unrestricted)]), state([chrome()]))
+        #expect(plan.canApply)
+        plan.limitReason = "That would need too many windows."
+        #expect(!plan.canApply)
+        #expect(!plan.isEmpty)
     }
 }

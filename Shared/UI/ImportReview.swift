@@ -16,11 +16,37 @@ struct ImportReviewList: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // Where the file came from, before what it would do. A setup file is worth keeping
+            // and worth sending, so the one from March and the one from last night look alike
+            // in a Downloads folder and do not look alike at all once applied.
+            if let provenance {
+                Text(provenance)
+                    .emberBody(11.5)
+                    .foregroundStyle(Ember.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.bottom, 6)
+            }
+
             Text(plan.headline)
                 .emberBody(13)
                 .foregroundStyle(Ember.cream)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.bottom, 4)
+
+            // Refused rather than warned about. An import iOS will not register is worse than
+            // one that does not happen: the rules land, registration throws, and nothing is
+            // watching them. The buttons on both platforms read `plan.canApply`.
+            if let limitReason = plan.limitReason {
+                Text(limitReason)
+                    .emberBody(12)
+                    .foregroundStyle(Ember.ember)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .emberCard()
+                    .padding(.top, 10)
+            }
 
             section("New here", plan.added, caption: "Added as soon as you apply this. Nothing was managing them before, so their first rule is in force at once.")
             section("Applies now", plan.immediate, caption: "These tighten your rules, so they take effect immediately.")
@@ -37,6 +63,17 @@ struct ImportReviewList: View {
                     .padding(.bottom, 12)
             }
         }
+    }
+
+    /// "This file was saved 8 Sep 2026 at 4:12 PM, by Furlough 1.0." The build is dropped when
+    /// the file does not name one — a file old enough to predate `appVersion` still opens.
+    private var provenance: String? {
+        guard let exportedAt = plan.exportedAt else { return nil }
+        let when = exportedAt.formatted(date: .abbreviated, time: .shortened)
+        guard let appVersion = plan.appVersion, !appVersion.isEmpty else {
+            return "This file was saved \(when)."
+        }
+        return "This file was saved \(when), by Furlough \(appVersion)."
     }
 
     @ViewBuilder

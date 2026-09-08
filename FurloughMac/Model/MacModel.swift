@@ -273,13 +273,19 @@ final class MacModel {
     /// edit typed by hand and wrong for twenty arriving together: it would be twenty writes and
     /// twenty passes over every browser tab. So the plan is worked out against `Policy`
     /// directly and applied whole, and the Mac is made to match it once at the end.
-    func applyImport(_ plan: ImportPlan) {
+    ///
+    /// Returns what it did, in the past tense, for the caller to say — the same sentence the
+    /// phone says, from `ImportPlan.confirmation`. Every other mutation on this model hands back
+    /// a `ProposalResult` that ends up in an alert, and an import is the one worth saying most:
+    /// the half of it that waits is invisible until it lands.
+    func applyImport(_ plan: ImportPlan) -> String {
         SharedStore.mutate { state in
             let now = state.now
             ConfigImport.apply(plan, to: &state, now: now)
         }
         SharedStore.log("imported a setup: \(plan.added.count) new, \(plan.immediate.count) now, \(plan.queued.count) queued, \(plan.skipped.count) not used")
         enforce(reason: "import")
+        return plan.confirmation
     }
 
     func classify(rule: Rule, for id: UUID) -> ChangeClass {

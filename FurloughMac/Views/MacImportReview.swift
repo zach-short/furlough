@@ -42,7 +42,7 @@ struct MacImportReview: View {
                 Button(plan.isEmpty ? "Nothing to apply" : "Apply this setup") { onApply() }
                     .buttonStyle(.glassProminent)
                     .tint(Ember.ember)
-                    .disabled(plan.isEmpty)
+                    .disabled(!plan.canApply)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 12)

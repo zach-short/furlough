@@ -95,7 +95,10 @@ small codebase he fully understands over a fork. He is interactive: ask when a d
   old `brick` key, and `AnchorProfile.init(from:)` reads `isAnchored`/`anchoredAt` and falls
   back to `isBricked`/`brickedAt`. Encoding always writes the new names, so the fallback is
   read-once in practice. Do not drop it: it is the only thing standing between a reinstall and
-  a lost pairing. The glyph is still `cube.fill`; SF Symbols has no anchor.
+  a lost pairing. SF Symbols has no anchor, so the app draws its own: `AnchorMark` in
+  `Shared/UI/AnchorMark.swift` is the mark the tile, the hourglass and the Spotlight shortcut
+  all use, and `scripts/make-anchor-symbol.swift` exports it into `anchor.symbolset` for the
+  shortcut, which can only be handed a symbol name.
 - Tightening edits apply instantly. Loosening edits (longer or more windows, bigger budget,
   removing a target, lowering the delay) queue for the loosening delay (24 h default) and can
   be cancelled from the pending list. A target's first rule is always instant because the
@@ -181,18 +184,30 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   case for showing and are matched without it),
   `PendingNotifications.swift` (`PlannedNotification`, the pure `plan`, `sync`, and the one
   `Notifier` both platforms post through),
-  `ActivityLimit.swift` (how many DeviceActivity activities a save would need; iOS-only, and
-  harmlessly unused on the Mac),
+  `ActivityLimit.swift` (how many DeviceActivity activities a save would need, and the same
+  count for a whole import via `reason(applying:in:)`; `Monitoring.register` reads its `spans`
+  rather than counting again, so what is refused ahead of time is what would be refused after.
+  iOS-only, and harmlessly unused on the Mac),
+  `ConfigExport.swift` (a setup as a file: `ConfigExport`, `ExportedTarget`, `Tier`; the Anchor,
+  the queue and the runtime are never written),
+  `ConfigImport.swift` (the same file coming back in: `read` refuses one whole, `plan` decides,
+  `apply` performs, `matches(for:config:)` is the Mac's own resolver; see the section below),
   `PendingText.swift` (`Delta`, the old → new pair a pending card shows; pure, so the phone
   and the Mac cannot word it differently).
 - `Tests/Core` (target `FurloughCoreTests`, macOS, Swift Testing, no host app): `Support.swift`
   (the pinned calendar and the fixtures), `ModelsTests`, `PolicyStatusTests`,
   `PolicyPendingTests`, `PolicySummaryTests`, `NamingTests`, `DecodingTests`, `ClockTests`,
   `QuitGraceTests`, `PendingNotificationTests`, `UtilityTests`, `UtilityPlanTests`,
-  `ActivityLimitTests`, `PendingTextTests`, `CompanionsTests`. 267 tests in 37 suites.
+  `ActivityLimitTests`, `PendingTextTests`, `CompanionsTests`, `ConfigImportTests`. 278 tests
+  in 37 suites.
 - `Shared/LiveActivity/FurloughActivityAttributes.swift` (app + widgets).
 - `Shared/UI/CompanionNudge.swift` (the phone's "you have one half of this" banner, on a
   named target whose other half is missing; the Mac asks at add time instead).
+- `Shared/UI/ImportReview.swift` (`ImportReviewList`, what an import would do, one view for
+  both platforms) and `Shared/UI/SetupDocument.swift` (the `FileDocument` the exporter writes).
+  Both are compiled into the widgets, so neither may use `SectionLabel`, `Footnote`,
+  `CardAction` or `CardDivider` — those exist only in the two apps, and reaching for one breaks
+  the widget build and not the app build.
 - `Shared/UI/Theme.swift` (app + widgets), `Shared/UI/Hourglass.swift` (`HourglassState`
   with its presets and `of(target:status:runtime:now:)`, `HourglassView(state:phase:)` pure,
   `LivingHourglass` animated, `TopSandShape`/`MoundShape` animatable).
@@ -766,6 +781,81 @@ The plan for this stretch. Tick each phase off here as it lands.
     Restricted page rather than the shield, and with no token nothing is counted, so such a
     target can have windows but no budget. That is a different product than the picker's
     sites; do not start it without his yes.
+
+21. **A setup as a file.** Export done 2026-09-08; import landed the same day in `48db063`,
+    with the confirmation, the ceiling check and the provenance line following it.
+
+    The one rule, and it governs everything here: **an import is a proposal, never a restore.**
+    Furlough's whole value is that a tightening applies at once and a loosening waits out the
+    delay. Restoring a file wholesale would be a hole straight through that — export, open the
+    JSON in any text editor, change a 30-minute budget to 1440, import, and the delay is gone in
+    half a minute. So every rule and every tier in a file goes through `Policy.classify` and
+    `Policy.plan`, the same gate the rule editor goes through. Nothing added here may become a
+    shorter road than the editor is. In particular **do not add a one-click undo for an import**:
+    the half that applied immediately is by definition the tightening half, and undoing a
+    tightening is a loosening.
+
+    What travels is targets and the base delay, and nothing else. `anchor`, `pending` and
+    `runtime` are never read from a file under any flag — the Anchor's key is a physical tag, a
+    queue is delay already served, and `runtime` is today's spent budget. A test asserts that a
+    hand-written file carrying all three changes none of them; do not weaken it.
+
+    Deliberate limits, not oversights. **Import is additive**: targets in the store and absent
+    from the file are left alone and named in `plan.untouched`. This restores a setup; it does
+    not make one Mac match another. Making removals travel means each one queuing against its
+    own delay, and that is a different feature — do not slip it in. **Cross-platform is refused**
+    on `platform`, in `read`, because a Screen Time token means nothing off the phone that
+    issued it. But `ImportMatch` and `ImportResolution` are deliberately platform-neutral: a Mac
+    could take a phone file through the same guided remap the phone uses, picking which Mac app
+    each rule was over `AppCatalog.installed()`. That is the most valuable follow-up in this
+    area and most of the machinery exists. It is a feature, not a fix.
+
+    The Mac resolves a file for itself (`ConfigImport.matches(for:config:)`: a bundle id or a
+    host is a string another Mac can look up). The phone cannot, so `ImportSetupView` walks
+    through Apple's picker one row at a time and rows left alone are left out.
+
+    Three things landed after the first pass, each fixing something the review could not say:
+
+    - **Apply says what it did.** `applyImport` returns `ImportPlan.confirmation` — the past-tense
+      sibling of `headline`, naming what is in force and when the queued half lands — and both
+      platforms put it in an alert, the way every other mutation puts a `ProposalResult` in one.
+      Before this the import was the only change in the app that ended in silence, and that
+      compounded with the next point.
+    - **Pressing Apply twice no longer costs anything.** `ConfigImport.apply` supersedes a
+      pending change of the same sort for the same target, so re-applying a file used to restart
+      the clock on every loosening in it — the activity log for 8 Sep 2026 has three
+      `imported a setup` lines inside two minutes, each pushing the same loosening further out.
+      An identical queued change (same kind, same payload) is now left exactly where it is.
+      **This is the one place import diverges from `assign`**, which does restart the clock on a
+      re-saved hand edit and should keep doing so: a hand edit is typed twice on purpose, a file
+      is pressed twice by accident. Anything that differs in the least still supersedes on the
+      new clock.
+    - **The review refuses what iOS would not register.** `Monitoring.register` takes at most 19
+      distinct window spans, the queued half of an import counts against that from the moment
+      Apply is pressed, and `enforce` catches a registration failure and saves anyway — so an
+      oversized import used to land whole, register nothing, and say so only in a row in
+      Settings. `AppModel.plan` now sets `plan.limitReason` from `ActivityLimit.reason`, the
+      review shows it, and `plan.canApply` disables both buttons. Refused rather than warned
+      about, deliberately: an import that cannot be registered leaves the rules in force with
+      nothing watching them, which is worse than not importing.
+
+    Also: the review's first line now says when the file was written and by which build
+    (`ImportPlan.exportedAt`/`appVersion`, both decoded since the first version and ignored by
+    the UI until now).
+
+    **Not yet run: the phone's import.** `ImportSetupView` compiles, its plan logic is the
+    shared and tested one, and the Mac path has been run against the real store with the
+    resulting state matching the plan exactly — but nobody has exercised the phone screen.
+    Three things in it are genuinely uncertain: `FamilyActivityPicker` presented three sheets
+    deep, `startAccessingSecurityScopedResource()` in `read(contentsOf:)` (which silently
+    returns empty data when it is wrong), and `answer(_:)`'s two refusals. Screen Time
+    authorization and the picker are both unreliable in the Simulator and the picker may come
+    back empty there; this needs a device. To make a file to try it with, you need one with
+    `platform: "ios"`, and phone exports carry no `identifier` — that absence is what forces the
+    guided flow, so do not add one to a test file or you will not be testing the real path.
+    (A target Apple's picker minted is what carries no identifier. The typed-host work landing
+    beside this gives an iOS `.host` its own exportable host string, so a phone file may hold
+    both kinds; the guided remap is for the token half.)
 
 ## Style rules
 

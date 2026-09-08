@@ -19,11 +19,14 @@ enum Monitoring {
         center.stopMonitoring()
 
         var events: [DeviceActivityEvent.Name: DeviceActivityEvent] = [:]
-        var windows = Set<TimeWindow>()
+        // The spans come from `ActivityLimit` rather than from a second count here, so that what
+        // the rule editor and the import review refuse ahead of time is exactly what this would
+        // have refused after the fact. Two readings of the same ceiling is how one of them ends
+        // up letting through the edit the other would have caught.
+        let windows = ActivityLimit.spans(in: state)
 
         func include(_ target: Target, _ rule: Rule) {
             guard rule.isEverAllowed else { return }
-            windows.formUnion(rule.windows.map(\.span))
             let minutes = rule.dailyBudgetMinutes
             let name = DeviceActivityEvent.Name(ActivityNaming.budgetEvent(targetID: target.id, minutes: minutes))
             let threshold = DateComponents(hour: minutes / 60, minute: minutes % 60)
@@ -33,6 +36,11 @@ enum Monitoring {
             case .webDomain(let token):
                 events[name] = DeviceActivityEvent(webDomains: [token], threshold: threshold, includesPastActivity: true)
             case .category:
+                break
+            // A typed host has no token, and a threshold event needs one, so nothing counts it
+            // and it gets no budget event. Its window spans are still collected by
+            // `ActivityLimit.spans`, so the reconcile at each window edge still happens.
+            case .host:
                 break
             }
         }
@@ -46,8 +54,8 @@ enum Monitoring {
             }
         }
 
-        guard windows.count + 1 <= Furlough.maxActivities else {
-            throw RegistrationError(message: "Too many distinct windows (\(windows.count)). iOS allows \(Furlough.maxActivities - 1).")
+        guard windows.count <= ActivityLimit.maxSpans else {
+            throw RegistrationError(message: "Too many distinct windows (\(windows.count)). iOS allows \(ActivityLimit.maxSpans).")
         }
 
         let day = DeviceActivitySchedule(

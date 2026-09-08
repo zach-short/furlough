@@ -74,4 +74,33 @@ enum ActivityLimit {
         guard needed > maxSpans else { return nil }
         return "That would need \(needed) different windows across everything Furlough manages, and iOS allows \(maxSpans). Merge or drop a window, or give this app hours another app already uses."
     }
+
+    /// The state as applying a whole import would leave it.
+    ///
+    /// Projected by running the real `ConfigImport.apply` against a copy rather than by a second
+    /// reading of what an import does: an import arrives as twenty edits at once, each of which
+    /// may land or queue, and a projection that guessed differently from the thing it is
+    /// predicting would be worth less than no projection at all. `plannedAt` stands in for the
+    /// clock — nothing is persisted and a span count does not depend on when anything lands, so
+    /// this stays a pure function of the plan and the state.
+    static func projecting(_ plan: ImportPlan, in state: SharedState) -> SharedState {
+        var copy = state
+        ConfigImport.apply(plan, to: &copy, now: plan.plannedAt)
+        return copy
+    }
+
+    /// Nil when the import fits once applied. Otherwise why it does not, for the review.
+    ///
+    /// Counted before the button rather than at registration, and for a worse reason than the
+    /// editor's. `Monitoring.register` runs *after* `applyImport` has saved, and `enforce`
+    /// catches what it throws and saves anyway — so an oversized import lands whole, registration
+    /// fails, nothing at all is monitored, and the only sign of it is a row in Settings. The
+    /// queued half counts too: `spans` gathers pending rules exactly as registration does, so
+    /// the loosenings in a file press against the ceiling from the moment Apply is pressed,
+    /// a day before any of them are in force.
+    static func reason(applying plan: ImportPlan, in state: SharedState) -> String? {
+        let needed = spans(in: projecting(plan, in: state)).count
+        guard needed > maxSpans else { return nil }
+        return "This setup would need \(needed) different windows across everything Furlough manages, and iOS allows \(maxSpans). Leave some of these rows out, or merge windows where two apps could share hours, and open the file again."
+    }
 }

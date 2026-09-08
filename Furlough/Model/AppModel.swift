@@ -170,6 +170,9 @@ final class AppModel {
             case .application(let token): selection.applicationTokens.insert(token)
             case .webDomain(let token): selection.webDomainTokens.insert(token)
             case .category(let token): selection.categoryTokens.insert(token)
+            // A typed host has no token, so there is nothing to preselect. `applyPicker`
+            // leaves those targets alone for the same reason.
+            case .host: break
             }
         }
         return selection
@@ -217,7 +220,11 @@ final class AppModel {
 
         // Each removal waits out its own target's tier, so unpicking Messages and TikTok
         // together does not make Messages wait for TikTok.
-        for target in current.config.targets where !selected.contains(target.kind) {
+        //
+        // A typed host is never in `selected` — it has no token and Apple's picker has never
+        // heard of it — so it has to be excluded explicitly. Without this, every trip through
+        // the picker would schedule the removal of every site added by name.
+        for target in current.config.targets where !target.kind.isHost && !selected.contains(target.kind) {
             if target.rule == nil {
                 current.config.targets.removeAll { $0.id == target.id }
                 continue
@@ -234,6 +241,33 @@ final class AppModel {
         SharedStore.log("picker: added \(outcome.added), removals scheduled \(outcome.removalsScheduled)")
         enforce(reason: "picker")
         return outcome
+    }
+
+    // MARK: Sites by name
+
+    /// What adding a typed host did, in the words the sheet says back.
+    enum AddHostOutcome: Equatable {
+        case added(String)
+        case already(String)
+        case unreadable
+    }
+
+    /// Adds a website by name, the way the Mac has always done it.
+    ///
+    /// No token and no picker: `WebContentSettings.blockedByFilter` takes a plain string, so
+    /// the host is the whole target. Nothing is enforced until it has a rule, as ever. A host
+    /// that is already managed — or a subdomain of one, which `Config.target(host:)` matches —
+    /// is not added twice; the sheet says which one it landed on.
+    @discardableResult
+    func addHost(_ raw: String) -> AddHostOutcome {
+        guard let host = Hosts.normalize(raw) else { return .unreadable }
+        var current = SharedStore.load()
+        if let existing = current.config.target(host: host) { return .already(existing.displayName) }
+        current.config.targets.append(Target(kind: .host(host)))
+        SharedStore.save(current)
+        SharedStore.log("added site by name: \(host)")
+        enforce(reason: "add site by name")
+        return .added(host)
     }
 
     // MARK: Importing a setup
@@ -255,7 +289,12 @@ final class AppModel {
 
     func plan(_ export: ConfigExport, matches: [ImportMatch]) -> ImportPlan {
         let current = SharedStore.load()
-        return ConfigImport.plan(export, matches: matches, state: current, now: current.now)
+        var plan = ConfigImport.plan(export, matches: matches, state: current, now: current.now)
+        // iOS's ceiling on monitored activities, asked before the button rather than after the
+        // save. `ConfigImport` cannot ask it: the limit is DeviceActivity's and the Mac has no
+        // such thing, so the platform that has the ceiling is the one that counts against it.
+        plan.limitReason = ActivityLimit.reason(applying: plan, in: current)
+        return plan
     }
 
     /// Applies a whole plan in one save and one enforcement pass.
@@ -265,41 +304,60 @@ final class AppModel {
     /// together. The targets a file adds are appended by the plan rather than through
     /// `applyPicker`: that method reads a selection as the whole truth and schedules a removal
     /// for everything absent from it, which is exactly wrong for a file that only ever adds.
-    func applyImport(_ plan: ImportPlan) {
+    ///
+    /// Returns what it did, in the past tense, for the caller to say. Every other mutation here
+    /// hands back a `ProposalResult` and every screen puts it in an alert; an import that
+    /// silently closed the sheet would be the one change in the app that says nothing, and it is
+    /// the largest one — see `ImportPlan.confirmation`.
+    func applyImport(_ plan: ImportPlan) -> String {
         SharedStore.mutate { state in
             let now = state.now
             ConfigImport.apply(plan, to: &state, now: now)
         }
         SharedStore.log("imported a setup: \(plan.added.count) new, \(plan.immediate.count) now, \(plan.queued.count) queued, \(plan.skipped.count) not used")
         enforce(reason: "import")
+        return plan.confirmation
     }
 
     // MARK: The other half
 
     /// What to offer beside `target`, or nil when there is nothing to say.
     ///
-    /// Nothing can be offered as a target is added: a Screen Time token is opaque. The shield
-    /// learns the name the first time it covers something, and from that name `Companions`
-    /// still answers — so the offer arrives on the second look rather than the first, which
-    /// is the best the phone can do. Nil once the other half is in, once the nudge has been
-    /// waved away, and for anything the table does not know.
+    /// A picked target cannot be offered anything as it is added: a Screen Time token is
+    /// opaque. The shield learns the name the first time it covers something, and from that
+    /// name `Companions` still answers — so for those the offer arrives on the second look
+    /// rather than the first, which is the best the phone can do. Nil once the other half is
+    /// in, once the nudge has been waved away, and for anything the table does not know.
     ///
-    /// "Already in" can only be judged by learned name, so a half that is in Furlough but has
+    /// A typed host is the exception, and the reason this reads the way it does. It was
+    /// written down rather than minted, so it carries its name from the moment it is added and
+    /// needs no learned one: its nudge fires on the first look, the way the Mac's sheet does.
+    ///
+    /// "Already in" can only be judged by the names Furlough knows, so a picked half that has
     /// never been blocked is invisible here and can be offered once. Dismissing it settles
     /// that for good, which is why the nudge is dismissible rather than merely closable.
     func companion(for target: Target) -> Companions.Half? {
         guard !companionDismissed.contains(target.id.uuidString) else { return nil }
-        guard let name = target.systemName, !name.isEmpty else { return nil }
         switch target.kind {
         case .application:
+            guard let name = learnedName(of: target) else { return nil }
             let hosts = Companions.missingHosts(forAppNamed: name, knownHosts: learnedNames(ofHosts: true))
             return hosts.isEmpty ? nil : .sites(hosts)
         case .webDomain:
             // A website target's learned name is its domain, so the lookup goes the other way.
+            guard let name = learnedName(of: target) else { return nil }
             return Companions.missingApp(forHost: name, knownAppNames: learnedNames(ofHosts: false)).map(Companions.Half.app)
         case .category:
             return nil
+        case .host(let host):
+            return Companions.missingApp(forHost: host, knownAppNames: learnedNames(ofHosts: false)).map(Companions.Half.app)
         }
+    }
+
+    /// The name Screen Time taught for a picked target, or nil while it has never been blocked.
+    private func learnedName(of target: Target) -> String? {
+        guard let name = target.systemName, !name.isEmpty else { return nil }
+        return name
     }
 
     /// Said once is enough: a nudge that comes back is a nag.
@@ -315,6 +373,8 @@ final class AppModel {
             case .webDomain: ofHosts ? target.systemName : nil
             case .application: ofHosts ? nil : target.systemName
             case .category: nil
+            // A typed host is its own name, learned or not, so it counts as a known site.
+            case .host(let host): ofHosts ? host : nil
             }
         }
     }
@@ -437,6 +497,7 @@ final class AppModel {
             case .application(let token): selection.applicationTokens.insert(token)
             case .webDomain(let token): selection.webDomainTokens.insert(token)
             case .category(let token): selection.categoryTokens.insert(token)
+            case .host: break
             }
         }
         return selection
@@ -450,6 +511,11 @@ final class AppModel {
         kinds += selection.applicationTokens.map(TargetKind.application)
         kinds += selection.webDomainTokens.map(TargetKind.webDomain)
         kinds += selection.categoryTokens.map(TargetKind.category)
+        // The picker speaks only about tokens, so it may only replace tokens. Anything the
+        // anchor holds by name is kept: a selection that has never heard of a typed host is
+        // not evidence that the host should be let go, and `Policy.decide` shields `.host`
+        // kinds in the anchor exactly like the rest.
+        kinds += current.config.anchor.kinds.filter(\.isHost)
         guard kinds != current.config.anchor.kinds else { return }
         current.config.anchor.kinds = kinds
         SharedStore.save(current)

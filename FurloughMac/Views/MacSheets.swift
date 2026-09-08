@@ -492,6 +492,9 @@ struct SettingsSheet: View {
     @State private var showImporter = false
     @State private var review: ImportPlan?
     @State private var importError: String?
+    /// What the import just did, waiting to be said. The review is dropped as the alert goes up,
+    /// so this is shown over Settings rather than over a screen that is on its way out.
+    @State private var imported: String?
 
     private var title: String {
         if showLog { return "Activity log" }
@@ -504,7 +507,7 @@ struct SettingsSheet: View {
                 LogView(onBack: { showLog = false })
             } else if let review {
                 MacImportReview(plan: review, onBack: { self.review = nil }) {
-                    model.applyImport(review)
+                    imported = model.applyImport(review)
                     self.review = nil
                 }
             } else {
@@ -554,6 +557,11 @@ struct SettingsSheet: View {
             Button("OK") { importError = nil }
         } message: { error in
             Text(error)
+        }
+        .alert("Restored", isPresented: Binding(get: { imported != nil }, set: { if !$0 { imported = nil } }), presenting: imported) { _ in
+            Button("OK") { imported = nil }
+        } message: { message in
+            Text(message)
         }
         #if DEBUG
         .confirmationDialog("Reset everything?", isPresented: $confirmReset, titleVisibility: .visible) {

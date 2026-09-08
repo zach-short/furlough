@@ -13,8 +13,17 @@ import SwiftUI
 /// one thing that cannot is which app each of them belonged to. This screen asks. Each row is
 /// a rule from the file with what it was called beside it, and Apple's own picker is how he
 /// says which app that is now. Rows left alone are left out; nothing here has to be answered.
+///
+/// Websites are the exception since 2026-09-08. A `.website` row that carries a host is a
+/// plain string this phone can look up, so `ConfigImport.preresolved` answers those rows
+/// before the screen is drawn and they arrive already filled in — which is the whole reason a
+/// Mac setup is worth carrying to a phone. They can still be left out, and left out then
+/// answered through the picker, if the picker's version is wanted for its daily budget.
 struct ImportSetupView: View {
     let export: ConfigExport
+    /// What this phone manages today, read once at the call site. `init` needs it to work out
+    /// which rows answer themselves, and the environment is not readable from an initialiser.
+    let config: Config
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
 
@@ -25,10 +34,17 @@ struct ImportSetupView: View {
     @State private var selection = FamilyActivitySelection()
     @State private var review: ImportPlan?
     @State private var problem: String?
+    /// What the import just did. The sheet stays up behind the alert and closes on OK: half of
+    /// an import may not be in force for a day, and a screen that simply vanished would be the
+    /// same as saying nothing happened.
+    @State private var applied: String?
 
-    init(export: ConfigExport) {
+    init(export: ConfigExport, config: Config) {
         self.export = export
-        _resolutions = State(initialValue: export.targets.map { _ in .skipped(Self.unanswered) })
+        self.config = config
+        _resolutions = State(
+            initialValue: ConfigImport.preresolved(for: export, config: config, unresolved: Self.unanswered)
+        )
     }
 
     private static let unanswered = "You did not say which app this is, so it was left out."
@@ -48,11 +64,10 @@ struct ImportSetupView: View {
                     VStack(alignment: .leading, spacing: 0) {
                         ImportReviewList(plan: review)
                         ProminentButton(title: "Apply this setup") {
-                            model.applyImport(review)
-                            dismiss()
+                            applied = model.applyImport(review)
                         }
-                        .disabled(review.isEmpty)
-                        .opacity(review.isEmpty ? 0.4 : 1)
+                        .disabled(!review.canApply)
+                        .opacity(review.canApply ? 1 : 0.4)
                         .padding(.top, 16)
                         GhostButton(title: "Back") { self.review = nil }
                     }
@@ -93,6 +108,14 @@ struct ImportSetupView: View {
             Button("OK") { problem = nil }
         } message: { problem in
             Text(problem)
+        }
+        .alert("Restored", isPresented: Binding(get: { applied != nil }, set: { if !$0 { applied = nil } }), presenting: applied) { _ in
+            Button("OK") {
+                applied = nil
+                dismiss()
+            }
+        } message: { message in
+            Text(message)
         }
     }
 
@@ -152,7 +175,7 @@ struct ImportSetupView: View {
                         .emberBody(12, .semibold)
                         .foregroundStyle(Ember.muted)
                 } else {
-                    Button("Choose the app") { picking = index }
+                    Button(exported.kind == .website ? "Choose the website" : "Choose the app") { picking = index }
                         .buttonStyle(.plain)
                         .emberBody(12.5, .bold)
                         .foregroundStyle(Ember.ember)

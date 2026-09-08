@@ -251,8 +251,24 @@ struct ImportPlan: Equatable {
     /// additive, and dropping them would be a loosening — but named, because "my old setup is
     /// back" and "my old setup is back and this is also still here" are different facts.
     var untouched: [String] = []
+    /// When the file was written, and by which build. Carried onto the plan rather than read
+    /// off the export by the review, so that the one view both platforms share needs only the
+    /// plan. This is the largest single change Furlough can make to itself, and whether the
+    /// file is from yesterday or from March is the first thing worth knowing about it.
+    var exportedAt: Date? = nil
+    var appVersion: String? = nil
+    /// Why this import cannot be registered, or nil. Set by the phone's model, because the
+    /// ceiling is iOS's: `Monitoring.register` refuses past 19 distinct window spans, and it
+    /// runs *after* the import is saved — so an oversized file would land, registration would
+    /// throw, and nothing at all would be monitored. Counted here while it is still a proposal.
+    /// Always nil on the Mac, which has no DeviceActivity; see `ActivityLimit`.
+    var limitReason: String? = nil
 
     var isEmpty: Bool { edits.isEmpty }
+    /// Whether the button should do anything. Empty is nothing to do; over the ceiling is worse
+    /// than nothing to do, because an import that cannot be registered leaves the rules in force
+    /// and no monitor watching them.
+    var canApply: Bool { !isEmpty && limitReason == nil }
     var added: [Item] { items.filter { $0.subject == .target && $0.outcome == .now } }
     var immediate: [Item] { items.filter { $0.outcome == .now && $0.subject != .target } }
     var queued: [Item] { items.filter { if case .queued = $0.outcome { return true }; return false } }
@@ -282,6 +298,41 @@ struct ImportPlan: Equatable {
         let sentence = UtilityText.list(parts)
         return sentence.prefix(1).uppercased() + sentence.dropFirst() + "."
     }
+
+    /// The same shape in the past tense, for the alert after the button.
+    ///
+    /// Every other mutation in the app ends in a sentence saying what it did — `ProposalResult`
+    /// is that sentence for one edit, and this is it for a whole file. It matters more here than
+    /// anywhere else: half of an import is invisible until it lands, so a screen that simply
+    /// closed would leave the queued half looking like nothing happened, and pressing the button
+    /// again is the natural response to that.
+    ///
+    /// `headline` cannot be reused. It is written for a review — what this *would* do — and the
+    /// two must not drift, which is why they are next to each other.
+    var confirmation: String {
+        guard !isEmpty else { return "There was nothing in that file that was not already set up here, so nothing changed." }
+        var parts: [String] = []
+        if !added.isEmpty {
+            parts.append(added.count == 1 ? "1 app or website is now managed" : "\(added.count) apps and websites are now managed")
+        }
+        if !immediate.isEmpty {
+            parts.append(immediate.count == 1 ? "1 change is in force" : "\(immediate.count) changes are in force")
+        }
+        if !queued.isEmpty {
+            parts.append(queued.count == 1
+                ? "1 loosening is waiting out the delay"
+                : "\(queued.count) loosenings are waiting out the delay")
+        }
+        let sentence = UtilityText.list(parts)
+        var said = sentence.prefix(1).uppercased() + sentence.dropFirst() + "."
+        // When it lands, not just that it waits. Without the date the only way to find out is
+        // the Pending screen, and the sentence would be telling someone to go and look.
+        if let last = lastEffectiveAt {
+            let when = last.formatted(date: .abbreviated, time: .shortened)
+            said += queued.count == 1 ? " It takes effect \(when)." : " The last of them takes effect \(when)."
+        }
+        return said
+    }
 }
 
 extension ConfigImport {
@@ -309,6 +360,8 @@ extension ConfigImport {
         now: Date
     ) -> ImportPlan {
         var plan = ImportPlan(plannedAt: now)
+        plan.exportedAt = export.exportedAt
+        plan.appVersion = export.appVersion
         // The config as the import would leave it, for classifying what comes after against
         // what came before. Only ever a scratch copy: nothing here is saved.
         var working = state.config
@@ -520,6 +573,19 @@ extension ConfigImport {
                 state.pending.removeAll { supersedes(kind, $0.kind) }
                 Policy.apply(PendingChange(kind: kind, effectiveAt: now), to: &state.config)
             case .queue(let change):
+                // The very same change, already waiting, is left exactly where it is.
+                //
+                // This is the one place import diverges from `assign`, and deliberately. Saving
+                // the same pending edit twice by hand restarts its clock, which is right: it was
+                // typed twice, and a hand edit is not something anyone does by accident. A file
+                // is applied as a whole and is easy to press twice — a second look at the review,
+                // a double tap, a Mac and a phone both restored from the same file — and every
+                // press would push every loosening in it further out than the last. Superseding
+                // it with an identical copy is not a decision, so it does not restart anything.
+                //
+                // Anything that differs in the least — one window moved, one minute of budget —
+                // is a different decision and supersedes the old one on the new clock, below.
+                guard !state.pending.contains(where: { $0.kind == change.kind }) else { continue }
                 state.pending.removeAll { supersedes(change.kind, $0.kind) }
                 var change = change
                 change.effectiveAt = change.effectiveAt.addingTimeInterval(read)
@@ -544,6 +610,54 @@ extension ConfigImport {
         }
     }
 }
+
+#if os(iOS)
+extension ConfigImport {
+    /// What the phone can work out for itself, before anybody is asked.
+    ///
+    /// Most of a phone import cannot be: a Screen Time token is scoped to one device and one
+    /// install, so the file writes no identifier for it and `ImportSetupView` walks the person
+    /// through the picker row by row. A website row is the exception since 2026-09-08. The
+    /// phone has `.host` targets now, and a `.website` row carrying an identifier is a plain
+    /// string this phone can look up exactly as a Mac would — so those rows need no picker
+    /// step at all, which is what lets a Mac's websites arrive here as real enforceable
+    /// targets rather than as rows nobody can answer.
+    ///
+    /// Everything else comes back `.skipped(unresolved)`, which is what an unanswered row says
+    /// until the person answers it: "not yet" and "leave it out" are the same state on that
+    /// screen until Import is pressed.
+    ///
+    /// Read against a config that grows as the file is read, the way the Mac's does, so a file
+    /// listing both "youtube.com" and "m.youtube.com" lands on one target rather than two: the
+    /// second is a subdomain of the first, and `Config.target(host:)` is the thing that knows it.
+    static func preresolved(for export: ConfigExport, config: Config, unresolved: String) -> [ImportResolution] {
+        var growing = config
+        var invented = Set<UUID>()
+        return export.targets.map { exported in
+            guard exported.kind == .website,
+                  let identifier = exported.identifier?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !identifier.isEmpty
+            else { return .skipped(unresolved) }
+            guard identifier.count <= maxIdentifierLength else {
+                return .skipped("The file names it with \(identifier.count) characters, which is not a name anything has.")
+            }
+            guard let host = Hosts.normalize(identifier) else {
+                return .skipped("\"\(identifier)\" is not a website Furlough can read.")
+            }
+            if let existing = growing.target(host: host) {
+                // Matched something this file asked for a moment ago rather than anything on
+                // this phone, which makes it the same row twice.
+                if invented.contains(existing.id) { return .skipped("The file lists it more than once.") }
+                return .existing(existing.id)
+            }
+            let stub = Target(kind: .host(host))
+            growing.targets.append(stub)
+            invented.insert(stub.id)
+            return .create(.host(host))
+        }
+    }
+}
+#endif
 
 #if !os(iOS)
 extension ConfigImport {

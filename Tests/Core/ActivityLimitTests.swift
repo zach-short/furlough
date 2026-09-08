@@ -161,4 +161,73 @@ struct ActivityLimitTests {
     func missingTarget() {
         #expect(ActivityLimit.reason(applying: rule(30), to: [UUID()], in: makeState([])) == nil)
     }
+
+    // MARK: A whole import against the ceiling
+
+    /// A plan the Mac's matcher works out, so these read like the review does.
+    func plan(_ targets: [ExportedTarget], _ state: SharedState) -> ImportPlan {
+        let file = ConfigExport(
+            platform: .mac,
+            exportedAt: at(8),
+            appVersion: "1.0",
+            loosenDelayHours: 24,
+            targets: targets
+        )
+        return ConfigImport.plan(
+            file,
+            matches: ConfigImport.matches(for: file, config: state.config),
+            state: state,
+            now: at(8, 12, 0)
+        )
+    }
+
+    func site(_ host: String, _ rule: Rule) -> ExportedTarget {
+        ExportedTarget(kind: .website, identifier: host, name: nil, nickname: nil, utility: nil, rule: rule)
+    }
+
+    /// The count has to run on the plan, not at registration: `applyImport` saves first and
+    /// `enforce` swallows what `Monitoring.register` throws, so an oversized import lands whole
+    /// and leaves the rules in force with nothing watching them.
+    @Test("an import that would not register is refused while it is still a proposal")
+    func importOverTheCeiling() {
+        let target = makeTarget("A", rule: nil)
+        let state = makeState([target])
+        let reason = ActivityLimit.reason(applying: plan([site("a.com", rule(20))], state), in: state)
+        #expect(reason?.contains("20 different windows") == true)
+        #expect(reason?.contains("iOS allows 19") == true)
+    }
+
+    @Test("an import that fits is not refused")
+    func importUnderTheCeiling() {
+        let target = makeTarget("A", rule: nil)
+        let state = makeState([target])
+        #expect(ActivityLimit.reason(applying: plan([site("a.com", rule(19))], state), in: state) == nil)
+    }
+
+    /// The queued half presses against the ceiling from the moment Apply is pressed, a day
+    /// before any of it is in force: `Monitoring.register` registers pending rules too, so the
+    /// old rule and the loosening that replaces it need their spans at the same time.
+    @Test("the queued half of an import counts before it lands")
+    func importQueuedCounts() {
+        let target = makeTarget("A", rule: Rule(windows: windows(10), dailyBudgetMinutes: 30))
+        let state = makeState([target])
+        // A loosening: it queues, and the rule it replaces stays in force beside it.
+        let looser = Rule(
+            windows: windows(10).map { window($0.startMinute + 5, $0.endMinute + 5) },
+            dailyBudgetMinutes: 240
+        )
+        let plan = plan([site("a.com", looser)], state)
+        #expect(plan.queued.count == 1)
+        #expect(ActivityLimit.spans(in: ActivityLimit.projecting(plan, in: state)).count == 20)
+        #expect(ActivityLimit.reason(applying: plan, in: state) != nil)
+    }
+
+    @Test("an import that changes nothing needs nothing")
+    func importOfWhatIsAlreadyHere() {
+        let target = makeTarget("A", rule: rule(19))
+        let state = makeState([target])
+        let plan = plan([site("a.com", rule(19))], state)
+        #expect(plan.isEmpty)
+        #expect(ActivityLimit.reason(applying: plan, in: state) == nil)
+    }
 }
