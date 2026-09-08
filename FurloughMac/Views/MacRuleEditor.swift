@@ -68,7 +68,7 @@ struct MacRuleEditor: View {
     private var hasChanges: Bool {
         guard let target else { return false }
         return !(target.rule?.isEquivalent(to: draft) ?? false)
-            || (target.nickname != trimmedNickname && !trimmedNickname.isEmpty)
+            || target.nickname != trimmedNickname
             || target.utility != tier
     }
 
@@ -136,6 +136,8 @@ struct MacRuleEditor: View {
                 if let target {
                     header(target)
                     nicknameCard
+                    Footnote(text: "The nickname shows on the shield card, the menu bar's menu and the widget. Empty it to go back to \(target.defaultName).")
+                        .padding(.top, 8)
                     SectionLabel(text: "Allowed windows")
                     windowsCard
                     if drafts.contains(where: { $0.window.isNight }) {
@@ -222,18 +224,22 @@ struct MacRuleEditor: View {
     }
 
     private var nicknameCard: some View {
-        HStack(spacing: 8) {
-            Text("Name")
-                .emberBody(13)
-                .foregroundStyle(Ember.cream)
-            TextField("Name", text: $nickname)
-                .textFieldStyle(.plain)
-                .emberBody(13, .medium)
-                .foregroundStyle(Ember.cream)
-                .multilineTextAlignment(.trailing)
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Text("Nickname")
+                    .emberBody(13)
+                    .foregroundStyle(Ember.cream)
+                // The placeholder is the name the app came with, so an empty field reads as
+                // "called what it is called" rather than as a name gone missing.
+                TextField(target?.defaultName ?? "Optional", text: $nickname)
+                    .textFieldStyle(.plain)
+                    .emberBody(13, .medium)
+                    .foregroundStyle(Ember.cream)
+                    .multilineTextAlignment(.trailing)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 11)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 11)
         .emberCard()
     }
 

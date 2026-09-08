@@ -205,8 +205,10 @@ targets:
         excludes:
           - ShieldReconciler.swift
       # The Mac's force-quit grace is pure and decides whether an app is killed under a save
-      # dialog, so it is tested here rather than left to the device pass.
+      # dialog, so it is tested here rather than left to the device pass. The name migration
+      # is here for the same reason: it edits state Zach already has.
       - path: FurloughMac/Model/QuitGrace.swift
+      - path: FurloughMac/Model/MacNames.swift
       # The sentence the App Intents answer with. Pure, and listed on its own: the intents
       # beside it need an app to run in, and AppIntents metadata has no business in a test
       # bundle.

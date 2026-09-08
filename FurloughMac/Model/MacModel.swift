@@ -54,6 +54,11 @@ final class MacModel {
             SharedStore.defaults.removeObject(forKey: "furlough.mac.migrated")
             SharedStore.log("moved the store into the App Group for the widget")
         }
+        var stored = SharedStore.load()
+        if MacNames.adopt(&stored.config, name: { AppInfo.name(for: $0) }) {
+            SharedStore.save(stored)
+            SharedStore.log("moved app names out of the nickname field")
+        }
         // The enforcer changes state on its own (a budget spent, a pending change landing),
         // and the widget draws from that state, so every change refreshes it.
         enforcer.onChange = { [weak self] in
@@ -176,7 +181,10 @@ final class MacModel {
         if let existing = current.config.target(bundleID: bundleID) {
             return AddOutcome(added: existing, message: "\(existing.displayName) is already in Furlough.")
         }
-        let target = Target(kind: .macApp(bundleID: bundleID), nickname: name)
+        // The app's own name goes in `systemName`, not `nickname`: that is the field
+        // `defaultName` reads, so clearing a nickname later comes back to "Safari" rather
+        // than to com.apple.Safari. `nickname` stays what Zach called it, as on the phone.
+        let target = Target(kind: .macApp(bundleID: bundleID), systemName: name)
         current.config.targets.append(target)
         SharedStore.save(current)
         SharedStore.log("added app \(bundleID)")
@@ -194,7 +202,7 @@ final class MacModel {
         if let existing = current.config.target(host: host) {
             return AddOutcome(added: existing, message: "\(existing.displayName) is already in Furlough.")
         }
-        let target = Target(kind: .host(host), nickname: host)
+        let target = Target(kind: .host(host))
         current.config.targets.append(target)
         SharedStore.save(current)
         SharedStore.log("added site \(host)")
@@ -267,11 +275,11 @@ final class MacModel {
         return outcome
     }
 
-    /// The name shown for the target at `index`: the trimmed nickname, or the app's own name
-    /// when that is empty.
+    /// The nickname for the target at `index`. An empty one is stored empty rather than
+    /// filled in with the app's own name: `displayName` already falls back to that, and
+    /// keeping the two apart is what lets a nickname be taken off again.
     private static func rename(_ index: Int, to nickname: String, in state: inout SharedState) {
-        let trimmed = nickname.trimmingCharacters(in: .whitespacesAndNewlines)
-        state.config.targets[index].nickname = trimmed.isEmpty ? state.config.targets[index].defaultName : trimmed
+        state.config.targets[index].nickname = nickname.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Gives `id` the rule, or leaves it alone when it already has it. A tightening lands in
