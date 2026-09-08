@@ -264,7 +264,7 @@ final class MacModel {
             state.config.targets[index].rule = rule
             return .appliedNow
         }
-        let effectiveAt = state.now.addingTimeInterval(state.config.loosenDelay)
+        let effectiveAt = state.now.addingTimeInterval(state.config.delay(for: target))
         state.pending.append(PendingChange(kind: .setRule(targetID: id, rule: rule), effectiveAt: effectiveAt))
         return .scheduled(effectiveAt)
     }
@@ -278,12 +278,41 @@ final class MacModel {
             current.pending.removeAll { $0.targetID == id }
             result = .appliedNow
         } else if !current.pending.contains(where: { $0.kind == .removeTarget(targetID: id) }) {
-            let effectiveAt = current.now.addingTimeInterval(current.config.loosenDelay)
+            let effectiveAt = current.now.addingTimeInterval(current.config.delay(for: target))
             current.pending.append(PendingChange(kind: .removeTarget(targetID: id), effectiveAt: effectiveAt))
             result = .scheduled(effectiveAt)
         }
         SharedStore.save(current)
         enforce(reason: "remove target")
+        return result
+    }
+
+    /// Puts `id` in a tier. Moving toward hazard lengthens its delay and lands now; moving
+    /// toward essential shortens it, so it queues behind the delay the target has *today* —
+    /// which is what keeps "call it essential, then loosen it" from being a way round the wait.
+    /// A target with no rule yet is enforcing nothing, so its first tier is free, exactly as
+    /// its first rule is.
+    func setUtility(_ level: Utility, for id: UUID) -> ProposalResult {
+        var current = SharedStore.load()
+        guard let target = current.config.target(id: id), target.utilityLevel != level else { return .unchanged }
+        current.pending.removeAll { change in
+            if case .setUtility(let targetID, _) = change.kind { return targetID == id }
+            return false
+        }
+        var result = ProposalResult.unchanged
+        if target.rule == nil || Policy.classify(newUtility: level, against: target) == .tightening {
+            if let index = current.config.targets.firstIndex(where: { $0.id == id }) {
+                current.config.targets[index].utilityLevel = level
+            }
+            result = .appliedNow
+        } else {
+            let effectiveAt = current.now.addingTimeInterval(current.config.delay(for: target))
+            current.pending.append(PendingChange(kind: .setUtility(targetID: id, level: level), effectiveAt: effectiveAt))
+            result = .scheduled(effectiveAt)
+        }
+        SharedStore.save(current)
+        SharedStore.log("utility for \(id): \(level.label), \(result)")
+        enforce(reason: "utility edit")
         return result
     }
 
@@ -295,7 +324,7 @@ final class MacModel {
 
     func setDelay(hours: Int) -> ProposalResult {
         var current = SharedStore.load()
-        let clamped = max(1, hours)
+        let clamped = max(Furlough.minimumLoosenDelayHours, hours)
         guard clamped != current.config.loosenDelayHours else { return .unchanged }
         current.pending.removeAll { if case .setDelay = $0.kind { return true }; return false }
         var result = ProposalResult.unchanged
@@ -303,7 +332,8 @@ final class MacModel {
             current.config.loosenDelayHours = clamped
             result = .appliedNow
         } else {
-            let effectiveAt = current.now.addingTimeInterval(current.config.loosenDelay)
+            // The base multiplies out to every target, so cutting it loosens the slowest one too.
+            let effectiveAt = current.now.addingTimeInterval(current.config.longestDelay)
             current.pending.append(PendingChange(kind: .setDelay(hours: clamped), effectiveAt: effectiveAt))
             result = .scheduled(effectiveAt)
         }

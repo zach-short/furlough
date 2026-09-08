@@ -347,6 +347,7 @@ struct PendingCard: View {
         case .setRule(_, let rule): "New rule: \(TimeFormat.rule(rule))"
         case .removeTarget: "Remove from Furlough"
         case .setDelay(let hours): "Becomes \(TimeFormat.delay(hours: hours))"
+        case .setUtility(_, let level): "Becomes \(level.label.lowercased()), which shortens its delay"
         }
     }
 }

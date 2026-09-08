@@ -19,6 +19,10 @@ struct RuleEditorView: View {
     /// What the last save did, shown in the alert that closes the editor.
     @State private var saved: String?
     @State private var confirmRemove = false
+    /// The tier in the draft. Saved through `AppModel.setUtility`, which decides on its own
+    /// whether it lands now or queues.
+    @State private var tier = Utility.unset
+    @State private var confirmBlockEssential = false
     @FocusState private var nicknameFocused: Bool
 
     /// A window with a stable identity while it is being edited.
@@ -58,7 +62,27 @@ struct RuleEditorView: View {
     private var trimmedNickname: String { nickname.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var hasChanges: Bool {
         guard let target else { return false }
-        return !(target.rule?.isEquivalent(to: draft) ?? false) || target.nickname != trimmedNickname
+        return !(target.rule?.isEquivalent(to: draft) ?? false)
+            || target.nickname != trimmedNickname
+            || target.utilityLevel != tier
+    }
+
+    /// What Furlough would have guessed, offered only while Zach has not answered for himself.
+    private var suggestion: Utility? {
+        guard let target, !target.hasChosenUtility else { return nil }
+        return AppUtility.suggestion(for: target)?.utility
+    }
+
+    /// What blocking this one costs, when it is worth saying. Nil for the tiers Furlough exists
+    /// to block, and nil for a draft that restricts nothing.
+    private var caution: String? {
+        // A draft that restricts nothing is not a block, so there is nothing to warn about.
+        guard let target, !Rule.unrestricted.isEquivalent(to: draft) else { return nil }
+        return UtilityText.blocking(
+            name: target.displayName,
+            utility: tier,
+            detail: AppUtility.suggestion(for: target)?.detail
+        )
     }
 
     /// Other apps and sites with windows worth copying.
@@ -112,10 +136,20 @@ struct RuleEditorView: View {
                         windowsCard
                         SectionLabel(text: "Daily budget")
                         budgetCard
+                        SectionLabel(text: "How much it is worth")
+                        UtilityPicker(
+                            selection: $tier,
+                            baseDelayHours: model.state.config.loosenDelayHours,
+                            suggestion: suggestion
+                        )
+                        if let caution {
+                            CautionBanner(text: caution, isSevere: tier == .essential)
+                                .padding(.top, 14)
+                        }
                         EffectBanner(kind: effect(for: target))
                             .padding(.top, 14)
-                        ProminentButton(title: "Save") { save() }
-                            .disabled(!hasChanges || draft.validationError != nil)
+                        ProminentButton(title: "Save") { attemptSave() }
+                            .disabled(!hasChanges || draft.validationError != nil || limitReason != nil)
                             .padding(.top, 10)
                     } else {
                         Footnote(text: "Categories are always blocked. Apps inside them that you give windows to are excepted.")
@@ -158,6 +192,16 @@ struct RuleEditorView: View {
             }
         }
         .onAppear(perform: load)
+        .confirmationDialog(
+            "Block something essential?",
+            isPresented: $confirmBlockEssential,
+            titleVisibility: .visible
+        ) {
+            Button("Block it anyway", role: .destructive) { save() }
+            Button("Keep it open", role: .cancel) {}
+        } message: {
+            Text(caution ?? "")
+        }
         .confirmationDialog("Remove from Furlough?", isPresented: $confirmRemove, titleVisibility: .visible) {
             Button("Remove", role: .destructive) {
                 saved = model.removeTarget(id: targetID).message
@@ -176,7 +220,8 @@ struct RuleEditorView: View {
             ApplyRuleSheet(
                 candidates: applyCandidates,
                 rule: draft,
-                delayHours: model.state.config.loosenDelayHours
+                delayHours: model.state.config.loosenDelayHours,
+                limitReason: { ids in ActivityLimit.reason(applying: draft, to: [targetID] + ids, in: model.state) }
             ) { ids in applyTo = ids }
         }
         .sheet(isPresented: $showWeek) {
@@ -271,8 +316,8 @@ struct RuleEditorView: View {
             if !applyCandidates.isEmpty {
                 CardDivider()
                 cardAction("Apply these windows to other apps", symbol: "arrowshape.turn.up.right") { showApply = true }
-                    .disabled(draft.validationError != nil)
-                    .opacity(draft.validationError == nil ? 1 : 0.45)
+                    .disabled(draft.validationError != nil || limitReason != nil)
+                    .opacity(draft.validationError == nil && limitReason == nil ? 1 : 0.45)
             }
         }
         .emberCard()
@@ -321,18 +366,25 @@ struct RuleEditorView: View {
         .emberCard()
     }
 
+    /// Why the draft will not fit inside iOS's 20 monitored activities once saved, or nil.
+    /// Checked here rather than at registration, which only finds out after the rule is saved.
+    private var limitReason: String? {
+        ActivityLimit.reason(applying: draft, to: [targetID], in: model.state)
+    }
+
     private func effect(for target: Target) -> EffectBanner.Kind {
         if let error = draft.validationError { return .error(error) }
+        if let limitReason { return .error(limitReason) }
         if !hasChanges { return .noChanges }
         if target.rule?.isEquivalent(to: draft) ?? false { return .nicknameOnly }
         if Policy.classify(newRule: draft, against: target) == .tightening { return .tightening }
-        return .loosening(model.clock.now.addingTimeInterval(model.state.config.loosenDelay))
+        return .loosening(model.clock.now.addingTimeInterval(model.state.config.delay(for: target)))
     }
 
     private func removalNote(_ target: Target) -> String {
         target.rule == nil
             ? "Nothing is enforced yet, so removal is immediate."
-            : "Removing loosens your rules, so it takes \(TimeFormat.delay(hours: model.state.config.loosenDelayHours))."
+            : "Removing loosens your rules, so it takes \(TimeFormat.delay(hours: model.state.config.delayHours(for: target)))."
     }
 
     // MARK: Actions
@@ -346,6 +398,7 @@ struct RuleEditorView: View {
             return nil
         }.first
         let rule = pendingRule ?? target.rule ?? Rule()
+        tier = pendingTier ?? target.utility
         budget = rule.dailyBudgetMinutes > 0 ? rule.dailyBudgetMinutes : Furlough.defaultBudgetMinutes
         drafts = TimeWindow.grouped(rule.windows).map { DraftWindow(window: $0) }
         byDay = !rule.isSameEveryDay
@@ -374,9 +427,37 @@ struct RuleEditorView: View {
         withAnimation(.snappy) { drafts = DraftWindow.sorted(drafts + [DraftWindow(window: window)]) }
     }
 
+    /// A tier already queued for this target is what the editor should show, the same way a
+    /// queued rule is: otherwise the chips would say one thing and the pending list another.
+    private var pendingTier: Utility? {
+        model.state.pending.compactMap { change -> Utility? in
+            if case .setUtility(let id, let level) = change.kind, id == targetID { return level }
+            return nil
+        }.first
+    }
+
+    /// Blocking something essential is the one edit here that cannot be undone in a hurry, so
+    /// it is the one that asks twice.
+    private func attemptSave() {
+        if caution != nil, tier == .essential {
+            nicknameFocused = false
+            confirmBlockEssential = true
+        } else {
+            save()
+        }
+    }
+
     private func save() {
         nicknameFocused = false
-        saved = model.propose(rule: draft, nickname: nickname, for: targetID).message
+        // The tier first: a tightening of it lands now and so lengthens the wait the rule
+        // itself is about to be given, while a loosening of it queues and changes nothing yet.
+        let tierResult = model.setUtility(tier, for: targetID)
+        let ruleResult = model.propose(rule: draft, nickname: nickname, for: targetID)
+        saved = [tierResult, ruleResult]
+            .filter { $0 != .unchanged }
+            .map(\.message)
+            .joined(separator: "\n\n")
+        if saved?.isEmpty ?? true { saved = ProposalResult.unchanged.message }
     }
 
     /// Saves the draft here and gives it to `ids` as well, in one go.
@@ -577,6 +658,10 @@ struct ApplyRuleSheet: View {
     let candidates: [Target]
     let rule: Rule
     let delayHours: Int
+    /// Why saving to this set of targets would not fit inside iOS's activity limit, or nil.
+    /// Each target keeps its own rule while a loosening waits, so a wide apply can overflow
+    /// even when the rule is small.
+    var limitReason: ([UUID]) -> String? = { _ in nil }
     let onApply: ([UUID]) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var selected: Set<UUID> = []
@@ -598,11 +683,15 @@ struct ApplyRuleSheet: View {
                     .sensoryFeedback(.selection, trigger: selected)
                     Footnote(text: summary, alignment: .center)
                         .padding(.top, 10)
+                    if let reason = limitReason(chosen.map(\.id)) {
+                        EffectBanner(kind: .error(reason))
+                            .padding(.top, 10)
+                    }
                     ProminentButton(title: buttonTitle) {
                         onApply(chosen.map(\.id))
                         dismiss()
                     }
-                    .disabled(selected.isEmpty)
+                    .disabled(selected.isEmpty || limitReason(chosen.map(\.id)) != nil)
                     .padding(.top, 14)
                 }
                 .padding(.horizontal, 16)

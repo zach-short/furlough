@@ -16,5 +16,8 @@ enum Furlough {
     static let maxActivities = 20
     static let warningMinutes = 5
     static let defaultLoosenDelayHours = 24
+    /// However short the base delay and however essential the app, a loosening still
+    /// waits this long. Without it a low base times the essential tier rounds to nothing.
+    static let minimumLoosenDelayHours = 1
     static let defaultBudgetMinutes = 30
 }

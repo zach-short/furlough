@@ -282,6 +282,17 @@ struct Target: Codable, Hashable, Identifiable {
     /// to call an app but "This app". Optional so state written before it existed still
     /// decodes; `SharedStore` folds the learned names in on every load.
     var systemName: String?
+    /// The tier Zach put this in, or nil while he has not said. Stored optional for the same
+    /// reason `systemName` is: a synthesised `init(from:)` demands every non-optional key, and
+    /// state written before tiers existed has none. Read it through `utility`.
+    var utilityLevel: Utility?
+
+    /// How much this one is worth, which sets both how long a loosening waits and how loudly
+    /// blocking it is questioned. Unset means the middle: the base delay, a mild warning.
+    var utility: Utility { utilityLevel ?? .unset }
+    /// Whether the tier is Zach's answer or Furlough's default, so the editor knows when to
+    /// offer a suggestion.
+    var hasChosenUtility: Bool { utilityLevel != nil }
 
     var defaultName: String {
         if let systemName, !systemName.isEmpty { return systemName }
@@ -373,6 +384,8 @@ enum PendingKind: Codable, Hashable {
     case setRule(targetID: UUID, rule: Rule)
     case removeTarget(targetID: UUID)
     case setDelay(hours: Int)
+    /// Moving a target toward essential shortens its delay, so that is a loosening and queues.
+    case setUtility(targetID: UUID, level: Utility)
 }
 
 /// A loosening edit waiting out the delay.
@@ -384,7 +397,7 @@ struct PendingChange: Codable, Hashable, Identifiable {
 
     var targetID: UUID? {
         switch kind {
-        case .setRule(let id, _), .removeTarget(let id): id
+        case .setRule(let id, _), .removeTarget(let id), .setUtility(let id, _): id
         case .setDelay: nil
         }
     }

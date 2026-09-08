@@ -79,6 +79,14 @@ enum PendingNotifications {
             return "\(name) will no longer be limited."
         case .setDelay(let hours):
             return "The delay before a loosening lands becomes \(TimeFormat.delay(hours: hours))."
+        case .setUtility(let targetID, let level):
+            let name = config.target(id: targetID)?.displayName ?? "An app"
+            var config = config
+            if let index = config.targets.firstIndex(where: { $0.id == targetID }) {
+                config.targets[index].utilityLevel = level
+            }
+            let hours = config.delayHours(forTargetID: targetID)
+            return "\(name) becomes \(level.label.lowercased()), so its loosenings will wait \(TimeFormat.delay(hours: hours))."
         }
     }
 

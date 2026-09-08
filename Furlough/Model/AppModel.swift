@@ -166,7 +166,7 @@ final class AppModel {
                 lines.append("\(added) added. Set a schedule for each one; nothing is enforced until you do.")
             }
             if removalsScheduled > 0, let effectiveAt {
-                lines.append("\(removalsScheduled) removal(s) take effect \(effectiveAt.formatted(date: .abbreviated, time: .shortened)). Cancel them from the pending list if you change your mind.")
+                lines.append("\(removalsScheduled) removal(s) take effect by \(effectiveAt.formatted(date: .abbreviated, time: .shortened)). Cancel them from the pending list if you change your mind.")
             }
             return lines.joined(separator: "\n\n")
         }
@@ -195,7 +195,8 @@ final class AppModel {
         selected.formUnion(selection.webDomainTokens.map(TargetKind.webDomain))
         selected.formUnion(selection.categoryTokens.map(TargetKind.category))
 
-        let effectiveAt = current.now.addingTimeInterval(current.config.loosenDelay)
+        // Each removal waits out its own target's tier, so unpicking Messages and TikTok
+        // together does not make Messages wait for TikTok.
         for target in current.config.targets where !selected.contains(target.kind) {
             if target.rule == nil {
                 current.config.targets.removeAll { $0.id == target.id }
@@ -203,10 +204,11 @@ final class AppModel {
             }
             let alreadyPending = current.pending.contains { $0.kind == .removeTarget(targetID: target.id) }
             guard !alreadyPending else { continue }
+            let effectiveAt = current.now.addingTimeInterval(current.config.delay(for: target))
             current.pending.append(PendingChange(kind: .removeTarget(targetID: target.id), effectiveAt: effectiveAt))
             outcome.removalsScheduled += 1
+            outcome.effectiveAt = max(effectiveAt, outcome.effectiveAt ?? effectiveAt)
         }
-        if outcome.removalsScheduled > 0 { outcome.effectiveAt = effectiveAt }
 
         SharedStore.save(current)
         SharedStore.log("picker: added \(outcome.added), removals scheduled \(outcome.removalsScheduled)")
@@ -296,7 +298,7 @@ final class AppModel {
             state.config.targets[index].rule = rule
             return .appliedNow
         }
-        let effectiveAt = state.now.addingTimeInterval(state.config.loosenDelay)
+        let effectiveAt = state.now.addingTimeInterval(state.config.delay(for: target))
         state.pending.append(PendingChange(kind: .setRule(targetID: id, rule: rule), effectiveAt: effectiveAt))
         return .scheduled(effectiveAt)
     }
@@ -310,7 +312,7 @@ final class AppModel {
             current.pending.removeAll { $0.targetID == id }
             result = .appliedNow
         } else if !current.pending.contains(where: { $0.kind == .removeTarget(targetID: id) }) {
-            let effectiveAt = current.now.addingTimeInterval(current.config.loosenDelay)
+            let effectiveAt = current.now.addingTimeInterval(current.config.delay(for: target))
             current.pending.append(PendingChange(kind: .removeTarget(targetID: id), effectiveAt: effectiveAt))
             result = .scheduled(effectiveAt)
         }
@@ -421,6 +423,48 @@ final class AppModel {
         return .failed(error.localizedDescription)
     }
 
+    /// Puts `id` in a tier. Moving toward hazard lengthens its delay and lands now; moving
+    /// toward essential shortens it, so it queues behind the delay the target has *today* —
+    /// which is what keeps "call it essential, then loosen it" from being a way round the wait.
+    /// A target with no rule yet is enforcing nothing, so its first tier is free, exactly as
+    /// its first rule is.
+    /// What anchoring would take away that is worth keeping, in the words both the Anchor
+    /// screen and the Anchor button use. Nil when the anchor holds nothing worth a warning.
+    var anchorCaution: (text: String, isSevere: Bool)? {
+        guard let warning = state.config.anchorWarning,
+              let text = UtilityText.anchoring(
+                names: warning.names,
+                utility: warning.utility,
+                detail: warning.detail
+              )
+        else { return nil }
+        return (text, warning.utility == .essential)
+    }
+
+    func setUtility(_ level: Utility, for id: UUID) -> ProposalResult {
+        var current = SharedStore.load()
+        guard let target = current.config.target(id: id), target.utilityLevel != level else { return .unchanged }
+        current.pending.removeAll { change in
+            if case .setUtility(let targetID, _) = change.kind { return targetID == id }
+            return false
+        }
+        var result = ProposalResult.unchanged
+        if target.rule == nil || Policy.classify(newUtility: level, against: target) == .tightening {
+            if let index = current.config.targets.firstIndex(where: { $0.id == id }) {
+                current.config.targets[index].utilityLevel = level
+            }
+            result = .appliedNow
+        } else {
+            let effectiveAt = current.now.addingTimeInterval(current.config.delay(for: target))
+            current.pending.append(PendingChange(kind: .setUtility(targetID: id, level: level), effectiveAt: effectiveAt))
+            result = .scheduled(effectiveAt)
+        }
+        SharedStore.save(current)
+        SharedStore.log("utility for \(id): \(level.label), \(result)")
+        enforce(reason: "utility edit")
+        return result
+    }
+
     func cancelPending(id: UUID) {
         SharedStore.mutate { $0.pending.removeAll { $0.id == id } }
         SharedStore.log("cancelled pending change \(id)")
@@ -429,7 +473,7 @@ final class AppModel {
 
     func setDelay(hours: Int) -> ProposalResult {
         var current = SharedStore.load()
-        let clamped = max(1, hours)
+        let clamped = max(Furlough.minimumLoosenDelayHours, hours)
         guard clamped != current.config.loosenDelayHours else { return .unchanged }
         current.pending.removeAll { if case .setDelay = $0.kind { return true }; return false }
         var result = ProposalResult.unchanged
@@ -437,7 +481,8 @@ final class AppModel {
             current.config.loosenDelayHours = clamped
             result = .appliedNow
         } else {
-            let effectiveAt = current.now.addingTimeInterval(current.config.loosenDelay)
+            // The base multiplies out to every target, so cutting it loosens the slowest one too.
+            let effectiveAt = current.now.addingTimeInterval(current.config.longestDelay)
             current.pending.append(PendingChange(kind: .setDelay(hours: clamped), effectiveAt: effectiveAt))
             result = .scheduled(effectiveAt)
         }

@@ -170,7 +170,9 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   `Hosts.swift` (`normalize`, `matches`; it lived in `MacModel.swift` until the tests wanted
   it, and is harmlessly unused on iOS),
   `PendingNotifications.swift` (`PlannedNotification`, the pure `plan`, `sync`, and the one
-  `Notifier` both platforms post through).
+  `Notifier` both platforms post through),
+  `ActivityLimit.swift` (how many DeviceActivity activities a save would need; iOS-only, and
+  harmlessly unused on the Mac).
 - `Tests/Core` (target `FurloughCoreTests`, macOS, Swift Testing, no host app): `Support.swift`
   (the pinned calendar and the fixtures), `ModelsTests`, `PolicyStatusTests`,
   `PolicyPendingTests`, `PolicySummaryTests`, `NamingTests`, `DecodingTests`, `ClockTests`,
@@ -336,7 +338,7 @@ Open, and where each one lives:
 - The shield icon still being the SF hourglass → step 17.
 - The duplicated Mac UI (`MacComponents.swift`, `MacWeekView.swift`, two `Notifier`s) → step 16.
 - Safari web apps in the Dock bypassing host rules → step 7. No web app on this Mac to test.
-- The 19-window limit only being checked after Save → step 6, `Policy.distinctSpans`.
+- **The 19-window limit only being checked after Save** — **done**, step 6, as `ActivityLimit`.
 - Window start lagging by minutes with no way to hurry it → step 6/step 3; the shield extension
   has the App Group and the entitlement, so it may be able to reconcile itself on `.open`.
 - Categories only being blockable all day → step 12. Ask Zach first.
@@ -348,7 +350,8 @@ Open, and where each one lives:
 - Per-weekday budgets → step 11.
 - Anchor everything except an allowlist → step 13.
 - A second tag → step 14.
-- A longer delay for the worst apps → step 15.
+- A longer delay for the worst apps → **done**, step 15, as four utility tiers rather than a
+  raw hours field, because one tier drives both the delay and the warnings.
 - iCloud sync of the Anchor → step 18. Rules cannot sync: tokens versus bundle ids.
 
 ## Next work, in order
@@ -426,9 +429,23 @@ The plan for this stretch. Tick each phase off here as it lands.
    `Notifier` now lives in Core with an `id:` on every post; the copies in
    `MonitorExtension.swift` and `Enforcer.swift` are gone, and the Mac's three posts have stable
    identifiers instead of a fresh UUID each time. Nobody has seen any of these on a device.
-6. **Small fixes**: the 19-span limit checked in the editors (`Policy.distinctSpans`), pending
-   cards showing old rule → new rule, `widgetURL` and the `furlough://target/<id>` scheme,
-   the Mac browser poll at two seconds, and iPad (ask Zach).
+6. **Small fixes.** The 19-span limit is done 2026-09-08, as `Shared/Core/ActivityLimit.swift`
+   rather than `Policy.distinctSpans` (Policy was being edited in another session, and this is
+   self-contained anyway): `spans(in:)` mirrors exactly what `Monitoring.register` collects,
+   `projecting(_:appliedTo:in:)` applies the same tightening-lands / loosening-queues rule as
+   `AppModel.assign`, and `reason(applying:to:in:)` is the sentence shown above Save.
+   **The subtlety worth keeping**: a loosening is queued *beside* the target's current rule and
+   `Monitoring.register` registers pending rules too, so for the length of the delay both sets of
+   spans are live — counting only the new rule would let exactly the edit that overflows through.
+   16 tests in `Tests/Core/ActivityLimitTests.swift`.
+   Wired into `RuleEditorView` only: the `EffectBanner`, the Save button, the "Apply these
+   windows to other apps" action, and `ApplyRuleSheet`'s own button, which re-checks against the
+   targets actually ticked. **Deliberately not wired into `MacRuleEditor`**: the Mac has no
+   DeviceActivity, so the limit does not exist there and gating on it would refuse valid Mac
+   rules. The Mac browser poll at two seconds landed with step 7 (`Browsers.pollInterval`).
+   Still open here: pending cards showing old rule → new rule, `widgetURL` and the
+   `furlough://target/<id>` scheme, and iPad (ask Zach). `widgetURL` needs a target id on
+   `Policy.Summary`, which today carries only names.
 7. **Mac hardening**: the 45-second grace before force quit with a countdown on the panel, and
    every window of every running browser rather than only the front one, are both done
    2026-09-08 (`QuitGrace.swift`, `Browsers.snapshots()`, `Tests/Core/QuitGraceTests.swift`;
@@ -454,7 +471,46 @@ The plan for this stretch. Tick each phase off here as it lands.
 12. **Rules for categories** instead of always-blocked. Ask Zach first.
 13. **Anchor the whole phone**: a scope on `AnchorProfile`, `.all(except:)` with an allowlist.
 14. **A second tag**: `AnchorProfile.tagIDs`, pairing another queues as loosening.
-15. **A longer delay for the worst apps**: `Target.loosenDelayHours`. Ask Zach first.
+15. **Tiers, and the warnings that come with them.** Done 2026-09-08. Zach asked for a delay
+    scaled to how useful an app is, and for a warning before blocking one the phone needs — and
+    the two are the same axis read in opposite directions, so they are one field, not two.
+    `Utility` (`Shared/Core/Utility.swift`) has four cases, `essential`/`useful`/`idle`/`hazard`,
+    multiplying the base delay by 0.25/1/2/4 (6 h to 4 days at the default 24 h) and floored at
+    `Furlough.minimumLoosenDelayHours` = 1 h, which is Zach's call: essential is fast, never
+    instant. `Config.delayHours(for:)` replaced `Config.loosenDelay` at every queueing site in
+    `AppModel` and `MacModel`; `Config.longestDelay` is what lowering the *base* now waits out,
+    since that loosens every target at once. Picker removals compute their date per target, so
+    unpicking Messages and TikTok together does not make Messages wait for TikTok.
+    **The invariant that matters**: raising a target toward essential shortens its delay, so it
+    is itself a loosening — `PendingKind.setUtility` queues behind the delay the target has
+    *today* (`Policy.classify(newUtility:against:)`, which reads `delayMultiplier` and never
+    `Rule.isTighterOrEqual`, because a tier changes when a change lands, not what is allowed).
+    So "mark it essential, then loosen it" in one save still waits the old, longer delay.
+    Moving toward hazard lengthens the delay and lands immediately.
+    `Target.utilityLevel` is stored optional — a synthesised `init(from:)` demands every
+    non-optional key, and state written before tiers has none — and read through
+    `Target.utility`, which answers `Utility.unset` (= `.useful`) so forgetting to choose is
+    always the safe way round. `hasChosenUtility` is what tells the editor to offer a suggestion.
+    `AppUtility` (`Shared/Core/AppUtility.swift`) is the table: bundle ids (exact, then longest
+    vendor prefix), hosts (longest match through subdomains, so `maps.google.com` is essential
+    where `google.com` is only useful), and names as the shield learns them. A table and not a
+    model on purpose: on the Mac a target already *is* a bundle id or host so a lookup is exact
+    and offline, and a server round-trip would make `PrivacyInfo.xcprivacy`'s "Data Not
+    Collected" false, which step 19 is filing on. Nothing is applied behind anyone's back —
+    the guess is a chip the editor offers, and `Target.utilityLevel` is only ever Zach's answer.
+    Warnings: `UtilityText.blocking` for the rule editor (nil for idle and hazard, since
+    blocking those is the point and nagging would teach him to swipe past the banner that
+    matters), `UtilityText.anchoring` for the anchor. `UtilityPicker` and `CautionBanner` live
+    in `Shared/UI`, so the phone and the Mac use one control and the wording cannot drift —
+    the first piece of step 16 done early. Saving an essential block asks twice
+    (`confirmBlockEssential`), and so does anchoring one; `Config.anchorWarning` picks the worst
+    tier the anchor holds and names it. Its limit, and it is real: it can only name anchored
+    kinds that are also targets, because an anchor may hold tokens Furlough has no name for.
+    Tests: `Tests/Core/UtilityTests.swift`, 24 tests over the multipliers, the floor,
+    `longestDelay`, both classify directions, the pending round trip, the table's three lookups,
+    `anchorWarning`, and state written before tiers existed.
+    **Not done**: the tier has no home on the home screen or in the widget, and nothing sorts by
+    it. Zach has not seen any of this on a device.
 16. **Unify the Mac duplicates** into `Shared/UI`, only while `Furlough/Views` is quiet.
 17. **Imagery** with the Higgsfield MCP, only with Zach's go-ahead per item, preflighting every
     cost (balance was about 413). Reference the icon jobs by id: original

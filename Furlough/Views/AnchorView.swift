@@ -15,6 +15,7 @@ struct AnchorView: View {
     @State private var confirmForget = false
 
     private var anchor: AnchorProfile { model.state.config.anchor }
+    private var anchorCaution: (text: String, isSevere: Bool)? { model.anchorCaution }
 
     var body: some View {
         ScrollView {
@@ -23,6 +24,10 @@ struct AnchorView: View {
                 stateCard
                 SectionLabel(text: "Apps")
                 appsCard
+                if let caution = anchorCaution {
+                    CautionBanner(text: caution.text, isSevere: caution.isSevere)
+                        .padding(.top, 12)
+                }
                 Footnote(text: anchor.isAnchored
                     ? "Unanchor with your tag to change the list."
                     : "Anything here is blocked while anchored. Windows and budgets still apply the rest of the time.")
@@ -211,8 +216,10 @@ struct AnchorToggleButton: View {
     @Environment(AppModel.self) private var model
     @State private var busy = false
     @State private var message: String?
+    @State private var confirmAnchor = false
 
     private var anchor: AnchorProfile { model.state.config.anchor }
+    private var caution: (text: String, isSevere: Bool)? { model.anchorCaution }
 
     var body: some View {
         Group {
@@ -227,10 +234,7 @@ struct AnchorToggleButton: View {
                 .buttonStyle(.glass)
             } else {
                 Button {
-                    switch model.anchor() {
-                    case .failed(let reason): message = reason
-                    default: break
-                    }
+                    if caution != nil { confirmAnchor = true } else { drop() }
                 } label: {
                     Text("Anchor")
                         .emberBody(13, .bold)
@@ -243,10 +247,27 @@ struct AnchorToggleButton: View {
             }
         }
         .disabled(busy)
+        .confirmationDialog(
+            "Anchor this?",
+            isPresented: $confirmAnchor,
+            titleVisibility: .visible
+        ) {
+            Button("Anchor anyway", role: .destructive) { drop() }
+            Button("Not yet", role: .cancel) {}
+        } message: {
+            Text(caution?.text ?? "")
+        }
         .alert("Anchor", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
             Button("OK") { message = nil }
         } message: {
             Text(message ?? "")
+        }
+    }
+
+    private func drop() {
+        switch model.anchor() {
+        case .failed(let reason): message = reason
+        default: break
         }
     }
 

@@ -20,6 +20,9 @@ struct MacRuleEditor: View {
     /// What the last save did, shown in the Saved alert.
     @State private var saved: String?
     @State private var confirmRemove = false
+    /// The tier in the draft, saved through `MacModel.setUtility`.
+    @State private var tier = Utility.unset
+    @State private var confirmBlockEssential = false
     @State private var now = Date.now
     private let clock = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -59,7 +62,33 @@ struct MacRuleEditor: View {
     private var trimmedNickname: String { nickname.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var hasChanges: Bool {
         guard let target else { return false }
-        return !(target.rule?.isEquivalent(to: draft) ?? false) || (target.nickname != trimmedNickname && !trimmedNickname.isEmpty)
+        return !(target.rule?.isEquivalent(to: draft) ?? false)
+            || (target.nickname != trimmedNickname && !trimmedNickname.isEmpty)
+            || target.utilityLevel != tier
+    }
+
+    /// What Furlough would have guessed, offered only while Zach has not answered for himself.
+    private var suggestion: Utility? {
+        guard let target, !target.hasChosenUtility else { return nil }
+        return AppUtility.suggestion(for: target)?.utility
+    }
+
+    /// What blocking this one costs, when it is worth saying.
+    private var caution: String? {
+        guard let target, !Rule.unrestricted.isEquivalent(to: draft) else { return nil }
+        return UtilityText.blocking(
+            name: target.displayName,
+            utility: tier,
+            detail: AppUtility.suggestion(for: target)?.detail
+        )
+    }
+
+    /// A tier already queued for this target is what the editor should show, as a queued rule is.
+    private var pendingTier: Utility? {
+        model.state.pending.compactMap { change -> Utility? in
+            if case .setUtility(let id, let level) = change.kind, id == targetID { return level }
+            return nil
+        }.first
     }
 
     /// The draft as a week for the visual editor. Writing back merges identical spans across
@@ -100,9 +129,19 @@ struct MacRuleEditor: View {
                     windowsCard
                     SectionLabel(text: "Daily budget")
                     budgetCard(target)
+                    SectionLabel(text: "How much it is worth")
+                    UtilityPicker(
+                        selection: $tier,
+                        baseDelayHours: model.state.config.loosenDelayHours,
+                        suggestion: suggestion
+                    )
+                    if let caution {
+                        CautionBanner(text: caution, isSevere: tier == .essential)
+                            .padding(.top, 14)
+                    }
                     effectBanner(for: target)
                         .padding(.top, 14)
-                    ProminentButton(title: "Save") { save() }
+                    ProminentButton(title: "Save") { attemptSave() }
                         .disabled(!hasChanges || draft.validationError != nil)
                         .padding(.top, 10)
                         .keyboardShortcut(.defaultAction)
@@ -121,6 +160,16 @@ struct MacRuleEditor: View {
         .onAppear(perform: load)
         .confirmationDialog("Remove from Furlough?", isPresented: $confirmRemove, titleVisibility: .visible) {
             Button("Remove", role: .destructive) { saved = model.removeTarget(id: targetID).message }
+        }
+        .confirmationDialog(
+            "Block something essential?",
+            isPresented: $confirmBlockEssential,
+            titleVisibility: .visible
+        ) {
+            Button("Block it anyway", role: .destructive) { save() }
+            Button("Keep it open", role: .cancel) {}
+        } message: {
+            Text(caution ?? "")
         }
         .sheet(isPresented: $showApply, onDismiss: {
             guard let ids = applyTo else { return }
@@ -301,7 +350,7 @@ struct MacRuleEditor: View {
         if !hasChanges { return .noChanges }
         if target.rule?.isEquivalent(to: draft) ?? false { return .nicknameOnly }
         if Policy.classify(newRule: draft, against: target) == .tightening { return .tightening }
-        return .loosening(model.clock.now.addingTimeInterval(model.state.config.loosenDelay))
+        return .loosening(model.clock.now.addingTimeInterval(model.state.config.delay(for: target)))
     }
 
     private func effectBanner(for target: Target) -> some View {
@@ -327,7 +376,7 @@ struct MacRuleEditor: View {
     private func removalNote(_ target: Target) -> String {
         target.rule == nil
             ? "Nothing is enforced yet, so removal is immediate."
-            : "Removing loosens your rules, so it takes \(TimeFormat.delay(hours: model.state.config.loosenDelayHours))."
+            : "Removing loosens your rules, so it takes \(TimeFormat.delay(hours: model.state.config.delayHours(for: target)))."
     }
 
     // MARK: Actions
@@ -341,6 +390,7 @@ struct MacRuleEditor: View {
             return nil
         }.first
         let rule = pendingRule ?? target.rule ?? Rule()
+        tier = pendingTier ?? target.utility
         budget = rule.dailyBudgetMinutes > 0 ? rule.dailyBudgetMinutes : Furlough.defaultBudgetMinutes
         drafts = TimeWindow.grouped(rule.windows).map { DraftWindow(window: $0) }
         byDay = !rule.isSameEveryDay
@@ -370,9 +420,23 @@ struct MacRuleEditor: View {
         withAnimation(.snappy) { drafts = DraftWindow.sorted(drafts + [DraftWindow(window: window)]) }
     }
 
+    /// Blocking something essential is the one edit here that cannot be undone in a hurry, so
+    /// it is the one that asks twice.
+    private func attemptSave() {
+        if caution != nil, tier == .essential { confirmBlockEssential = true } else { save() }
+    }
+
     private func save() {
         drafts = DraftWindow.tidy(drafts)
-        saved = model.propose(rule: draft, nickname: nickname, for: targetID).message
+        // The tier first: a tightening of it lands now and so lengthens the wait the rule
+        // itself is about to be given, while a loosening of it queues and changes nothing yet.
+        let tierResult = model.setUtility(tier, for: targetID)
+        let ruleResult = model.propose(rule: draft, nickname: nickname, for: targetID)
+        let message = [tierResult, ruleResult]
+            .filter { $0 != .unchanged }
+            .map(\.message)
+            .joined(separator: "\n\n")
+        saved = message.isEmpty ? ProposalResult.unchanged.message : message
     }
 
     /// Saves the draft here and gives it to `ids` as well, in one go.

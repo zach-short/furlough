@@ -133,6 +133,10 @@ enum Policy {
             config.targets.removeAll { $0.id == id }
         case .setDelay(let hours):
             config.loosenDelayHours = hours
+        case .setUtility(let id, let level):
+            if let index = config.targets.firstIndex(where: { $0.id == id }) {
+                config.targets[index].utilityLevel = level
+            }
         }
     }
 
@@ -149,6 +153,15 @@ enum Policy {
         let old = target?.rule ?? .unrestricted
         let new = newRule ?? .unrestricted
         return new.isTighterOrEqual(to: old) ? .tightening : .loosening
+    }
+
+    /// A tier changes nothing about what is allowed, only how long the next loosening waits —
+    /// so it is classified on the delay it buys, not with `Rule.isTighterOrEqual`. Moving
+    /// toward hazard lengthens the wait and lands now; moving toward essential shortens it and
+    /// queues, which is what stops "mark everything essential" from being a way out of the delay.
+    static func classify(newUtility: Utility, against target: Target?) -> ChangeClass {
+        let old = target?.utility ?? .unset
+        return newUtility.delayMultiplier >= old.delayMultiplier ? .tightening : .loosening
     }
 
     // MARK: Status
