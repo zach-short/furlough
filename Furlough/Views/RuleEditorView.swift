@@ -21,6 +21,20 @@ struct RuleEditorView: View {
     struct DraftWindow: Identifiable {
         let id = UUID()
         var window: TimeWindow
+
+        /// Rows on the same days that overlap or touch, joined into the earlier row, in order.
+        static func joined(_ rows: [DraftWindow]) -> [DraftWindow] {
+            var result: [DraftWindow] = []
+            for row in rows.sorted(by: { $0.window < $1.window }) {
+                if let index = result.lastIndex(where: { $0.window.days == row.window.days }),
+                   row.window.startMinute <= result[index].window.endMinute {
+                    result[index].window.endMinute = max(result[index].window.endMinute, row.window.endMinute)
+                } else {
+                    result.append(row)
+                }
+            }
+            return result
+        }
     }
 
     private var target: Target? { model.state.config.target(id: targetID) }
@@ -60,6 +74,7 @@ struct RuleEditorView: View {
                     byDay = !on
                     if on {
                         for index in drafts.indices { drafts[index].window.days = .all }
+                        drafts = DraftWindow.joined(drafts)
                     }
                 }
             }
@@ -198,9 +213,12 @@ struct RuleEditorView: View {
             .padding(.vertical, 8)
             CardDivider()
             ForEach($drafts) { $draft in
-                WindowRow(window: $draft.window, showsDays: byDay) {
-                    drafts.removeAll { $0.id == draft.id }
-                }
+                WindowRow(
+                    window: $draft.window,
+                    showsDays: byDay,
+                    onCommit: { withAnimation(.snappy) { drafts = DraftWindow.joined(drafts) } },
+                    onRemove: { drafts.removeAll { $0.id == draft.id } }
+                )
                 CardDivider()
             }
             cardAction("Add window", symbol: "plus") { addWindow() }
@@ -317,10 +335,12 @@ struct RuleEditorView: View {
 }
 
 /// One allowed window: two glass time chips, an arrow, the duration, a quiet remove button,
-/// and, when the rule varies by day, a strip of day toggles beneath.
+/// and, when the rule varies by day, a strip of day toggles beneath. `onCommit` fires when
+/// a time picker closes, so the owner can join rows that now touch.
 struct WindowRow: View {
     @Binding var window: TimeWindow
     var showsDays = false
+    var onCommit: () -> Void = {}
     let onRemove: () -> Void
     @State private var editing: WindowEdge?
 
@@ -364,7 +384,7 @@ struct WindowRow: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .sheet(item: $editing) { edge in
+        .sheet(item: $editing, onDismiss: onCommit) { edge in
             TimePickerSheet(
                 title: edge == .start ? "Opens at" : "Closes at",
                 minute: edge == .start ? $window.startMinute : $window.endMinute,

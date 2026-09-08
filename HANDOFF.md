@@ -46,7 +46,10 @@ small codebase he fully understands over a fork. He is interactive: ask when a d
   (`Views/WeekView.swift`): a seven-column 24-hour grid, a per-day editor reached by
   tapping a column, and "Apply to other days" which adds that day's hours to the chosen
   days on top of what they have, joining spans that overlap or touch (Zach's call,
-  2026-09-07: merge, not replace). `WeekDraft` is the bridge: per-day span lists both ways, merging identical spans
+  2026-09-07: merge, not replace). Connected hours are always one window: rows on the
+  same days that overlap or touch join when a time picker closes (`DraftWindow.joined`,
+  `TimeWindow.joined`), and the week and day pictures draw joined spans. A freshly added
+  row is left alone until its times are set, since it starts where the last one ends. `WeekDraft` is the bridge: per-day span lists both ways, merging identical spans
   across days back into one window, so edits in the sheet land in the editor's draft
   through one binding and the Same every day toggle follows. Categories are always-blocked containers; apps inside them that have their own
   windows are excepted.

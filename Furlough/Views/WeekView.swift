@@ -1,43 +1,30 @@
 import SwiftUI
 
 /// The editor's windows as seven per-day lists of spans: what the week grid draws and the
-/// day editor changes. Going back to windows merges identical spans across days into one
-/// window on all of those days, so the editor's list stays as short as it can be.
+/// day editor changes. Each day's spans are joined wherever they overlap or touch. Going back
+/// to windows merges identical spans across days into one window on all of those days, so
+/// the editor's list stays as short as it can be.
 struct WeekDraft: Equatable {
     private var spans: [Int: [TimeWindow]] = [:]
 
     init(windows: [TimeWindow]) {
         for weekday in 1...7 {
-            spans[weekday] = windows.filter { $0.applies(on: weekday) }.map(\.span).sorted()
+            spans[weekday] = TimeWindow.joined(windows.filter { $0.applies(on: weekday) }.map(\.span))
         }
     }
 
     func spans(on weekday: Int) -> [TimeWindow] { spans[weekday] ?? [] }
 
     mutating func set(_ hours: [TimeWindow], on weekday: Int) {
-        spans[weekday] = hours.map(\.span).sorted()
+        spans[weekday] = TimeWindow.joined(hours.map(\.span))
     }
 
     /// Adds the hours of `source` to every day in `days`, on top of what each already had.
-    /// Spans that overlap or touch are joined into one.
     mutating func apply(from source: Int, to days: Weekdays) {
         let hours = spans(on: source)
         for weekday in 1...7 where weekday != source && days.contains(weekday: weekday) {
-            spans[weekday] = Self.joined(spans(on: weekday) + hours)
+            spans[weekday] = TimeWindow.joined(spans(on: weekday) + hours)
         }
-    }
-
-    /// Sorted spans with any that overlap or touch merged into one.
-    static func joined(_ spans: [TimeWindow]) -> [TimeWindow] {
-        var result: [TimeWindow] = []
-        for span in spans.map(\.span).sorted() {
-            if let last = result.last, span.startMinute <= last.endMinute {
-                result[result.count - 1].endMinute = max(last.endMinute, span.endMinute)
-            } else {
-                result.append(span)
-            }
-        }
-        return result
     }
 
     /// One window per distinct span, on every day that has it.
@@ -261,7 +248,7 @@ struct DayEditor: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                DayBar(spans: windows)
+                DayBar(spans: TimeWindow.joined(windows))
                     .padding(.horizontal, 12)
                     .padding(.top, 12)
                     .padding(.bottom, 10)
@@ -278,9 +265,7 @@ struct DayEditor: View {
                         CardDivider()
                     }
                     ForEach($rows) { $row in
-                        WindowRow(window: $row.window) {
-                            withAnimation(.snappy) { rows.removeAll { $0.id == row.id } }
-                        }
+                        WindowRow(window: $row.window, onCommit: commit, onRemove: { remove(row) })
                         CardDivider()
                     }
                     Button { addWindow() } label: {
@@ -332,10 +317,6 @@ struct DayEditor: View {
             }
         }
         .onAppear(perform: load)
-        .onChange(of: windows) { _, hours in
-            week.set(hours, on: weekday)
-            appliedNote = nil
-        }
         .sensoryFeedback(.success, trigger: applied)
     }
 
@@ -349,11 +330,29 @@ struct DayEditor: View {
         rows = week.spans(on: weekday).map { RuleEditorView.DraftWindow(window: $0) }
     }
 
+    /// A new row is left alone until its times are set, so it can start where the last ends.
     private func addWindow() {
         var start = windows.map(\.endMinute).max() ?? 12 * 60
         if start > Furlough.minutesPerDay - 60 { start = 0 }
         let window = TimeWindow(startMinute: start, endMinute: min(start + 60, Furlough.minutesPerDay))
         withAnimation(.snappy) { rows.append(RuleEditorView.DraftWindow(window: window)) }
+        sync()
+    }
+
+    /// After a time edit: rows that now overlap or touch become one, then the week is updated.
+    private func commit() {
+        withAnimation(.snappy) { rows = RuleEditorView.DraftWindow.joined(rows) }
+        sync()
+    }
+
+    private func remove(_ row: RuleEditorView.DraftWindow) {
+        withAnimation(.snappy) { rows.removeAll { $0.id == row.id } }
+        sync()
+    }
+
+    private func sync() {
+        week.set(windows, on: weekday)
+        appliedNote = nil
     }
 
     private func apply() {

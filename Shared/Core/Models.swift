@@ -86,6 +86,21 @@ struct TimeWindow: Codable, Hashable, Identifiable, Comparable {
     static func < (lhs: TimeWindow, rhs: TimeWindow) -> Bool {
         (lhs.startMinute, lhs.endMinute, lhs.days.rawValue) < (rhs.startMinute, rhs.endMinute, rhs.days.rawValue)
     }
+
+    /// Windows on the same days that overlap or touch, joined into one, in order. Windows on
+    /// different days are left alone.
+    static func joined(_ windows: [TimeWindow]) -> [TimeWindow] {
+        var result: [TimeWindow] = []
+        for window in windows.sorted() {
+            if let index = result.lastIndex(where: { $0.days == window.days }),
+               window.startMinute <= result[index].endMinute {
+                result[index].endMinute = max(result[index].endMinute, window.endMinute)
+            } else {
+                result.append(window)
+            }
+        }
+        return result
+    }
 }
 
 extension TimeWindow {
