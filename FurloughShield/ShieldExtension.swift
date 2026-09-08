@@ -1,5 +1,6 @@
 import ManagedSettings
 import ManagedSettingsUI
+import SwiftUI
 import UIKit
 import WidgetKit
 
@@ -45,25 +46,56 @@ final class ShieldExtension: ShieldConfigurationDataSource {
         }
         let text = ShieldText.text(name: name, status: status, rule: target?.rule)
 
-        // Ember Glass tokens (design/DESIGN.md): the shield extension cannot see Shared/UI.
-        let ember = UIColor(red: 0xE5 / 255, green: 0x56 / 255, blue: 0x3D / 255, alpha: 1)
+        // Ember Glass tokens (design/DESIGN.md). The shield sees Shared/Core, plus the
+        // hourglass drawing and its colours, which are on its source list in project.yml.
         let amber = UIColor(red: 0xF5 / 255, green: 0x9E / 255, blue: 0x4A / 255, alpha: 1)
         let cream = UIColor(red: 0xF5 / 255, green: 0xEF / 255, blue: 0xE6 / 255, alpha: 1)
         let muted = UIColor(red: 0xB8 / 255, green: 0xAF / 255, blue: 0xA3 / 255, alpha: 1)
         let ground = UIColor(red: 0x0F / 255, green: 0x0D / 255, blue: 0x0B / 255, alpha: 1)
-        let symbol = UIImage.SymbolConfiguration(pointSize: 72, weight: .medium)
-        let icon = UIImage(systemName: "hourglass", withConfiguration: symbol)?
-            .withTintColor(amber, renderingMode: .alwaysOriginal)
+        var glass: HourglassState?
+        if let target, let status {
+            glass = HourglassState.of(target, status: status, runtime: state.runtime, now: now)
+        }
         return ShieldConfiguration(
-            backgroundBlurStyle: .systemUltraThinMaterialDark,
-            backgroundColor: ember.withAlphaComponent(0.22),
-            icon: icon,
+            // The app's own ground over the most opaque dark material: the shield reads as a
+            // Furlough screen, not as a smear of whatever it is covering.
+            backgroundBlurStyle: .systemChromeMaterialDark,
+            backgroundColor: ground.withAlphaComponent(0.92),
+            icon: icon(for: glass, fallbackTint: amber),
             title: ShieldConfiguration.Label(text: text.title, color: cream),
             subtitle: ShieldConfiguration.Label(text: text.subtitle, color: muted),
-            primaryButtonLabel: ShieldConfiguration.Label(text: "Close", color: ground),
-            primaryButtonBackgroundColor: cream,
+            // The card fill from the app, not a shouting cream pill: Close is the only thing
+            // here, so it does not have to fight for the eye.
+            primaryButtonLabel: ShieldConfiguration.Label(text: "Close", color: cream),
+            primaryButtonBackgroundColor: UIColor.white.withAlphaComponent(0.14),
             secondaryButtonLabel: nil
         )
+    }
+
+    /// The icon slot takes a UIImage, so the glass is the app's own view rendered to one still
+    /// frame: the same drawing, at the sand level this rule has reached, without the timeline.
+    /// `ImageRenderer` is main-actor work and iOS calls us on the main thread, but a shield
+    /// that throws is a shield the user never sees, so anything else falls back to the symbol.
+    private func icon(for glass: HourglassState?, fallbackTint: UIColor) -> UIImage? {
+        if let glass, Thread.isMainThread {
+            return MainActor.assumeIsolated { Self.still(glass) }
+        }
+        let symbol = UIImage.SymbolConfiguration(pointSize: 72, weight: .medium)
+        return UIImage(systemName: "hourglass", withConfiguration: symbol)?
+            .withTintColor(fallbackTint, renderingMode: .alwaysOriginal)
+    }
+
+    @MainActor
+    private static func still(_ glass: HourglassState) -> UIImage? {
+        let renderer = ImageRenderer(
+            content: HourglassView(state: glass, phase: 0, motion: false)
+                .frame(width: 132, height: 176)
+        )
+        // No view context out here to read a trait from, and the slot is small: @3x covers
+        // every device that draws a shield, and UIKit takes it down on a @2x screen.
+        renderer.scale = 3
+        renderer.isOpaque = false
+        return renderer.uiImage
     }
 
     /// The shield is the one place Screen Time tells us what an app is called; everywhere else

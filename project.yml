@@ -125,6 +125,10 @@ targets:
     sources:
       - path: FurloughShield
       - path: Shared/Core
+      # The shield draws the real hourglass (see ShieldExtension.still), so it needs the
+      # drawing and the colours it fills with — not the rest of Shared/UI.
+      - path: Shared/UI/Hourglass.swift
+      - path: Shared/UI/Theme.swift
       - path: Shared/PrivacyInfo.xcprivacy
         buildPhase: resources
     entitlements:
