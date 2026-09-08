@@ -10,7 +10,11 @@ enum ShieldReconciler {
     @discardableResult
     static func reconcile(now: Date = .now, reason: String) -> Decision {
         var state = SharedStore.load()
-        if Policy.applyDuePending(&state, now: now) {
+        let trust = state.clockTrust(now: now)
+        if case .movedForward(let drift) = trust {
+            SharedStore.log("clock is \(Clock.describe(drift)) ahead: loosening changes are held")
+        }
+        if Policy.applyDuePending(&state, now: now, trust: trust) {
             SharedStore.log("applied due pending changes during reconcile")
         }
         let decision = Policy.decide(config: state.config, runtime: state.runtime, now: now)

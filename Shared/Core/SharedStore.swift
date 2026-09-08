@@ -44,12 +44,18 @@ enum SharedStore {
         }
     }
 
-    static func save(_ state: SharedState) {
+    /// Every save records both clocks, which is what lets a wall clock moved forward be seen.
+    /// The mark only advances while the clock is trusted; see `Clock`.
+    @discardableResult
+    static func save(_ state: SharedState) -> SharedState {
+        var state = state
+        state.runtime.clock = Clock.stamp(state.runtime.clock)
         do {
             defaults.set(try encoder.encode(state), forKey: stateKey)
         } catch {
             log("Failed to encode state: \(error)")
         }
+        return state
     }
 
     /// Forgets every target, rule, pending change, and the Anchor. The activity log is kept.
@@ -59,8 +65,7 @@ enum SharedStore {
     static func mutate(_ body: (inout SharedState) -> Void) -> SharedState {
         var state = load()
         body(&state)
-        save(state)
-        return state
+        return save(state)
     }
 
     static func log(_ message: String) {

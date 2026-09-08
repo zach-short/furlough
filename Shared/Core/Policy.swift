@@ -107,17 +107,36 @@ enum Policy {
     // MARK: Pending changes
 
     /// Applies every pending change whose time has come. Returns true when anything changed.
+    ///
+    /// While the wall clock is ahead of where the machine says it should be, changes that would
+    /// loosen the rules are held and the rest still apply, so moving the date forward buys
+    /// nothing. `trust` defaults to reading this machine's clock rather than to `.trusted`, so
+    /// no caller can forget it and let a shield lift; pass it to keep the call pure.
     @discardableResult
-    static func applyDuePending(_ state: inout SharedState, now: Date) -> Bool {
+    static func applyDuePending(_ state: inout SharedState, now: Date, trust: Clock.Trust? = nil) -> Bool {
+        let trust = trust ?? state.clockTrust()
         let due = state.pending
             .filter { $0.effectiveAt <= now }
             .sorted { $0.effectiveAt < $1.effectiveAt }
         guard !due.isEmpty else { return false }
-        for change in due {
+        var changed = false
+        for change in due where trust.isTrusted || !loosens(change, in: state.config) {
             apply(change, to: &state.config)
+            state.pending.removeAll { $0.id == change.id }
+            changed = true
         }
-        state.pending.removeAll { $0.effectiveAt <= now }
-        return true
+        return changed
+    }
+
+    /// Whether applying this change right now would let more through than the rules do today.
+    /// Everything in the queue was a loosening when it was made, but it is judged again here:
+    /// the rule it loosened may have been tightened since.
+    static func loosens(_ change: PendingChange, in config: Config) -> Bool {
+        switch change.kind {
+        case .setRule(let id, let rule): classify(newRule: rule, against: config.target(id: id)) == .loosening
+        case .removeTarget: true
+        case .setDelay(let hours): hours < config.loosenDelayHours
+        }
     }
 
     static func apply(_ change: PendingChange, to config: inout Config) {
@@ -133,10 +152,12 @@ enum Policy {
         }
     }
 
-    /// The config as it stands at `now`, with due pending changes folded in but nothing persisted.
-    static func effectiveConfig(_ state: SharedState, now: Date) -> Config {
+    /// The config as it stands at `now`, with due pending changes folded in but nothing
+    /// persisted. `now` may be in the future (the widget projects a timeline), so the clock is
+    /// judged as it is at this instant, not at `now`.
+    static func effectiveConfig(_ state: SharedState, now: Date, trust: Clock.Trust? = nil) -> Config {
         var copy = state
-        applyDuePending(&copy, now: now)
+        applyDuePending(&copy, now: now, trust: trust ?? state.clockTrust())
         return copy.config
     }
 
@@ -295,8 +316,13 @@ enum Policy {
         }
     }
 
-    static func summary(state: SharedState, now: Date, calendar: Calendar = .current) -> Summary {
-        let config = effectiveConfig(state, now: now)
+    static func summary(
+        state: SharedState,
+        now: Date,
+        calendar: Calendar = .current,
+        trust: Clock.Trust? = nil
+    ) -> Summary {
+        let config = effectiveConfig(state, now: now, trust: trust)
         var summary = Summary()
         summary.pendingCount = state.pending.filter { $0.effectiveAt > now }.count
         summary.isAnchored = config.anchor.isAnchored

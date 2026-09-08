@@ -270,6 +270,9 @@ struct PendingSheet: View {
         SheetFrame(title: "Pending", width: 520, height: 520) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
+                    if !model.state.clockTrust().isTrusted {
+                        ClockBanner()
+                    }
                     if pending.isEmpty {
                         VStack(spacing: 8) {
                             Image(systemName: "checkmark.circle")

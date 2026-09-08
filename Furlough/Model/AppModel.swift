@@ -109,7 +109,11 @@ final class AppModel {
     /// DeviceActivity schedules, and re-applies shields. Safe to call at any time.
     func enforce(reason: String) {
         var current = SharedStore.load()
-        if Policy.applyDuePending(&current, now: .now) {
+        let trust = current.clockTrust()
+        if case .movedForward(let drift) = trust {
+            SharedStore.log("clock is \(Clock.describe(drift)) ahead: loosening changes are held")
+        }
+        if Policy.applyDuePending(&current, now: .now, trust: trust) {
             SharedStore.log("applied due pending changes (\(reason))")
         }
         do {

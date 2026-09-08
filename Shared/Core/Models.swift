@@ -387,6 +387,8 @@ struct PendingChange: Codable, Hashable, Identifiable {
 struct RuntimeState: Codable, Equatable {
     var exhausted: [String: String] = [:]
     var warned: [String: String] = [:]
+    /// Both clocks as they stood at the last save, so a wall clock moved forward is visible.
+    var clock: ClockMark?
     var lastReconcile: Date?
     var lastRegistration: Date?
     var registrationError: String?

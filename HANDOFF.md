@@ -226,6 +226,9 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   state incrementally.
 - Exhaustion is keyed by target id and day (`yyyy-MM-dd`), so a missed midnight callback
   still resets.
+- `SharedStore.save` stamps `runtime.clock` on every save and returns the stamped state. Do not
+  bypass it by writing the defaults key directly, and do not advance the mark while the clock
+  is untrusted: that is what makes a forward jump stick until it is undone.
 - The shield extension only reads. It folds due pending changes in memory for display.
 - `Policy.decide` is the union of rule shields and, while anchored, every kind in the anchor.
   `allowedApps` never contains an anchored app, so category exceptions cannot leak one through.
@@ -300,10 +303,21 @@ The plan for this stretch. Tick each phase off here as it lands.
    redirect and its one-time Automation prompt, budget counting, the login item, and the
    desktop widget placed on the desktop. Record the results here. Also: does a web-domain shield reach Chrome on the
    phone? Put the answer in README's limits.
-4. **The clock cannot be an unblock button.** A `ClockMark` in `RuntimeState` (wall time plus
-   `systemUptime`), a pure `Clock.isTrusted(now:uptime:mark:tolerance:)` in `Shared/Core`, and
-   `Policy.applyDuePending` holding loosening changes on an untrusted clock while tightening
-   still applies. The Mac enforcer listens for `NSSystemClockDidChange`.
+4. **The clock cannot be an unblock button.** Done 2026-09-08. `ClockMark` (wall time plus the
+   machine's count) lives in `RuntimeState`; `SharedStore.save` stamps it on every save, from
+   every process, and the mark only advances while the clock is trusted, so a jump cannot be
+   laundered by saving again. `Clock.isTrusted(now:uptime:mark:tolerance:)` in `Shared/Core` is
+   pure, with a ten-minute tolerance. `Policy.applyDuePending(_:now:trust:)` holds changes that
+   `Policy.loosens(_:in:)` says would loosen and applies the rest; `trust` defaults to reading
+   this machine's clock rather than to `.trusted`, so no call site can forget and let a shield
+   lift. Both Pending screens show `ClockBanner`; the app, the reconciler and the Mac enforcer
+   log it, the enforcer once per crossing. The Mac also ticks on `NSSystemClockDidChange`.
+   **Not the machine's `systemUptime`**: that stops while a Mac sleeps, so a night with the lid
+   shut would read as an eight-hour jump. `Clock.uptime` is Darwin's `CLOCK_MONOTONIC`, which
+   counts through sleep and still restarts at boot.
+   **Still open, ask Zach**: windows themselves are still read off the wall clock, so setting
+   the clock to 9 PM opens an 8–10 PM window. Making an untrusted clock close every window
+   would fix it and is a tightening, but it blocks everything until the clock is right.
 5. **Notifications**: "Window opened" from the monitor at a window's start, and "lands in an
    hour" / "landed" for pending changes, through one `PendingNotifications` helper in Core.
 6. **Small fixes**: the 19-span limit checked in the editors (`Policy.distinctSpans`), pending

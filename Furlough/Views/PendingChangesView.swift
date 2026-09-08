@@ -9,6 +9,9 @@ struct PendingChangesView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
+                    if !model.state.clockTrust().isTrusted {
+                        ClockBanner()
+                    }
                     if pending.isEmpty {
                         VStack(spacing: 8) {
                             Image(systemName: "checkmark.circle")

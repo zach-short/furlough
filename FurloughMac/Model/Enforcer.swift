@@ -26,6 +26,8 @@ final class Enforcer {
     private var lastShield: [UUID: Date] = [:]
     /// Window ends already warned about today, per target.
     private var windowWarned: [UUID: Int] = [:]
+    /// Whether the wall clock was ahead at the last tick, so the log gets one line per change.
+    private var clockAhead = false
     private let shield = ShieldPanel()
     private static let forceQuitAfter: TimeInterval = 2
     private static let idleAfter: TimeInterval = 120
@@ -38,6 +40,13 @@ final class Enforcer {
                 MainActor.assumeIsolated { self?.tick(reason: "app event") }
             })
         }
+        // Moving the date forward is the obvious way to try to buy time, so react at once
+        // rather than on the next tick; Policy holds the loosening changes either way.
+        observers.append(NotificationCenter.default.addObserver(
+            forName: NSNotification.Name.NSSystemClockDidChange, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.tick(reason: "clock changed") }
+        })
         let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick(reason: nil) }
         }
@@ -50,7 +59,7 @@ final class Enforcer {
     @discardableResult
     func reconcile(now: Date = .now, reason: String) -> Decision {
         var state = SharedStore.load()
-        if Policy.applyDuePending(&state, now: now) {
+        if Policy.applyDuePending(&state, now: now, trust: clockTrust(state, now: now)) {
             SharedStore.log("applied due pending changes during reconcile")
         }
         let decision = apply(&state, now: now, elapsed: 0)
@@ -61,6 +70,22 @@ final class Enforcer {
         )
         onChange?()
         return decision
+    }
+
+    /// Reads the clock and logs the first tick on each side of the line, so the log shows both
+    /// when the wall clock moved forward and when it came back.
+    private func clockTrust(_ state: SharedState, now: Date) -> Clock.Trust {
+        let trust = state.clockTrust(now: now)
+        if case .movedForward(let drift) = trust {
+            if !clockAhead {
+                clockAhead = true
+                SharedStore.log("clock is \(Clock.describe(drift)) ahead: loosening changes are held")
+            }
+        } else if clockAhead {
+            clockAhead = false
+            SharedStore.log("clock is back: pending changes can land again")
+        }
+        return trust
     }
 
     func usedSeconds(for id: UUID) -> Int {
@@ -85,7 +110,7 @@ final class Enforcer {
         if reason == nil { lastTick = now }
         var state = SharedStore.load()
         let before = state
-        if Policy.applyDuePending(&state, now: now) {
+        if Policy.applyDuePending(&state, now: now, trust: clockTrust(state, now: now)) {
             SharedStore.log("applied due pending changes")
         }
         apply(&state, now: now, elapsed: elapsed)

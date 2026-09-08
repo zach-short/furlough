@@ -35,6 +35,7 @@ Rules for each app live in an App Group so all four processes read the same stat
 - **Visualize windows** opens the week as a seven-column, 24-hour grid. Tap a day to see just its hours, change them, and **Apply to other days** to add the same hours to any other days, on top of what they have.
 - Raising the delay is instant. Lowering it waits out the current delay.
 - While anything is shielded, iOS is told to deny deleting apps, so the app cannot be removed as a shortcut.
+- Moving the clock forward does not buy time. Every save records the wall clock alongside the machine's own count of seconds since it booted, which nothing in Settings can change. When the wall clock has run further ahead than that count — by more than ten minutes, so an ordinary correction is ignored — every queued loosening is held: tightening changes still apply, the Pending screen says **The clock moved forward. Changes wait until it is back.**, and the activity log records it. Setting the clock back releases them, on the phone and on the Mac alike. The gap that is left is a reboot, which starts the machine's count again from zero: a reboot followed by a clock change looks like an ordinary first reading.
 
 ### The Anchor
 
