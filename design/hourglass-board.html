@@ -1,0 +1,790 @@
+<title>Living Hourglass</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Onest:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --ground: #0F0D0B; --ember: #E5563D; --amber: #F59E4A; --cream: #F5EFE6; --muted: #B8AFA3;
+    --faint: #7E766B; --moss: #7BC96F; --pending: #F2B544; --sand-light: #FFD59A;
+    --card: rgba(255,255,255,.06); --edge: rgba(255,255,255,.12); --edge-strong: rgba(255,255,255,.22);
+    --display: 'Bricolage Grotesque', 'Helvetica Neue', Arial, sans-serif;
+    --body: 'Onest', -apple-system, 'Segoe UI', sans-serif;
+    --mono: 'Geist Mono', 'SF Mono', Menlo, monospace;
+  }
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--ground); color: var(--cream); font-family: var(--body); font-size: 14px;
+    line-height: 1.5; -webkit-font-smoothing: antialiased;
+    background-image:
+      radial-gradient(ellipse 70% 42% at 28% 104%, rgba(229,86,61,.28), transparent 62%),
+      radial-gradient(ellipse 60% 40% at 90% -4%, rgba(245,158,74,.10), transparent 60%);
+    background-attachment: fixed;
+  }
+  a { color: var(--amber); }
+  .board { max-width: 1240px; margin: 0 auto; padding: 44px 24px 96px; }
+  .eyebrow { font-family: var(--body); font-weight: 700; font-size: 10.5px; letter-spacing: .13em; text-transform: uppercase; color: var(--faint); }
+  .eyebrow.amber { color: var(--amber); } .eyebrow.moss { color: var(--moss); } .eyebrow.ember { color: var(--ember); }
+  .eyebrow.pending { color: var(--pending); } .eyebrow.muted { color: var(--muted); }
+  h1 { font-family: var(--display); font-variation-settings: "opsz" 72; font-weight: 700; font-size: 46px; line-height: 1.02; letter-spacing: -.025em; margin: 8px 0 14px; text-wrap: balance; }
+  h2 { font-family: var(--display); font-variation-settings: "opsz" 48; font-weight: 600; font-size: 26px; letter-spacing: -.02em; line-height: 1.1; margin: 6px 0 8px; text-wrap: balance; }
+  h3 { font-family: var(--display); font-variation-settings: "opsz" 24; font-weight: 600; font-size: 17px; letter-spacing: -.01em; margin: 0 0 4px; }
+  p { margin: 0; max-width: 64ch; color: var(--muted); }
+  p strong, li strong { color: var(--cream); font-weight: 600; }
+  .lede { color: var(--cream); font-size: 16px; max-width: 62ch; }
+  section { margin-top: 64px; }
+  .section-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; margin-bottom: 20px; }
+  .section-head p { max-width: 70ch; }
+  .card { background: var(--card); border: 1px solid var(--edge); border-radius: 20px; }
+  .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  /* Top */
+  .top { display: grid; grid-template-columns: 1fr auto; gap: 32px; align-items: center; }
+  .top .glass-wrap { width: 132px; height: 176px; filter: drop-shadow(0 0 26px rgba(245,158,74,.35)); }
+  .reply { margin-top: 18px; display: inline-flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1px solid var(--edge-strong); border-radius: 999px; font-size: 13px; color: var(--cream);
+    background: linear-gradient(160deg, rgba(255,255,255,.14), rgba(255,255,255,.05)); }
+  .reply .k { font-family: var(--mono); color: var(--amber); }
+
+  /* Facts table */
+  table.facts { width: 100%; min-width: 760px; border-collapse: collapse; font-size: 13px; }
+  table.facts th { text-align: left; font-weight: 700; font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); padding: 0 14px 10px; }
+  table.facts td { padding: 11px 14px; border-top: 1px solid var(--edge); vertical-align: top; color: var(--muted); }
+  table.facts td:first-child { color: var(--cream); font-weight: 500; width: 30%; }
+  table.facts td.k { white-space: nowrap; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: .04em; }
+  .pill.yes { background: rgba(123,201,111,.16); color: var(--moss); }
+  .pill.no { background: rgba(229,86,61,.16); color: var(--ember); }
+  .pill.maybe { background: rgba(245,158,74,.16); color: var(--amber); }
+  .pill.report { background: rgba(184,175,163,.14); color: var(--muted); }
+  .tablewrap { overflow-x: auto; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.25) transparent; }
+
+  /* Demo day */
+  .demo { padding: 16px 18px 18px; display: grid; grid-template-columns: auto 1fr; gap: 20px; align-items: center; }
+  .demo .clock { font-family: var(--mono); font-size: 30px; font-weight: 500; letter-spacing: -.02em; color: var(--cream); line-height: 1; }
+  .demo .doing { font-size: 12px; color: var(--muted); margin-top: 6px; min-height: 18px; }
+  .demo .doing b { color: var(--cream); font-weight: 600; }
+  .timeline { position: relative; height: 52px; }
+  .timeline .track { position: absolute; left: 0; right: 0; top: 22px; height: 8px; border-radius: 4px; background: rgba(255,255,255,.07); }
+  .timeline .window { position: absolute; top: 22px; height: 8px; border-radius: 4px; background: rgba(123,201,111,.25); }
+  .timeline .use { position: absolute; top: 22px; height: 8px; background: linear-gradient(90deg, var(--sand-light), var(--amber)); border-radius: 4px; }
+  .timeline .mark { position: absolute; top: 34px; font-family: var(--mono); font-size: 9.5px; color: var(--faint); transform: translateX(-50%); white-space: nowrap; }
+  .timeline .mark::before { content: ""; position: absolute; left: 50%; top: -12px; width: 1px; height: 10px; background: var(--faint); }
+  .timeline .mark.warn { color: var(--amber); } .timeline .mark.warn::before { background: var(--amber); }
+  .timeline .mark.out { color: var(--ember); } .timeline .mark.out::before { background: var(--ember); }
+  .timeline .mark.up { top: 2px; } .timeline .mark.up::before { top: auto; bottom: -11px; }
+  .timeline .label { position: absolute; top: 0; font-family: var(--mono); font-size: 10px; color: var(--muted); transform: translateX(-50%); }
+  .timeline .head { position: absolute; top: 18px; width: 2px; height: 16px; background: var(--cream); border-radius: 1px; transform: translateX(-50%); box-shadow: 0 0 8px rgba(245,239,230,.6); }
+
+  /* Direction cards */
+  .directions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+  .dir { padding: 18px 18px 16px; display: flex; flex-direction: column; gap: 12px; }
+  .dir .meaning { font-size: 13px; color: var(--muted); min-height: 60px; }
+  .wall { border-radius: 16px; background: #0F0D0B;
+    background-image: radial-gradient(ellipse 80% 60% at 22% 110%, rgba(229,86,61,.55), transparent 62%), radial-gradient(ellipse 60% 50% at 95% -10%, rgba(245,158,74,.12), transparent 60%);
+    border: 1px solid rgba(255,255,255,.08); padding: 22px 18px 18px; }
+  .hero { display: flex; align-items: center; gap: 14px; }
+  .hero .glass-wrap { width: 74px; height: 98px; flex: 0 0 auto; }
+  .hero .text { min-width: 0; }
+  .hero .name { font-family: var(--display); font-variation-settings: "opsz" 72; font-weight: 700; font-size: 24px; letter-spacing: -.025em; line-height: 1.05; margin-top: 4px; color: var(--cream); }
+  .hero .count { font-family: var(--mono); font-weight: 500; font-size: 42px; letter-spacing: -.02em; line-height: 1; margin-top: 8px; color: var(--cream); font-variant-numeric: tabular-nums; }
+  .hero .count.quiet { color: var(--muted); font-size: 30px; margin-top: 12px; }
+  .hero .sub { font-size: 11.5px; color: var(--muted); margin-top: 7px; }
+  .variants { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .variant { text-align: left; background: var(--card); border: 1px solid var(--edge); border-radius: 12px; padding: 10px 10px 9px; color: var(--muted); cursor: pointer; font: inherit; display: flex; flex-direction: column; gap: 6px; transition: border-color .2s, background .2s; }
+  .variant:hover { border-color: var(--edge-strong); }
+  .variant[aria-pressed="true"] { border-color: var(--amber); background: rgba(245,158,74,.08); color: var(--cream); }
+  .variant:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+  .variant .k { font-family: var(--mono); font-size: 11px; color: var(--amber); }
+  .variant .t { font-size: 11.5px; line-height: 1.35; }
+  .variant.single { grid-column: 1 / -1; flex-direction: row; align-items: center; justify-content: space-between; }
+  .cost { font-size: 12px; color: var(--muted); border-top: 1px solid var(--edge); padding-top: 10px; display: grid; gap: 4px; }
+  .cost b { color: var(--cream); font-weight: 600; }
+  .cost .warn { color: var(--amber); }
+  .toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); cursor: pointer; }
+  .toggle input { accent-color: var(--amber); }
+
+  /* Status rows */
+  .statuses { display: grid; gap: 12px; margin-top: 16px; }
+  .status-row { padding: 14px 18px; display: grid; grid-template-columns: 150px 1fr; gap: 14px; align-items: center; }
+  .status-row .who { font-family: var(--display); font-variation-settings: "opsz" 24; font-weight: 600; font-size: 15px; }
+  .status-row .who small { display: block; font-family: var(--body); font-weight: 400; font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .swatches { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+  .swatch { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 6px 10px; border-radius: 14px; background: #0F0D0B; border: 1px solid rgba(255,255,255,.07);
+    background-image: radial-gradient(ellipse 90% 60% at 30% 115%, rgba(229,86,61,.22), transparent 60%); }
+  .swatch .glass-wrap { width: 54px; height: 72px; }
+  .swatch .l { font-size: 10.5px; color: var(--muted); text-align: center; line-height: 1.25; }
+  .swatch .l b { display: block; color: var(--cream); font-weight: 600; }
+
+  /* Elsewhere */
+  .elsewhere { display: grid; grid-template-columns: auto auto 1fr auto; gap: 14px; align-items: center; margin-top: 16px; padding: 16px 18px; }
+  .rowchip { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; background: var(--card); border: 1px solid var(--edge); width: 250px; }
+  .tile { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; font-family: var(--display); font-weight: 700; font-size: 15px; color: #fff; flex: 0 0 auto; }
+  .rowchip .n { font-family: var(--display); font-variation-settings: "opsz" 24; font-weight: 600; font-size: 13.5px; line-height: 1.15; }
+  .rowchip .r { font-size: 11.5px; color: var(--muted); }
+  .chip { margin-left: auto; display: flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .chip .glass-wrap { width: 12px; height: 16px; }
+  .widget { width: 150px; height: 150px; border-radius: 26px; padding: 14px; background: #0F0D0B; border: 1px solid rgba(255,255,255,.1); display: flex; flex-direction: column;
+    background-image: radial-gradient(ellipse 80% 60% at 25% 110%, rgba(229,86,61,.5), transparent 62%); position: relative; }
+  .widget .n { font-family: var(--display); font-variation-settings: "opsz" 72; font-weight: 700; font-size: 15px; letter-spacing: -.02em; margin-top: 3px; }
+  .widget .c { font-family: var(--mono); font-size: 22px; letter-spacing: -.02em; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .widget .d { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .widget .glass-wrap { position: absolute; right: 12px; bottom: 12px; width: 30px; height: 40px; }
+  .island { justify-self: center; display: flex; align-items: center; gap: 10px; background: #000; border-radius: 999px; padding: 8px 14px 8px 12px; border: 1px solid rgba(255,255,255,.12); }
+  .island .glass-wrap { width: 14px; height: 18px; }
+  .island .c { font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .la { width: 300px; border-radius: 20px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; background: linear-gradient(160deg, rgba(255,255,255,.14), rgba(255,255,255,.05)); border: 1px solid rgba(255,255,255,.22); }
+  .la .glass-wrap { width: 30px; height: 40px; flex: 0 0 auto; }
+  .la .n { font-family: var(--display); font-variation-settings: "opsz" 72; font-weight: 700; font-size: 17px; letter-spacing: -.02em; }
+  .la .d { font-size: 11px; color: var(--muted); }
+  .la .c { margin-left: auto; font-family: var(--mono); font-size: 26px; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+
+  /* Phones */
+  .headers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+  .layout { display: flex; flex-direction: column; gap: 12px; }
+  .layout .about { padding: 0 4px; font-size: 12.5px; color: var(--muted); min-height: 78px; }
+  .layout .about b { color: var(--cream); font-weight: 600; }
+  .phone { width: 340px; max-width: 100%; height: 660px; margin: 0 auto; border-radius: 44px; border: 1px solid rgba(255,255,255,.16); background: #0F0D0B; overflow: hidden; position: relative;
+    background-image: radial-gradient(ellipse 70% 42% at 28% 104%, rgba(229,86,61,.6), transparent 62%), radial-gradient(ellipse 60% 40% at 90% -4%, rgba(245,158,74,.14), transparent 60%);
+    box-shadow: 0 30px 60px rgba(0,0,0,.5), inset 0 0 0 1px rgba(0,0,0,.6); }
+  .phone .statusbar { display: flex; justify-content: space-between; padding: 16px 30px 0; font-size: 13px; font-weight: 600; }
+  .phone .statusbar span:last-child { font-size: 11px; color: var(--muted); letter-spacing: .06em; }
+  .toolbar { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px 0; }
+  .gbtn { height: 36px; min-width: 36px; padding: 0 12px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--cream);
+    background: linear-gradient(160deg, rgba(255,255,255,.15), rgba(255,255,255,.05)); border: 1px solid rgba(255,255,255,.28); position: relative; }
+  .gbtn::after { content: ""; position: absolute; inset: 1px 1px 55% 1px; border-radius: 999px 999px 40% 40%; background: linear-gradient(180deg, rgba(255,255,255,.12), transparent); pointer-events: none; }
+  .gbtn.pending { color: var(--pending); }
+  .toolbar .right { display: flex; gap: 8px; }
+  .gbtn svg { width: 16px; height: 16px; }
+  .scroll { padding: 0 16px; }
+  .phone .hero { padding: 22px 6px 8px; }
+  .phone .hero .glass-wrap { width: 74px; height: 98px; }
+  .phone .hero .count { font-size: 40px; }
+  .indicator { display: flex; justify-content: center; align-items: flex-end; gap: 9px; padding: 2px 0 12px; height: 34px; }
+  .indicator .glass-wrap { width: 11px; height: 15px; opacity: .5; transition: transform .25s, opacity .25s; }
+  .indicator .glass-wrap.on { opacity: 1; transform: scale(1.35); }
+  .pager { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .pager::-webkit-scrollbar { display: none; }
+  .pager .page { flex: 0 0 100%; scroll-snap-align: start; }
+  .brickcard { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
+  .brickcard .cube { width: 34px; height: 34px; border-radius: 9px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14); display: grid; place-items: center; box-shadow: 0 0 10px rgba(229,86,61,.35); }
+  .brickcard .cube svg { width: 16px; height: 16px; }
+  .brickcard .n { font-family: var(--display); font-variation-settings: "opsz" 24; font-weight: 600; font-size: 13.5px; display: flex; align-items: baseline; gap: 6px; }
+  .brickcard .n .eyebrow { font-size: 9px; }
+  .brickcard .r { font-size: 11.5px; color: var(--muted); }
+  .brickcard .gbtn { margin-left: auto; height: 32px; font-size: 12.5px; }
+  .seclabel { padding: 12px 8px 6px; }
+  .rows { display: flex; flex-direction: column; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
+  .row + .row { border-top: 1px solid var(--edge); }
+  .row .n { font-family: var(--display); font-variation-settings: "opsz" 24; font-weight: 600; font-size: 13.5px; line-height: 1.15; }
+  .row .r { font-size: 11.5px; color: var(--muted); }
+  .row .chip { margin-left: auto; }
+  .phone .fade { position: absolute; left: 0; right: 0; bottom: 0; height: 64px; background: linear-gradient(180deg, transparent, rgba(15,13,11,.95)); pointer-events: none; }
+  /* H2 strip */
+  .strip { display: flex; gap: 8px; padding: 4px 4px 12px; overflow-x: auto; scrollbar-width: none; }
+  .strip::-webkit-scrollbar { display: none; }
+  .strip button { flex: 0 0 auto; width: 44px; height: 56px; border-radius: 14px; border: 1px solid rgba(255,255,255,.18); background: linear-gradient(160deg, rgba(255,255,255,.12), rgba(255,255,255,.04)); display: grid; place-items: center; cursor: pointer; padding: 0; transition: border-color .2s, transform .2s; }
+  .strip button .glass-wrap { width: 20px; height: 27px; }
+  .strip button[aria-pressed="true"] { border-color: var(--cream); transform: translateY(-2px); }
+  .strip button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+  .swap .glass-wrap.pop { animation: pop .35s cubic-bezier(.2,.9,.3,1.2); }
+  @keyframes pop { from { transform: scale(.45); opacity: .3; } to { transform: scale(1); opacity: 1; } }
+  /* H3 deck */
+  .deck { position: relative; padding: 8px 0 10px; }
+  .deck .front { border-radius: 20px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.12); padding: 4px 10px 12px; position: relative; z-index: 2; }
+  .deck .front .hero { padding: 14px 4px 4px; }
+  .deck .bars { display: flex; flex-direction: column; gap: 5px; padding: 8px 10px 0; }
+  .deck .bar { height: 22px; border-radius: 8px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.04); display: flex; align-items: center; gap: 8px; padding: 0 10px; font-size: 11px; color: var(--muted); cursor: pointer; font-family: var(--body); width: 100%; text-align: left; transition: transform .25s, opacity .25s; }
+  .deck .bar .glass-wrap { width: 10px; height: 13px; }
+  .deck .bar .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .deck .bar b { color: var(--cream); font-weight: 600; }
+  .deck .bar:focus-visible { outline: 2px solid var(--amber); }
+  .deck .hint { font-size: 10.5px; color: var(--faint); text-align: center; padding-top: 8px; }
+
+  /* Recommendation */
+  .reco { display: grid; grid-template-columns: 1.1fr .9fr; gap: 16px; margin-top: 16px; }
+  .reco .card { padding: 18px 20px; }
+  .reco ul { margin: 10px 0 0; padding-left: 18px; color: var(--muted); font-size: 13px; display: grid; gap: 6px; }
+  .reco .answer { font-family: var(--mono); font-size: 13px; color: var(--cream); background: rgba(255,255,255,.06); border: 1px solid var(--edge); border-radius: 10px; padding: 10px 12px; margin-top: 12px; }
+  .reco .answer span { color: var(--amber); }
+
+  /* Hourglass SVG */
+  .glass-wrap svg { width: 100%; height: 100%; display: block; overflow: visible; }
+  .hg .glow { transform-box: fill-box; transform-origin: 50% 50%; }
+  .hg .glow.slow { animation: pulse 3.4s ease-in-out infinite alternate; }
+  .hg .glow.fast { animation: pulse 1.2s ease-in-out infinite alternate; }
+  .hg .glow.breathe { animation: pulse 4.2s ease-in-out infinite alternate; }
+  @keyframes pulse { from { transform: scale(.94); opacity: .72; } to { transform: scale(1.06); opacity: 1; } }
+  .hg .stream.running { animation: fall .5s linear infinite; }
+  @keyframes fall { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -13; } }
+  .hg .grain.dropping { animation: drop 3.2s ease-in infinite; }
+  @keyframes drop { 0% { transform: translateY(0); opacity: 0; } 4% { opacity: 1; } 34% { opacity: 1; } 38% { transform: translateY(70px); opacity: 0; } 100% { transform: translateY(70px); opacity: 0; } }
+  .hg .body.pendingpulse { animation: once 1.6s ease-out 1; }
+  @keyframes once { 0% { opacity: .35; } 45% { opacity: 1; } 100% { opacity: .8; } }
+  .glass-wrap.flip { transition: transform 1.1s cubic-bezier(.4,0,.2,1); }
+  .glass-wrap.flip.turned { transform: rotate(180deg); }
+  @media (prefers-reduced-motion: reduce) { .hg *, .glass-wrap { animation: none !important; transition: none !important; } }
+
+  @media (max-width: 1020px) {
+    .directions, .headers { grid-template-columns: 1fr; }
+    .elsewhere { grid-template-columns: 1fr 1fr; }
+    .reco { grid-template-columns: 1fr; }
+    .top { grid-template-columns: 1fr; }
+    .top .glass-wrap { display: none; }
+  }
+  @media (max-width: 720px) {
+    h1 { font-size: 36px; }
+    .swatches { grid-template-columns: repeat(4, 1fr); }
+    .status-row { grid-template-columns: 1fr; }
+    .elsewhere { grid-template-columns: 1fr; }
+    .demo { grid-template-columns: 1fr; }
+  }
+</style>
+
+<div class="board">
+  <header class="top">
+    <div>
+      <div class="eyebrow amber">Furlough · brief of 7 Sept 2026</div>
+      <h1>The living hourglass</h1>
+      <p class="lede">The hero hourglass should mean something, animate, and be one of several: the header pages through every managed app, and each app's glass is coloured by its status. Three readings of the sand, one colour system, three ways to page.</p>
+      <div class="reply">Reply with a direction and a header, e.g. <span class="k">C + marks, H1</span></div>
+    </div>
+    <div class="glass-wrap" id="bigGlass"></div>
+  </header>
+
+  <section>
+    <div class="section-head">
+      <div>
+        <div class="eyebrow">What the app can honestly know</div>
+        <h2>The sand cannot show what the API will not say</h2>
+      </div>
+      <p>Screen Time hands Furlough exact window times and exact statuses, but never a usage number. Budget is known only at the thresholds it fires. Every direction below is built on this table.</p>
+    </div>
+    <div class="card tablewrap">
+      <table class="facts">
+        <thead><tr><th>Fact</th><th>Known</th><th>How</th></tr></thead>
+        <tbody>
+          <tr><td>Window start, end, time remaining</td><td class="k"><span class="pill yes">Exactly, every second</span></td><td><span class="mono">Rule.windows</span> and <span class="mono">Policy.status</span> give <span class="mono">.open(until:)</span>; the countdown already ticks on this.</td></tr>
+          <tr><td>Open, closed, used up, always blocked, unconfigured, bricked</td><td class="k"><span class="pill yes">Exactly</span></td><td><span class="mono">TargetStatus</span>, recomputed from persisted state on every callback.</td></tr>
+          <tr><td>Budget: 5 minutes left, budget spent</td><td class="k"><span class="pill yes">At the callback</span></td><td>Two threshold events per target today. They can land a few minutes late, occasionally twice; the day-keyed state absorbs both.</td></tr>
+          <tr><td>Budget used, in quarters</td><td class="k"><span class="pill maybe">Possible</span></td><td>Three more events per target at 25 / 50 / 75 % (<span class="mono">mark:&lt;uuid&gt;:&lt;quarter&gt;</span>), recorded day-keyed in <span class="mono">RuntimeState</span>. Same lateness. Not yet verified that DeviceActivity accepts that many events on one activity.</td></tr>
+          <tr><td>Budget used, exact minutes</td><td class="k"><span class="pill no">Never in the app</span></td><td>Only inside a <span class="mono">DeviceActivityReport</span> view, which is slow, unstyleable from outside, and cannot pass data back. Not for the hero.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <div>
+        <div class="eyebrow">Three readings of the sand</div>
+        <h2>One demo day, three hourglasses</h2>
+      </div>
+      <p>The same evening plays under all three: TikTok, window 8:00–10:00 PM, 30 minute budget, used 8:04–8:20 and 8:44–8:58. It runs at four minutes a second and loops. Pick a variation inside each card to see it live.</p>
+    </div>
+    <div class="card demo">
+      <div>
+        <div class="clock" id="demoClock">7:55 PM</div>
+        <div class="doing" id="demoDoing"></div>
+      </div>
+      <div class="timeline" id="timeline"></div>
+    </div>
+
+    <div class="directions">
+      <div class="card dir" id="dirA">
+        <div>
+          <div class="eyebrow amber">Direction A</div>
+          <h3>Window glass</h3>
+          <div class="meaning">The sand is <b>window time</b>. The top bulb holds what is left of the window and empties exactly at close, in step with the countdown. Budget lives beside it: the sub line, and an amber tint on the glass after the 5-minute warning.</div>
+        </div>
+        <div class="wall"><div class="hero" id="heroA"></div></div>
+        <div class="variants" id="varA">
+          <button class="variant" data-v="A1" aria-pressed="true"><span class="k">A1</span><span class="t">Plain drain.</span></button>
+          <button class="variant" data-v="A2" aria-pressed="false"><span class="k">A2</span><span class="t">Four etched ticks on the top bulb dim as the window's quarters pass.</span></button>
+          <button class="variant" data-v="A3" aria-pressed="false"><span class="k">A3</span><span class="t">The flip: the glass turns over at window start and settles at close.</span></button>
+        </div>
+        <div class="cost"><div><b>Costs</b> nothing new. Everything it shows is exact.</div><div><b>Trusts</b> only the clock.</div><div><b>Does not show</b> usage. On a 2-hour window with a 30-minute budget the sand drains for two hours whether you touch the app or not.</div></div>
+      </div>
+
+      <div class="card dir" id="dirB">
+        <div>
+          <div class="eyebrow amber">Direction B</div>
+          <h3>Budget glass</h3>
+          <div class="meaning">The sand is <b>budget</b>, in quarters. The level steps down a quarter at each threshold callback and settles; after the 5-minute warning the last grains run under a faster amber pulse; spent means every grain at the bottom, ember, still. This is the "half an hour left" reading.</div>
+        </div>
+        <div class="wall"><div class="hero" id="heroB"></div></div>
+        <div class="variants" id="varB">
+          <button class="variant" data-v="B1" aria-pressed="true"><span class="k">B1</span><span class="t">Quarters only.</span></button>
+          <button class="variant" data-v="B2" aria-pressed="false"><span class="k">B2</span><span class="t">Plus a faint inner wick that guesses within the quarter from elapsed open time.</span></button>
+          <button class="variant" data-v="B3" aria-pressed="false"><span class="k">B3</span><span class="t">The bottom mound grows in four layers, so the day's history is legible.</span></button>
+        </div>
+        <div class="cost"><div><b>Costs</b> three more threshold events per target, a new event name, a day-keyed quarter map, and a monitor change.</div><div><b>Trusts</b> the monitor's timing: steps can land minutes late.</div><div class="warn">The stream runs while the window is open, not while you are using the app. The API cannot tell the two apart, so the stream is a mood, not a measurement.</div></div>
+      </div>
+
+      <div class="card dir" id="dirC">
+        <div>
+          <div class="eyebrow amber">Direction C</div>
+          <h3>Hybrid</h3>
+          <div class="meaning">Top bulb is the <b>window</b>, exact and draining, from A. The bottom mound's <b>colour carries the budget</b>: sand while plenty is left, amber after the 5-minute warning, ember once spent. Optional quarter marks on the base if the extra thresholds go in.</div>
+        </div>
+        <div class="wall"><div class="hero" id="heroC"></div></div>
+        <div class="variants" id="varC">
+          <button class="variant single" data-v="C" aria-pressed="true"><span><span class="k">C</span> <span class="t">Window drains, mound colour is budget.</span></span><label class="toggle" onclick="event.stopPropagation()"><input type="checkbox" id="marksToggle" checked> quarter marks on the base</label></button>
+        </div>
+        <div class="cost"><div><b>Costs</b> nothing without marks; with marks, the same three events per target as B.</div><div><b>Trusts</b> the clock for the drain and the callbacks only for colour, which they get right even when late.</div><div><b>Shows</b> both facts in one object, each at the precision the API allows.</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <div>
+        <div class="eyebrow">Colour by status</div>
+        <h2>Every status, in every direction</h2>
+      </div>
+      <p>The colour system is the same everywhere; what differs is what the sand does while the app is open and during the last five minutes. Bricked, always-blocked and unscheduled pages get the full glass too, so paging never shows an empty page.</p>
+    </div>
+    <div class="statuses" id="statusRows"></div>
+    <div class="card elsewhere">
+      <div class="rowchip"><div class="tile" style="background:#111;border:1px solid rgba(255,255,255,.18)">T</div><div><div class="n">TikTok</div><div class="r">8:00–10:00 PM · 30 min</div></div><div class="chip" style="color:var(--moss)"><div class="glass-wrap" data-mini="open"></div>10:00 PM</div></div>
+      <div class="widget"><div class="eyebrow amber">Open now</div><div class="n">TikTok</div><div class="c" data-count="wide">1:43:00</div><div class="d">until 10:00 PM</div><div class="glass-wrap" data-mini="open"></div></div>
+      <div class="island"><div class="glass-wrap" data-mini="open"></div><div class="c" data-count="wide">1:43:00</div></div>
+      <div class="la"><div class="glass-wrap" data-mini="open"></div><div><div class="eyebrow amber">Furlough</div><div class="n">TikTok</div><div class="d">Open until 10:00 PM</div></div><div class="c" data-count="wide">1:43:00</div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <div>
+        <div class="eyebrow">Header layouts</div>
+        <h2>Three ways to page through the apps</h2>
+      </div>
+      <p>Six managed apps in the list's own order: Bricked, Open now, Later today, Tomorrow, Always blocked, Needs a schedule. The phones are live: swipe the pager, tap the strip, tap a bar in the deck. The list below the hero stays in every layout.</p>
+    </div>
+    <div class="headers">
+      <div class="layout">
+        <div class="about"><b>H1 · Horizontal paging</b> (the brief's recommendation). One page per app, swiped like Weather. The page indicator is a row of tiny hourglasses in status colours, so the strip itself is a status summary. Tapping a page opens that app's rule editor. Lands on the first open app.</div>
+        <div class="phone" id="phoneH1"></div>
+      </div>
+      <div class="layout">
+        <div class="about"><b>H2 · Thumbnail strip.</b> One big hero plus a strip of small coloured hourglasses, one per app; tapping one swaps the hero with a matched-geometry move. Denser than paging, so it holds up better with many apps.</div>
+        <div class="phone" id="phoneH2"></div>
+      </div>
+      <div class="layout">
+        <div class="about"><b>H3 · Vertical deck.</b> The hero is a stack: the front card is expanded and the others peek below it as thin status bars; drag or tap to bring the next forward. The most dramatic, and the hardest to make feel native inside the main scroll view.</div>
+        <div class="phone" id="phoneH3"></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <div>
+        <div class="eyebrow">If it were mine</div>
+        <h2>What I would build</h2>
+      </div>
+    </div>
+    <div class="reco">
+      <div class="card">
+        <h3>C with quarter marks, paged as H1</h3>
+        <ul>
+          <li><strong>The drain is real.</strong> The top bulb tracks the countdown to the second, so the glass and the numbers never disagree, and the animation is continuous rather than four jumps a day.</li>
+          <li><strong>The budget is still in the glass.</strong> The mound turns amber at the warning and ember when spent, which are the two callbacks that matter, and the base marks add the quarters once the extra thresholds prove reliable on your phone.</li>
+          <li><strong>Nothing pretends.</strong> B's running stream would imply usage the API cannot see. C keeps the stream tied to the window, which is what it actually measures.</li>
+          <li><strong>H1 reads at a glance.</strong> The indicator strip doubles as the status summary you asked for, and paging matches how iOS already teaches people to move between things.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>How to answer</h3>
+        <p style="font-size:13px;margin-top:6px">Name a direction with its variation and a header. Add anything you want changed in words, and say if the quarter marks should wait until the thresholds are tested.</p>
+        <div class="answer">Examples: <span>A2, H1</span> · <span>B3, H2</span> · <span>C + marks, H1</span> · <span>C no marks, H3</span></div>
+        <p style="font-size:12px;margin-top:12px">Whatever you pick, the same <span class="mono">HourglassView</span> serves the hero, the 12 pt row chips, the widget, the Live Activity and the Dynamic Island, with sand level, running, tint, glow and frozen as its state.</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const C = { ground: '#0F0D0B', ember: '#E5563D', amber: '#F59E4A', cream: '#F5EFE6', muted: '#B8AFA3', faint: '#7E766B', moss: '#7BC96F', pending: '#F2B544', sandLight: '#FFD59A' };
+  const BODY = 'M22 12H98V32C98 52 80 64 68 76V84C80 96 98 108 98 128V148H22V128C22 108 40 96 52 84V76C40 64 22 52 22 32Z';
+  const TOPSAND = 'M40 36H80C80 48 68 58 60 66C52 58 40 48 40 36Z';
+  const HIGHLIGHT = 'M31 20C31 34 37 42 45 50';
+  let uid = 0;
+
+  // x of the top bulb's left wall at height y (bezier (22,32)-(22,52)-(40,64)-(52,76)).
+  function wallX(y) {
+    let lo = 0, hi = 1;
+    for (let i = 0; i < 24; i++) {
+      const s = (lo + hi) / 2, u = 1 - s;
+      const yy = 32*u*u*u + 3*52*u*u*s + 3*64*u*s*s + 76*s*s*s;
+      if (yy < y) lo = s; else hi = s;
+    }
+    const s = (lo + hi) / 2, u = 1 - s;
+    return 22*u*u*u + 3*22*u*u*s + 3*40*u*s*s + 52*s*s*s;
+  }
+  function mound(h) {
+    if (h < 0.15) return '';
+    const w = 12 + 18 * (h / 38), x0 = 60 - w, x1 = 60 + w, c0 = 60 - w * .53, c1 = 60 + w * .53;
+    const y = v => (144 - v).toFixed(2);
+    return `M${x0.toFixed(2)} ${y(.21*h)}C${x0.toFixed(2)} ${y(.63*h)} ${c0.toFixed(2)} ${y(.89*h)} 60 ${y(h)}C${c1.toFixed(2)} ${y(.89*h)} ${x1.toFixed(2)} ${y(.63*h)} ${x1.toFixed(2)} ${y(.21*h)}V144H${x0.toFixed(2)}Z`;
+  }
+  const STROKES = {
+    cream: [['#fff', .6], ['#fff', .14], ['#fff', .45]],
+    amber: [[C.amber, .95], [C.amber, .35], [C.amber, .8]],
+    dim: [['#fff', .38], ['#fff', .1], ['#fff', .3]],
+    grey: [['#fff', .3], ['#fff', .1], ['#fff', .24]],
+    pending: [[C.pending, .95], [C.pending, .55], [C.pending, .9]],
+  };
+  const FILLS = { cream: 'rgba(255,255,255,.07)', amber: 'rgba(245,158,74,.12)', dim: 'rgba(255,255,255,.045)', grey: 'rgba(255,255,255,.035)', pending: 'rgba(242,181,68,.03)' };
+  const SANDS = {
+    sand: [[C.sandLight, 0], [C.amber, .55], [C.ember, 1]],
+    amber: [[C.sandLight, 0], [C.amber, .6], [C.amber, 1]],
+    ember: [[C.ember, 0], [C.ember, .5], ['#9C3524', 1]],
+    grey: [['#8B847A', 0], ['#6A635B', .6], ['#4E4841', 1]],
+  };
+  const LAYER_TONES = ['#F6C27A', '#EE9F55', '#E67E45', '#DC5F3C'];
+
+  class Glass {
+    constructor(el, mini = false) {
+      this.el = el; this.mini = mini; const id = this.id = 'hg' + (uid++);
+      const sw = mini ? 7 : 2.5;
+      const grads = Object.entries(SANDS).map(([k, stops]) => `<linearGradient id="${id}-${k}" x1="0" y1="0" x2="0" y2="1">${stops.map(([c, o]) => `<stop offset="${o}" stop-color="${c}"/>`).join('')}</linearGradient>`).join('');
+      el.innerHTML = `<svg class="hg" viewBox="0 0 120 160" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+          <radialGradient id="${id}-glow" cx="50%" cy="65%" r="55%"><stop offset="0" stop-color="${C.amber}" stop-opacity=".95"/><stop offset="1" stop-color="${C.ember}" stop-opacity="0"/></radialGradient>
+          <linearGradient id="${id}-stroke" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".6"/><stop offset=".5" stop-color="#fff" stop-opacity=".14"/><stop offset="1" stop-color="#fff" stop-opacity=".45"/></linearGradient>
+          ${grads}
+          <clipPath id="${id}-clip"><rect class="cliprect" x="0" y="36" width="120" height="30"/></clipPath>
+          ${mini ? '' : `<filter id="${id}-blur" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="7"/></filter>`}
+        </defs>
+        <ellipse class="glow" cx="60" cy="118" rx="${mini ? 40 : 46}" ry="${mini ? 30 : 34}" fill="url(#${id}-glow)" ${mini ? '' : `filter="url(#${id}-blur)"`}/>
+        <path class="body" d="${BODY}" fill="${FILLS.cream}" stroke="url(#${id}-stroke)" stroke-width="${sw}" stroke-linejoin="round"/>
+        <g clip-path="url(#${id}-clip)"><path class="topsand" d="${TOPSAND}" fill="url(#${id}-sand)"/></g>
+        <line class="wick" x1="0" y1="0" x2="0" y2="0" stroke="${C.cream}" stroke-opacity=".38" stroke-width="1.2" stroke-dasharray="1.5 2.2" visibility="hidden"/>
+        <g class="ticks"></g>
+        <g class="mound"></g>
+        <line class="streamcore" x1="60" y1="70" x2="60" y2="143" stroke="${C.sandLight}" stroke-opacity=".5" stroke-width="${mini ? 6 : 3}" stroke-linecap="round" visibility="hidden"/>
+        <line class="stream" x1="60" y1="70" x2="60" y2="143" stroke="${C.sandLight}" stroke-width="${mini ? 6 : 3}" stroke-linecap="round" stroke-dasharray="3 3.5" visibility="hidden"/>
+        <circle class="grain" cx="60" cy="72" r="${mini ? 4 : 1.9}" fill="${C.sandLight}" visibility="hidden"/>
+        <rect class="cap top" x="18" y="8" width="84" height="${mini ? 10 : 8}" rx="4" fill="${C.cream}" fill-opacity=".92"/>
+        <rect class="cap bottom" x="18" y="144" width="84" height="${mini ? 10 : 8}" rx="4" fill="${C.cream}" fill-opacity=".92"/>
+        ${mini ? '' : `<path class="highlight" d="${HIGHLIGHT}" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="2" stroke-linecap="round"/>`}
+        <g class="marks" visibility="hidden">${[0,1,2,3].map(k => `<rect x="${30 + k*15.5}" y="155" width="13.5" height="2.6" rx="1.3"/>`).join('')}</g>
+        <g class="cube" visibility="hidden">
+          <path d="M60 138L67 142V150L60 154L53 150V142Z" fill="${C.ember}" stroke="${C.cream}" stroke-opacity=".7" stroke-width="1" stroke-linejoin="round"/>
+          <path d="M53 142L60 146L67 142" fill="none" stroke="${C.cream}" stroke-opacity=".7" stroke-width="1" stroke-linejoin="round"/>
+          <path d="M60 146V154" stroke="${C.cream}" stroke-opacity=".7" stroke-width="1"/>
+        </g>
+      </svg>`;
+      const q = s => el.querySelector(s);
+      this.n = { glow: q('.glow'), body: q('.body'), clip: q('.cliprect'), topsand: q('.topsand'), wick: q('.wick'), ticks: q('.ticks'), mound: q('.mound'), core: q('.streamcore'), stream: q('.stream'), grain: q('.grain'), capT: q('.cap.top'), capB: q('.cap.bottom'), marks: q('.marks'), cube: q('.cube'), glowGrad: q(`#${id}-glow`) };
+      this.last = {};
+    }
+    set(o) {
+      const n = this.n, id = this.id;
+      const top = Math.max(0, Math.min(1, o.top ?? 0)), bottom = Math.max(0, Math.min(1, o.bottom ?? 0));
+      const h = bottom * 38;
+      n.clip.setAttribute('y', (36 + (1 - top) * 30).toFixed(2)); n.clip.setAttribute('height', (top * 30 + 0.01).toFixed(2));
+      n.topsand.setAttribute('fill', `url(#${id}-${o.sand || 'sand'})`);
+      // Mound: layers or one shape.
+      if (o.layers) {
+        const d = [];
+        for (let k = o.layers; k >= 1; k--) d.push(`<path d="${mound(38 * k / 4)}" fill="${LAYER_TONES[k-1]}"/>`);
+        const sig = 'L' + o.layers; if (this.last.mound !== sig) { n.mound.innerHTML = d.join(''); this.last.mound = sig; }
+      } else {
+        const sig = 'M' + h.toFixed(2) + (o.mound || o.sand || 'sand');
+        if (this.last.mound !== sig) { n.mound.innerHTML = `<path d="${mound(h)}" fill="url(#${id}-${o.mound || o.sand || 'sand'})"/>`; this.last.mound = sig; }
+      }
+      const landing = (144 - (o.layers ? 38 * o.layers / 4 : h) - 1.5).toFixed(2);
+      n.core.setAttribute('y2', landing); n.stream.setAttribute('y2', landing);
+      const streamOn = o.running || o.frozen;
+      n.core.setAttribute('visibility', streamOn ? 'visible' : 'hidden');
+      n.stream.setAttribute('visibility', streamOn ? 'visible' : 'hidden');
+      n.stream.classList.toggle('running', !!o.running);
+      n.grain.setAttribute('visibility', o.grain ? 'visible' : 'hidden'); n.grain.classList.toggle('dropping', !!o.grain);
+      // Glass.
+      const glass = o.glass || 'cream';
+      if (this.last.glass !== glass) {
+        n.body.setAttribute('fill', FILLS[glass]);
+        const sg = n.body.ownerSVGElement.querySelector(`#${id}-stroke`);
+        STROKES[glass].forEach(([c, op], i) => { sg.children[i].setAttribute('stop-color', c); sg.children[i].setAttribute('stop-opacity', op); });
+        const capOp = glass === 'grey' || glass === 'dim' ? .55 : glass === 'pending' ? .35 : .92;
+        n.capT.setAttribute('fill-opacity', capOp); n.capB.setAttribute('fill-opacity', capOp);
+        n.body.classList.toggle('pendingpulse', glass === 'pending');
+        this.last.glass = glass;
+      }
+      // Glow.
+      const glow = o.glow || null, strength = o.glowStrength ?? 1;
+      if (glow) {
+        n.glowGrad.children[0].setAttribute('stop-color', glow); n.glowGrad.children[1].setAttribute('stop-color', glow);
+        n.glowGrad.children[0].setAttribute('stop-opacity', (0.95 * strength).toFixed(2));
+      }
+      n.glow.setAttribute('visibility', glow ? 'visible' : 'hidden');
+      const pulse = o.pulse || 'none';
+      if (this.last.pulse !== pulse) { n.glow.classList.remove('slow', 'fast', 'breathe'); if (pulse !== 'none') n.glow.classList.add(pulse); this.last.pulse = pulse; }
+      // Ticks (A2).
+      if (o.ticks !== undefined) {
+        const sig = 'T' + o.ticks; if (this.last.ticks !== sig) {
+          n.ticks.innerHTML = [0,1,2,3].map(k => { const y = 36 + 7.5 * k, x = wallX(y); const lit = top > 1 - k / 4 - 0.002; return `<line x1="${(x+2).toFixed(1)}" y1="${y}" x2="${(x+7).toFixed(1)}" y2="${y}" stroke="${C.cream}" stroke-opacity="${lit ? .75 : .18}" stroke-width="1.4" stroke-linecap="round"/>`; }).join('');
+          this.last.ticks = sig;
+        }
+      } else if (this.last.ticks) { n.ticks.innerHTML = ''; this.last.ticks = null; }
+      // Wick (B2).
+      if (o.wick != null && top > 0) {
+        const y = 36 + (1 - o.wick) * 30, x = wallX(Math.min(75, Math.max(33, y)));
+        n.wick.setAttribute('x1', (x + 3).toFixed(1)); n.wick.setAttribute('x2', (120 - x - 3).toFixed(1)); n.wick.setAttribute('y1', y.toFixed(1)); n.wick.setAttribute('y2', y.toFixed(1));
+        n.wick.setAttribute('visibility', 'visible');
+      } else n.wick.setAttribute('visibility', 'hidden');
+      // Marks (C).
+      if (o.marks != null) {
+        n.marks.setAttribute('visibility', 'visible');
+        [...n.marks.children].forEach((r, k) => { const on = k < o.marks; r.setAttribute('fill', on ? (o.marksColor || C.amber) : '#fff'); r.setAttribute('fill-opacity', on ? 1 : .16); });
+      } else n.marks.setAttribute('visibility', 'hidden');
+      n.cube.setAttribute('visibility', o.cube ? 'visible' : 'hidden');
+      // Drop shadow on the wrapper, in the glow colour.
+      const shadow = glow ? `drop-shadow(0 0 ${this.mini ? 4 : 18}px ${glow}${this.mini ? '66' : '55'})` : 'none';
+      if (this.last.shadow !== shadow) { this.el.style.filter = shadow; this.last.shadow = shadow; }
+    }
+  }
+
+  // The seven statuses, expressed as Glass options. `dir` changes only what open / five minutes look like.
+  const STATUS = {
+    open:    { label: 'Open now', sub: 'moss glow, stream running', color: C.moss },
+    soon:    { label: 'Coming soon', sub: 'amber, sand waiting, grain drops under 10 min', color: C.amber },
+    five:    { label: '5 minutes left', sub: 'amber glass, pulse quickens', color: C.amber },
+    used:    { label: 'Used up today', sub: 'ember, dim, still', color: C.ember },
+    always:  { label: 'Always blocked', sub: 'grey, no glow', color: C.faint },
+    needs:   { label: 'Needs a schedule', sub: 'pending outline, empty', color: C.pending },
+    bricked: { label: 'Bricked', sub: 'ember, stream frozen, cube', color: C.ember },
+  };
+  function statusGlass(status, dir, extra = {}) {
+    const base = {
+      open:    { top: .62, bottom: .38, running: true, glass: 'cream', glow: C.moss, pulse: 'slow' },
+      soon:    { top: 1, bottom: 0, glass: 'cream', glow: C.amber, glowStrength: .55, pulse: 'breathe', grain: true },
+      five:    { top: .62, bottom: .38, running: true, glass: 'amber', glow: C.amber, pulse: 'fast' },
+      used:    { top: 0, bottom: 1, glass: 'dim', glow: C.ember, glowStrength: .45, pulse: 'none' },
+      always:  { top: 0, bottom: .55, sand: 'grey', glass: 'grey', glow: null },
+      needs:   { top: 0, bottom: 0, glass: 'pending', glow: null },
+      bricked: { top: .55, bottom: .4, frozen: true, glass: 'cream', glow: C.ember, glowStrength: .9, pulse: 'none', cube: true },
+    }[status];
+    const o = { ...base };
+    if (dir === 'A') { if (status === 'five') { o.top = .3; o.bottom = .7; } if (extra.ticks) o.ticks = 1; }
+    if (dir === 'B') {
+      if (status === 'open') { o.top = .5; o.bottom = .5; }
+      if (status === 'five') { o.top = .12; o.bottom = .88; }
+      if (extra.layers && (status === 'open' || status === 'five' || status === 'used')) o.layers = status === 'used' ? 4 : status === 'five' ? 3 : 2;
+      if (extra.wick && status === 'open') o.wick = .4;
+    }
+    if (dir === 'C') {
+      if (status === 'five') { o.top = .3; o.bottom = .7; o.mound = 'amber'; }
+      if (status === 'used') { o.mound = 'ember'; }
+      if (extra.marks && (status === 'open' || status === 'five' || status === 'used')) { o.marks = status === 'used' ? 4 : status === 'five' ? 3 : 1; if (status === 'used') o.marksColor = C.ember; }
+    }
+    return o;
+  }
+
+  // ---------- Demo day ----------
+  const SPEED = 4;                         // app minutes per real second
+  const PRE = 5, OPEN_UNTIL = 58, HOLD = 12, PERIOD = PRE + OPEN_UNTIL + HOLD;
+  const USES = [[4, 20], [44, 58]];
+  const realSec = () => performance.now() / 1000;
+  function demoT() { return ((realSec() * SPEED) % PERIOD) - PRE; }
+  function used(t) { return USES.reduce((s, [a, b]) => s + Math.max(0, Math.min(t, b) - a), 0); }
+  function quarterTime(k) { let acc = 0; for (const [a, b] of USES) { const need = 7.5 * k - acc; if (need <= b - a) return a + need; acc += b - a; } return Infinity; }
+  function usingNow(t) { return USES.some(([a, b]) => t >= a && t < b); }
+  function fmtClock(t) { const m = 20 * 60 + Math.floor(t); const h = Math.floor(m / 60) % 24; const mm = m % 60; const h12 = ((h + 11) % 12) + 1; return `${h12}:${String(mm).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`; }
+  function fmtCountdown(minutes) { const total = Math.max(0, Math.floor(minutes)); const hh = Math.floor(total / 60), mm = total % 60; const ss = 59 - (Math.floor(realSec()) % 60); return hh > 0 ? `${hh}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}` : `${mm}:${String(ss).padStart(2, '0')}`; }
+
+  function statusAt(t) { const u = used(t); if (t < 0) return 'soon'; if (u >= 30) return 'used'; if (u >= 25) return 'five'; return 'open'; }
+
+  // Timeline.
+  const tl = document.getElementById('timeline');
+  const span = [-5, PERIOD - PRE];
+  const pct = t => ((t - span[0]) / (span[1] - span[0]) * 100).toFixed(2) + '%';
+  tl.innerHTML = `
+    <div class="track"></div>
+    <div class="window" style="left:${pct(0)};width:calc(${pct(PERIOD - PRE)} - ${pct(0)})"></div>
+    ${USES.map(([a, b]) => `<div class="use" style="left:${pct(a)};width:calc(${pct(b)} - ${pct(a)})"></div>`).join('')}
+    <div class="label" style="left:${pct(0)}">8:00 opens</div>
+    ${[1, 2, 3].map(k => `<div class="mark" style="left:${pct(quarterTime(k))}">${['¼', '½', '¾'][k-1]}</div>`).join('')}
+    <div class="mark warn" style="left:${pct(quarterTime(25/7.5))}">5 min</div>
+    <div class="mark out up" style="left:${pct(58)}">spent 8:58</div>
+    <div class="head" id="playhead"></div>`;
+  const playhead = document.getElementById('playhead');
+  const demoClock = document.getElementById('demoClock'), demoDoing = document.getElementById('demoDoing');
+
+  // Hero DOM.
+  function heroHTML(name) { return `<div class="glass-wrap"></div><div class="text"><div class="eyebrow"></div><div class="name">${name}</div><div class="count"></div><div class="sub"></div></div>`; }
+  function heroRefs(root) { return { wrap: root.querySelector('.glass-wrap'), eyebrow: root.querySelector('.eyebrow'), count: root.querySelector('.count'), sub: root.querySelector('.sub') }; }
+  function setHeroText(r, eyebrowText, eyebrowClass, count, sub, quiet = false) {
+    if (r.eyebrow.textContent !== eyebrowText) r.eyebrow.textContent = eyebrowText;
+    r.eyebrow.className = 'eyebrow ' + eyebrowClass;
+    r.count.textContent = count; r.count.classList.toggle('quiet', quiet);
+    if (r.sub.textContent !== sub) r.sub.textContent = sub;
+  }
+  function heroCopy(status, t, budgetSub) {
+    if (status === 'soon') return ['Next window', 'amber', fmtCountdown(-t), 'opens at 8:00 PM · 30 min a day'];
+    if (status === 'used') return ['Used up today', 'ember', fmtCountdown(1440 - t), 'opens tomorrow at 8:00 PM · 30 min a day'];
+    if (status === 'five') return ['Open now · 5 min left', 'amber', fmtCountdown(120 - t), '30 min budget · 5 min left'];
+    return ['Open now · until 10:00 PM', 'moss', fmtCountdown(120 - t), budgetSub];
+  }
+
+  const heroA = document.getElementById('heroA'), heroB = document.getElementById('heroB'), heroC = document.getElementById('heroC');
+  [heroA, heroB, heroC].forEach(h => h.innerHTML = heroHTML('TikTok'));
+  const rA = heroRefs(heroA), rB = heroRefs(heroB), rC = heroRefs(heroC);
+  const gA = new Glass(rA.wrap), gB = new Glass(rB.wrap), gC = new Glass(rC.wrap);
+  const big = new Glass(document.getElementById('bigGlass'));
+  let vA = 'A1', vB = 'B1', marks = true;
+  document.getElementById('varA').addEventListener('click', e => { const b = e.target.closest('.variant'); if (!b) return; vA = b.dataset.v; [...e.currentTarget.children].forEach(x => x.setAttribute('aria-pressed', x === b)); });
+  document.getElementById('varB').addEventListener('click', e => { const b = e.target.closest('.variant'); if (!b) return; vB = b.dataset.v; [...e.currentTarget.children].forEach(x => x.setAttribute('aria-pressed', x === b)); });
+  document.getElementById('marksToggle').addEventListener('change', e => { marks = e.target.checked; });
+  rA.wrap.classList.add('flip');
+
+  function tick() {
+    const t = demoT(), st = statusAt(t), u = used(t);
+    const q = Math.min(4, Math.floor(u / 7.5 + 1e-9));
+    const open = st === 'open' || st === 'five';
+    const winLevel = open ? 1 - t / 120 : (st === 'soon' ? 1 : 0);
+
+    demoClock.textContent = fmtClock(t);
+    demoDoing.innerHTML = st === 'soon' ? `window opens in <b>${Math.ceil(-t)} min</b>` : st === 'used' ? `<b>budget spent</b> · shielded until tomorrow` : usingNow(t) ? `<b>using TikTok</b> · ${u.toFixed(0)} of 30 min` : `TikTok open, <b>idle</b> · ${u.toFixed(0)} of 30 min used`;
+    playhead.style.left = pct(t);
+
+    // A
+    const flipping = vA === 'A3' && t >= 0 && t < 4.4;
+    const aClosedBottom = vA === 'A3' && st === 'soon';
+    const glowA = st === 'open' ? C.moss : st === 'five' ? C.amber : st === 'soon' ? C.amber : C.ember;
+    const oA = {
+      top: aClosedBottom ? 0 : (flipping ? 0 : winLevel), bottom: aClosedBottom ? 1 : (flipping ? 1 : 1 - winLevel),
+      running: open && !flipping, glass: st === 'five' ? 'amber' : st === 'used' ? 'dim' : 'cream',
+      glow: glowA, glowStrength: st === 'soon' ? .55 : st === 'used' ? .45 : 1, pulse: st === 'open' ? 'slow' : st === 'five' ? 'fast' : st === 'soon' ? 'breathe' : 'none',
+      grain: st === 'soon' && -t <= 10 && !aClosedBottom,
+    };
+    if (vA === 'A2') oA.ticks = 1;
+    rA.wrap.classList.toggle('turned', flipping);
+    gA.set(oA);
+    const subA = st === 'open' ? '30 min budget today' : '';
+    setHeroText(rA, ...heroCopy(st, t, subA));
+
+    // B
+    const lastCb = q === 0 ? 0 : quarterTime(q);
+    const est = open ? Math.min(30, q * 7.5 + Math.min(7.5, Math.max(0, t - lastCb))) : 0;
+    const oB = {
+      top: st === 'soon' ? 1 : st === 'used' ? 0 : st === 'five' ? .12 : 1 - q / 4,
+      bottom: st === 'soon' ? 0 : st === 'used' ? 1 : st === 'five' ? .88 : q / 4,
+      running: open, glass: st === 'five' ? 'amber' : st === 'used' ? 'dim' : 'cream',
+      glow: glowA, glowStrength: oA.glowStrength, pulse: oA.pulse, grain: st === 'soon' && -t <= 10,
+    };
+    if (vB === 'B2' && open && st !== 'five') oB.wick = 1 - est / 30;
+    if (vB === 'B3' && st !== 'soon') oB.layers = st === 'used' ? 4 : st === 'five' ? Math.max(3, q) : q;
+    gB.set(oB);
+    const leftB = 30 - q * 7.5;
+    const subB = q === 0 ? '30 min budget · nothing spent yet' : `about ${Math.round(leftB)} min left of 30`;
+    setHeroText(rB, ...heroCopy(st, t, subB));
+
+    // C
+    const oC = {
+      top: winLevel, bottom: 1 - winLevel, running: open, glass: st === 'five' ? 'amber' : st === 'used' ? 'dim' : 'cream',
+      mound: st === 'used' ? 'ember' : st === 'five' ? 'amber' : 'sand',
+      glow: glowA, glowStrength: oA.glowStrength, pulse: oA.pulse, grain: st === 'soon' && -t <= 10,
+    };
+    if (marks) { oC.marks = st === 'used' ? 4 : q; if (st === 'used') oC.marksColor = C.ember; }
+    gC.set(oC);
+    const subC = marks ? (q === 0 ? '30 min budget today' : `30 min budget · ${['¼', '½', '¾'][q-1] || ''} spent`) : '30 min budget today';
+    setHeroText(rC, ...heroCopy(st, t, subC));
+    big.set(oC);
+
+    // Ticking counts elsewhere.
+    document.querySelectorAll('[data-count="wide"]').forEach(el => el.textContent = fmtCountdown(120 - Math.max(0, t)));
+    requestAnimationFrame(tick);
+  }
+
+  // ---------- Status rows ----------
+  const rows = document.getElementById('statusRows');
+  const DIRS = [['A', 'Window glass', 'top bulb = window'], ['B', 'Budget glass', 'sand = budget quarters'], ['C', 'Hybrid', 'window drains, mound colour = budget']];
+  for (const [d, name, note] of DIRS) {
+    const row = document.createElement('div'); row.className = 'card status-row';
+    row.innerHTML = `<div class="who">${d} · ${name}<small>${note}</small></div><div class="swatches">${Object.entries(STATUS).map(([k, s]) => `<div class="swatch"><div class="glass-wrap" data-status="${k}"></div><div class="l"><b>${s.label}</b>${s.sub}</div></div>`).join('')}</div>`;
+    rows.appendChild(row);
+    row.querySelectorAll('.glass-wrap').forEach(w => new Glass(w).set(statusGlass(w.dataset.status, d, { ticks: false, layers: d === 'B', wick: false, marks: d === 'C' })));
+  }
+  document.querySelectorAll('[data-mini]').forEach(w => new Glass(w, true).set(statusGlass(w.dataset.mini, 'C')));
+
+  // ---------- Phones ----------
+  const APPS = [
+    { name: 'Reddit', status: 'bricked', tile: '#FF4500', i: 'R', rule: '9:00–10:00 PM · 20 min', chip: 'Bricked', eyebrow: ['Bricked · since 6:12 PM', 'ember'], count: () => fmtCountdown(108), sub: 'tag to unbrick · falls back to 9:00–10:00 PM' },
+    { name: 'TikTok', status: 'open', tile: '#161616', i: 'T', rule: '8:00–10:00 PM · 30 min', chip: '10:00 PM', eyebrow: ['Open now · until 10:00 PM', 'moss'], count: () => fmtCountdown(103), sub: '30 min budget today' },
+    { name: 'Instagram', status: 'soon', tile: '#C13584', i: 'I', rule: '9:00–10:30 PM · 20 min', chip: '9:00 PM', eyebrow: ['Next window', 'amber'], count: () => fmtCountdown(43), sub: 'opens at 9:00 PM · 20 min a day' },
+    { name: 'YouTube', status: 'used', tile: '#E62117', i: 'Y', rule: 'Used up today · 45 min', chip: '7:00 PM', eyebrow: ['Used up today', 'ember'], count: () => fmtCountdown(1363), sub: 'opens tomorrow at 7:00 PM · 45 min a day' },
+    { name: 'X', status: 'always', tile: '#000', i: 'X', rule: 'No windows', chip: '', eyebrow: ['Always blocked', 'muted'], count: () => 'all day', sub: 'No allowed windows · tap to add one', quiet: true },
+    { name: 'Snapchat', status: 'needs', tile: '#FFFC00', i: 'S', rule: 'Not enforced yet', chip: 'Set up', eyebrow: ['Needs a schedule', 'pending'], count: () => 'not enforced', sub: 'Tap to set windows and a budget', quiet: true, dark: true },
+  ];
+  const SECTIONS = [['Bricked', ['Reddit']], ['Open now', ['TikTok']], ['Later today', ['Instagram']], ['Tomorrow', ['YouTube']], ['Always blocked', ['X']], ['Needs a schedule', ['Snapchat']]];
+  const ICON = { gear: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 5.2a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 0 0 0-5.6Zm6.2 3.6-.9-.5.1-.6v-.4l.9-.5c.2-.1.3-.4.2-.6l-1.1-1.9a.5.5 0 0 0-.6-.2l-1 .4a5 5 0 0 0-.9-.5l-.2-1.1a.5.5 0 0 0-.5-.4H7.8a.5.5 0 0 0-.5.4l-.2 1.1a5 5 0 0 0-.9.5l-1-.4a.5.5 0 0 0-.6.2L3.5 6.2c-.1.2 0 .5.2.6l.9.5v1l-.9.5c-.2.1-.3.4-.2.6l1.1 1.9c.1.2.4.3.6.2l1-.4c.3.2.6.4.9.5l.2 1.1c0 .2.3.4.5.4h2.4c.2 0 .5-.2.5-.4l.2-1.1c.3-.1.6-.3.9-.5l1 .4c.2.1.5 0 .6-.2l1.1-1.9c.1-.2 0-.5-.2-.6Z"/></svg>',
+    plus: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg>',
+    cube: '<svg viewBox="0 0 16 16" fill="#E5563D"><path d="M8 1.5 14 5v6l-6 3.5L2 11V5l6-3.5Z"/></svg>' };
+  const app = n => APPS.find(a => a.name === n);
+  function tileHTML(a) { return `<div class="tile" style="background:${a.tile};${a.dark ? 'color:#111;' : ''}${a.tile === '#000' || a.tile === '#161616' ? 'border:1px solid rgba(255,255,255,.18);' : ''}">${a.i}</div>`; }
+  function listHTML() {
+    return `<div class="card brickcard"><div class="cube">${ICON.cube}</div><div><div class="n">Brick <span class="eyebrow ember">Bricked</span></div><div class="r">1 item · since 6:12 PM</div></div><div class="gbtn">Unbrick</div></div>` +
+      SECTIONS.map(([title, names]) => `<div class="eyebrow seclabel">${title}</div><div class="card rows">${names.map(n => { const a = app(n); return `<div class="row">${tileHTML(a)}<div><div class="n">${a.name}</div><div class="r">${a.rule}</div></div><div class="chip" style="color:${STATUS[a.status].color}"><div class="glass-wrap" data-rowmini="${a.status}"></div>${a.chip}</div></div>`; }).join('')}</div>`).join('');
+  }
+  function phoneShell(inner) {
+    return `<div class="statusbar"><span>9:41</span><span>●●● ᯤ ▮</span></div><div class="toolbar"><div class="gbtn">${ICON.gear}</div><div class="right"><div class="gbtn pending">2 pending</div><div class="gbtn">${ICON.plus}</div></div></div><div class="scroll">${inner}${listHTML()}</div><div class="fade"></div>`;
+  }
+  function pageHeroHTML(a) { return `<div class="hero" data-app="${a.name}"><div class="glass-wrap"></div><div class="text"><div class="eyebrow ${a.eyebrow[1]}">${a.eyebrow[0]}</div><div class="name">${a.name}</div><div class="count${a.quiet ? ' quiet' : ''}"></div><div class="sub">${a.sub}</div></div></div>`; }
+  const liveCounts = [];
+  function mountHero(root, a) { const g = new Glass(root.querySelector('.glass-wrap')); g.set(statusGlass(a.status, 'C', { marks: true })); const c = root.querySelector('.count'); liveCounts.push({ el: c, fn: a.count }); return g; }
+  function mountRowMinis(root) { root.querySelectorAll('[data-rowmini]').forEach(w => new Glass(w, true).set(statusGlass(w.dataset.rowmini, 'C'))); }
+
+  // H1
+  const h1 = document.getElementById('phoneH1');
+  h1.innerHTML = phoneShell(`<div class="pager" id="pager">${APPS.map(a => `<div class="page">${pageHeroHTML(a)}</div>`).join('')}</div><div class="indicator" id="ind">${APPS.map(a => `<div class="glass-wrap" data-ind="${a.status}"></div>`).join('')}</div>`);
+  h1.querySelectorAll('.page .hero').forEach(hh => mountHero(hh, app(hh.dataset.app)));
+  h1.querySelectorAll('[data-ind]').forEach(w => new Glass(w, true).set(statusGlass(w.dataset.ind, 'C')));
+  mountRowMinis(h1);
+  const pager = document.getElementById('pager'), ind = [...document.getElementById('ind').children];
+  function syncInd() { const i = Math.round(pager.scrollLeft / pager.clientWidth); ind.forEach((w, k) => w.classList.toggle('on', k === i)); }
+  pager.addEventListener('scroll', syncInd, { passive: true });
+  requestAnimationFrame(() => { pager.scrollLeft = pager.clientWidth; syncInd(); });
+
+  // H2
+  const h2 = document.getElementById('phoneH2');
+  h2.innerHTML = phoneShell(`<div class="swap" id="swap">${pageHeroHTML(app('TikTok'))}</div><div class="strip" id="strip">${APPS.map(a => `<button data-app="${a.name}" aria-pressed="${a.name === 'TikTok'}" title="${a.name}"><div class="glass-wrap" data-strip="${a.status}"></div></button>`).join('')}</div>`);
+  const swap = document.getElementById('swap');
+  let swapGlass = mountHero(swap.querySelector('.hero'), app('TikTok'));
+  h2.querySelectorAll('[data-strip]').forEach(w => new Glass(w, true).set(statusGlass(w.dataset.strip, 'C')));
+  mountRowMinis(h2);
+  document.getElementById('strip').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const a = app(b.dataset.app);
+    [...e.currentTarget.children].forEach(x => x.setAttribute('aria-pressed', x === b));
+    const old = swap.querySelector('.hero .count'); const idx = liveCounts.findIndex(l => l.el === old); if (idx >= 0) liveCounts.splice(idx, 1);
+    swap.innerHTML = pageHeroHTML(a); swapGlass = mountHero(swap.querySelector('.hero'), a); swap.querySelector('.glass-wrap').classList.add('pop');
+  });
+
+  // H3
+  const h3 = document.getElementById('phoneH3');
+  let deckOrder = ['TikTok', 'Instagram', 'YouTube', 'Reddit', 'X', 'Snapchat'];
+  function deckHTML() {
+    const front = app(deckOrder[0]);
+    return `<div class="deck"><div class="front" id="deckFront">${pageHeroHTML(front)}</div><div class="bars" id="bars">${deckOrder.slice(1).map(n => { const a = app(n); return `<button class="bar" data-app="${a.name}"><div class="glass-wrap" data-bar="${a.status}"></div><b>${a.name}</b><span>${a.status === 'open' ? 'open · until 10:00 PM' : a.status === 'soon' ? 'opens 9:00 PM' : a.status === 'used' ? 'used up · tomorrow' : a.status === 'bricked' ? 'bricked' : a.status === 'always' ? 'always blocked' : 'needs a schedule'}</span></button>`; }).join('')}</div><div class="hint">tap a bar to bring it forward · drag down on the phone</div></div>`;
+  }
+  function mountDeck() {
+    const old = h3.querySelector('#deckFront .count'); if (old) { const idx = liveCounts.findIndex(l => l.el === old); if (idx >= 0) liveCounts.splice(idx, 1); }
+    h3.innerHTML = phoneShell(deckHTML());
+    mountHero(h3.querySelector('#deckFront .hero'), app(deckOrder[0]));
+    h3.querySelectorAll('[data-bar]').forEach(w => new Glass(w, true).set(statusGlass(w.dataset.bar, 'C')));
+    mountRowMinis(h3);
+    h3.querySelector('#deckFront .glass-wrap').classList.add('pop');
+    document.getElementById('bars').addEventListener('click', e => { const b = e.target.closest('.bar'); if (!b) return; deckOrder = [b.dataset.app, ...deckOrder.filter(n => n !== b.dataset.app)]; mountDeck(); });
+  }
+  mountDeck();
+
+  // Live counts in the phones.
+  function countTick() { for (const l of liveCounts) l.el.textContent = l.fn(); }
+  setInterval(countTick, 250); countTick();
+
+  requestAnimationFrame(tick);
+})();
+</script>
