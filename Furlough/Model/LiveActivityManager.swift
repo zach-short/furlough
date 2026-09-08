@@ -26,7 +26,7 @@ enum LiveActivityManager {
             return
         }
 
-        let contentState = FurloughActivityAttributes.ContentState(openNames: summary.openNames, note: "Open")
+        let contentState = FurloughActivityAttributes.ContentState(openNames: summary.openNames, note: "Open", warned: summary.openWarned)
         let content = ActivityContent(state: contentState, staleDate: openUntil)
 
         if let current = existing.first(where: { $0.attributes.windowEnd == openUntil }) {
@@ -36,7 +36,7 @@ enum LiveActivityManager {
         }
 
         await end(existing)
-        let attributes = FurloughActivityAttributes(windowStart: now, windowEnd: openUntil)
+        let attributes = FurloughActivityAttributes(windowStart: min(summary.openStart ?? now, now), windowEnd: openUntil)
         do {
             _ = try Activity.request(attributes: attributes, content: content, pushType: nil)
         } catch {

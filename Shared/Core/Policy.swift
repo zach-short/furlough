@@ -79,6 +79,15 @@ enum Policy {
         return date(atMinute: next.minuteOfDay, of: day, calendar: calendar)
     }
 
+    /// How much of the window from `start` to `end` (minutes of `now`'s day) is still ahead, 0…1.
+    static func windowFraction(start: Int, end: Int, now: Date, calendar: Calendar = .current) -> Double {
+        let startDate = date(atMinute: start, of: now, calendar: calendar)
+        let endDate = date(atMinute: end, of: now, calendar: calendar)
+        let total = endDate.timeIntervalSince(startDate)
+        guard total > 0 else { return 0 }
+        return min(1, max(0, endDate.timeIntervalSince(now) / total))
+    }
+
     // MARK: Pending changes
 
     /// Applies every pending change whose time has come. Returns true when anything changed.
@@ -211,10 +220,16 @@ enum Policy {
     struct Summary: Equatable {
         var openNames: [String] = []
         var openUntil: Date?
+        /// Start of the open window that closes soonest, so the widget's sand can be at the right level.
+        var openStart: Date?
+        /// That target has had its 5-minute budget warning.
+        var openWarned = false
         var nextOpenAt: Date?
         var nextOpenNames: [String] = []
         /// Budget of the target opening next, for the widget's detail line.
         var nextOpenBudgetMinutes: Int?
+        /// The target opening next is waiting because its budget is spent, not its window.
+        var nextOpenIsExhausted = false
         var blockedCount = 0
         var exhaustedCount = 0
         var unconfiguredCount = 0
@@ -234,8 +249,10 @@ enum Policy {
         summary.pendingCount = state.pending.filter { $0.effectiveAt > now }.count
         summary.isBricked = config.brick.isBricked
         summary.brickedCount = config.brick.isBricked ? config.brick.count : 0
-        var openUntilMinute: Int?
-        var soonest: (date: Date, names: [String], budget: Int?)?
+        let minute = minuteOfDay(now)
+        let weekday = weekday(now)
+        var soonestOpen: (until: Int, start: Int, warned: Bool)?
+        var soonest: (date: Date, names: [String], budget: Int?, exhausted: Bool)?
 
         for target in config.targets {
             switch status(of: target, config: config, runtime: state.runtime, now: now) {
@@ -247,32 +264,38 @@ enum Policy {
                 summary.blockedCount += 1
             case .open(let until):
                 summary.openNames.append(target.displayName)
-                openUntilMinute = min(openUntilMinute ?? until, until)
+                if soonestOpen == nil || until < soonestOpen!.until {
+                    let start = target.rule?.window(containing: minute, on: weekday)?.startMinute ?? 0
+                    soonestOpen = (until, start, state.runtime.wasWarned(target.id, dayKey: dayKey(now)))
+                }
             case .exhausted(let next):
                 summary.exhaustedCount += 1
                 summary.blockedCount += 1
-                if let next { consider(date(at: next, from: now), target) }
+                if let next { consider(date(at: next, from: now), target, exhausted: true) }
             case .closed(let next):
                 summary.blockedCount += 1
-                consider(date(at: next, from: now), target)
+                consider(date(at: next, from: now), target, exhausted: false)
             }
         }
-        func consider(_ date: Date, _ target: Target) {
+        func consider(_ date: Date, _ target: Target, exhausted: Bool) {
             let name = target.displayName
             let budget = target.rule?.dailyBudgetMinutes
             if let current = soonest {
-                if date < current.date { soonest = (date, [name], budget) }
+                if date < current.date { soonest = (date, [name], budget, exhausted) }
                 else if date == current.date { soonest?.names.append(name) }
             } else {
-                soonest = (date, [name], budget)
+                soonest = (date, [name], budget, exhausted)
             }
         }
-        if let openUntilMinute {
-            summary.openUntil = date(atMinute: openUntilMinute, of: now)
+        if let soonestOpen {
+            summary.openUntil = date(atMinute: soonestOpen.until, of: now)
+            summary.openStart = date(atMinute: soonestOpen.start, of: now)
+            summary.openWarned = soonestOpen.warned
         }
         summary.nextOpenAt = soonest?.date
         summary.nextOpenNames = soonest?.names ?? []
         summary.nextOpenBudgetMinutes = soonest?.budget
+        summary.nextOpenIsExhausted = soonest?.exhausted ?? false
         return summary
     }
 }

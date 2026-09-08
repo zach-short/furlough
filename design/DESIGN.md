@@ -65,14 +65,40 @@ padding and are separated by the card border color.
 Render the real icon with FamilyControls `Label(token)`.
 
 **Home.** Top bar: glass gear on the left, "N pending" glass pill (Pending color) and glass
-plus on the right. Hero: hourglass image on the left with an ember glow beneath it, then the
-eyebrow ("OPEN NOW · UNTIL 10:00 PM" in Moss when something is open, "NEXT WINDOW" in Amber
-otherwise), the app name in Display, the countdown in Geist Mono, and a sub line such as
-"30 min budget today". List sections in this order: Open now · Later today · Tomorrow ·
-Later this week · Always blocked · Needs a schedule. A row whose rule varies by day shows
-today's windows ("Today 8:00 PM–midnight"), and its chip shows the day ("Sat") when the next
-window is more than a day away. Each row: tile, name (nickname small and muted beside
-it), rule line; on the right a status chip with a lock or hourglass glyph and the next time.
+plus on the right. Hero: one page per managed app, paged horizontally in the list's order
+and landing on the first open app (design/HOURGLASS.md, Direction C with header H1). Each
+page: the living hourglass (74 × 98 pt) on the left with its glow beneath it, then the
+eyebrow, the app name in Display, the big line in Geist Mono, and a sub line. Per status:
+"OPEN NOW · UNTIL 10:00 PM" in Moss with the countdown and "30 min budget today"; "OPEN NOW ·
+5 MIN LEFT" in Amber after the budget warning; "NEXT WINDOW" in Amber with a countdown to the
+opening; "USED UP TODAY" in Ember with a countdown to the next opening; "BRICKED · SINCE
+6:12 PM" in Ember counting up; "ALWAYS BLOCKED" in Muted and "NEEDS A SCHEDULE" in Pending
+with a quiet word ("all day", "not enforced") in place of the countdown. Under the pages, a
+row of 11 pt status hourglasses is the page indicator, the current one at 135 %; the strip
+is a status summary in itself. Tapping a page opens its rule editor. List sections in this
+order: Bricked · Open now · Later today · Tomorrow · Later this week · Always blocked · Needs
+a schedule. A row whose rule varies by day shows today's windows ("Today 8:00 PM–midnight"),
+and its chip shows the day ("Sat") when the next window is more than a day away. Each row:
+tile, name (nickname small and muted beside it), rule line; on the right a status chip with
+the 12 pt hourglass in the status colour and the next time.
+
+**The hourglass.** One vector drawing in a 120 × 160 space, coloured by status. The top bulb
+is the window: its sand level is the fraction of the current window still ahead, exact, and
+it drains with the countdown. The mound's colour is the budget at the precision the API
+allows: sand while there is plenty, Amber after the 5-minute warning, Ember once spent.
+
+| Status | Glass and glow | Sand | Motion |
+|---|---|---|---|
+| Open now | Cream glass, Moss glow | Draining, stream running | Stream, glow pulse 3.4 s |
+| 5 minutes left | Amber glass, Amber glow | Draining, mound Amber | Pulse 1.2 s |
+| Coming soon (later today) | Cream glass, Amber glow at 55 % | All in the top | Glow breathes 4.2 s; a grain drops every 3.2 s under 10 minutes to open |
+| Done for today (opens another day) | Cream glass, Amber glow at 35 % | All in the bottom | Still |
+| Used up today | Dim glass, Ember glow at 45 % | All in the bottom, Ember | Still |
+| Always blocked | Grey glass, no glow | Grey, a low mound | Still |
+| Needs a schedule | Pending outline, no glow | Empty | Outline fades up once on appear |
+| Bricked | Cream glass, Ember glow at 90 % | Frozen mid-stream, an Ember cube at the base | Still |
+
+Reduce Motion: no pulse, no grains (the stream is a solid line), levels still change.
 
 **Rule editor.** Header: large tile, name in Display, "Nickname shows on the shield and
 widget." Cards: Nickname (text field), Allowed windows (a "Same every day" row with an
@@ -92,13 +118,15 @@ background color Ember at 22%, icon = the hourglass with a transparent backgroun
 generated), title cream, subtitle muted, primary button "Close" with cream background and dark
 text, no secondary button.
 
-**Lock screen.** Live Activity: glass card, eyebrow "FURLOUGH" in Amber, name in Display,
-"Open until 10:00 PM" muted, countdown in Geist Mono on the right. Dynamic Island compact:
-hourglass glyph in Amber plus a Geist Mono countdown. Widgets: eyebrows "OPEN NOW" or "NEXT",
-name in Display, countdown or next time in Geist Mono, detail line muted.
+**Lock screen.** Live Activity: glass card, the open hourglass (30 × 40 pt) at the leading
+edge, eyebrow "FURLOUGH" in Amber, name in Display, "Open until 10:00 PM" muted, countdown in
+Geist Mono on the right. Dynamic Island: the same hourglass at 14 × 18 pt (compact leading)
+and 12 × 16 pt (minimal) plus a Geist Mono countdown. Widgets: eyebrows "OPEN NOW" or
+"NEXT", name in Display, countdown or next time in Geist Mono, detail line muted, and the
+status hourglass (30 × 40 pt) in the bottom right corner of the home-screen sizes.
 
-**Motion.** A slow ember pulse under the hourglass (3.4 s, alternating), and the sand in the
-hourglass settles when a window closes. Respect Reduce Motion.
+**Motion.** The hourglass table above. Everything in it runs off one frame clock at 30 fps
+that pauses when the state is still. Respect Reduce Motion.
 
 ## Imagery
 

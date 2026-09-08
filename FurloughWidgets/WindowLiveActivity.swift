@@ -5,7 +5,9 @@ import WidgetKit
 struct WindowLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: FurloughActivityAttributes.self) { context in
-            HStack(alignment: .center, spacing: 10) {
+            HStack(alignment: .center, spacing: 12) {
+                HourglassView(state: glass(context))
+                    .frame(width: 30, height: 40)
                 VStack(alignment: .leading, spacing: 2) {
                     Eyebrow(text: "Furlough", color: Ember.amber)
                     Text(context.state.openNames.joined(separator: ", "))
@@ -28,10 +30,9 @@ struct WindowLiveActivity: Widget {
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "hourglass")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Ember.amber)
+                    HStack(spacing: 8) {
+                        HourglassView(state: glass(context))
+                            .frame(width: 18, height: 24)
                         Text(context.state.openNames.first ?? "Open")
                             .emberDisplay(17)
                             .foregroundStyle(Ember.cream)
@@ -49,9 +50,8 @@ struct WindowLiveActivity: Widget {
                         .foregroundStyle(Ember.muted)
                 }
             } compactLeading: {
-                Image(systemName: "hourglass")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Ember.amber)
+                HourglassView(state: glass(context))
+                    .frame(width: 14, height: 18)
             } compactTrailing: {
                 countdown(context.attributes)
                     .font(EmberFont.numerals(13))
@@ -59,9 +59,8 @@ struct WindowLiveActivity: Widget {
                     .foregroundStyle(Ember.cream)
                     .frame(width: 58, alignment: .trailing)
             } minimal: {
-                Image(systemName: "hourglass")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Ember.amber)
+                HourglassView(state: glass(context))
+                    .frame(width: 12, height: 16)
             }
             .keylineTint(Ember.ember)
         }
@@ -69,5 +68,14 @@ struct WindowLiveActivity: Widget {
 
     private func countdown(_ attributes: FurloughActivityAttributes) -> some View {
         Text(timerInterval: attributes.windowStart...attributes.windowEnd, countsDown: true)
+    }
+
+    /// The open glass at the level of the last update. Live Activities cannot animate custom
+    /// views, so the sand only moves when the app syncs the activity.
+    private func glass(_ context: ActivityViewContext<FurloughActivityAttributes>) -> HourglassState {
+        let attributes = context.attributes
+        let total = attributes.windowEnd.timeIntervalSince(attributes.windowStart)
+        let level = total > 0 ? min(1, max(0, attributes.windowEnd.timeIntervalSince(.now) / total)) : 0
+        return .open(level: level, warned: context.state.warned)
     }
 }

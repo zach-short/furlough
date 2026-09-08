@@ -50,14 +50,15 @@ struct TokenTile: View {
     }
 }
 
-/// The glyph and time on the right of a home row.
+/// The 12 pt status hourglass and the next time on the right of a home row.
 struct StatusChip: View {
     let status: TargetStatus
+    let glass: HourglassState
 
     var body: some View {
-        HStack(spacing: 4) {
-            Image(systemName: symbol)
-                .font(.system(size: 11, weight: .semibold))
+        HStack(spacing: 5) {
+            HourglassView(state: glass)
+                .frame(width: 12, height: 16)
             if let text {
                 Text(text)
                     .emberBody(11.5, .semibold)
@@ -67,16 +68,6 @@ struct StatusChip: View {
         .foregroundStyle(color)
         .lineLimit(1)
         .fixedSize()
-    }
-
-    private var symbol: String {
-        switch status {
-        case .bricked: "cube.fill"
-        case .open: "lock.open.fill"
-        case .unconfigured: "exclamationmark.triangle.fill"
-        case .exhausted: "hourglass.bottomhalf.filled"
-        case .closed, .blockedAllDay: "lock.fill"
-        }
     }
 
     private var text: String? {

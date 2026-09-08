@@ -10,7 +10,8 @@ struct OnboardingView: View {
             EmberWall()
             VStack(alignment: .leading, spacing: 0) {
                 Spacer(minLength: 24)
-                HourglassView(isOpen: true)
+                LivingHourglass(state: .open(level: 0.62, warned: false))
+                    .compositingGroup()
                     .frame(width: 106, height: 140)
                     .shadow(color: Ember.amber.opacity(0.45), radius: 24)
                 Eyebrow(text: "Furlough", color: Ember.amber)

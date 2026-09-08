@@ -18,18 +18,45 @@ struct StatusProvider: TimelineProvider {
         completion(StatusEntry(date: .now, summary: Policy.summary(state: SharedStore.load(), now: .now)))
     }
 
+    /// One entry per status change over the next day and a half, plus one every three
+    /// minutes while a window is open so the hourglass keeps draining. Entries are free;
+    /// only reloads count against the widget budget.
     func getTimeline(in context: Context, completion: @escaping (Timeline<StatusEntry>) -> Void) {
         let state = SharedStore.load()
         var entries: [StatusEntry] = []
         var cursor = Date.now
-        for _ in 0..<12 {
-            entries.append(StatusEntry(date: cursor, summary: Policy.summary(state: state, now: cursor)))
+        let horizon = cursor.addingTimeInterval(36 * 3600)
+        while entries.count < 200, cursor < horizon {
+            let summary = Policy.summary(state: state, now: cursor)
+            entries.append(StatusEntry(date: cursor, summary: summary))
             let config = Policy.effectiveConfig(state, now: cursor)
             let next = Policy.nextTransition(config: config, after: cursor)
             guard next > cursor else { break }
-            cursor = next.addingTimeInterval(1)
+            let step = summary.openUntil == nil ? next : min(next, cursor.addingTimeInterval(180))
+            cursor = step == next ? next.addingTimeInterval(1) : step
         }
         completion(Timeline(entries: entries, policy: .atEnd))
+    }
+}
+
+extension HourglassState {
+    /// The widget's glass: the open target closing soonest, else whatever opens next.
+    static func of(_ summary: Policy.Summary, now: Date) -> HourglassState {
+        if let until = summary.openUntil, until > now, !summary.openNames.isEmpty {
+            let start = summary.openStart ?? now
+            let total = until.timeIntervalSince(start)
+            let level = total > 0 ? min(1, max(0, until.timeIntervalSince(now) / total)) : 0
+            return .open(level: level, warned: summary.openWarned)
+        }
+        if let next = summary.nextOpenAt {
+            if summary.nextOpenIsExhausted { return .usedUp }
+            if Calendar.current.isDate(next, inSameDayAs: now) {
+                return .comingSoon(inMinutes: next.timeIntervalSince(now) / 60)
+            }
+            return .doneForToday
+        }
+        if summary.isEmpty { return .unconfigured }
+        return summary.isBricked ? .bricked : .alwaysBlocked
     }
 }
 
@@ -47,8 +74,19 @@ struct StatusWidgetView: View {
         }
     }
 
-    /// Home-screen sizes: eyebrow, name in Display, countdown or next time in Geist Mono, detail.
+    /// Home-screen sizes: eyebrow, name in Display, countdown or next time in Geist Mono, detail,
+    /// and the status hourglass in the bottom corner.
     private var home: some View {
+        HStack(alignment: .bottom, spacing: 6) {
+            homeText
+            Spacer(minLength: 0)
+            HourglassView(state: .of(entry.summary, now: entry.date))
+                .frame(width: 30, height: 40)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var homeText: some View {
         let summary = entry.summary
         return VStack(alignment: .leading, spacing: 0) {
             if let until = summary.openUntil, !summary.openNames.isEmpty, until > entry.date {

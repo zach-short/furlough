@@ -18,6 +18,8 @@ Built on Apple's Screen Time API (FamilyControls, ManagedSettings, DeviceActivit
 | `FurloughWidgets` | Home-screen widget and the Live Activity shown while a window is open. |
 | `Shared/Core` | Models, the pure rules engine (`Policy`), App Group persistence, and the shield reconciler. Compiled into every target. |
 
+The home screen pages through every managed app. Each page has a living hourglass: the top bulb is the app's current window and drains with the countdown, and the mound turns amber at the "5 minutes left" warning and ember once the budget is spent. The glass is coloured by status everywhere it appears: in the rows, the widget, the Live Activity and the Dynamic Island.
+
 Rules for each app live in an App Group so all four processes read the same state. Apple never tells the app which apps you picked; the tokens are opaque. SwiftUI can still render each app's real icon and name, and you can give each one a nickname that shows on the shield, the widget, and notifications.
 
 ### The commitment device

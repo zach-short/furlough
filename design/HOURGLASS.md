@@ -2,8 +2,41 @@
 
 Asked for by Zach on 2026-09-07 after seeing the restyle on his phone. The hero hourglass
 should mean something, animate, and be one of several: the header pages through every
-managed app, and each app's hourglass is coloured by its status. Present the directions below
-(a mockup board is the right form; Zach chooses visually), get his pick, then build.
+managed app, and each app's hourglass is coloured by its status.
+
+## Chosen (2026-09-07): Direction C without quarter marks, header H1
+
+Picked from the mockup board `design/hourglass-board.html`
+(https://claude.ai/code/artifact/113cbd4e-85ba-46d4-a144-4ad48a204779), which shows every
+direction and variation live against one demo day, all seven status colours per direction,
+and the three header layouts as working phones. Built the same day:
+
+- `Shared/UI/Hourglass.swift`: `HourglassState` (sand level, mound level, running, frozen,
+  glass tint, sand and mound tones, glow colour and strength, pulse, grain, cube) with the
+  presets `open(level:warned:)`, `comingSoon(inMinutes:)`, `doneForToday`, `usedUp`,
+  `alwaysBlocked`, `unconfigured`, `bricked`, and `HourglassState.of(target, status:,
+  runtime:, now:)` mapping a `TargetStatus` to Direction C. `HourglassView(state:phase:)` is a
+  pure drawing driven by a clock value; `TopSandShape` and `MoundShape` take the level (both
+  `Animatable`); under 40 pt it switches to a bolder chip drawing. `LivingHourglass` wraps it
+  in `TimelineView(.animation)` at 30 fps, pauses two seconds after the state goes still, and
+  under Reduce Motion drops the pulse and the grains but keeps the level.
+- Home: `HeroPager` pages one `HeroPage` per target in the list's order (Bricked, Open now,
+  Later today, Tomorrow, Later this week, Always blocked, Needs a schedule), lands on the
+  first open app, and `HeroIndicator` is the strip of 11 pt status hourglasses; tapping one
+  turns to that page, tapping a page opens the rule editor. Each page ticks once a second and
+  derives the sand level and the countdown from the same date.
+- Rows: `StatusChip` shows the 12 pt hourglass in the status colour instead of the SF glyph.
+- Widget: `Policy.Summary` gained `openStart`, `openWarned` and `nextOpenIsExhausted`; the
+  home-screen sizes show the glass bottom right, and the timeline adds an entry every three
+  minutes while a window is open so the sand keeps draining between reloads.
+- Live Activity: the glass sits at the leading edge of the card and in the Dynamic Island
+  (compact, minimal, expanded). ActivityKit cannot animate custom views, so its level is the
+  level at the last sync; `windowStart` is now the window's real start and `ContentState`
+  carries `warned` (decoded tolerantly).
+- Quarter marks were not built: no `mark:` events, no quarter map. The budget shows only
+  through the two callbacks that exist: amber at the 5-minute warning, ember when spent.
+
+The rest of this file is the brief as presented.
 
 ## What the app can actually know
 
