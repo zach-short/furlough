@@ -186,7 +186,7 @@ final class AppModel {
         let target = current.config.targets[index]
 
         var result = ProposalResult.unchanged
-        if target.rule != rule {
+        if !(target.rule?.isEquivalent(to: rule) ?? false) {
             current.pending.removeAll { change in
                 if case .setRule(let targetID, _) = change.kind { return targetID == id }
                 return false

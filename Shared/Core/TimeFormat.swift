@@ -71,12 +71,7 @@ enum TimeFormat {
                 groups.append((window.days, [window]))
             }
         }
-        let order = Weekdays.ordered(calendar: calendar)
-        func firstPosition(_ days: Weekdays) -> Int { order.firstIndex { days.contains(weekday: $0) } ?? 7 }
-        groups.sort { a, b in
-            let (pa, pb) = (firstPosition(a.days), firstPosition(b.days))
-            return pa != pb ? pa < pb : a.days.count > b.days.count
-        }
+        groups.sort { $0.days.groupOrder(calendar: calendar) < $1.days.groupOrder(calendar: calendar) }
         return groups
             .map { "\(days($0.days, calendar: calendar)) \($0.windows.map(window).joined(separator: ", "))" }
             .joined(separator: " · ")

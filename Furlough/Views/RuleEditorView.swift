@@ -22,7 +22,7 @@ struct RuleEditorView: View {
         let id = UUID()
         var window: TimeWindow
 
-        /// Rows on the same days that overlap or touch, joined into the earlier row, in order.
+        /// Rows on the same days that overlap or touch, joined into the earlier row.
         static func joined(_ rows: [DraftWindow]) -> [DraftWindow] {
             var result: [DraftWindow] = []
             for row in rows.sorted(by: { $0.window < $1.window }) {
@@ -35,6 +35,17 @@ struct RuleEditorView: View {
             }
             return result
         }
+
+        /// Rows by group of days, then by time of day: the order the list always reads in.
+        static func sorted(_ rows: [DraftWindow]) -> [DraftWindow] {
+            let order = TimeWindow.grouped(rows.map(\.window))
+            return rows.sorted { a, b in
+                (order.firstIndex(of: a.window) ?? 0) < (order.firstIndex(of: b.window) ?? 0)
+            }
+        }
+
+        /// Joined, then sorted: what a committed edit leaves behind.
+        static func tidy(_ rows: [DraftWindow]) -> [DraftWindow] { sorted(joined(rows)) }
     }
 
     private var target: Target? { model.state.config.target(id: targetID) }
@@ -43,7 +54,7 @@ struct RuleEditorView: View {
     private var trimmedNickname: String { nickname.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var hasChanges: Bool {
         guard let target else { return false }
-        return target.rule != draft || target.nickname != trimmedNickname
+        return !(target.rule?.isEquivalent(to: draft) ?? false) || target.nickname != trimmedNickname
     }
 
     /// Other apps and sites with windows worth copying.
@@ -59,7 +70,7 @@ struct RuleEditorView: View {
         Binding(
             get: { WeekDraft(windows: windows) },
             set: { week in
-                let merged = week.windows
+                let merged = TimeWindow.grouped(week.windows)
                 drafts = merged.map { DraftWindow(window: $0) }
                 byDay = !merged.allSatisfy { $0.days == .all }
             }
@@ -74,7 +85,7 @@ struct RuleEditorView: View {
                     byDay = !on
                     if on {
                         for index in drafts.indices { drafts[index].window.days = .all }
-                        drafts = DraftWindow.joined(drafts)
+                        drafts = DraftWindow.tidy(drafts)
                     }
                 }
             }
@@ -225,7 +236,7 @@ struct RuleEditorView: View {
                 WindowRow(
                     window: $draft.window,
                     showsDays: byDay,
-                    onCommit: { withAnimation(.snappy) { drafts = DraftWindow.joined(drafts) } },
+                    onCommit: { withAnimation(.snappy) { drafts = DraftWindow.tidy(drafts) } },
                     onRemove: { drafts.removeAll { $0.id == draft.id } }
                 )
                 CardDivider()
@@ -287,7 +298,7 @@ struct RuleEditorView: View {
     private func effect(for target: Target) -> EffectBanner.Kind {
         if let error = draft.validationError { return .error(error) }
         if !hasChanges { return .noChanges }
-        if target.rule == draft { return .nicknameOnly }
+        if target.rule?.isEquivalent(to: draft) ?? false { return .nicknameOnly }
         if Policy.classify(newRule: draft, against: target) == .tightening { return .tightening }
         return .loosening(Date.now.addingTimeInterval(model.state.config.loosenDelay))
     }
@@ -310,29 +321,31 @@ struct RuleEditorView: View {
         }.first
         let rule = pendingRule ?? target.rule ?? Rule()
         budget = rule.dailyBudgetMinutes > 0 ? rule.dailyBudgetMinutes : Furlough.defaultBudgetMinutes
-        drafts = rule.sortedWindows.map { DraftWindow(window: $0) }
+        drafts = TimeWindow.grouped(rule.windows).map { DraftWindow(window: $0) }
         byDay = !rule.isSameEveryDay
     }
 
     /// Replaces the draft with another target's rule. Nothing is saved until Save.
     private func adopt(_ rule: Rule) {
         withAnimation(.snappy) {
-            drafts = rule.sortedWindows.map { DraftWindow(window: $0) }
+            drafts = TimeWindow.grouped(rule.windows).map { DraftWindow(window: $0) }
             budget = rule.dailyBudgetMinutes > 0 ? rule.dailyBudgetMinutes : Furlough.defaultBudgetMinutes
             byDay = !rule.isSameEveryDay
         }
     }
 
-    /// The first window is an evening. Each one after that is the hour after the latest, or
-    /// from midnight once the evening is taken, so "later on weekends" starts as the
-    /// early-morning window it has to be.
+    /// The first window is an evening. Each one after that goes on the same days as the last
+    /// row, where those days have room: after the latest window, or from the first free hour
+    /// once the evening is taken, so "later on weekends" starts as the early-morning window
+    /// it has to be. The list keeps its order; the new row is not joined until its times are
+    /// set. Nothing is added when those days are full.
     private func addWindow() {
         var window = TimeWindow(startMinute: 20 * 60, endMinute: 22 * 60)
-        if var start = windows.map(\.endMinute).max() {
-            if start > Furlough.minutesPerDay - 60 { start = 0 }
-            window = TimeWindow(startMinute: start, endMinute: min(start + 60, Furlough.minutesPerDay))
+        if let last = drafts.last {
+            guard let free = TimeWindow.nextFree(after: windows, on: last.window.days) else { return }
+            window = free
         }
-        withAnimation(.snappy) { drafts.append(DraftWindow(window: window)) }
+        withAnimation(.snappy) { drafts = DraftWindow.sorted(drafts + [DraftWindow(window: window)]) }
     }
 
     private func save() {
@@ -391,6 +404,7 @@ struct WindowRow: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+        .onChange(of: window.days) { _, _ in onCommit() }
         .sheet(item: $editing, onDismiss: onCommit) { edge in
             TimePickerSheet(
                 title: edge == .start ? "Opens at" : "Closes at",

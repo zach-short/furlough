@@ -341,18 +341,19 @@ struct DayEditor: View {
         rows = week.spans(on: weekday).map { RuleEditorView.DraftWindow(window: $0) }
     }
 
-    /// A new row is left alone until its times are set, so it can start where the last ends.
+    /// A new row where the day has room, slotted into time order and left unjoined until its
+    /// times are set. Nothing is added when the day is full.
     private func addWindow() {
-        var start = windows.map(\.endMinute).max() ?? 12 * 60
-        if start > Furlough.minutesPerDay - 60 { start = 0 }
-        let window = TimeWindow(startMinute: start, endMinute: min(start + 60, Furlough.minutesPerDay))
-        withAnimation(.snappy) { rows.append(RuleEditorView.DraftWindow(window: window)) }
+        guard let window = TimeWindow.nextFree(after: windows, on: .all) else { return }
+        withAnimation(.snappy) {
+            rows = RuleEditorView.DraftWindow.sorted(rows + [RuleEditorView.DraftWindow(window: window)])
+        }
         sync()
     }
 
-    /// After a time edit: rows that now overlap or touch become one, then the week is updated.
+    /// After a time edit: rows that now overlap or touch become one, in order, then the week is updated.
     private func commit() {
-        withAnimation(.snappy) { rows = RuleEditorView.DraftWindow.joined(rows) }
+        withAnimation(.snappy) { rows = RuleEditorView.DraftWindow.tidy(rows) }
         sync()
     }
 

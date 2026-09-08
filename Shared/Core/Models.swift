@@ -32,6 +32,17 @@ struct Weekdays: OptionSet, Hashable {
     static func ordered(calendar: Calendar = .current) -> [Int] {
         (0..<7).map { (calendar.firstWeekday - 1 + $0) % 7 + 1 }
     }
+
+    /// Where the earliest of these days falls in the calendar's week, 0…6; 7 when empty.
+    func firstPosition(calendar: Calendar = .current) -> Int {
+        Weekdays.ordered(calendar: calendar).firstIndex { contains(weekday: $0) } ?? 7
+    }
+
+    /// The order groups of days are listed in: earliest day first, then the broader group
+    /// ("Every day" before "Sat, Sun"), then a stable tiebreak.
+    func groupOrder(calendar: Calendar = .current) -> (Int, Int, UInt8) {
+        (firstPosition(calendar: calendar), -count, rawValue)
+    }
 }
 
 /// Stored as the bare integer, not `{"rawValue": n}`.
@@ -87,6 +98,43 @@ struct TimeWindow: Codable, Hashable, Identifiable, Comparable {
         (lhs.startMinute, lhs.endMinute, lhs.days.rawValue) < (rhs.startMinute, rhs.endMinute, rhs.days.rawValue)
     }
 
+    /// The order a list of windows reads best in: by group of days, then by time of day.
+    static func grouped(_ windows: [TimeWindow], calendar: Calendar = .current) -> [TimeWindow] {
+        windows.sorted { a, b in
+            let (ga, gb) = (a.days.groupOrder(calendar: calendar), b.days.groupOrder(calendar: calendar))
+            return ga != gb ? ga < gb : (a.startMinute, a.endMinute) < (b.startMinute, b.endMinute)
+        }
+    }
+
+    /// Where a new window on `days` goes among `windows`: from the latest end on those days
+    /// when there is room before midnight, else the first free stretch of the day. Up to an
+    /// hour long, never shorter than the minimum. Nil when those days are already full.
+    static func nextFree(after windows: [TimeWindow], on days: Weekdays) -> TimeWindow? {
+        let related = windows.filter { !$0.days.isDisjoint(with: days) }
+        var taken = [Bool](repeating: false, count: Furlough.minutesPerDay)
+        for window in related {
+            let lower = max(0, window.startMinute)
+            let upper = min(Furlough.minutesPerDay, window.endMinute)
+            guard lower < upper else { continue }
+            for minute in lower..<upper { taken[minute] = true }
+        }
+        let latestEnd = related.map(\.endMinute).max() ?? 12 * 60
+        for origin in [min(latestEnd, Furlough.minutesPerDay), 0] {
+            var minute = origin
+            while minute < Furlough.minutesPerDay {
+                guard !taken[minute] else { minute += 1; continue }
+                let start = minute
+                var end = start
+                while end < Furlough.minutesPerDay, !taken[end], end - start < 60 { end += 1 }
+                if end - start >= Furlough.minimumWindowMinutes {
+                    return TimeWindow(startMinute: start, endMinute: end, days: days)
+                }
+                minute = end
+            }
+        }
+        return nil
+    }
+
     /// Windows on the same days that overlap or touch, joined into one, in order. Windows on
     /// different days are left alone.
     static func joined(_ windows: [TimeWindow]) -> [TimeWindow] {
@@ -136,6 +184,11 @@ struct Rule: Codable, Hashable {
     var sortedWindows: [TimeWindow] { windows.sorted() }
     /// Every window applies every day, so one list describes the whole week.
     var isSameEveryDay: Bool { windows.allSatisfy { $0.days == .all } }
+
+    /// The same rule whatever order the windows are listed in.
+    func isEquivalent(to other: Rule) -> Bool {
+        dailyBudgetMinutes == other.dailyBudgetMinutes && sortedWindows == other.sortedWindows
+    }
 
     /// The windows that apply on `weekday` (Calendar's 1…7), in order: the whole day when
     /// the rule has none of its own.
