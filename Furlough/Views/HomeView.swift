@@ -7,6 +7,7 @@ struct HomeView: View {
     /// What the popover asked for; `addTargetsFlow` takes it from here to Apple's picker.
     @State private var addRequest: AddChoice?
     @State private var showSettings = false
+    @State private var showHelp = false
     @State private var showPending = false
 
     var body: some View {
@@ -30,6 +31,10 @@ struct HomeView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Settings", systemImage: "gearshape.fill") { showSettings = true }
+                        .tint(Ember.cream)
+                }
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Help", systemImage: "questionmark.circle.fill") { showHelp = true }
                         .tint(Ember.cream)
                 }
                 if !model.state.pending.isEmpty {
@@ -60,6 +65,7 @@ struct HomeView: View {
             .addTargetsFlow($addRequest)
             .sheet(isPresented: $showPending) { PendingChangesView() }
             .sheet(isPresented: $showSettings) { SettingsView() }
+            .sheet(isPresented: $showHelp) { HelpView() }
         }
     }
 }
