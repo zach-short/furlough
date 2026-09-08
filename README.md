@@ -59,10 +59,14 @@ Apple's Screen Time API does not exist on the Mac: FamilyControls, ManagedSettin
 | iOS shields a blocked app | Furlough quits it the moment it launches or the window closes (force-quits if it lingers), and shows a floating card saying when it opens next |
 | iOS shields a blocked site | Furlough reads the front tab's address in Safari and the Chromium browsers (Chrome, Arc, Brave, Edge, Vivaldi, Opera, Dia) through Apple Events and sends the tab to its shield page |
 | iOS counts usage toward the budget | Furlough counts seconds while the app or site is in front and the Mac is not idle; "5 minutes left" and "Time's up" arrive as notifications |
-| Live Activity, widget, the Brick | A menu bar item with the countdown. No Brick: a Mac has no NFC reader |
+| The home-screen widget | A desktop widget with the same card: **Edit Widgets** on the desktop or in Notification Center, then add Furlough |
+| The Live Activity and Dynamic Island | A menu bar item with the countdown. ActivityKit does not exist on the Mac |
+| The Brick | Nothing: a Mac has no NFC reader |
 | Escape: Settings > Screen Time > turn Furlough off | Escape: Force Quit. Quit is refused while anything is blocked; logging out and shutting down are always allowed. Furlough opens at login |
 
-Windows per weekday, budgets, the pending list and the loosening delay are the same code as the phone. Rules are per device; nothing syncs.
+Windows per weekday, budgets, the pending list and the loosening delay are the same code as the phone, and so are **Visualize windows**, **Use windows from another app** and **Apply these windows to other apps**. The selected app's page opens with the phone's hero: the living hourglass, the countdown, and how much of today's budget is used, which the Mac knows because it counts the minutes itself. The sidebar groups apps the way the phone's home screen does. Rules are per device; nothing syncs.
+
+The Mac keeps its rules in an App Group container shared with the widget (`X9V4L6HR2R.com.zachshort.furlough`, under `~/Library/Group Containers`). The first launch of a build that has the widget moves the older store there; nothing is lost.
 
 macOS asks once per browser whether Furlough may control it, the first time that browser is in front while a website has a rule. Refusing means that browser is not enforced; Settings > Browsers shows the status, and System Settings > Privacy & Security > Automation is where to change it. Firefox is not scriptable this way and is not enforced.
 
@@ -146,7 +150,7 @@ Limits to know about:
 
 ## Testing builds
 
-Debug builds, which is what Xcode and the commands above produce, add **Settings > Testing > Reset everything**. After a confirmation it forgets every app, rule, pending change and the Brick with its tag, lifts every shield, and leaves the app as it was right after allowing Screen Time access. Use it to start over after trying a week-long delay or a five-minute budget. It is compiled out of Release builds (`-configuration Release`), so a build you mean to live with keeps its promise of no unblock button.
+Debug builds, which is what Xcode and the commands above produce, add **Settings > Testing > Reset everything**. After a confirmation it forgets every app, rule, pending change and the Brick with its tag, lifts every shield, and leaves the app as it was right after allowing Screen Time access. Use it to start over after trying a week-long delay or a five-minute budget. It is compiled out of Release builds (`-configuration Release`), so a build you mean to live with keeps its promise of no unblock button. A Debug build of the Mac app has the same button; there it also forgets today's counted minutes, and the app stays set up and running.
 
 ## Known limits of the Screen Time API
 

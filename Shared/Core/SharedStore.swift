@@ -15,9 +15,23 @@ enum SharedStore {
         UserDefaults(suiteName: Furlough.appGroupID) ?? .standard
     }
     #else
-    /// The Mac has no extensions to share with, so the app's own defaults are the store.
-    static var isAppGroupAvailable: Bool { true }
-    static var defaults: UserDefaults { .standard }
+    static var isAppGroupAvailable: Bool { UserDefaults(suiteName: Furlough.macAppGroupID) != nil }
+
+    /// The Mac app and its widget share the App Group container. Before the widget existed the
+    /// app kept everything in its own defaults, so the first launch that finds the group empty
+    /// while the old store has state copies the old store across, once. The old keys are left
+    /// where they were. `UserDefaults` is thread-safe but not marked Sendable, hence the unsafe.
+    nonisolated(unsafe) static let defaults: UserDefaults = {
+        guard let group = UserDefaults(suiteName: Furlough.macAppGroupID) else { return .standard }
+        let old = UserDefaults.standard
+        if group.data(forKey: stateKey) == nil, old.data(forKey: stateKey) != nil {
+            for key in [stateKey, logKey, "furlough.mac.usage.v1", "furlough.mac.onboarded"] {
+                if let value = old.object(forKey: key) { group.set(value, forKey: key) }
+            }
+            group.set(true, forKey: "furlough.mac.migrated")
+        }
+        return group
+    }()
     #endif
 
     static func load() -> SharedState {

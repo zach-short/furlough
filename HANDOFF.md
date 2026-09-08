@@ -298,8 +298,18 @@ name `Furlough`, macOS 26, non-sandboxed, hardened runtime with the
 
 - Shared code compiles for both: `TargetKind` is `#if os(iOS)` tokens `#else`
   `.macApp(bundleID:)` / `.host(String)`; `Decision`/`Policy.decide` have a Mac variant
-  (`blockedApps`, `blockedHosts` by string); `SharedStore.defaults` is `.standard` on the Mac.
-  `ShieldReconciler.swift` and `ActivityNaming.swift` are excluded from the Mac target in
+  (`blockedApps`, `blockedHosts` by string). `SharedStore.defaults` on the Mac is the App Group
+  suite `Furlough.macAppGroupID` (`X9V4L6HR2R.com.zachshort.furlough`, added 2026-09-08 for the
+  widget); it is team-prefixed rather than `group.`-prefixed on purpose, because on the Mac a
+  `group.` identifier needs a Mac App Development profile, which needs this Mac registered
+  with the team (xcodebuild refused with "Device isn't registered"), while a team-prefixed
+  group needs neither. The first access that finds the group empty while `.standard` has
+  state copies `furlough.state.v1`, the log, the usage ledger and the onboarded flag across
+  once and leaves the old keys in place; `MacModel.start()` logs "moved the store into the App
+  Group". So `defaults read com.zachshort.furlough.mac` now shows stale data: read the plist
+  in `~/Library/Group Containers/X9V4L6HR2R.com.zachshort.furlough/Library/Preferences/`
+  instead (a CLI without the entitlement cannot open the suite through `UserDefaults`).
+  `ShieldReconciler.swift` and `ActivityNaming.swift` are excluded from the Mac targets in
   `project.yml`. `Shared/UI` (Theme, Hourglass) compiles unchanged. Fonts ship as a folder
   reference under `Resources/Fonts` with `ATSApplicationFontsPath: Fonts`; the activity log's
   first line says whether they loaded.
@@ -327,12 +337,34 @@ name `Furlough`, macOS 26, non-sandboxed, hardened runtime with the
   `RowCopy` and `BudgetSlider` rather than moving them out of `Furlough/Views`, because that
   folder was being edited in another session at the time; unify into `Shared/UI` when quiet.
   Times are `DatePicker` fields; an end of 12:00 AM means midnight (1440). `MacRuleEditor`
-  has the phone's "Use windows from another app" (a menu) and "Apply these windows to other
+  has the phone's "Use windows from another app" (a menu), "Apply these windows to other
   apps" (`ApplyRuleSheet` in `MacSheets.swift`, backed by `MacModel.apply`, same semantics as
-  the phone's).
-- Verified on this Mac (2026-09-07): Release build clean, installed to `/Applications`,
-  a target blocked all day was quit within a second of launching and logged. Not yet seen by
-  a person: the window itself, the shield panel, the browser redirect (it needs the one-time
-  Automation prompt), budget counting and the login item. Ask Zach.
+  the phone's) and, since 2026-09-08, "Visualize windows": `MacWeekView.swift` is a copy of
+  the phone's `WeekDraft`, `WeekGrid`, `DayColumn`, `WindowBlock`, `DayBar` and `DayEditor`,
+  with `WeekSheet` swapping the grid for the day editor in place (a Back link, like
+  `LogView`) instead of pushing. The Mac's `DraftWindow` has the phone's `sorted`/`tidy`;
+  rows are joined at Save and when Apply to other days runs, not as time fields change,
+  because the fields commit as you type and a row that moved mid-edit would leave the cursor.
+  `MacHero.swift` holds `TargetHero` (the phone's `HeroPage` for the selected app, at the top
+  of the editor, with "n of m min used today" from `MacModel.usedSeconds`) and a copy of the
+  phone's `HomeGroups` (no Bricked section) that the sidebar uses.
+- Debug builds carry Settings > Testing > Reset everything (`MacModel.resetEverything`,
+  `Enforcer.resetUsage`, both `#if DEBUG`), like the phone.
+- The desktop widget: target `FurloughMacWidgets` (bundle `com.zachshort.furlough.mac.widgets`,
+  sandboxed, same App Group), `MacStatusWidget.swift` is the phone's `StatusWidget` without
+  the lock-screen family, small and medium only; `FurloughMacWidgetsBundle` registers the
+  bundled fonts with `CTFontManagerRegisterFontURLs` because a Mac appex does not honour
+  `ATSApplicationFontsPath`. `MacModel.enforce` and the enforcer's `onChange` call
+  `WidgetCenter.shared.reloadAllTimelines()`. No Live Activity: ActivityKit is iOS-only.
+- Verified on this Mac: 2026-09-07, Release build clean, installed to `/Applications`, a
+  target blocked all day was quit within a second of launching and logged. 2026-09-08, from
+  screenshots of a Debug build driven by a temporary env-var hook and a seeded demo suite
+  (see the memory note on Mac screenshots): the hero with its countdown, the six sidebar
+  sections, the week grid, the day editor with the locked day, Settings; and the store
+  migration on the real state (log line present, keys in the group plist). Not yet seen by a
+  person: the shield panel, the browser redirect (it needs the one-time Automation prompt),
+  budget counting, the login item, and the widget itself placed on the desktop (nothing here
+  can click Edit Widgets; `pluginkit -m -i com.zachshort.furlough.mac.widgets` shows it is
+  registered). Ask Zach.
 - Build check for the Mac: the README's `xcodebuild … -scheme FurloughMac` line; keep it
   warning-free like the phone.

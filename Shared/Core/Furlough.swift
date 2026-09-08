@@ -3,6 +3,10 @@ import Foundation
 /// Constants shared by the app and every extension.
 enum Furlough {
     static let appGroupID = "group.com.zachshort.furlough"
+    /// The Mac app and its widget share this container. It starts with the team identifier
+    /// rather than "group." because on the Mac a group named that way needs no provisioning
+    /// profile, and so no registered Mac: the signing team is the proof.
+    static let macAppGroupID = "X9V4L6HR2R.com.zachshort.furlough"
     static let storeName = "furlough"
     static let bundleID = "com.zachshort.furlough"
     static let minutesPerDay = 1440

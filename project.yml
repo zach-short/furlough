@@ -194,6 +194,8 @@ targets:
       path: FurloughMac/FurloughMac.entitlements
       properties:
         com.apple.security.automation.apple-events: true
+        com.apple.security.application-groups:
+          - X9V4L6HR2R.com.zachshort.furlough
     info:
       path: FurloughMac/Info.plist
       properties:
@@ -216,3 +218,47 @@ targets:
         ENABLE_APP_SANDBOX: NO
         COMBINE_HIDPI_IMAGES: YES
         ENABLE_PREVIEWS: YES
+    dependencies:
+      - target: FurloughMacWidgets
+
+  # The Mac's desktop widget: the phone's home-screen widget, through WidgetKit on macOS. It
+  # reads the app's store through the App Group, which is why the Mac app carries one too.
+  # The group starts with the team identifier, not "group.": on the Mac that kind needs no
+  # provisioning profile, so no Mac has to be registered with the team. No Live Activity:
+  # ActivityKit does not exist on the Mac; the menu bar item carries the countdown instead.
+  FurloughMacWidgets:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: FurloughMacWidgets
+      - path: Shared/Core
+        excludes:
+          - ShieldReconciler.swift
+          - ActivityNaming.swift
+      - path: Shared/UI
+      - path: Furlough/Fonts
+        type: folder
+        buildPhase: resources
+    entitlements:
+      path: FurloughMacWidgets/FurloughMacWidgets.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.application-groups:
+          - X9V4L6HR2R.com.zachshort.furlough
+    info:
+      path: FurloughMacWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Furlough Widgets
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.zachshort.furlough.mac.widgets
+        MACOSX_DEPLOYMENT_TARGET: "26.0"
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ENABLE_HARDENED_RUNTIME: YES
+        ENABLE_APP_SANDBOX: YES
+        COMBINE_HIDPI_IMAGES: YES

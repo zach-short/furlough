@@ -3,6 +3,7 @@ import Foundation
 import Observation
 import ServiceManagement
 import UserNotifications
+import WidgetKit
 
 enum ProposalResult: Equatable {
     case appliedNow
@@ -40,7 +41,16 @@ final class MacModel {
 
     func start() {
         SharedStore.log("fonts: \(NSFont(name: "Onest-Regular", size: 12) == nil ? "MISSING, check ATSApplicationFontsPath" : "ok")")
-        enforcer.onChange = { [weak self] in self?.reload() }
+        if SharedStore.defaults.bool(forKey: "furlough.mac.migrated") {
+            SharedStore.defaults.removeObject(forKey: "furlough.mac.migrated")
+            SharedStore.log("moved the store into the App Group for the widget")
+        }
+        // The enforcer changes state on its own (a budget spent, a pending change landing),
+        // and the widget draws from that state, so every change refreshes it.
+        enforcer.onChange = { [weak self] in
+            self?.reload()
+            WidgetCenter.shared.reloadAllTimelines()
+        }
         enforcer.start()
         reload()
         Task { await refreshNotificationStatus() }
@@ -96,6 +106,7 @@ final class MacModel {
         current.runtime.lastRegistration = .now
         SharedStore.save(current)
         enforcer.reconcile(reason: reason)
+        WidgetCenter.shared.reloadAllTimelines()
         reload()
     }
 
