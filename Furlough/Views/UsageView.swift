@@ -20,16 +20,37 @@ struct UsageView: View {
     /// Categories have no hours of their own worth a card.
     private var targets: [Target] { model.state.config.targets.filter { !$0.kind.isCategory } }
 
+    /// A report cannot tell the app how tall it is, so every slot gets a height the row was
+    /// designed for: name, two lines of where, three lines of rule, and the card's padding.
+    private let rankHeight: CGFloat = 176
+    private let focusHeight: CGFloat = 176
+
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                DeviceActivityReport(.cutback, filter: UsageReader.filter())
-                    .frame(minHeight: 320)
+            VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Eyebrow(text: "Where the time goes")
+                        Spacer()
+                        Eyebrow(text: "Last \(UsageReader.days) days")
+                    }
+                    .padding(.horizontal, 4)
+                    ForEach(1...UsageAnalysis.rankLimit, id: \.self) { position in
+                        DeviceActivityReport(.rank(position), filter: UsageReader.filter())
+                            .frame(height: rankHeight)
+                    }
+                }
                 if UsageReader.hasDataAccess {
                     applySection
                 }
-                ForEach(targets) { target in
-                    focusCard(target)
+                if !targets.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Eyebrow(text: "What Furlough manages")
+                            .padding(.horizontal, 4)
+                        ForEach(targets) { target in
+                            focusCard(target)
+                        }
+                    }
                 }
                 Text("Screen Time draws these cards in a sandbox of its own; Furlough never sees the numbers. A suggestion closes the hours that hold most of the use and keeps half the time.")
                     .emberBody(11)
@@ -100,7 +121,7 @@ struct UsageView: View {
                 }
             }
             DeviceActivityReport(.focus, filter: UsageReader.filter(for: target.kind))
-                .frame(height: 150)
+                .frame(height: focusHeight)
         }
     }
 

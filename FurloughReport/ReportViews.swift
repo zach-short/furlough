@@ -1,45 +1,32 @@
 import SwiftUI
 
-/// The heaviest few, each with where its time piles up and the rule that would take it back.
-/// Drawn on Furlough's own dark card whatever the host paints behind it.
-struct CutbackView: View {
-    let summary: UsageSummary
-
-    private var advice: [Recommendation] { summary.recommendations }
+/// One slot of the ranking, in a frame the app fixed: the row for that position, or, in the
+/// first empty slot, a line saying the list ended. Every text is allowed its lines and the
+/// whole thing sits at the top, so nothing is squeezed to fit or centred out of view.
+struct RankView: View {
+    let slot: RankSlot
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Eyebrow(text: "Where the time goes")
-                Spacer()
-                if summary.totalDays > 0 {
-                    Eyebrow(text: "\(summary.totalDays) days · \(TimeFormat.budget(Int(summary.totalMinutesPerDay.rounded())))/day")
-                }
-            }
-            if advice.isEmpty {
-                Text(summary.entries.isEmpty
-                    ? "Screen Time has nothing for this stretch yet."
-                    : "Nothing here passes \(Int(UsageAnalysis.minimumDailyMinutes)) minutes a day. Nothing to cut.")
-                    .emberBody(13)
-                    .foregroundStyle(Ember.muted)
-            } else {
-                ForEach(advice) { item in
-                    RecommendationRow(item: item)
-                    if item.id != advice.last?.id {
-                        Divider().overlay(Ember.cardBorder)
-                    }
-                }
-                Text("Only this card sees these numbers; Furlough does not. Open an app's rule below and type its suggestion in.")
-                    .emberBody(11)
+        Group {
+            if let item = slot.item {
+                RecommendationRow(item: item)
+                    .padding(14)
+                    .reportCard()
+            } else if slot.position == slot.count + 1 {
+                Text(slot.count == 0
+                    ? "Nothing on this phone passes \(Int(UsageAnalysis.minimumDailyMinutes)) minutes a day in the last \(slot.days) days."
+                    : "Nothing else passes \(Int(UsageAnalysis.minimumDailyMinutes)) minutes a day.")
+                    .emberBody(12)
                     .foregroundStyle(Ember.faint)
+                    .padding(.horizontal, 4)
             }
         }
-        .padding(16)
-        .reportCard()
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 }
 
-/// One line of advice: the name, the daily average, where it piles up, and the rule.
+/// One line of advice: the name, the daily average, where it piles up, and the rule. Sized
+/// for the app's fixed slot: two lines for where, three for the rule.
 struct RecommendationRow: View {
     let item: Recommendation
 
@@ -50,23 +37,31 @@ struct RecommendationRow: View {
                     .emberDisplaySmall(17)
                     .foregroundStyle(Ember.cream)
                     .lineLimit(1)
-                Spacer()
+                Spacer(minLength: 12)
                 Text("\(TimeFormat.budget(Int(item.averageDailyMinutes.rounded())))/day")
                     .emberNumerals(13)
+                    .lineLimit(1)
             }
             Text(Self.whereItGoes(item))
                 .emberBody(13)
                 .foregroundStyle(Ember.muted)
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Eyebrow(text: "Suggested", color: Ember.amber)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 8) {
+                    Eyebrow(text: "Suggested", color: Ember.amber)
+                    if item.lateNightShare >= 0.5 {
+                        Eyebrow(text: "Mostly late at night", color: Ember.ember)
+                    }
+                }
                 Text(TimeFormat.rule(item.rule))
                     .emberBody(13)
                     .foregroundStyle(Ember.cream)
-            }
-            if item.lateNightShare >= 0.5 {
-                Eyebrow(text: "Mostly late at night", color: Ember.ember)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// "Mostly 10:00 PM–1:00 AM weekdays; 2:00 PM–3:00 PM weekends, 14 pickups a day."
@@ -106,6 +101,8 @@ struct FocusView: View {
                         Text(TimeFormat.rule(advice.rule))
                             .emberBody(12)
                             .foregroundStyle(Ember.cream)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 } else {
                     Text("Under \(Int(UsageAnalysis.minimumDailyMinutes)) minutes a day. Nothing to cut.")
@@ -119,7 +116,9 @@ struct FocusView: View {
             }
         }
         .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .reportCard()
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 }
 

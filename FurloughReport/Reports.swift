@@ -2,20 +2,47 @@ import DeviceActivity
 import ExtensionKit
 import SwiftUI
 
-// The contexts these scenes answer to, `.cutback` and `.focus`, live in Shared/Usage: the app
-// names one when it hosts a DeviceActivityReport, and this extension matches it here.
+// The contexts these scenes answer to, `.rank(n)` and `.focus`, live in Shared/Usage: the app
+// names one when it hosts a DeviceActivityReport, and the scene here with the same context
+// draws it.
 
-/// Ranks everything Screen Time hands over and suggests a rule for the heaviest few.
+/// What a rank slot draws: the recommendation at that position, or nothing, and enough about
+/// the rest to say why nothing.
+struct RankSlot: Sendable {
+    var position: Int
+    var item: Recommendation?
+    /// How many positions have something.
+    var count: Int
+    var days: Int
+}
+
+/// One row of the ranking. Five of these exist (`UsageAnalysis.rankLimit`), each its own
+/// report, so the app can give every row a fixed height and nothing is squeezed or clipped:
+/// a report cannot tell its host how tall it wants to be.
 ///
 /// `nonisolated`: `AppExtensionScene` is a main-actor protocol, so a scene would otherwise be
 /// inferred onto the main actor, and the extension's `body`, which is not, could not build it.
 /// Off the main actor is also where the walk over a fortnight of segments belongs.
-nonisolated struct CutbackReport: DeviceActivityReportScene {
-    let context: DeviceActivityReport.Context = .cutback
-    let content: (UsageSummary) -> CutbackView
+nonisolated struct RankReport: DeviceActivityReportScene {
+    let position: Int
+    let content: (RankSlot) -> RankView
 
-    func makeConfiguration(representing data: DeviceActivityResults<DeviceActivityData>) async -> UsageSummary {
-        await UsageCollector.summary(of: data)
+    var context: DeviceActivityReport.Context { .rank(position) }
+
+    init(_ position: Int, content: @escaping (RankSlot) -> RankView) {
+        self.position = position
+        self.content = content
+    }
+
+    func makeConfiguration(representing data: DeviceActivityResults<DeviceActivityData>) async -> RankSlot {
+        let summary = await UsageCollector.summary(of: data)
+        let advice = summary.recommendations
+        return RankSlot(
+            position: position,
+            item: position <= advice.count ? advice[position - 1] : nil,
+            count: advice.count,
+            days: summary.totalDays
+        )
     }
 }
 

@@ -2,11 +2,15 @@ import DeviceActivity
 import ManagedSettings
 import SwiftUI
 
-/// The two reports the app hosts and the extension draws. The app names one when it makes a
+/// The reports the app hosts and the extension draws. The app names one when it makes a
 /// `DeviceActivityReport`; the scene in FurloughReport with the same context answers it.
+/// A report cannot tell the app how tall its content is, so each one is shaped to fit a
+/// height the app already knows.
 extension DeviceActivityReport.Context {
-    /// The whole phone: the heaviest apps and sites and the rule each one would take.
-    static let cutback = Self("cutback")
+    /// The `position`-th heaviest app or site on the phone, 1 the heaviest, with the rule it
+    /// would take: one row, one report. The slot after the last worthwhile one says so; slots
+    /// past that draw nothing. `UsageAnalysis.rankLimit` says how many there are.
+    static func rank(_ position: Int) -> Self { Self("rank-\(position)") }
     /// One thing, which the app filters to its token: its hours, and the rule for it.
     static let focus = Self("focus")
 }

@@ -115,6 +115,8 @@ enum UsageAnalysis {
     static let budgetKeep = 0.5
     /// Under this many minutes a day there is nothing worth a rule.
     static let minimumDailyMinutes = 10.0
+    /// How many of the heaviest are ranked: one report slot each on the usage screen.
+    static let rankLimit = 5
     /// 10 PM to 4 AM.
     static let lateHours: Set<Int> = [22, 23, 0, 1, 2, 3]
     /// The day groups a suggestion tells apart. School nights and weekends differ; anything
@@ -217,7 +219,7 @@ enum UsageAnalysis {
 
     /// The heaviest first, at most `limit` of them, and only those worth a rule. Equal minutes
     /// fall back to the key, so the order never depends on how the input was gathered.
-    static func rank(_ entries: [(key: String, name: String, histogram: UsageHistogram)], limit: Int = 5) -> [Recommendation] {
+    static func rank(_ entries: [(key: String, name: String, histogram: UsageHistogram)], limit: Int = rankLimit) -> [Recommendation] {
         let ranked = entries
             .compactMap { recommendation(key: $0.key, name: $0.name, histogram: $0.histogram) }
             .sorted { a, b in

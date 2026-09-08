@@ -12,7 +12,13 @@ import SwiftUI
 @main
 struct FurloughReport: DeviceActivityReportExtension {
     var body: some DeviceActivityReportScene {
-        CutbackReport { CutbackView(summary: $0) }
+        // One scene per rank slot: as many as UsageAnalysis.rankLimit. A result builder
+        // cannot loop, so they are spelled out.
+        RankReport(1) { RankView(slot: $0) }
+        RankReport(2) { RankView(slot: $0) }
+        RankReport(3) { RankView(slot: $0) }
+        RankReport(4) { RankView(slot: $0) }
+        RankReport(5) { RankView(slot: $0) }
         FocusReport { FocusView(summary: $0) }
     }
 }
