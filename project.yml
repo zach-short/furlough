@@ -417,6 +417,13 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        # The app carries this key too, and macOS refuses the activation without it *here*:
+        # "extensions belonging to the com.apple.system_extension.network_extension category
+        # require the presence of the 'NSSystemExtensionUsageDescription' property", thrown
+        # before anything is asked of the user, which is why nothing appeared under System
+        # Settings > Login Items & Extensions to approve. The string itself is never shown for
+        # a network extension — Apple's own engineers say so — but its absence is fatal.
+        NSSystemExtensionUsageDescription: Furlough's web filter refuses connections to a website outside its windows from every app on this Mac, including browsers it cannot read.
         # What NEProvider.startSystemExtensionMode reads: the Mach service the extension
         # listens on for the app, and the provider class for the content-filter extension point.
         NetworkExtension:
