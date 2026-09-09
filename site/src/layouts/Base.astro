@@ -13,7 +13,8 @@ const { title, description = site.description } = Astro.props;
 const fullTitle = title ? `${title} · ${site.name}` : `${site.name} — ${site.tagline}`;
 // `site` in astro.config.mjs; without it the pages carry no canonical link or Open Graph image.
 const origin = Astro.site?.origin ?? '';
-const canonical = origin ? `${origin}${Astro.url.pathname.replace(/\/$/, '') || '/'}` : undefined;
+// Pages serves privacy/index.html at /privacy/ and redirects /privacy to it, so the canonical keeps the slash.
+const canonical = origin ? `${origin}${Astro.url.pathname}` : undefined;
 ---
 
 <!doctype html>

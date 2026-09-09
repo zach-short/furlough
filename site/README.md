@@ -24,8 +24,15 @@ bun run preview
 - `site` in `astro.config.mjs` is the public origin (`https://furloughapp.com`). The canonical
   link and the Open Graph image are built from it.
 
-Deploy the `site/` directory as a static site. On Vercel, import the repo with the root
-directory set to `site`; the framework is detected and the output is `dist/`.
+It is served by Cloudflare Pages, project `furlough`, which owns `furloughapp.com` and
+`furlough-4e1.pages.dev`. Deploys are direct uploads with wrangler, not git-linked:
+
+```bash
+bun run deploy   # astro build, then wrangler pages deploy dist --project-name furlough
+```
+
+Pages serves `privacy/index.html` at `/privacy/` and redirects `/privacy` to it, which is why
+the site links and canonicals carry the slash while the App Store fields may stay slashless.
 
 ## Pages
 
