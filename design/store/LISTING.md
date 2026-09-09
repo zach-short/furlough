@@ -487,12 +487,15 @@ Per the handoff, wording problems belong here rather than in a quiet edit.
    tomorrow at 8:00 PM". Only matters if a placeholder ever ships, which it must not, but the mock
    is the wrong voice to be checking the layout against.
 
-6. **`site/src/pages/privacy.astro` understates what the app now reads.** It says Screen Time
-   "usage is reported only as anonymous 'a limit was reached' signals". That was true before
-   `FurloughReport`. The report extension reads real per-app history, and on a device with App &
-   Website Usage data access the app reads it directly. Nothing leaves the phone either way, so
-   the *conclusion* still holds, but the sentence as written is no longer accurate and a privacy
-   policy is the wrong page to be loose on.
+6. ~~**`site/src/pages/privacy.astro` understates what the app now reads.**~~ **Fixed
+   2026-09-08.** It had said Screen Time "usage is reported only as anonymous 'a limit was
+   reached' signals", which was true before `FurloughReport` and is not true now. The old
+   sentence was replaced with an accurate account of the enforcement path (opaque tokens, budget
+   signals only) plus a new "Reading your usage history" section covering both paths the usage
+   step actually takes: the sandboxed report extension, which is the usual one and can pass
+   nothing back out, and direct reads where Apple grants the app that access. The conclusion is
+   unchanged and still true: it happens on the phone, is not kept, and there is no networking
+   code to send it with.
 
 7. **`site/src/site.ts` has `appStoreURL: null`.** Value to set once the listing is public is in
    the URLs section above.

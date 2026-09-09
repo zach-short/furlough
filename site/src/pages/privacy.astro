@@ -27,7 +27,15 @@ import { site } from '../site';
       <p>Deleting Furlough deletes all of it.</p>
 
       <h2>Screen Time data</h2>
-      <p>Furlough uses Apple's Screen Time APIs (Family Controls, Managed Settings and Device Activity) with your explicit permission, to apply the limits you set for yourself. Apple designs these so apps like Furlough never see which apps you use or for how long: your choices are represented by opaque tokens that cannot be turned back into app names, and usage is reported only as anonymous "a limit was reached" signals. That information stays on your device and is never transmitted.</p>
+      <p>Furlough uses Apple's Screen Time APIs (Family Controls, Managed Settings and Device Activity), with your permission, to apply the limits you set for yourself. The apps and sites you pick are represented by opaque tokens: Furlough is never told which ones they are, and a token cannot be turned back into an app name. While your rules are running, Screen Time tells Furlough only that a budget has been reached, never what you did.</p>
+
+      <h2>Reading your usage history</h2>
+      <p>One screen is an exception, and it is worth being exact about. <strong>Where your time went</strong> reviews the last fourteen days of your Screen Time history and suggests a rule for whatever is taking the most of it. That screen reads real per-app usage. Which part of Furlough reads it depends on your iPhone:</p>
+      <ul>
+        <li>Usually, only Furlough's report extension ever sees a number. Apple runs it in a sandbox isolated from the rest of the app, and nothing can be passed back out of it: not the hours, not which app they belong to, not even that you tapped a button.</li>
+        <li>Where Apple makes that history available to apps directly, and only if you approve it when iOS asks, Furlough reads the fourteen days itself and draws the cards without the extension.</li>
+      </ul>
+      <p>Either way the reading happens on your iPhone, is used only to draw that screen, and is not kept afterwards or sent anywhere. Furlough has no networking code, so it has no way to send it.</p>
 
       <h2>Children</h2>
       <p>Furlough is a tool for restricting your own device and asks for individual Screen Time authorization, which iOS grants only to an adult account. It is not a parental-control product and does not monitor anyone else.</p>
