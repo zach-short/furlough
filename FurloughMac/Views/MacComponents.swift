@@ -261,3 +261,51 @@ struct SheetFrame<Content: View>: View {
         .preferredColorScheme(.dark)
     }
 }
+
+/// The web filter's directions for whatever state it is in: where you stand, the steps out, and
+/// the trap, drawn from `WebFilter.Status.guidance` so onboarding and Settings > Web cannot word
+/// them differently. The numbers are the point — the two approvals are several scrolls apart in
+/// System Settings and one of them is under a heading you reach only by going past a list that
+/// looks like the end of the page.
+struct FilterDirections: View {
+    let guidance: WebFilter.Guidance
+    /// Onboarding has room to talk; the Settings card is a footnote under a row.
+    var size: CGFloat = 12.5
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(guidance.lead)
+                .emberBody(size)
+                .foregroundStyle(Ember.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            if !guidance.steps.isEmpty {
+                VStack(alignment: .leading, spacing: 7) {
+                    ForEach(Array(guidance.steps.enumerated()), id: \.offset) { index, step in
+                        HStack(alignment: .firstTextBaseline, spacing: 9) {
+                            Text("\(index + 1)")
+                                .emberBody(size - 1, .semibold)
+                                .monospacedDigit()
+                                .foregroundStyle(Ember.amber)
+                                .frame(width: 12, alignment: .trailing)
+                            Text(step)
+                                .emberBody(size)
+                                .foregroundStyle(Ember.cream)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+            }
+            if let caution = guidance.caution {
+                HStack(alignment: .firstTextBaseline, spacing: 7) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: size - 2.5, weight: .bold))
+                        .foregroundStyle(Ember.pending)
+                    Text(caution)
+                        .emberBody(size - 1)
+                        .foregroundStyle(Ember.faint)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+}

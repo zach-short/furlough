@@ -924,8 +924,11 @@ struct SettingsSheet: View {
 
                 SectionLabel(text: "Web")
                 filterCard
-                Footnote(text: filterFootnote)
+                Footnote(text: WebFilter.explainer)
                     .padding(.top, 8)
+                FilterDirections(guidance: model.enforcer.webFilter.status.guidance, size: 11.5)
+                    .padding(.horizontal, 8)
+                    .padding(.top, 10)
 
                 SectionLabel(text: "Browsers")
                 VStack(spacing: 0) {
@@ -1079,26 +1082,6 @@ struct SettingsSheet: View {
             }
         }
         .emberCard()
-    }
-
-    private var filterFootnote: String {
-        let what = "The web filter is a system extension that sees every connection this Mac opens and refuses the ones to a blocked site, from any app: Firefox, a site saved to the Dock, anything that loads a site outside a browser. Those get the floating card rather than the shield page."
-        switch model.enforcer.webFilter.status {
-        case .notInApplications:
-            return what + "\n\nmacOS only loads it from an app in the Applications folder. Move Furlough there and open it again."
-        case .notInstalled:
-            return what + "\n\nmacOS asks twice: once to allow the extension, under System Settings > General > Login Items & Extensions, and once to let it filter."
-        case .awaitingApproval:
-            return what + "\n\nAllow it under System Settings > General > Login Items & Extensions > Network Extensions, then check again here."
-        case .disabledInSettings:
-            return what + "\n\nIt was switched off in System Settings. Sites are enforced by the tab reader alone until it is turned on again, under General > Login Items & Extensions > Network Extensions."
-        case .filterOff:
-            return what + "\n\nThe extension is in place but macOS is not sending it any traffic. Turning it on asks the filtering question again."
-        case .failed(let reason):
-            return what + "\n\n" + reason
-        case .installing, .on:
-            return what + "\n\nWhile something is blocked, connections that cannot be named are refused over QUIC and the browser falls back to the ordinary kind, where the name can be read. That is invisible, and only while a rule is in force."
-        }
     }
 
     private func filterColor(_ status: WebFilter.Status) -> Color {

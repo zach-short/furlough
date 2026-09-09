@@ -18,13 +18,20 @@ struct MacOnboardingView: View {
                     .compositingGroup()
                     .frame(width: 150, height: 200)
                     .shadow(color: Ember.amber.opacity(0.45), radius: 32)
-                Group {
-                    switch step {
-                    case .promise: promise
-                    case .filter: filter
+                // Scrolls because the filter pane grows: six numbered steps and a caution is a
+                // taller column than the promise, and a step that falls off the bottom of a
+                // fixed window is a step nobody follows.
+                ScrollView(.vertical) {
+                    Group {
+                        switch step {
+                        case .promise: promise
+                        case .filter: filter
+                        }
                     }
+                    .frame(maxWidth: 460, alignment: .leading)
                 }
-                .frame(maxWidth: 460, alignment: .leading)
+                .scrollBounceBehavior(.basedOnSize)
+                .frame(maxWidth: 460)
             }
             .padding(40)
         }
@@ -79,20 +86,21 @@ struct MacOnboardingView: View {
                 .emberDisplay(36)
                 .foregroundStyle(Ember.cream)
                 .padding(.top, 6)
-            Text("Furlough reads the tabs of Safari and the Chromium browsers and sends a blocked one to its shield page. It cannot read Firefox, a site saved to the Dock as an app, or an app that loads a site on its own. The web filter closes those: a system extension that refuses the connection instead, from any app.")
-                .emberBody(14.5)
-                .foregroundStyle(Ember.muted)
-                .padding(.top, 14)
-            Text("macOS asks twice: once to allow the extension, under System Settings > General > Login Items & Extensions, and once to let it filter. Both are yours to give, and Settings > Web says where it stands afterwards.")
-                .emberBody(12.5)
-                .foregroundStyle(Ember.faint)
-                .padding(.top, 14)
-            if status != .notInstalled {
-                Text(statusLine(status))
-                    .emberBody(12.5, .semibold)
+            if status == .notInstalled {
+                Text("Furlough reads the tabs of Safari and the Chromium browsers and sends a blocked one to its shield page. It cannot read Firefox, a site saved to the Dock as an app, or an app that loads a site on its own. The web filter closes those: a system extension that refuses the connection instead, from any app.")
+                    .emberBody(14.5)
+                    .foregroundStyle(Ember.muted)
+                    .padding(.top, 14)
+            } else {
+                // Once Install has been pressed, what the filter is matters less than what is
+                // being waited on, and the steps need the room the paragraph was using.
+                Text(status.label)
+                    .emberBody(13, .semibold)
                     .foregroundStyle(status.isOn ? Ember.moss : Ember.pending)
-                    .padding(.top, 12)
+                    .padding(.top, 14)
             }
+            FilterDirections(guidance: status.guidance)
+                .padding(.top, 14)
             HStack(spacing: 10) {
                 switch status {
                 case .notInstalled, .failed:
@@ -103,7 +111,19 @@ struct MacOnboardingView: View {
                     Button("Not now") { model.finishOnboarding() }
                         .buttonStyle(.glass)
                 case .awaitingApproval, .disabledInSettings:
+                    // Check again is step 5, so it has to be on this screen and not only in
+                    // Settings > Web. A step that names a button the person cannot see is how
+                    // this pane went wrong in the first place.
                     Button("Open System Settings…") { WebFilter.openSystemSettings() }
+                        .buttonStyle(.glassProminent)
+                        .tint(Ember.ember)
+                    Button("Check again") { Task { await filter.refresh() } }
+                        .buttonStyle(.glass)
+                    Button("Continue") { model.finishOnboarding() }
+                        .buttonStyle(.glass)
+                        .keyboardShortcut(.defaultAction)
+                case .filterOff:
+                    Button("Turn the filter on") { Task { await filter.enableFilter() } }
                         .buttonStyle(.glassProminent)
                         .tint(Ember.ember)
                     Button("Continue") { model.finishOnboarding() }
@@ -113,7 +133,7 @@ struct MacOnboardingView: View {
                     Button("Continue") { model.finishOnboarding() }
                         .buttonStyle(.glass)
                         .keyboardShortcut(.defaultAction)
-                case .on, .filterOff, .notInApplications:
+                case .on, .notInApplications:
                     Button("Continue") { model.finishOnboarding() }
                         .buttonStyle(.glassProminent)
                         .tint(Ember.ember)
@@ -124,18 +144,5 @@ struct MacOnboardingView: View {
             .padding(.top, 24)
         }
         .task { await filter.refresh() }
-    }
-
-    private func statusLine(_ status: WebFilter.Status) -> String {
-        switch status {
-        case .on: "The web filter is on."
-        case .installing: "Installing… macOS will ask for your approval."
-        case .awaitingApproval: "Waiting for approval in System Settings > General > Login Items & Extensions > Network Extensions."
-        case .disabledInSettings: "The extension is switched off in System Settings."
-        case .filterOff: "The extension is in place but not filtering yet. Settings > Web can turn it on."
-        case .notInApplications: "macOS only loads the filter from an app in the Applications folder. Move Furlough there and open it again; Settings > Web has the button."
-        case .failed(let reason): reason
-        case .notInstalled: ""
-        }
     }
 }

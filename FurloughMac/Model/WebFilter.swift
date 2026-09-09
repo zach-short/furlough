@@ -44,7 +44,96 @@ final class WebFilter {
         }
 
         var isOn: Bool { self == .on }
+
+        /// What to do next, in the order it has to be done.
+        ///
+        /// Onboarding and Settings > Web both draw these rather than wording it twice, because
+        /// the one place this copy matters is the one place it was easy to get lost. On
+        /// 2026-09-09 the direction was a single sentence — "allow it under System Settings >
+        /// General > Login Items & Extensions > Network Extensions" — and Zach followed it,
+        /// landed on a page listing Furlough twice under *other* headings, found no Network
+        /// Extensions row without scrolling past a long list, and stopped. So the steps now say
+        /// where to scroll, what to click, what the switch is called, and which two rows are not
+        /// it. `failed` says the opposite of all that on purpose: when the activation is refused
+        /// nothing was ever asked of the person, and sending them to System Settings to look for
+        /// a prompt that was never made is the worst thing this screen can do.
+        var guidance: Guidance {
+            switch self {
+            case .notInApplications:
+                Guidance(
+                    lead: "macOS loads a system extension only from an app in the Applications folder.",
+                    steps: [
+                        "Quit Furlough.",
+                        "Move Furlough into Applications.",
+                        "Open it again and install the filter from Settings > Web."
+                    ]
+                )
+            case .notInstalled:
+                Guidance(
+                    lead: "Installing asks you for two things: the extension itself, in System Settings, and then permission to filter. Both are yours to give, and Settings > Web takes it back out whenever you like."
+                )
+            case .installing:
+                Guidance(lead: "Asking macOS. This takes a moment.")
+            case .awaitingApproval:
+                Guidance(
+                    lead: "macOS is waiting for you in System Settings. Nothing is filtered until this is done.",
+                    steps: Self.approvalSteps(verb: "Switch on"),
+                    caution: Self.notTheseTwo
+                )
+            case .disabledInSettings:
+                Guidance(
+                    lead: "The extension is installed and switched off, so websites are enforced by the tab reader alone.",
+                    steps: Self.approvalSteps(verb: "Switch back on"),
+                    caution: Self.notTheseTwo
+                )
+            case .filterOff:
+                Guidance(
+                    lead: "macOS has the extension but is sending it nothing to look at.",
+                    steps: [
+                        "Press Turn the filter on.",
+                        "Answer macOS's question, “Furlough would like to filter network content”, with Allow."
+                    ]
+                )
+            case .on:
+                Guidance(
+                    lead: "The web filter is on. Firefox, a site saved to the Dock, and anything else that opens a blocked address are refused the connection.\n\nWhile something is blocked, connections that cannot be named are refused over QUIC and the browser falls back to the ordinary kind, where the name can be read. That is invisible, and only while a rule is in force."
+                )
+            case .failed(let reason):
+                Guidance(
+                    lead: reason,
+                    caution: "Nothing was asked of you, and nothing is waiting in System Settings — the install was refused before macOS ever put a question up. There is nothing to allow until this is fixed."
+                )
+            }
+        }
+
+        /// The walk through System Settings, which is the same either way; only the switch's
+        /// position differs. Step 2 is the one that matters: the row sits under its own heading
+        /// below a list long enough to look like the end of the page.
+        private static func approvalSteps(verb: String) -> [String] {
+            [
+                "Open System Settings > General > Login Items & Extensions.",
+                "Scroll that page to the very bottom, past Open at Login and past the whole App Background Activity list.",
+                "Click the ⓘ button beside Network Extensions.",
+                "\(verb) Furlough Web Filter, and give macOS your password.",
+                "Come back here and press Check again.",
+                "Answer macOS's last question, “Furlough would like to filter network content”, with Allow. If it does not appear, press Turn the filter on."
+            ]
+        }
+
+        private static let notTheseTwo = "Furlough is listed twice further up that page, under Open at Login and under App Background Activity. Those are the app itself and the agent that reopens it after a Force Quit. Neither one is the filter, and switching them on does nothing for it."
     }
+
+    /// One state's directions: a line that says where you stand, the steps out of it, and the
+    /// trap it has, if it has one.
+    struct Guidance: Equatable {
+        var lead: String
+        var steps: [String] = []
+        var caution: String?
+    }
+
+    /// What the filter is, for the two screens that offer it. Separate from `Guidance`, which
+    /// only ever says what to do next.
+    static let explainer = "The web filter is a system extension that sees every connection this Mac opens and refuses the ones to a blocked site, from any app: Firefox, a site saved to the Dock, anything that loads a site outside a browser. Those get the floating card rather than the shield page."
 
     private(set) var status: Status = .notInstalled
     /// Set once Install is pressed and cleared by Remove, so a launch that finds the extension
