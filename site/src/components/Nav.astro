@@ -11,8 +11,8 @@ const cta = site.appStoreURL ? { href: site.appStoreURL, label: 'Get the app' } 
       <span>Furlough</span>
     </a>
     <nav class="links" aria-label="Site">
-      <a class="glass" href="/support/" aria-current={path === '/support' ? 'page' : undefined}>Support</a>
-      <a class="glass" href="/privacy/" aria-current={path === '/privacy' ? 'page' : undefined}>Privacy</a>
+      <a class="glass" href="/help/" aria-current={path === '/help' ? 'page' : undefined}>Help</a>
+      <a class="glass" href="/help/nfc-tags/" aria-current={path === '/help/nfc-tags' ? 'page' : undefined}>NFC tags</a>
       <a class="glass prominent" href={cta.href}>{cta.label}</a>
     </nav>
   </div>
@@ -36,7 +36,10 @@ const cta = site.appStoreURL ? { href: site.appStoreURL, label: 'Get the app' } 
   .links { display: flex; align-items: center; gap: 8px; }
   .links .glass { min-height: 36px; padding: 0 14px; font-size: 13px; }
   .links a[aria-current='page'] { background: linear-gradient(160deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.1)); }
-  @media (max-width: 560px) {
+  @media (max-width: 720px) {
+    .links a[href='/help/nfc-tags/'] { display: none; }
+  }
+  @media (max-width: 360px) {
     .links .glass:not(.prominent) { display: none; }
   }
 </style>

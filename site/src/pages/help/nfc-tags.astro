@@ -1,0 +1,106 @@
+---
+import Base from '../../layouts/Base.astro';
+import { site } from '../../site';
+
+// The one question the Anchor raises that the app cannot answer for you: which tag, and where
+// to keep it. /help/the-anchor/ covers using one; this covers buying one, and says plainly
+// that a Mac has no reader, since "how does the Anchor work on my Mac" has one answer and it
+// is "it does not".
+---
+
+<Base
+  title="NFC tags"
+  description="Which NFC tag to buy for Furlough's Anchor, what you may already own, and how tags work on iPhone and on the Mac."
+>
+  <section class="wrap page">
+    <header class="head" data-reveal>
+      <canvas class="mark" width="60" height="80" data-hourglass="anchored" data-still aria-hidden="true"></canvas>
+      <div class="eyebrow ember">Help · The Anchor</div>
+      <h1 class="display">You supply the tag. Almost any of them will do.</h1>
+      <p class="sub">Furlough for iPhone · the Anchor is optional, and nothing else depends on it</p>
+    </header>
+
+    <article class="card prose body" data-reveal style="--d: .1s">
+      <p>The <a href="/#anchor">Anchor</a> is a second list of apps you lock in one tap, from anywhere. The only thing that releases it is holding your iPhone to a physical NFC tag you paired beforehand. Furlough does not sell one and does not care which one you use. <a href="/help/the-anchor/">Using the Anchor</a> covers the lock; this page is about the key.</p>
+
+      <div class="note">
+        <p><strong>The tag is not a security device. It is a distance.</strong> Anyone could buy the same sticker; what stops you is that <em>yours</em> is in a drawer at home and you are not. Choose the walk, not the tag.</p>
+      </div>
+
+      <h2>What Furlough does with a tag</h2>
+      <ul>
+        <li>Pairing reads the identifier burned into the chip when it was made — a few bytes, unique to that tag, the same every time it is read.</li>
+        <li><strong>Nothing is ever written.</strong> The tag's memory is not touched, so one already carrying a URL, a business card or a Shortcut keeps doing that too.</li>
+        <li>Reading only happens in the foreground, on your tap, with Apple's own NFC sheet on the screen. Furlough never reads a tag in the background.</li>
+        <li>Up to three tags can be paired, each with a name. They are keys to one lock, not a sequence: any of them lifts the anchor, at once.</li>
+        <li>The identifier is all that is kept, and it stays on the phone. See the <a href="/privacy/">privacy policy</a>.</li>
+      </ul>
+
+      <h2>What to buy</h2>
+      <p>Search for <strong>NTAG213 stickers</strong> and buy the cheapest pack with decent reviews. That is the whole recommendation. A pack of ten is a few dollars and you only need one.</p>
+      <ul>
+        <li><strong>Memory does not matter.</strong> NTAG213, 215 and 216 differ only in how much you can write to them, and Furlough writes nothing. The smallest is the same tag for this purpose.</li>
+        <li><strong>The two families that work</strong> are the ones iOS polls for: ISO 14443 — every NTAG and MIFARE-style sticker, card and fob — and ISO 15693, the ICODE tags. Almost everything sold as "NFC tag" is the first.</li>
+        <li><strong>Pick the shape for the place.</strong> A sticker for the inside of a cupboard door, a keyfob for a jar, a card for a wallet you leave behind, a wristband for a drawer. This is the only choice that changes anything.</li>
+        <li><strong>Metal detunes a tag.</strong> A plain sticker on a fridge, a laptop lid or a tin will not read. Stick it to wood, card, glass or plastic, or buy tags sold as <em>on-metal</em>, which have a ferrite layer for exactly this.</li>
+        <li><strong>Outside or in a bathroom</strong>, buy the epoxy or PVC ones rather than paper stickers.</li>
+      </ul>
+
+      <h2>What you may already own</h2>
+      <ul>
+        <li>The tag that came with another blocking product, if you have one. It is an ordinary tag and Furlough reads it like any other.</li>
+        <li>NFC business cards, tags inside packaging, hotel and gym fobs, amiibo and other toys-to-life figures, most building access cards.</li>
+        <li>Anything at all, really: if it reads once during pairing it will read every time. The test is whether you will still have it in a year and whether it lives somewhere inconvenient.</li>
+      </ul>
+
+      <h2>What will not work</h2>
+      <ul>
+        <li><strong>Contactless bank cards and phone wallets.</strong> Many present a fresh random identifier on every tap, on purpose — pair one and you get a key that stops fitting. Do not use a payment card even if it seems to work.</li>
+        <li><strong>Passports and national ID cards.</strong> They are locked to readers that hold a key printed inside them.</li>
+        <li><strong>A second phone.</strong> An iPhone cannot pretend to be an ordinary tag for another iPhone to read.</li>
+        <li><strong>A QR code or a Bluetooth tracker.</strong> Neither is NFC; the phone has nothing to read.</li>
+      </ul>
+
+      <h2>How it works on iPhone</h2>
+      <p>No accessory, no Bluetooth, no pairing in Settings. Every iPhone that can run Furlough can read a tag — Core NFC has been in every model since the iPhone 7.</p>
+      <ol>
+        <li><strong>Pair.</strong> Anchor › <span class="path">Pair a tag</span>. Apple's sheet appears; hold the top of the phone, just behind the cameras, flat against the tag until it says the tag was read. Name it for its place, not for itself: <em>Kitchen drawer</em> tells you something, <em>Tag 2</em> does not.</li>
+        <li><strong>Anchor.</strong> One tap, from anywhere, no tag needed. Everything on the list is shielded immediately, and no delay applies, because anchoring only ever takes things away.</li>
+        <li><strong>Unanchor.</strong> Anchor › <span class="path">Unanchor</span> opens the same sheet. Any tag you paired lifts it instantly. This is the only unblock in Furlough, and it exists only here.</li>
+      </ol>
+      <p><strong>Pair every tag you want before you anchor.</strong> While the anchor is on, the app list and the tag list are both frozen — no key can be cut from under the lock — and <span class="path">Forget tag</span> is hidden for the same reason.</p>
+      <p>If a read fails: keep the phone still against the tag for a second rather than waving it, try the tag off any metal surface, and make sure the screen is on and unlocked. A thick case rarely matters; a metal or magnetic wallet on the back does.</p>
+
+      <h2>How it works on the Mac</h2>
+      <p><strong>It does not, and there is nothing to buy.</strong> No Mac has ever shipped an NFC reader, so Furlough for Mac has no Anchor at all. A one-tap lock released only by a tag would be a lock with no key on that machine, so it is not offered rather than half-offered.</p>
+      <ul>
+        <li>Everything else is there: apps and websites, windows per weekday, daily budgets, the four tiers and the same loosening delay. Apple's Screen Time API does not exist on macOS, so the Mac app enforces on its own — it counts the seconds an app or site is in front while the Mac is not idle, and quits or blocks it when the time is gone.</li>
+        <li><strong>Rules are per device and nothing syncs.</strong> Anchoring your phone does not touch your Mac, and a Mac rule is not a phone rule.</li>
+        <li>USB NFC readers exist, but Apple's Core NFC framework is iPhone-only, so Furlough cannot use one. If that ever changes, it changes.</li>
+        <li>Furlough for Mac is open source and built from source: <a href={site.githubURL} rel="noopener">the repository is here</a>.</li>
+      </ul>
+
+      <h2>Where to leave it</h2>
+      <p>This is the part that decides whether the Anchor does anything. A tag on your keyring is not a lock — it is a button you carry. Put it where getting to it is the point:</p>
+      <ul>
+        <li>At home, in a drawer, when what you want is for your phone to be quiet while you are out.</li>
+        <li>At the office, or with someone you trust, when what you want is your evenings back.</li>
+        <li>Three tags means a key at each place you actually live, which keeps the friction at "walk to the drawer" in both — rather than enough of them that one is always in reach.</li>
+      </ul>
+
+      <h2>If you lose every tag while anchored</h2>
+      <p>Buy another and pair it, and you are fine — for next time. A tag can only be paired while the anchor is off, so it will not release the anchor you are in now. That one is waited out or lifted the way everything in Furlough can be: <span class="path">Settings › Screen Time › Apps with Screen Time Access › Furlough › off.</span> Every shield lifts, your rules are kept, and turning it back on picks up where it left off. That escape is Apple's, it always works, and it is documented on purpose.</p>
+
+      <p class="contact">More: <a href="/support/">Support</a> · <a href="/privacy/">Privacy policy</a> · <a href={`mailto:${site.email}`}>{site.email}</a></p>
+    </article>
+  </section>
+</Base>
+
+<style>
+  .page { padding: clamp(24px, 6vh, 64px) 0 0; max-width: 760px; }
+  .mark { width: 60px; height: 80px; margin-bottom: 20px; }
+  .head h1 { margin-top: 12px; font-size: clamp(32px, 4.6vw, 52px); }
+  .sub { color: var(--faint); font-size: 14px; margin-top: 14px; }
+  .body { margin-top: 28px; padding: clamp(22px, 4vw, 36px); }
+  .contact { margin-top: 32px; padding-top: 18px; border-top: 1px solid var(--edge); font-size: 14px; }
+</style>
