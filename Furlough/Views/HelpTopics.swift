@@ -177,15 +177,17 @@ struct PickerHelp: View {
                 .padding(.top, 2)
 
             SectionLabel(text: "On the Mac")
-            HelpProse("The Mac has no picker at all — no Screen Time API to draw one from — so it reads instead: every window of Safari and the Chromium browsers, tab by tab, redirected to Furlough's shield the moment a blocked host shows up there. Three things stay out of its reach.")
+            HelpProse("The Mac has no picker at all — no Screen Time API to draw one from — so it reads instead: every window of Safari and the Chromium browsers, tab by tab, redirected to Furlough's shield the moment a blocked host shows up there. A tab is the whole of what that reader can see, and three things live outside it.")
                 .padding(.top, 2)
             HelpPoints([
-                .init("Firefox", "Not scriptable the way the others are, so a site with a rule stays open in it."),
+                .init("Firefox", "Not scriptable the way the others are, so none of its tabs can be read."),
                 .init("Safari web apps in the Dock", "They run under their own identifier rather than Safari's, so the same host inside one is not caught."),
                 .init("Anything without a tab", "An app with its own network code is invisible to a reader built on browser windows."),
             ])
             .padding(.top, 10)
-            Footnote(text: "Closing those gaps means reading network traffic rather than tabs, which is a heavier mechanism than the one that runs today. Written for how the Mac works now.")
+            HelpProse("The Mac's web filter covers all three. It is a system extension that sees every connection the Mac opens and refuses the ones going to a blocked site, whichever app opened it; those get Furlough's floating card rather than the shield page. It is switched on in Settings > Web on the Mac, needs Furlough in the Applications folder, and macOS asks twice before it runs.")
+                .padding(.top, 10)
+            Footnote(text: "The filter is built and tested but has not been run on a Mac yet, since installing a system extension takes two approvals in front of the screen. If what you see differs from this, that is the thing worth writing in about.")
                 .padding(.top, 8)
         }
     }

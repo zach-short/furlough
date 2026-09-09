@@ -6,7 +6,8 @@ import { site } from '../../site';
 // not just Furlough's, and three of them are worth a workaround; Phone is not, and this page
 // says why not rather than pretending there is one. The Mac's own gaps are a different
 // mechanism (Apple Events, not a picker) but the same idea — where Furlough cannot reach —
-// so they get a section here rather than a page of their own.
+// so they get a section here rather than a page of their own. That section is now two
+// mechanisms deep: what the tab reader misses, and the web filter that covers it.
 ---
 
 <Base
@@ -45,13 +46,15 @@ import { site } from '../../site';
       <p>Phone is left out of the picker too, and Furlough leaves it alone on purpose rather than offering the same trick. A phone you cannot call out from is not a commitment device, it is a hazard — and Furlough already treats an app that carries something you might need in an emergency as worth a warning, never a block. If Phone itself is the distraction, the honest answer is that Furlough is not the tool for that part.</p>
 
       <h2>On the Mac</h2>
-      <p>The Mac has no picker at all — no Screen Time API to draw one from — so it reads instead: every window of Safari and the Chromium browsers (Chrome, Arc, Brave, Edge, Vivaldi, Opera, Dia), tab by tab, redirected to Furlough's shield the moment a blocked host shows up there.</p>
+      <p>The Mac has no picker at all — no Screen Time API to draw one from — so it reads instead: every window of Safari and the Chromium browsers (Chrome, Arc, Brave, Edge, Vivaldi, Opera, Dia), tab by tab, redirected to Furlough's shield the moment a blocked host shows up there. A tab is the whole of what that reader can see, and three things live outside it.</p>
       <ul>
-        <li><strong>Firefox</strong> is not scriptable the way the others are, so a site with a rule stays open there.</li>
+        <li><strong>Firefox</strong> is not scriptable the way the others are, so none of its tabs can be read.</li>
         <li><strong>Safari web apps saved to the Dock</strong> run under their own identifier rather than Safari's, so the same host inside one of those is not caught either.</li>
         <li><strong>Anything that reaches a blocked host without a browser tab</strong> — an app with its own network code — is invisible to a reader built on browser windows.</li>
       </ul>
-      <p>Closing those gaps means reading network traffic rather than tabs, which is a different, heavier mechanism than what runs today. Written for how the Mac works right now; if that changes, this paragraph does too.</p>
+      <p>The web filter covers all three. It is a system extension that watches every connection this Mac opens and refuses the ones going to a site you have blocked, whichever app opened it — so Firefox, a web app in the Dock and an app loading a site on its own are all enforced once it is on. They get Furlough's floating card rather than the shield page, since there is no tab to redirect.</p>
+      <p>It is yours to turn on rather than something Furlough installs behind you. Furlough has to be in your Applications folder, and macOS asks twice: once to allow the extension, under <span class="path">System Settings › General › Login Items &amp; Extensions</span>, and once to let it filter. Inside Furlough, <span class="path">Settings › Web</span> says where it stands and takes it back off again.</p>
+      <p><strong>Not yet run on a Mac.</strong> The filter is built and tested, but installing a system extension takes two approvals in front of the screen and nobody has given them yet. If what you see differs from this, that is the thing to fix here.</p>
 
       <p class="contact">More: <a href="/help/apps-and-websites/">Apps and websites</a> · <a href="/help/">All help</a> · <a href={`mailto:${site.email}`}>{site.email}</a></p>
     </article>

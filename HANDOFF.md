@@ -1494,9 +1494,12 @@ The plan for this stretch. Tick each phase off here as it lands.
     the pass-off's items 8a and 10 in one session, no Xcode.
 
     A new page, `site/src/pages/help/beyond-the-picker.astro`, linked from
-    `site/src/pages/help/index.astro` and from `Furlough/Views/HelpView.swift`'s rules card
-    (`page: "beyond-the-picker"`, through `Furlough.helpURL(_:)`; the app itself still makes no
-    network request — the row hands the address to Safari, same as every other site link). It
+    `site/src/pages/help/index.astro`. It was also linked out of `Furlough/Views/HelpView.swift`
+    through a `Furlough.helpURL(_:)` row; commit `70781e0` ("bring every help page back into the
+    app") then took every outbound help link out, so `helpURL` no longer exists and no Swift file
+    holds a `/help/` path. The in-app counterpart is `PickerHelp` in `Furlough/Views/HelpTopics.swift`,
+    reached from HelpView's rules card, and the two copies have to be edited together — the
+    literal-mismatch trap the pass-off warned about is gone, but the duplication replaced it. It
     covers the four apps Apple's picker never offers, on any Screen Time app, not only
     Furlough's: **Safari** itself (Furlough already reaches it by blocking sites inside it, one
     domain at a time — no single switch closes all of Safari's web today; the everything-except
@@ -1509,8 +1512,12 @@ The plan for this stretch. Tick each phase off here as it lands.
     you cannot call out from is a hazard, not a commitment device, and that is the honest answer
     rather than a trick that happens to work. A section "On the Mac" covers the same idea for
     `Browsers.snapshots()`: Safari and the Chromium browsers by tab, not Firefox (not scriptable),
-    not a Safari web app in the Dock (its own bundle id), not a non-browser app's own network code
-    — item 8b's content filter would close the last one if it ever lands; written for today.
+    not a Safari web app in the Dock (its own bundle id), not a non-browser app's own network code.
+    **Updated 2026-09-09** once step 26's web filter landed, which closes all three rather than only
+    the last: both copies now name the filter, say it is opt-in (Applications folder, two macOS
+    approvals, `Settings > Web`), and say those flows get the floating card rather than the shield
+    page. Both carry the same "not yet run on a Mac" note step 26 does; when Zach runs it, that
+    note comes off here and on the site.
 
     **Not yet run on a phone.** The Shortcuts automation steps are written from how personal
     automations work, not from having built one. The task said plainly not to publish steps

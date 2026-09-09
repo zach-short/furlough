@@ -156,6 +156,9 @@ h3.display { font-family: var(--display-small); font-weight: 600; font-size: 19p
 .prose p, .prose li { color: var(--muted); font-size: 16px; line-height: 1.65; }
 .prose p + p { margin-top: 12px; }
 .prose ul, .prose ol { margin: 10px 0 0; padding-left: 22px; }
+/* A list has no bottom margin, so a paragraph after one would sit against the last bullet;
+   give it the same gap two paragraphs get. */
+.prose ul + p, .prose ol + p { margin-top: 12px; }
 .prose li + li { margin-top: 6px; }
 .prose li::marker { color: var(--faint); }
 .prose strong { color: var(--cream); }
