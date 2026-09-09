@@ -66,6 +66,16 @@ enum AnchorSync {
     /// heard from, a Mac drop would be a lock with no key, and `macDrop` refuses it.
     static var phoneSeen: Bool { SharedStore.defaults.bool(forKey: phoneSeenKey) }
 
+    #if DEBUG || TESTING_TOOLS
+    /// Forgets that a phone has ever written the record, for Settings > Testing > Reset
+    /// everything on the Mac. Without it a reset Mac would still take a drop that a fresh
+    /// install refuses, and `macDrop`'s lock-with-no-key guard would be untestable after the
+    /// first sync.
+    static func forgetPhone() {
+        SharedStore.defaults.removeObject(forKey: phoneSeenKey)
+    }
+    #endif
+
     static func record(_ anchor: AnchorProfile, origin: AnchorRecord.Origin, now: Date) -> AnchorRecord {
         AnchorRecord(
             sequence: anchor.sequence,

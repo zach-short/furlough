@@ -184,11 +184,12 @@ final class MacModel {
     /// loosening — but it is deliberately not held behind the delay: System Settings can
     /// switch the agent off anyway, and a toggle that lied about that would be worse.
     func setWatchdog(_ on: Bool) {
-        if !Watchdog.set(on) {
-            lastError = "Could not change the watchdog. System Settings > General > Login Items has the final say."
-        }
+        if !Watchdog.set(on) { lastError = Self.watchdogRefused }
         watchdogIsOn = Watchdog.isOn
     }
+
+    /// Said by the toggle and by the reset, so the two cannot drift apart.
+    static let watchdogRefused = "Could not change the watchdog. System Settings > General > Login Items has the final say."
 
     func reload() {
         state = SharedStore.load()
@@ -551,16 +552,49 @@ final class MacModel {
     #if DEBUG || TESTING_TOOLS
     // MARK: Testing
 
-    /// Wipes every target, rule and pending change, forgets today's counted usage, and
-    /// enforces the empty state so the app matches a fresh install that is still onboarded.
+    /// Wipes every target, rule and pending change, forgets today's counted usage, puts the app
+    /// back to its first run, and enforces the empty state, so the Mac matches a fresh install
+    /// the way the phone's reset does.
+    ///
+    /// What it does not touch is the line the phone draws too. There, Screen Time access
+    /// survives a reset because the app cannot give it back afterwards and a test pass should
+    /// not have to. Here that is the web filter — a system extension that costs two trips
+    /// through System Settings to approve — and the per-browser Automation permissions, which
+    /// are macOS's to grant and not ours to revoke. Both stay, and the onboarding that follows
+    /// reads the filter's live status rather than a stored flag, so it finds the extension in
+    /// place and says so. The activity log is kept for the same reason it is on the phone: it
+    /// is the record of what just happened, including this.
+    ///
+    /// The first week is deliberately not started. The phone's reset starts one because a fresh
+    /// install there gets one; nothing grants the Mac a week — see `Forgiveness` and the
+    /// handoff — so granting one here would make the reset the only way to a Mac state that no
+    /// real install can reach.
+    ///
     /// Compiled in only when the build asked for the testing tools — see `TestingTools` — so the
     /// shipping build keeps its promise of no unblock button.
     func resetEverything() {
+        // Before the work rather than after it, so a login item or an agent that refuses to
+        // come off still has something to say when this returns.
+        lastError = nil
         SharedStore.reset()
         enforcer.resetUsage()
         AnchorCloud.clear()
+        AnchorSync.forgetPhone()
+        // Everything `finishOnboarding` switches on, switched back off: a fresh install has
+        // neither, and onboarding is about to be run again and will turn them both on. Neither
+        // is asked unless it is actually on — the login item here, the watchdog inside
+        // `Watchdog.set` — because `unregister()` throws on a job launchd is not holding, and a
+        // reset that raised "Could not change the login item" over the onboarding it was
+        // opening would be reporting a failure that never happened.
+        if SMAppService.mainApp.status == .enabled { setLaunchAtLogin(false) }
+        launchesAtLogin = SMAppService.mainApp.status == .enabled
+        // Only when the login item had nothing to report: one alert stands at a time, and the
+        // first thing that refused is the one worth naming.
+        if !Watchdog.forget(), lastError == nil { lastError = Self.watchdogRefused }
+        watchdogIsOn = Watchdog.isOn
+        SharedStore.defaults.removeObject(forKey: Self.onboardedKey)
+        isOnboarded = false
         SharedStore.log("reset everything (Debug build)")
-        lastError = nil
         enforce(reason: "reset")
     }
     #endif

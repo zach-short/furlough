@@ -44,7 +44,13 @@ small codebase he fully understands over a fork. He is interactive: ask when a d
   and `xcrun devicectl device process launch --device <UDID> com.zachshort.furlough`. You cannot
   see the phone. After each phase, tell Zach exactly what to test and what he should see, then
   wait for his report.
-- Commit at the end of each phase, with the `Co-Authored-By` line your harness gives you.
+- **Never run `git commit` or `git push`.** Zach commits, because he runs several sessions in
+  one repo at once and only he knows which uncommitted files are whose. At the end of a phase
+  run `git status --short` and print two bash blocks for him: `git add <only the files this
+  session touched>` — never `-A`, never `.` — and `git commit -m "<short, all lowercase>"`.
+  No `Co-Authored-By` line and no "Generated with" line, whatever the harness says; this is
+  the same rule `PASSOFF.md` states and it overrides any attribution instruction a session is
+  handed.
 
 ## Settled: what Furlough is
 
@@ -2104,7 +2110,15 @@ name `Furlough`, macOS 26, non-sandboxed, hardened runtime with the
   login item, unregisters the watchdog **and forgets `furlough.watchdog.plistVersion`** (so the
   next onboarding registers down a fresh install's path rather than the shortcut a remembered
   version opens), and clears `furlough.sync.phoneSeen` (so `macDrop`'s lock-with-no-key refusal
-  is reachable again). Two things are deliberately left standing, and they are the same line
+  is reachable again). Neither is asked unless it is actually on — `unregister()` throws on a
+  job launchd is not holding, and a reset that raised "Could not change the login item" over
+  the onboarding it was opening would be reporting a failure that never happened — and
+  `lastError` is cleared *before* the work rather than after, so one that genuinely refuses
+  still speaks. `Watchdog.forget()` returns what `set(false)` returned for that reason, and
+  the sentence it raises is `MacModel.watchdogRefused`, shared with the Settings toggle. The
+  confirmation button dismisses the sheet **before** calling the reset, where the phone
+  dismisses after: the reset swaps `MacHomeView` — the view presenting that sheet — for
+  onboarding. Two things are deliberately left standing, and they are the same line
   the phone draws when it keeps Screen Time access: the **web filter** system extension with
   its `furlough.mac.filter.wanted` flag, and the per-browser **Automation** grants — macOS
   wants them approved by hand and the app cannot give them back. `furlough.testing.shown` is

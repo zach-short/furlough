@@ -79,6 +79,23 @@ enum Watchdog {
         Task.detached { await replaceRegistration() }
     }
 
+    #if DEBUG || TESTING_TOOLS
+    /// Takes the agent away and forgets which plist went in, for Settings > Testing > Reset
+    /// everything. Forgetting the version matters as much as unregistering: a fresh install has
+    /// no record either, so the onboarding that follows registers down the same path a real
+    /// first run takes rather than the shortcut a remembered version opens.
+    ///
+    /// Returns what `set` returned, so a reset can say that the agent refused to come off. The
+    /// version is forgotten either way: an agent still running an old plist is exactly the one
+    /// the next onboarding should register again from scratch.
+    @discardableResult
+    static func forget() -> Bool {
+        let off = set(false)
+        SharedStore.defaults.removeObject(forKey: versionKey)
+        return off
+    }
+    #endif
+
     /// Takes the agent away and puts it back, for a launch that finds the bundled plist changed.
     ///
     /// Registering over a job launchd already holds updates its arguments but not the code

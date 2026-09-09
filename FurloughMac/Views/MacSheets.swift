@@ -883,11 +883,15 @@ struct SettingsSheet: View {
         #if DEBUG || TESTING_TOOLS
         .confirmationDialog("Reset everything?", isPresented: $confirmReset, titleVisibility: .visible) {
             Button("Reset everything", role: .destructive) {
-                model.resetEverything()
+                // Dismissed before the reset, where the phone does it after. The reset puts the
+                // Mac back to onboarding, which swaps `MacHomeView` — the view presenting this
+                // sheet — out from under it; closing while the presenter is still there leaves
+                // AppKit nothing to tidy up after.
                 dismiss()
+                model.resetEverything()
             }
         } message: {
-            Text("Every app, rule and pending change is forgotten, along with today's usage. Furlough stays set up and keeps running.")
+            Text("Every app, website, rule and pending change is forgotten, along with today's usage and the Anchor, and Furlough goes back to its first run. The web filter and the browser permissions you have given macOS are kept.")
         }
         #endif
     }
@@ -1028,7 +1032,7 @@ struct SettingsSheet: View {
                         }
                     }
                     .emberCard()
-                    Footnote(text: "Not in the shipping build. Reset everything forgets every app, website, rule, pending change and today's usage, and lifts every block.\n\nHide these buttons puts this section away. Show testing buttons, or five clicks on Version under Help > About, brings it back.")
+                    Footnote(text: "Not in the shipping build. Reset everything forgets every app, website, rule, pending change, the Anchor and today's usage, lifts every block, takes the login item and the watchdog back off, and returns to onboarding — a fresh install, apart from the web filter and the browser permissions, which macOS would make you grant again and which are kept.\n\nHide these buttons puts this section away. Show testing buttons, or five clicks on Version under Help > About, brings it back.")
                         .padding(.top, 8)
                         .padding(.bottom, 20)
                 } else {

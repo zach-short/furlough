@@ -179,7 +179,7 @@ Limits to know about:
 
 ## Testing builds
 
-Debug builds, which is what Xcode and the commands above produce, add **Settings > Testing > Reset everything**. After a confirmation it forgets every app, rule, pending change and the Anchor with its tag, lifts every shield, and leaves the app as it was right after allowing Screen Time access. Use it to start over after trying a week-long delay or a five-minute budget. The Mac app has the same button; there it also forgets today's counted minutes and today's usage, and the app stays set up and running.
+Debug builds, which is what Xcode and the commands above produce, add **Settings > Testing > Reset everything**. After a confirmation it forgets every app, rule, pending change and the Anchor with its tag, lifts every shield, and leaves the app as it was right after allowing Screen Time access. Use it to start over after trying a week-long delay or a five-minute budget. The Mac app has the same button and it goes the same distance: it also forgets today's counted minutes, takes the login item and the watchdog agent back off, and returns to onboarding. What it keeps is the Mac's equivalent of the Screen Time access the phone keeps — the web filter system extension and the per-browser Automation permissions, both of which macOS would make you approve again by hand.
 
 It is compiled out of Release builds, so a build you mean to live with keeps its promise of no unblock button. A Release build that should carry it — a TestFlight round where wiping the setup on the phone is the point — has to ask by name:
 
