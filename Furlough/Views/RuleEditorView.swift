@@ -191,6 +191,7 @@ struct RuleEditorView: View {
             VStack(alignment: .leading, spacing: 0) {
                 if let target {
                     header(target)
+                    undoCard(target)
                     nudge(target)
                     nicknameCard
                     if !target.kind.isCategory {
@@ -318,6 +319,10 @@ struct RuleEditorView: View {
         }
         EffectBanner(kind: effect(for: target))
             .padding(.top, 14)
+        if let preview = consequence(for: target) {
+            ConsequenceCard(preview: preview)
+                .padding(.top, 10)
+        }
         ProminentButton(title: "Save") { attemptSave() }
             .disabled(!hasChanges || draft.validationError != nil || limitReason != nil)
             .padding(.top, 10)
@@ -627,6 +632,35 @@ struct RuleEditorView: View {
         if target.rule?.isEquivalent(to: draft) ?? false { return .nicknameOnly }
         if Policy.classify(newRule: draft, against: target) == .tightening { return .tightening }
         return .loosening(model.clock.now.addingTimeInterval(model.state.config.delay(for: target)))
+    }
+
+    /// The edit on this target that has not set yet, if there is one. Its own function, and a
+    /// `@ViewBuilder` one, for the reason the sections below are: this body is a single
+    /// expression to the type checker and it has been over its budget before.
+    @ViewBuilder
+    private func undoCard(_ target: Target) -> some View {
+        if let undo = model.undo(for: targetID) {
+            UndoCard(
+                name: target.displayName,
+                restoresNothing: undo.rule == nil,
+                deviceExpiry: model.clock.device(undo.expiresAt)
+            ) {
+                model.undoRule(for: targetID)
+                // The draft on screen is the rule that was just taken back, so it is reloaded
+                // rather than left showing the edit that no longer exists.
+                loaded = false
+                load()
+            }
+            .padding(.top, 12)
+        }
+    }
+
+    /// What the draft would do today and what taking it back would cost, or nil when there is
+    /// nothing worth saying — a loosening (the banner above already answers for those), a rule
+    /// that will not save, or no change at all.
+    private func consequence(for target: Target?) -> Consequence.Preview? {
+        guard hasChanges, draft.validationError == nil, limitReason == nil else { return nil }
+        return Consequence.preview(rule: draft, for: target, config: model.state.config, now: model.clock.now)
     }
 
     private func removalNote(_ target: Target) -> String {
@@ -1287,6 +1321,87 @@ struct MergeOffer: View {
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(Ember.amber.opacity(0.35), lineWidth: 1)
+        )
+    }
+}
+
+/// The way back out of an edit that has not set yet.
+///
+/// It is not an unblock and must never read as one: it puts the rule back exactly as it was a
+/// quarter of an hour ago, so the only person it can help is the one who did not mean it. The
+/// countdown is the honest part — this closes, and it says when.
+struct UndoCard: View {
+    let name: String
+    /// True when the edit was this target's first rule, so undoing leaves it enforcing nothing.
+    let restoresNothing: Bool
+    /// The expiry on the *device's* clock, because the system renders this timer itself and
+    /// knows nothing about Furlough's. `Clock.Reading.device` is what converts it.
+    let deviceExpiry: Date
+    let action: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Eyebrow(text: "Not set yet", color: Ember.pending, size: 10.5)
+                Spacer()
+                // Ticked here rather than handed to `Text(timerInterval:)`, which the system
+                // renders for itself, so the tick is on the device's clock — hence
+                // `deviceExpiry`. `TimeFormat.countdown` is the same Geist Mono countdown the
+                // hero and the rows use, spelt out rather than reached through `emberNumerals`
+                // because that helper bakes in Cream and would win over a colour set after it.
+                // The palette's amber is for pending, and a window closing is exactly that.
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    Text(TimeFormat.countdown(from: context.date, to: deviceExpiry))
+                        .font(EmberFont.numerals(12))
+                        .monospacedDigit()
+                        .tracking(-0.02 * 12)
+                        .foregroundStyle(Ember.pending)
+                }
+            }
+            Text(restoresNothing
+                 ? "You just set the first rule for \(name). It can go back to enforcing nothing."
+                 : "You just changed \(name). It can go back to exactly the rule it had.")
+                .emberBody(12.5)
+                .foregroundStyle(Ember.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            GhostButton(title: "Undo this change", color: Ember.pending, action: action)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .emberCard()
+    }
+}
+
+/// What the rule on screen would do, said before it is saved rather than found out at ten past
+/// nine. Two sentences: today, and the cost of changing your mind.
+struct ConsequenceCard: View {
+    let preview: Consequence.Preview
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top, spacing: 9) {
+                Image(systemName: "calendar.day.timeline.left")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Ember.moss)
+                    .padding(.top, 1)
+                Text(preview.today)
+                    .emberBody(12.5, .semibold)
+                    .foregroundStyle(Ember.cream)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Text(preview.undoing)
+                .emberBody(11.5)
+                .foregroundStyle(Ember.faint)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.leading, 21)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 11)
+        .background(Ember.cardFill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Ember.cardBorder, lineWidth: 1)
         )
     }
 }

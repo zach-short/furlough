@@ -91,6 +91,8 @@ enum PendingNotifications {
             let name = config.target(id: targetID)?.displayName ?? "An app"
             let half = kind.hostName ?? "its other half"
             return "\(half) stops being blocked with \(name)."
+        case .setAnchorSchedules(let schedules):
+            return "The anchor's schedule becomes: \(TimeFormat.anchorSchedules(schedules, calendar: calendar))."
         }
     }
 

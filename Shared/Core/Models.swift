@@ -456,6 +456,31 @@ enum TargetKind: Codable, Hashable {
     }
 }
 
+/// The rule an edit replaced, and when it landed. What makes a change takeable-back for
+/// `Furlough.undoWindowMinutes` after it is saved.
+///
+/// It holds the rule that *was* there, never a looser one someone would like, and that is the
+/// whole of why it is safe: undo can only ever put a target back exactly where it stood before
+/// the edit. Someone who wants TikTok open cannot reach for it, because before the edit TikTok
+/// was shut too. So there is no count to spend, nothing to hoard, and nothing to negotiate with
+/// at 11 PM — which is what a pass count would have been.
+struct RuleUndo: Codable, Hashable {
+    /// The rule before the edit. Nil means the target had none at all: nothing was enforced,
+    /// and undoing puts it back to unconfigured.
+    var rule: Rule?
+    /// Furlough's own time when the edit landed, never the device's — `SharedState.now`.
+    var savedAt: Date
+
+    /// The moment it stops being takeable back.
+    var expiresAt: Date {
+        savedAt.addingTimeInterval(TimeInterval(Furlough.undoWindowMinutes) * 60)
+    }
+
+    /// Still open at `now`. Every reader asks this rather than trusting the field's presence:
+    /// `Policy.applyDuePending` clears expired ones, but it has not necessarily run.
+    func isOpen(at now: Date) -> Bool { now < expiresAt }
+}
+
 /// One app, website, or category that Furlough manages.
 struct Target: Codable, Hashable, Identifiable {
     var id = UUID()
@@ -492,6 +517,11 @@ struct Target: Codable, Hashable, Identifiable {
     /// added, so it says so rather than waiting to be told. A name Screen Time teaches later
     /// still wins — `SharedStore.load` folds the learned names over the top.
     var systemName: String?
+    /// What this target's rule was before the edit that is still takeable back, or nil when
+    /// there is nothing to undo. Written only where a rule lands *now*; a loosening that
+    /// finally arrives after its delay leaves this alone, because undoing a loosening is a
+    /// tightening and those are already instant.
+    var undo: RuleUndo?
     /// The tier Zach put this in, or nil while he has not said. Stored optional for the same
     /// reason `systemName` is: a synthesised `init(from:)` demands every non-optional key, and
     /// state written before tiers existed has none. Read it through `utility`.
@@ -565,10 +595,38 @@ struct PairedTag: Codable, Equatable, Identifiable {
 /// from the app; weighing anchor needs one of the paired tags. This is the only unblock path in
 /// Furlough, and it exists only here: rule-based targets never get one. While anchored, the list
 /// and the tags cannot be changed.
+///
+/// Since 2026-09-09 the anchor has a `scope`: the list, or the whole phone except the list.
+/// One list, read the right way round by `holds`, so everything downstream asks the anchor
+/// what it takes away rather than reading `kinds` for itself.
 struct AnchorProfile: Codable, Equatable {
+    /// How far the anchor reaches when it drops.
+    enum Scope: String, Codable, CaseIterable, Sendable {
+        /// The listed kinds and nothing else: what the anchor has always done.
+        case chosen
+        /// Every app and every website on the phone, except the listed kinds. `kinds` is the
+        /// allowlist under this scope, and it starts from every target tiered Essential
+        /// (`Config.essentialKinds`) so that Messages and the authenticator stay reachable
+        /// unless someone takes them off it on purpose.
+        case everythingExcept
+    }
+
+    var scope: Scope = .chosen
+    /// Under `.chosen`, what the anchor holds. Under `.everythingExcept`, what it lets through.
     var kinds: [TargetKind] = []
     var isAnchored = false
     var anchoredAt: Date?
+    /// When a timed anchor lifts by itself, or nil for the tag alone. Read it through
+    /// `isHolding(at:)`: an `until` already past is released whatever `isAnchored` says, and
+    /// the next reconcile clears the flag. Since 2026-09-09.
+    var until: Date?
+    /// Times of day at which the anchor drops by itself, on their days. The monitor extension
+    /// performs them (`Policy.scheduledDrop`); the app registers their wakes. Since 2026-09-09.
+    var schedules: [AnchorSchedule] = []
+    /// One higher on every drop and every release, on either device, and moved on to whatever
+    /// the other device last wrote: the clock `AnchorSync.merge` orders records by. Since
+    /// 2026-09-09; a store without it starts at zero.
+    var sequence: Int = 0
     /// Every tag that releases this anchor. They are keys to one lock, not a sequence: any of
     /// them lifts it, so a tag at each place you live keeps the friction at "walk to the drawer"
     /// in both. Capped at `Furlough.maxAnchorTags`, since the failure here is not two keys but
@@ -579,12 +637,35 @@ struct AnchorProfile: Codable, Equatable {
     /// Room for another key. Pairing is refused past the cap rather than evicting the oldest:
     /// silently dropping a key is how someone finds out at the drawer that it no longer opens.
     var canPairMore: Bool { tags.count < Furlough.maxAnchorTags }
+    /// How long the list is: what is held under the chosen scope, what stays open under the
+    /// other. Read `heldDescription` for a line a person sees.
     var count: Int { kinds.count }
+    /// The anchor is down over the whole phone when it drops, not over a list.
+    var anchorsEverything: Bool { scope == .everythingExcept }
+    /// Something to lock: a list, or the whole phone, which an empty allowlist still is where
+    /// an empty chosen list is nothing.
+    var hasSomethingToHold: Bool { anchorsEverything || !kinds.isEmpty }
     /// Ready to anchor: something to lock and a tag to unlock it with.
-    var canAnchor: Bool { !kinds.isEmpty && isPaired && !isAnchored }
+    var canAnchor: Bool { hasSomethingToHold && isPaired && !isAnchored }
+    /// Whether `kind` is on the list. Says nothing about whether it is held: read `holds`.
     func contains(_ kind: TargetKind) -> Bool { kinds.contains(kind) }
-    /// True when `kind` is blocked by the anchor right now.
-    func blocks(_ kind: TargetKind) -> Bool { isAnchored && contains(kind) }
+    /// Whether the anchor takes `kind` away when it drops: on the list under the chosen scope,
+    /// off the list under everything-except. The one place the list is read the right way
+    /// round, so nothing else has to know which way that is.
+    func holds(_ kind: TargetKind) -> Bool {
+        switch scope {
+        case .chosen: contains(kind)
+        case .everythingExcept: !contains(kind)
+        }
+    }
+    /// What the anchor holds, for the state line, the home card and the spoken answer:
+    /// "3 items", or "Everything except 3" — "Everything" when the allowlist is empty.
+    var heldDescription: String {
+        switch scope {
+        case .chosen: "\(kinds.count) \(kinds.count == 1 ? "item" : "items")"
+        case .everythingExcept: kinds.isEmpty ? "Everything" : "Everything except \(kinds.count)"
+        }
+    }
     /// The paired tag a scan matches, if any.
     func tag(matching scanned: Data) -> PairedTag? { tags.first { $0.id == scanned } }
     /// A placeholder for a tag just paired, never a duplicate of one already here, because a
@@ -600,15 +681,22 @@ extension AnchorProfile {
     /// The anchor was called the Brick until 2026-09-08, and held a single `tagID` until
     /// 2026-09-08. Read the old names when the new ones are missing; encoding always writes the
     /// new. A lone stored identifier becomes the first of the list, named rather than blank, so
-    /// the phone comes back with the key it already had.
+    /// the phone comes back with the key it already had. The scope arrived on 2026-09-09; a
+    /// store without one is the chosen list, which is what every store before it meant.
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let legacy = try decoder.container(keyedBy: LegacyKeys.self)
+        scope = try container.decodeIfPresent(Scope.self, forKey: .scope) ?? .chosen
         kinds = try container.decodeIfPresent([TargetKind].self, forKey: .kinds) ?? []
         isAnchored = try container.decodeIfPresent(Bool.self, forKey: .isAnchored)
             ?? legacy.decodeIfPresent(Bool.self, forKey: .isBricked) ?? false
         anchoredAt = try container.decodeIfPresent(Date.self, forKey: .anchoredAt)
             ?? legacy.decodeIfPresent(Date.self, forKey: .brickedAt)
+        // The clock arrived on 2026-09-09: a store without it is an anchor only the tag lifts,
+        // with nothing scheduled, which is what every store before it meant.
+        until = try container.decodeIfPresent(Date.self, forKey: .until)
+        schedules = try container.decodeIfPresent([AnchorSchedule].self, forKey: .schedules) ?? []
+        sequence = try container.decodeIfPresent(Int.self, forKey: .sequence) ?? 0
         if let stored = try container.decodeIfPresent([PairedTag].self, forKey: .tags) {
             // Trimmed on the way in as well as on the way out: a file written when the cap was
             // higher, or by hand, does not get to hand the anchor more keys than it allows.
@@ -625,6 +713,19 @@ struct Config: Codable, Equatable {
     var targets: [Target] = []
     var loosenDelayHours: Int = Furlough.defaultLoosenDelayHours
     var anchor = AnchorProfile()
+    /// When the first week ends, set once, the first time Screen Time access is granted, and
+    /// never moved after. Kept even after it has run out, because it is also the record that
+    /// this install has already had its week: turning Screen Time access off and on again is
+    /// the documented way out of Furlough, and without this it would also be a way to draw a
+    /// fresh trial every Sunday.
+    var trialStartedAt: Date?
+    var trialEndsAt: Date?
+    /// Whether that week is still running. A stored fact rather than a comparison made on every
+    /// read, for the same reason a due pending change is not folded in until something folds
+    /// it: `delayHours` is asked from a dozen places that have no business knowing the time,
+    /// and `Policy.applyDuePending` — which every enforce, every widget read and every
+    /// `effectiveConfig` goes through — is the one place that moves the clock forward.
+    var isInTrial = false
     var schemaVersion = 1
 
     init() {}
@@ -640,15 +741,22 @@ struct Config: Codable, Equatable {
             ?? legacy.decodeIfPresent(AnchorProfile.self, forKey: .brick)
             ?? AnchorProfile()
         schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
+        // Absent in every state written before the trial existed, and absent means "no trial":
+        // a week of forgiveness is granted at the moment access is first given, and an upgrade
+        // is not that moment. An install already running keeps the delays it already had.
+        trialStartedAt = try container.decodeIfPresent(Date.self, forKey: .trialStartedAt)
+        trialEndsAt = try container.decodeIfPresent(Date.self, forKey: .trialEndsAt)
+        isInTrial = try container.decodeIfPresent(Bool.self, forKey: .isInTrial) ?? false
     }
 
     private enum LegacyKeys: String, CodingKey { case brick }
 
     var loosenDelay: TimeInterval { TimeInterval(loosenDelayHours) * 3600 }
 
-    /// Whether `target` is locked by the anchor right now. Any door being anchored anchors the
-    /// target: the halves are one thing, and one of them held is the whole of it held.
-    func isAnchored(_ target: Target) -> Bool { target.kinds.contains { anchor.blocks($0) } }
+    /// Whether `target` is locked by the anchor at `now`. Any door being anchored anchors the
+    /// target: the halves are one thing, and one of them held is the whole of it held. Takes
+    /// the moment because a timed anchor is released the instant its time passes.
+    func isAnchored(_ target: Target, at now: Date) -> Bool { target.kinds.contains { anchor.blocks($0, at: now) } }
 
     func target(id: UUID) -> Target? { targets.first { $0.id == id } }
     /// The target `kind` is a door into, whether it is the face or a linked half. Reading only
@@ -668,6 +776,10 @@ enum PendingKind: Codable, Hashable {
     /// loosening and queues, exactly as removing the whole row does. Linking is the tightening
     /// and lands at once.
     case unlink(targetID: UUID, kind: TargetKind)
+    /// The anchor's drop times replaced with fewer, or shorter, ones. A schedule that can be
+    /// deleted at 9:59 PM is not a commitment, so a removal waits out the delay like every
+    /// other loosening; adding a drop lands at once. Zach's call, 2026-09-09.
+    case setAnchorSchedules([AnchorSchedule])
 }
 
 /// A loosening edit waiting out the delay.
@@ -680,7 +792,7 @@ struct PendingChange: Codable, Hashable, Identifiable {
     var targetID: UUID? {
         switch kind {
         case .setRule(let id, _), .removeTarget(let id), .setUtility(let id, _), .unlink(let id, _): id
-        case .setDelay: nil
+        case .setDelay, .setAnchorSchedules: nil
         }
     }
 }
@@ -694,9 +806,89 @@ struct RuntimeState: Codable, Equatable {
     var lastReconcile: Date?
     var lastRegistration: Date?
     var registrationError: String?
+    /// The record of the contract, by `Policy.dayKey`, kept for `Record.retainedDays`. Written
+    /// only through `Record`; never read by `Policy.decide`.
+    var days: [String: DayRecord] = [:]
+    /// How far the record has counted. Whole minutes only, so the part-minute between two
+    /// reconciles is carried rather than lost or double counted.
+    var recordedThrough: Date?
+
+    init() {}
 
     func isExhausted(_ id: UUID, dayKey: String) -> Bool { exhausted[id.uuidString] == dayKey }
     func wasWarned(_ id: UUID, dayKey: String) -> Bool { warned[id.uuidString] == dayKey }
+
+    /// Tolerant, like `Config`'s: a phone that has been running since before the record existed
+    /// has no `days` key, and a synthesised decoder would throw on it rather than fall back to
+    /// the default. Everything here is a fact about today that can be recovered, so a missing
+    /// key is always the empty value and never a refusal to load the whole state.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        exhausted = try container.decodeIfPresent([String: String].self, forKey: .exhausted) ?? [:]
+        warned = try container.decodeIfPresent([String: String].self, forKey: .warned) ?? [:]
+        clock = try container.decodeIfPresent(ClockMark.self, forKey: .clock)
+        lastReconcile = try container.decodeIfPresent(Date.self, forKey: .lastReconcile)
+        lastRegistration = try container.decodeIfPresent(Date.self, forKey: .lastRegistration)
+        registrationError = try container.decodeIfPresent(String.self, forKey: .registrationError)
+        days = try container.decodeIfPresent([String: DayRecord].self, forKey: .days) ?? [:]
+        recordedThrough = try container.decodeIfPresent(Date.self, forKey: .recordedThrough)
+    }
+}
+
+/// One day of the record. Written from the events that already move the shields — a threshold
+/// callback, a reconcile, a change queued or cancelled or landing — and read only by the two
+/// screens that show it. See `Record`.
+struct DayRecord: Codable, Equatable {
+    /// By target id, as a string: the same shape `exhausted` and `warned` are stored in.
+    var targets: [String: TargetDay] = [:]
+    /// Loosenings queued on this day.
+    var queued = 0
+    /// Loosenings cancelled before they landed. The number worth showing: it is the count of
+    /// times the delay did its job.
+    var cancelled = 0
+    /// Loosenings that waited out the delay and landed.
+    var landed = 0
+    /// The longest stretch the Anchor held that ended on this day, in minutes. Recorded on
+    /// release rather than accumulated, so a stretch that ran over midnight is one number.
+    var longestAnchorMinutes = 0
+
+    init() {}
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        targets = try container.decodeIfPresent([String: TargetDay].self, forKey: .targets) ?? [:]
+        queued = try container.decodeIfPresent(Int.self, forKey: .queued) ?? 0
+        cancelled = try container.decodeIfPresent(Int.self, forKey: .cancelled) ?? 0
+        landed = try container.decodeIfPresent(Int.self, forKey: .landed) ?? 0
+        longestAnchorMinutes = try container.decodeIfPresent(Int.self, forKey: .longestAnchorMinutes) ?? 0
+    }
+}
+
+/// What one target did on one day. The minutes are minutes of the day, not minutes of use:
+/// the phone cannot see use without Screen Time's data-access entitlement, so `spent` is the
+/// only thing here that knows a budget ran out, and the copy must not pretend otherwise.
+struct TargetDay: Codable, Equatable {
+    /// The daily budget ran out.
+    var spent = false
+    /// The 5-minute warning fired.
+    var warned = false
+    /// Minutes the rule left it open.
+    var openMinutes = 0
+    /// Minutes it was shut, whether by a rule, a spent budget or the Anchor.
+    var shieldedMinutes = 0
+    /// Of those, the minutes the Anchor was what held it.
+    var anchoredMinutes = 0
+
+    init() {}
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        spent = try container.decodeIfPresent(Bool.self, forKey: .spent) ?? false
+        warned = try container.decodeIfPresent(Bool.self, forKey: .warned) ?? false
+        openMinutes = try container.decodeIfPresent(Int.self, forKey: .openMinutes) ?? 0
+        shieldedMinutes = try container.decodeIfPresent(Int.self, forKey: .shieldedMinutes) ?? 0
+        anchoredMinutes = try container.decodeIfPresent(Int.self, forKey: .anchoredMinutes) ?? 0
+    }
 }
 
 struct SharedState: Codable, Equatable {

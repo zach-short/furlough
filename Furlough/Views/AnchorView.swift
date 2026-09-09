@@ -18,6 +18,15 @@ struct AnchorView: View {
     @State private var forgetting: PairedTag?
     @State private var renaming: PairedTag?
     @State private var draftName = ""
+    /// The scope tapped while the list still holds something, waiting on a confirmation:
+    /// switching starts the list again, and a curated list is worth a second look first.
+    @State private var switchingTo: AnchorProfile.Scope?
+    /// A drop made from here lifts by itself at `liftMinute`. Off, the tag is the only way
+    /// back, as ever. Not stored: it is how the next drop is made, not a setting.
+    @State private var liftsBySelf = false
+    @State private var liftMinute = 18 * 60
+    @State private var pickingLift = false
+    @State private var editingSchedule = false
 
     private var anchor: AnchorProfile { model.state.config.anchor }
     private var anchorCaution: (text: String, isSevere: Bool)? { model.anchorCaution }
@@ -27,15 +36,23 @@ struct AnchorView: View {
             VStack(alignment: .leading, spacing: 0) {
                 header
                 stateCard
-                SectionLabel(text: "Apps")
+                if !anchor.isAnchored {
+                    timedCard
+                        .padding(.top, 10)
+                }
+                SectionLabel(text: "Scope")
+                scopeCard
+                SectionLabel(text: anchor.anchorsEverything ? "Stays open" : "Apps")
                 appsCard
                 if let caution = anchorCaution {
                     CautionBanner(text: caution.text, isSevere: caution.isSevere)
                         .padding(.top, 12)
                 }
-                Footnote(text: anchor.isAnchored
-                    ? "Unanchor with your tag to change the list."
-                    : "Anything here is blocked while anchored. Windows and budgets still apply the rest of the time.")
+                Footnote(text: listFootnote)
+                    .padding(.top, 8)
+                SectionLabel(text: "Schedule")
+                scheduleCard
+                Footnote(text: scheduleFootnote)
                     .padding(.top, 8)
                 SectionLabel(text: "Tags")
                 tagCard
@@ -56,14 +73,20 @@ struct AnchorView: View {
             }
         }
         .familyActivityPicker(
-            headerText: "Choose what the anchor holds",
-            footerText: "Picking a category locks every app in it.",
+            headerText: anchor.anchorsEverything ? "Choose what stays open while anchored" : "Choose what the anchor holds",
+            footerText: anchor.anchorsEverything ? "Picking a category keeps every app in it open." : "Picking a category locks every app in it.",
             isPresented: $showPicker,
             selection: $selection
         )
         .onChange(of: showPicker) { _, presented in
             guard !presented else { return }
             model.setAnchorSelection(selection)
+        }
+        .sheet(isPresented: $pickingLift) {
+            TimePickerSheet(title: "Lifts at", minute: $liftMinute)
+        }
+        .sheet(isPresented: $editingSchedule) {
+            AnchorScheduleSheet(schedules: anchor.schedules)
         }
         .sheet(isPresented: $showFromRules, onDismiss: {
             guard pickerAfterSheet else { return }
@@ -80,6 +103,21 @@ struct AnchorView: View {
             Button("OK") { message = nil }
         } message: {
             Text(message ?? "")
+        }
+        .confirmationDialog(
+            "Start the list again?",
+            isPresented: Binding(get: { switchingTo != nil }, set: { if !$0 { switchingTo = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button(switchingTo == .everythingExcept ? "Anchor everything except a list" : "Anchor chosen apps only") {
+                if let scope = switchingTo { model.setAnchorScope(scope) }
+                switchingTo = nil
+            }
+            Button("Keep it as it is", role: .cancel) { switchingTo = nil }
+        } message: {
+            Text(switchingTo == .everythingExcept
+                ? "The list becomes what stays open, starting from every app you tiered Essential. What it holds now is not carried over."
+                : "The list becomes what is held, starting empty. What you already block is offered first.")
         }
         .confirmationDialog(
             "Forget this tag?",
@@ -116,6 +154,71 @@ struct AnchorView: View {
         return "Anchoring works without a tag. Weighing anchor needs one, so keep every tag somewhere that makes you think. \(cap)"
     }
 
+    private var listFootnote: String {
+        if anchor.isAnchored { return "Unanchor with your tag to change the list." }
+        switch anchor.scope {
+        case .chosen:
+            return "Anything here is blocked while anchored. Windows and budgets still apply the rest of the time."
+        case .everythingExcept:
+            return "Everything not listed here is blocked while anchored. What is listed keeps its own windows and budget."
+        }
+    }
+
+    /// How far the anchor reaches: the list, or the whole phone but the list. Locked while
+    /// anchored along with everything else. The list does not survive a switch (see
+    /// `AppModel.setAnchorScope`), so a list that holds anything asks first.
+    private var scopeCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                scopeChip(.chosen, "Chosen apps")
+                scopeChip(.everythingExcept, "Everything except")
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 12)
+            Text(scopeSummary)
+                .emberBody(12)
+                .foregroundStyle(Ember.muted)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.top, 10)
+                .padding(.bottom, 14)
+        }
+        .emberCard()
+    }
+
+    private var scopeSummary: String {
+        switch anchor.scope {
+        case .chosen: "Only what is listed is held. Everything else keeps its own rules."
+        case .everythingExcept: "Every app and website is held. Only what is listed stays open."
+        }
+    }
+
+    private func scopeChip(_ scope: AnchorProfile.Scope, _ title: String) -> some View {
+        let isOn = anchor.scope == scope
+        return Button {
+            guard !isOn else { return }
+            if anchor.kinds.isEmpty { model.setAnchorScope(scope) } else { switchingTo = scope }
+        } label: {
+            Text(title)
+                .emberBody(12, .semibold)
+                .foregroundStyle(isOn ? Ember.ground : Ember.muted)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(isOn ? Ember.amber : Color.white.opacity(0.06))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(isOn ? .clear : Ember.cardBorder, lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+        .disabled(anchor.isAnchored)
+        .accessibilityAddTraits(isOn ? .isSelected : [])
+    }
+
     private var header: some View {
         HStack(spacing: 12) {
             AnchorGlyph(isAnchored: anchor.isAnchored, size: 48)
@@ -142,7 +245,7 @@ struct AnchorView: View {
                     .foregroundStyle(Ember.cream)
             }
             Spacer(minLength: 8)
-            AnchorToggleButton()
+            AnchorToggleButton(until: timedUntil)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 12)
@@ -150,18 +253,143 @@ struct AnchorView: View {
     }
 
     private var stateLine: String {
+        let held = anchor.heldDescription
         if anchor.isAnchored, let since = anchor.anchoredAt {
-            return "\(count(anchor.count)) since \(since.formatted(date: .omitted, time: .shortened))"
+            let lift = anchor.until.map { " · lifts \(TimeFormat.clock($0))" } ?? ""
+            return "\(held) since \(since.formatted(date: .omitted, time: .shortened))\(lift)"
         }
-        if anchor.kinds.isEmpty { return "Nothing chosen yet" }
-        if !anchor.isPaired { return "\(count(anchor.count)) · pair a tag to enable" }
-        return "\(count(anchor.count)) ready"
+        if anchor.scope == .chosen, anchor.kinds.isEmpty { return "Nothing chosen yet" }
+        if !anchor.isPaired { return "\(held) · pair a tag to enable" }
+        return "\(held) · ready"
+    }
+
+    /// The moment a drop made now would lift by itself: the chosen time later today, or
+    /// tomorrow when it is already past or too close — the monitor cannot be woken for less
+    /// than a quarter of an hour. Nil when the tag is the only way back.
+    private var timedUntil: Date? {
+        guard liftsBySelf else { return nil }
+        let now = model.clock.now
+        let soonest = now.addingTimeInterval(TimeInterval(Furlough.minimumWindowMinutes * 60))
+        let today = Policy.date(atMinute: liftMinute, of: now)
+        if today >= soonest { return today }
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: now) ?? now
+        return Policy.date(atMinute: liftMinute, of: tomorrow)
+    }
+
+    /// Whether the next drop lifts by itself. Off, the tag is the only way back, as ever.
+    private var timedCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 12) {
+                Text("Lifts by itself")
+                    .emberBody(13)
+                    .foregroundStyle(Ember.cream)
+                Spacer(minLength: 8)
+                if liftsBySelf {
+                    TimeChip(minute: liftMinute) { pickingLift = true }
+                }
+                Toggle("Lifts by itself", isOn: $liftsBySelf.animation(.snappy))
+                    .labelsHidden()
+                    .tint(Ember.ember)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            Text(timedLine)
+                .emberBody(11.5)
+                .foregroundStyle(Ember.muted)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 10)
+        }
+        .emberCard()
+    }
+
+    private var timedLine: String {
+        guard let until = timedUntil else { return "Only the tag lifts it." }
+        let day = Calendar.current.isDateInToday(until) ? "today" : "tomorrow"
+        return "Anchor lifts \(day) at \(TimeFormat.clock(until)), or sooner with the tag."
+    }
+
+    private var sortedSchedules: [AnchorSchedule] {
+        anchor.schedules.sorted { ($0.minuteOfDay, $0.days.rawValue) < ($1.minuteOfDay, $1.days.rawValue) }
+    }
+
+    /// The drop times, and the way to change them while the anchor is off. Edited as one draft
+    /// in `AnchorScheduleSheet`, because the whole set is classified at once.
+    private var scheduleCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if anchor.schedules.isEmpty {
+                Text("No scheduled drops.")
+                    .emberBody(13)
+                    .foregroundStyle(Ember.muted)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 11)
+            } else {
+                ForEach(Array(sortedSchedules.enumerated()), id: \.element.id) { index, schedule in
+                    if index > 0 { CardDivider() }
+                    scheduleRow(schedule)
+                }
+            }
+            if !anchor.isAnchored {
+                CardDivider()
+                Button {
+                    editingSchedule = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: anchor.schedules.isEmpty ? "plus" : "clock")
+                            .font(.system(size: 12, weight: .bold))
+                        Text(anchor.schedules.isEmpty ? "Add a drop time" : "Change the schedule")
+                            .emberBody(13, .semibold)
+                    }
+                    .foregroundStyle(Ember.ember)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 11)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .emberCard()
+    }
+
+    private func scheduleRow(_ schedule: AnchorSchedule) -> some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(TimeFormat.minute(schedule.minuteOfDay)) · \(TimeFormat.days(schedule.days))")
+                    .emberBody(13)
+                    .monospacedDigit()
+                    .foregroundStyle(Ember.cream)
+                Text(schedule.liftMinuteOfDay.map { "Lifts at \(TimeFormat.minute($0))" } ?? "Until the tag")
+                    .emberBody(11.5)
+                    .foregroundStyle(Ember.muted)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+    }
+
+    private var scheduleFootnote: String {
+        if anchor.isAnchored { return "Unanchor with your tag to change the schedule." }
+        let rule = "Adding a time applies at once. Removing or shortening one waits out the delay, and can be cancelled from Pending until then."
+        guard let next = anchor.schedules.nextDrop(after: model.clock.now) else {
+            return "The anchor drops by itself at each time, on its days. \(rule)"
+        }
+        return "Next drop \(nextDropWords(next)). \(rule)"
+    }
+
+    /// "today at 10:00 PM", "tomorrow at 10:00 PM", "Monday at 10:00 PM".
+    private func nextDropWords(_ date: Date) -> String {
+        let calendar = Calendar.current
+        let time = TimeFormat.clock(date)
+        if calendar.isDateInToday(date) { return "today at \(time)" }
+        if calendar.isDateInTomorrow(date) { return "tomorrow at \(time)" }
+        return "\(date.formatted(.dateTime.weekday(.wide))) at \(time)"
     }
 
     private var appsCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             if anchor.kinds.isEmpty {
-                Text("No apps yet.")
+                Text(anchor.anchorsEverything ? "Nothing stays open." : "No apps yet.")
                     .emberBody(13)
                     .foregroundStyle(Ember.muted)
                     .padding(.horizontal, 12)
@@ -180,8 +408,10 @@ struct AnchorView: View {
                     // An empty list starts from the rules: what Furlough already blocks is
                     // offered first, and Apple's picker, which lists every app on the phone,
                     // is one tap further on. Once the anchor holds anything, straight to the
-                    // picker, filled in with the list.
-                    if anchor.kinds.isEmpty, !model.state.config.anchorCandidates.isEmpty {
+                    // picker, filled in with the list. The offer is for the chosen scope only:
+                    // under everything-except what is already blocked is already held, and
+                    // the list is what stays open, so it goes straight to the picker too.
+                    if anchor.scope == .chosen, anchor.kinds.isEmpty, !model.state.config.anchorCandidates.isEmpty {
                         showFromRules = true
                     } else {
                         openPicker()
@@ -190,7 +420,7 @@ struct AnchorView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "plus")
                             .font(.system(size: 12, weight: .bold))
-                        Text(anchor.kinds.isEmpty ? "Choose apps" : "Change apps")
+                        Text(chooseTitle)
                             .emberBody(13, .semibold)
                     }
                     .foregroundStyle(Ember.ember)
@@ -304,6 +534,15 @@ struct AnchorView: View {
 
     private var tagCount: String { "\(anchor.tags.count) of \(Furlough.maxAnchorTags)" }
 
+    private var chooseTitle: String {
+        switch (anchor.scope, anchor.kinds.isEmpty) {
+        case (.chosen, true): "Choose apps"
+        case (.chosen, false): "Change apps"
+        case (.everythingExcept, true): "Choose what stays open"
+        case (.everythingExcept, false): "Change what stays open"
+        }
+    }
+
     private func openPicker() {
         selection = model.anchorSelection
         showPicker = true
@@ -324,10 +563,6 @@ struct AnchorView: View {
     private func tagLabel(_ id: Data) -> String {
         let hex = id.map { String(format: "%02X", $0) }.joined()
         return "…\(hex.suffix(4))"
-    }
-
-    private func count(_ n: Int) -> String {
-        "\(n) \(n == 1 ? "item" : "items")"
     }
 }
 
@@ -486,9 +721,212 @@ struct AnchorFromRulesSheet: View {
     }
 }
 
+/// Edits the anchor's drop times as one draft with one Save, the way a rule is edited,
+/// because the whole set is classified at once: more drops or longer holds land now, fewer
+/// or shorter ones queue behind the delay. The banner above Save says which before it happens.
+struct AnchorScheduleSheet: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    @State private var drafts: [AnchorSchedule]
+    @State private var message: String?
+    private let original: [AnchorSchedule]
+
+    init(schedules: [AnchorSchedule]) {
+        original = schedules
+        _drafts = State(initialValue: schedules)
+    }
+
+    private var effect: EffectBanner.Kind {
+        if drafts == original { return .noChanges }
+        if drafts.contains(where: { $0.days.isEmpty }) { return .error("Each drop needs at least one day.") }
+        if drafts.contains(where: { $0.liftMinuteOfDay == $0.minuteOfDay }) { return .error("A lift has to come after its drop.") }
+        if let reason = ActivityLimit.reason(schedules: drafts, in: model.state) { return .error(reason) }
+        switch Policy.classify(newSchedules: drafts, against: original) {
+        case .tightening:
+            return .tightening
+        case .loosening:
+            let hours = model.state.config.anchorDelayHours
+            return .loosening(model.clock.now.addingTimeInterval(TimeInterval(hours) * 3600))
+        }
+    }
+
+    private var canSave: Bool {
+        switch effect {
+        case .noChanges, .error: false
+        default: true
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("At each time, on its days, the anchor drops by itself. It holds until the tag, or until the lift you give it.")
+                        .emberBody(13)
+                        .foregroundStyle(Ember.muted)
+                        .padding(.horizontal, 8)
+                        .padding(.bottom, 12)
+                    VStack(spacing: 0) {
+                        if drafts.isEmpty {
+                            Text("No drop times yet.")
+                                .emberBody(13)
+                                .foregroundStyle(Ember.muted)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 11)
+                        }
+                        ForEach($drafts) { $draft in
+                            ScheduleDraftRow(schedule: $draft) {
+                                withAnimation(.snappy) { drafts.removeAll { $0.id == draft.id } }
+                            }
+                            CardDivider()
+                        }
+                        Button {
+                            withAnimation(.snappy) {
+                                drafts.append(AnchorSchedule(minuteOfDay: 22 * 60, days: .weekdays))
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 12, weight: .bold))
+                                Text("Add a drop time")
+                                    .emberBody(13, .semibold)
+                            }
+                            .foregroundStyle(Ember.ember)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 11)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .emberCard()
+                    EffectBanner(kind: effect)
+                        .padding(.top, 12)
+                    ProminentButton(title: "Save") { save() }
+                        .disabled(!canSave)
+                        .padding(.top, 14)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 32)
+            }
+            .background(EmberWall())
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("Schedule")
+                        .emberBody(15, .semibold)
+                        .foregroundStyle(Ember.cream)
+                }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                        .tint(Ember.cream)
+                }
+            }
+        }
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Ember.ground)
+        .alert("Schedule", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
+            Button("OK") {
+                message = nil
+                dismiss()
+            }
+        } message: {
+            Text(message ?? "")
+        }
+    }
+
+    private func save() {
+        switch model.setAnchorSchedules(drafts) {
+        case .unchanged, .appliedNow:
+            dismiss()
+        case .scheduled(let date):
+            message = ProposalResult.scheduled(date).message
+        }
+    }
+}
+
+/// One drop time in the schedule editor: when, on which days, and whether it lifts by itself.
+struct ScheduleDraftRow: View {
+    @Binding var schedule: AnchorSchedule
+    let onRemove: () -> Void
+    @State private var editing: Edge?
+
+    enum Edge: String, Identifiable {
+        case drop, lift
+        var id: String { rawValue }
+    }
+
+    private static let defaultLift = 7 * 60
+
+    private var liftsBySelf: Binding<Bool> {
+        Binding(
+            get: { schedule.liftMinuteOfDay != nil },
+            set: { on in schedule.liftMinuteOfDay = on ? (schedule.liftMinuteOfDay ?? Self.defaultLift) : nil }
+        )
+    }
+
+    private var liftMinute: Binding<Int> {
+        Binding(
+            get: { schedule.liftMinuteOfDay ?? Self.defaultLift },
+            set: { schedule.liftMinuteOfDay = $0 }
+        )
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text("Drops at")
+                    .emberBody(12)
+                    .foregroundStyle(Ember.muted)
+                TimeChip(minute: schedule.minuteOfDay) { editing = .drop }
+                Spacer(minLength: 8)
+                Button(action: onRemove) {
+                    Image(systemName: "minus.circle.fill")
+                        .font(.system(size: 18))
+                        .foregroundStyle(Ember.muted)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Remove this drop time")
+            }
+            DayStrip(days: $schedule.days)
+            HStack(spacing: 8) {
+                Text("Lifts")
+                    .emberBody(12)
+                    .foregroundStyle(Ember.muted)
+                if let lift = schedule.liftMinuteOfDay {
+                    TimeChip(minute: lift, nextDay: lift <= schedule.minuteOfDay) { editing = .lift }
+                } else {
+                    Text("with the tag")
+                        .emberBody(12, .semibold)
+                        .foregroundStyle(Ember.cream)
+                }
+                Spacer(minLength: 8)
+                Toggle("Lifts by itself", isOn: liftsBySelf.animation(.snappy))
+                    .labelsHidden()
+                    .tint(Ember.ember)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .sheet(item: $editing) { edge in
+            TimePickerSheet(
+                title: edge == .drop ? "Drops at" : "Lifts at",
+                minute: edge == .drop ? $schedule.minuteOfDay : liftMinute,
+                nextDayAfter: edge == .lift ? schedule.minuteOfDay : nil
+            )
+        }
+    }
+}
+
 /// Anchor when free, Unanchor (scan the tag to release it) when anchored. Alerts explain a wrong tag or failure.
 struct AnchorToggleButton: View {
     @Environment(AppModel.self) private var model
+    /// When the drop made here lifts by itself; nil for the tag alone, which the home card
+    /// always passes, since only the Anchor screen offers a time.
+    var until: Date?
     @State private var busy = false
     @State private var message: String?
     @State private var confirmAnchor = false
@@ -540,7 +978,7 @@ struct AnchorToggleButton: View {
     }
 
     private func drop() {
-        switch model.anchor() {
+        switch model.anchor(until: until) {
         case .failed(let reason): message = reason
         default: break
         }
@@ -590,14 +1028,16 @@ struct AnchorCard: View {
         .emberCard()
     }
 
+    /// "3 items · ready", or under the wider scope "Everything except 3 · since 6:12 PM".
     private var subtitle: String {
-        let items = "\(anchor.count) \(anchor.count == 1 ? "item" : "items")"
-        if anchor.kinds.isEmpty { return "Tap to choose apps and pair a tag" }
-        if !anchor.isPaired { return "\(items) · pair a tag to enable" }
+        let held = anchor.heldDescription
+        if anchor.scope == .chosen, anchor.kinds.isEmpty { return "Tap to choose apps and pair a tag" }
+        if !anchor.isPaired { return "\(held) · pair a tag to enable" }
         if anchor.isAnchored, let since = anchor.anchoredAt {
-            return "\(items) · since \(since.formatted(date: .omitted, time: .shortened))"
+            let lift = anchor.until.map { " · lifts \(TimeFormat.clock($0))" } ?? ""
+            return "\(held) · since \(since.formatted(date: .omitted, time: .shortened))\(lift)"
         }
-        return "\(items) · ready"
+        return "\(held) · ready"
     }
 }
 

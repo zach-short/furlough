@@ -39,8 +39,8 @@ final class ShieldExtension: ShieldConfigurationDataSource {
         var status = target.map { Policy.status(of: $0, config: config, runtime: state.runtime, now: now) }
         if status == nil {
             // Things the anchor holds that are not targets, directly or through their category.
-            let anchoredDirectly = kind.map(config.anchor.blocks) ?? false
-            let anchoredByCategory = category?.token.map { config.anchor.blocks(.category($0)) } ?? false
+            let anchoredDirectly = kind.map { config.anchor.blocks($0, at: now) } ?? false
+            let anchoredByCategory = category?.token.map { config.anchor.blocks(.category($0), at: now) } ?? false
             if anchoredDirectly || anchoredByCategory { status = .anchored }
         }
         let text = ShieldText.text(name: name, status: status, rule: target?.rule)

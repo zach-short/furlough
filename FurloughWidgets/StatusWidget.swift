@@ -1,3 +1,4 @@
+import AppIntents
 import SwiftUI
 import WidgetKit
 
@@ -73,6 +74,27 @@ struct StatusWidgetView: View {
                 HourglassView(state: .of(entry.summary, now: entry.date))
                     .frame(width: 30, height: 40)
             }
+            .overlay(alignment: .topTrailing) {
+                // The medium widget has room for one action, and there is only one Furlough
+                // allows from a widget: dropping the anchor, which can only tighten. It runs
+                // the same intent Control Center does, in this extension; release stays in the
+                // app behind the tag.
+                if family == .systemMedium, entry.summary.canDropAnchor {
+                    Button(intent: DropAnchorIntent()) {
+                        HStack(spacing: 5) {
+                            Image("anchor")
+                                .font(.system(size: 10, weight: .bold))
+                            Text("Anchor")
+                                .emberBody(11, .bold)
+                        }
+                        .foregroundStyle(Ember.cream)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Ember.ember.opacity(0.85), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
     }
 
     private var homeText: some View {
@@ -124,7 +146,7 @@ struct StatusWidgetView: View {
                         .lineLimit(1)
                 }
                 if summary.isAnchored {
-                    Text("\(summary.anchoredCount) anchored")
+                    Text(anchoredLine(summary))
                         .emberBody(10.5, .semibold)
                         .foregroundStyle(Ember.ember)
                 }
@@ -191,6 +213,13 @@ struct StatusWidgetView: View {
         let lead = names.prefix(shown).joined(separator: ", ")
         let rest = names.count - min(names.count, shown)
         return rest > 0 ? "\(lead) +\(rest)" : lead
+    }
+
+    /// "3 anchored", "Everything anchored", and the lift when the anchor has one.
+    private func anchoredLine(_ summary: Policy.Summary) -> String {
+        let what = summary.anchorsEverything ? "Everything anchored" : "\(summary.anchoredCount) anchored"
+        guard let until = summary.anchorUntil else { return what }
+        return "\(what) · lifts \(until.formatted(date: .omitted, time: .shortened))"
     }
 
     private func detail(_ text: String) -> some View {

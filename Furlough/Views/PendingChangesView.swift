@@ -88,7 +88,7 @@ struct PendingCard: View {
                         .foregroundStyle(Ember.pending)
                         .frame(width: 34, height: 34)
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("Loosening delay")
+                        Text(PendingText.subject(of: change.kind) ?? "Loosening delay")
                             .emberDisplaySmall(13.5)
                             .foregroundStyle(Ember.cream)
                         PendingDeltaView(delta: delta)

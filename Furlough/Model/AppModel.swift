@@ -94,8 +94,12 @@ final class AppModel {
     // MARK: Lifecycle
 
     func activate() {
+        observeChanges()
+        observeCloud()
+        AnchorCloud.synchronize()
         note(AuthorizationCenter.shared.authorizationStatus)
         reload()
+        applyRemoteAnchor(reason: "activate")
         considerUsageStep()
         Task { await refreshNotificationStatus() }
         // Names for anything the shield has not covered yet, where this phone can read them.
@@ -106,6 +110,37 @@ final class AppModel {
         weighAnchorIfInFront()
         guard isAuthorized else { return }
         enforce(reason: "app active")
+    }
+
+    /// Listens for a write from another process — a Control Center drop, the monitor's
+    /// schedule firing or lifting — and catches up, so the screen does not say Free over a
+    /// phone that is anchored. A Darwin notification carries no payload and reaches every
+    /// process; the observer is registered once, and its callback can capture nothing, so it
+    /// goes through `shared`.
+    @ObservationIgnored private var observesChanges = false
+
+    private func observeChanges() {
+        guard !observesChanges else { return }
+        observesChanges = true
+        CFNotificationCenterAddObserver(
+            CFNotificationCenterGetDarwinNotifyCenter(),
+            nil,
+            { _, _, _, _, _ in Task { @MainActor in AppModel.shared.changedElsewhere() } },
+            SharedStore.changeNotification as CFString,
+            nil,
+            .deliverImmediately
+        )
+    }
+
+    /// Another process wrote the store. Reload, and if that changed anything, enforce: a drop
+    /// from the widget has applied its shields already, but only the app registers
+    /// DeviceActivity, and the monitor's own writes are worth a fresh registration too. The
+    /// app's own writes come back through here as well and find nothing new.
+    func changedElsewhere() {
+        let before = state
+        reload()
+        guard state != before, isAuthorized else { return }
+        enforce(reason: "changed elsewhere")
     }
 
     /// Follows FamilyControls' own updates. After a cold start the first read says "not
@@ -138,7 +173,45 @@ final class AppModel {
             lastError = "Screen Time access failed: \(error.localizedDescription)"
         }
         note(AuthorizationCenter.shared.authorizationStatus)
-        if isAuthorized { enforce(reason: "authorized") }
+        if isAuthorized {
+            startTrialIfNeeded()
+            enforce(reason: "authorized")
+        }
+    }
+
+    /// Begins the first week the first time Screen Time access is granted, and never again on
+    /// this install — `Forgiveness.startTrial` is what refuses the second time. This is the
+    /// only moment it can start: before access there is nothing to be forgiven for, and after
+    /// it every path back here goes through Settings, which is the way out of Furlough and
+    /// must not also be the way to a fresh week.
+    private func startTrialIfNeeded() {
+        var current = SharedStore.load()
+        guard Forgiveness.startTrial(&current.config, now: current.now) else { return }
+        SharedStore.save(current)
+        SharedStore.log("first week started; loosenings wait \(Furlough.trialDelayHours) h until it ends")
+    }
+
+    /// The edit on `id` that is still takeable back, or nil. Read on Furlough's own clock, so
+    /// a device clock moved back does not reopen a window that has closed.
+    func undo(for id: UUID) -> RuleUndo? {
+        guard let target = state.config.target(id: id) else { return nil }
+        return Forgiveness.undo(for: target, at: clock.now)
+    }
+
+    /// Puts `id` back to the rule it had before the last edit. True when it happened.
+    ///
+    /// Instant, and not an unblock: the rule it restores is the one that was in force a quarter
+    /// of an hour ago, so nothing comes open that was not open then. A target whose previous
+    /// rule was none goes back to unconfigured, which is where it stood before it was touched.
+    @discardableResult
+    func undoRule(for id: UUID) -> Bool {
+        var current = SharedStore.load()
+        let name = current.config.target(id: id)?.displayName ?? "a target"
+        guard Forgiveness.revert(targetID: id, in: &current, now: current.now) else { return false }
+        SharedStore.save(current)
+        SharedStore.log("undid the last rule change for \(name)")
+        enforce(reason: "undo")
+        return true
     }
 
     func requestNotifications() async {
@@ -175,6 +248,11 @@ final class AppModel {
         }
         if Policy.applyDuePending(&current, now: clock.now) {
             SharedStore.log("applied due pending changes (\(reason))")
+        }
+        // Folded before registration, so a timed anchor whose time has passed does not get its
+        // wake registered again; `Policy` has read it as released since the moment it passed.
+        if Policy.liftExpiredAnchor(&current.config, now: clock.now) {
+            SharedStore.log("a timed anchor's time had passed; lifted it (\(reason))")
         }
         do {
             try Monitoring.register(state: current)
@@ -271,7 +349,7 @@ final class AppModel {
             let alreadyPending = current.pending.contains { $0.kind == .removeTarget(targetID: target.id) }
             guard !alreadyPending else { continue }
             let effectiveAt = current.now.addingTimeInterval(current.config.delay(for: target))
-            current.pending.append(PendingChange(kind: .removeTarget(targetID: target.id), effectiveAt: effectiveAt))
+            Record.queue(PendingChange(kind: .removeTarget(targetID: target.id), effectiveAt: effectiveAt), in: &current, now: current.now)
             outcome.removalsScheduled += 1
             outcome.effectiveAt = max(effectiveAt, outcome.effectiveAt ?? effectiveAt)
         }
@@ -671,7 +749,7 @@ final class AppModel {
         let already = current.pending.contains { $0.kind == .unlink(targetID: id, kind: kind) }
         guard !already else { return .unchanged }
         let effectiveAt = current.now.addingTimeInterval(current.config.delay(for: target))
-        current.pending.append(PendingChange(kind: .unlink(targetID: id, kind: kind), effectiveAt: effectiveAt))
+        Record.queue(PendingChange(kind: .unlink(targetID: id, kind: kind), effectiveAt: effectiveAt), in: &current, now: current.now)
         SharedStore.save(current)
         SharedStore.log("queued unlinking a half of \(target.displayName)")
         enforce(reason: "unlink")
@@ -838,11 +916,15 @@ final class AppModel {
             return false
         }
         if Policy.classify(newRule: rule, against: target) == .tightening {
+            // What it replaced, so the next quarter of an hour can put it back. Only here,
+            // where a rule lands *now*: a loosening arriving after its delay needs no undo,
+            // because undoing a loosening is a tightening and those are instant anyway.
+            Forgiveness.record(previous: target.rule, on: &state.config.targets[index], at: state.now)
             state.config.targets[index].rule = rule
             return .appliedNow
         }
         let effectiveAt = state.now.addingTimeInterval(state.config.delay(for: target))
-        state.pending.append(PendingChange(kind: .setRule(targetID: id, rule: rule), effectiveAt: effectiveAt))
+        Record.queue(PendingChange(kind: .setRule(targetID: id, rule: rule), effectiveAt: effectiveAt), in: &state, now: state.now)
         return .scheduled(effectiveAt)
     }
 
@@ -856,7 +938,7 @@ final class AppModel {
             result = .appliedNow
         } else if !current.pending.contains(where: { $0.kind == .removeTarget(targetID: id) }) {
             let effectiveAt = current.now.addingTimeInterval(current.config.delay(for: target))
-            current.pending.append(PendingChange(kind: .removeTarget(targetID: id), effectiveAt: effectiveAt))
+            Record.queue(PendingChange(kind: .removeTarget(targetID: id), effectiveAt: effectiveAt), in: &current, now: current.now)
             result = .scheduled(effectiveAt)
         }
         SharedStore.save(current)
@@ -883,14 +965,22 @@ final class AppModel {
         return selection
     }
 
-    /// Replaces what the anchor holds. Refused while anchored, so nothing loosens under a lock.
+    /// Replaces the anchor's list: what it holds, or under the everything-except scope what it
+    /// lets through. Refused while anchored, so nothing loosens under a lock.
     func setAnchorSelection(_ selection: FamilyActivitySelection) {
         var current = SharedStore.load()
         guard !current.config.anchor.isAnchored else { return }
         var kinds: [TargetKind] = []
         kinds += selection.applicationTokens.map(TargetKind.application)
         kinds += selection.webDomainTokens.map(TargetKind.webDomain)
-        kinds += selection.categoryTokens.map(TargetKind.category)
+        // A category can be held, but it cannot be let through: `.all(except:)` excepts app
+        // and site tokens and nothing else. The picker expands a picked category into its apps
+        // (`includeEntireCategory`), so those are on the allowlist as apps, and the category
+        // token itself would only sit in the list unread. Dropped here rather than ignored
+        // downstream, so the list a person sees is the list that is enforced.
+        if !current.config.anchor.anchorsEverything {
+            kinds += selection.categoryTokens.map(TargetKind.category)
+        }
         // The picker speaks only about tokens, so it may only replace tokens. Anything the
         // anchor holds by name is kept: a selection that has never heard of a typed host is
         // not evidence that the host should be let go, and `Policy.decide` shields `.host`
@@ -899,17 +989,19 @@ final class AppModel {
         guard kinds != current.config.anchor.kinds else { return }
         current.config.anchor.kinds = kinds
         SharedStore.save(current)
-        SharedStore.log("anchor: now holds \(kinds.count) item(s)")
+        SharedStore.log("anchor: now \(current.config.anchor.anchorsEverything ? "lets through" : "holds") \(kinds.count) item(s)")
         enforce(reason: "anchor edit")
     }
 
     /// Takes what `targetIDs` cover into the anchor, on top of what it holds. This is the
     /// Anchor screen's first offer — the targets Furlough already blocks, chosen from
     /// `Config.anchorCandidates` — landing; Apple's picker is the other way in, through
-    /// `setAnchorSelection`. Refused while anchored, like every other change to the list.
+    /// `setAnchorSelection`. Refused while anchored, like every other change to the list, and
+    /// refused under the everything-except scope, where "what you already block" is already
+    /// held and taking it in would mean letting it through.
     func addToAnchor(targetIDs: [UUID]) {
         var current = SharedStore.load()
-        guard !current.config.anchor.isAnchored else { return }
+        guard !current.config.anchor.isAnchored, !current.config.anchor.anchorsEverything else { return }
         let chosen = current.config.targets.filter { targetIDs.contains($0.id) }
         guard current.config.anchor.add(chosen) else { return }
         SharedStore.save(current)
@@ -917,19 +1009,77 @@ final class AppModel {
         enforce(reason: "anchor edit")
     }
 
-    /// Anchoring is tightening, so it needs no tag. It does need a paired tag to exist, or there
-    /// would be no way back.
-    func anchor() -> AnchorOutcome {
+    /// Chooses how far the anchor reaches: its list, or the whole phone except its list.
+    /// Refused while anchored, like every other change to it.
+    ///
+    /// The list does not survive the switch, because it cannot: under one scope it is what
+    /// goes and under the other it is what stays, so a list carried across would turn TikTok
+    /// into the one app left open. Widening to the whole phone starts the allowlist from every
+    /// target tiered Essential (`Config.essentialKinds`); narrowing back starts the list empty,
+    /// where the rules sheet offers everything already blocked again in one tap. The Anchor
+    /// screen says both before asking.
+    func setAnchorScope(_ scope: AnchorProfile.Scope) {
         var current = SharedStore.load()
-        guard current.config.anchor.canAnchor else {
-            return current.config.anchor.isAnchored ? .anchored : .failed("Choose apps and pair a tag first.")
-        }
-        current.config.anchor.isAnchored = true
-        current.config.anchor.anchoredAt = current.now
+        guard !current.config.anchor.isAnchored, current.config.anchor.scope != scope else { return }
+        current.config.anchor.scope = scope
+        current.config.anchor.kinds = scope == .everythingExcept ? current.config.essentialKinds : []
         SharedStore.save(current)
-        SharedStore.log("anchored \(current.config.anchor.count) item(s)")
-        enforce(reason: "anchor")
-        return .anchored
+        SharedStore.log("anchor: scope is now \(scope.rawValue); the list starts with \(current.config.anchor.count) item(s)")
+        enforce(reason: "anchor scope")
+    }
+
+    /// Anchoring is tightening, so it needs no tag. It does need a paired tag to exist, or there
+    /// would be no way back. `until` makes it a timed drop: it lifts by itself then, or sooner
+    /// with the tag. The drop itself is `AnchorDrop`, shared with the intent that runs in the
+    /// widget extension; the app adds only what it alone can do, which is register the wake at
+    /// `until` through `enforce`.
+    func anchor(until: Date? = nil) -> AnchorOutcome {
+        switch AnchorDrop.drop(until: until, reason: "anchor") {
+        case .refused(.alreadyAnchored):
+            reload()
+            return .anchored
+        case .refused(let why):
+            return .failed(why.message)
+        case .anchored:
+            enforce(reason: "anchor")
+            return .anchored
+        }
+    }
+
+    /// Replaces the anchor's drop times. Refused while anchored, like every other change to it.
+    /// More drops or longer holds land at once; fewer or shorter ones queue behind the delay the
+    /// anchor's contents earn (`Config.anchorDelayHours`) as `PendingKind.setAnchorSchedules`,
+    /// so the pending list shows and cancels them like any other loosening. Saving the schedule
+    /// the anchor already has drops any queued change to it, the way choosing a saved tier back
+    /// cancels a queued tier.
+    func setAnchorSchedules(_ schedules: [AnchorSchedule]) -> ProposalResult {
+        var current = SharedStore.load()
+        let now = current.now
+        Policy.liftExpiredAnchor(&current.config, now: now)
+        guard !current.config.anchor.isAnchored else { return .unchanged }
+        let hadQueued = current.pending.contains { if case .setAnchorSchedules = $0.kind { return true }; return false }
+        current.pending.removeAll { if case .setAnchorSchedules = $0.kind { return true }; return false }
+        guard schedules != current.config.anchor.schedules else {
+            guard hadQueued else { return .unchanged }
+            SharedStore.save(current)
+            SharedStore.log("anchor schedule: cancelled the queued change")
+            enforce(reason: "anchor schedule")
+            return .unchanged
+        }
+        let result: ProposalResult
+        switch Policy.classify(newSchedules: schedules, against: current.config.anchor.schedules) {
+        case .tightening:
+            current.config.anchor.schedules = schedules
+            result = .appliedNow
+        case .loosening:
+            let effectiveAt = now.addingTimeInterval(TimeInterval(current.config.anchorDelayHours) * 3600)
+            current.pending.append(PendingChange(kind: .setAnchorSchedules(schedules), effectiveAt: effectiveAt))
+            result = .scheduled(effectiveAt)
+        }
+        SharedStore.save(current)
+        SharedStore.log("anchor schedule: \(TimeFormat.anchorSchedules(schedules)) (\(result == .appliedNow ? "now" : "queued"))")
+        enforce(reason: "anchor schedule")
+        return result
     }
 
     /// The only unblock in Furlough: scans a tag and, if it is one of the paired ones, lifts the
@@ -947,12 +1097,45 @@ final class AppModel {
             SharedStore.log("refused to weigh anchor: not a paired tag")
             return .wrongTag
         }
+        Record.noteAnchorReleased(&current, now: current.now)
         current.config.anchor.isAnchored = false
         current.config.anchor.anchoredAt = nil
+        current.config.anchor.until = nil
+        current.config.anchor.sequence += 1
         SharedStore.save(current)
         SharedStore.log("weighed anchor with \(matched.name)")
         enforce(reason: "weigh anchor")
+        // The one release the other device will take: a tag scan, on a phone.
+        AnchorSync.publish(current.config.anchor, origin: .tagScan, now: current.now)
         return .released
+    }
+
+    // MARK: The anchor across devices
+
+    /// A notification from iCloud that the other device wrote the anchor's record.
+    @ObservationIgnored private var cloudObserver: (any NSObjectProtocol)?
+
+    /// Listens for the other device's writes, once. iCloud posts the change to a running app
+    /// only, so the reconciler pulls on every wake besides — the monitor's callbacks reach the
+    /// record while the app is closed.
+    private func observeCloud() {
+        guard cloudObserver == nil else { return }
+        cloudObserver = NotificationCenter.default.addObserver(
+            forName: AnchorCloud.changeNotification, object: nil, queue: .main
+        ) { _ in
+            Task { @MainActor in AppModel.shared.applyRemoteAnchor(reason: "iCloud changed") }
+        }
+    }
+
+    /// Merges what the other device wrote, through `AnchorSync.merge`, and enforces if it
+    /// changed anything. Called on activation, when iCloud says the record changed, and by
+    /// every reconcile besides.
+    func applyRemoteAnchor(reason: String) {
+        var current = SharedStore.load()
+        guard let note = AnchorSync.pull(into: &current.config, now: current.now) else { return }
+        SharedStore.save(current)
+        SharedStore.log("iCloud anchor (\(reason)): \(note)")
+        if isAuthorized { enforce(reason: "iCloud anchor") } else { reload() }
     }
 
     /// Asked for by the Weigh Anchor intent, which opens the app to get here.
@@ -1092,7 +1275,7 @@ final class AppModel {
             result = .appliedNow
         } else {
             let effectiveAt = current.now.addingTimeInterval(current.config.delay(for: target))
-            current.pending.append(PendingChange(kind: .setUtility(targetID: id, level: level), effectiveAt: effectiveAt))
+            Record.queue(PendingChange(kind: .setUtility(targetID: id, level: level), effectiveAt: effectiveAt), in: &current, now: current.now)
             result = .scheduled(effectiveAt)
         }
         SharedStore.save(current)
@@ -1102,7 +1285,11 @@ final class AppModel {
     }
 
     func cancelPending(id: UUID) {
-        SharedStore.mutate { $0.pending.removeAll { $0.id == id } }
+        SharedStore.mutate { state in
+            let before = state.pending.count
+            state.pending.removeAll { $0.id == id }
+            Record.noteCancelled(before - state.pending.count, in: &state, now: state.now)
+        }
         SharedStore.log("cancelled pending change \(id)")
         enforce(reason: "cancel pending")
     }
@@ -1119,7 +1306,7 @@ final class AppModel {
         } else {
             // The base multiplies out to every target, so cutting it loosens the slowest one too.
             let effectiveAt = current.now.addingTimeInterval(current.config.longestDelay)
-            current.pending.append(PendingChange(kind: .setDelay(hours: clamped), effectiveAt: effectiveAt))
+            Record.queue(PendingChange(kind: .setDelay(hours: clamped), effectiveAt: effectiveAt), in: &current, now: current.now)
             result = .scheduled(effectiveAt)
         }
         SharedStore.save(current)
@@ -1137,9 +1324,16 @@ final class AppModel {
     func resetEverything() {
         SharedStore.reset()
         ShieldReconciler.clearEverything()
+        // A stale drop left in iCloud would anchor the phone again on its next pull.
+        AnchorCloud.clear()
         companionDismissed = []
         UserDefaults.standard.removeObject(forKey: AppModel.companionDismissedKey)
         SharedStore.log("reset everything (Debug build)")
+        // A reset leaves Screen Time access granted, so `requestAuthorization` never runs
+        // again and the first week would never start. A fresh install gets one; this is meant
+        // to look like a fresh install.
+        var current = SharedStore.load()
+        if Forgiveness.startTrial(&current.config, now: current.now) { SharedStore.save(current) }
         lastError = nil
         enforce(reason: "reset")
     }

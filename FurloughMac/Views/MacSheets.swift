@@ -93,6 +93,308 @@ struct AddAppSheet: View {
 }
 
 /// A website by host.
+/// The Anchor on the Mac: its list, its scope, and one button to drop it. No release here — a
+/// Mac has no tag reader — so the release arrives through iCloud from the phone's tag scan,
+/// and dropping is refused until a phone has been heard from. The list is this Mac's own,
+/// bundle identifiers and hosts, since a Screen Time token means nothing here.
+struct AnchorSheet: View {
+    @Environment(MacModel.self) private var model
+    @State private var apps: [InstalledApp] = []
+    @State private var query = ""
+    @State private var host = ""
+    @State private var message: String?
+    @State private var switchingTo: AnchorProfile.Scope?
+
+    private var anchor: AnchorProfile { model.state.config.anchor }
+    private var isHolding: Bool { anchor.isHolding(at: model.now) }
+
+    /// Installed apps matching the search and not already listed, a handful at a time.
+    private var found: [InstalledApp] {
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return [] }
+        return Array(apps.filter { app in
+            !anchor.contains(.macApp(bundleID: app.bundleID))
+                && (app.name.localizedCaseInsensitiveContains(trimmed) || app.bundleID.localizedCaseInsensitiveContains(trimmed))
+        }.prefix(8))
+    }
+
+    var body: some View {
+        SheetFrame(title: "Anchor", width: 560, height: 640) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    stateCard
+                    SectionLabel(text: "Scope")
+                    scopeCard
+                    SectionLabel(text: anchor.anchorsEverything ? "Stays open" : "Held")
+                    listCard
+                    if !isHolding {
+                        addCard
+                            .padding(.top, 10)
+                    }
+                    Footnote(text: footnote)
+                        .padding(.top, 8)
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 24)
+            }
+        }
+        .task { apps = AppCatalog.installed() }
+        .alert("Anchor", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
+            Button("OK") { message = nil }
+        } message: {
+            Text(message ?? "")
+        }
+        .confirmationDialog(
+            "Start the list again?",
+            isPresented: Binding(get: { switchingTo != nil }, set: { if !$0 { switchingTo = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button(switchingTo == .everythingExcept ? "Anchor everything except a list" : "Anchor chosen apps only") {
+                if let scope = switchingTo { model.setAnchorScope(scope) }
+                switchingTo = nil
+            }
+            Button("Keep it as it is", role: .cancel) { switchingTo = nil }
+        } message: {
+            Text(switchingTo == .everythingExcept
+                ? "The list becomes what stays open, starting from every app you tiered Essential. What it holds now is not carried over."
+                : "The list becomes what is held, starting empty.")
+        }
+    }
+
+    private var stateCard: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Eyebrow(text: isHolding ? "Anchored" : "Free", color: isHolding ? Ember.ember : Ember.moss)
+                Text(stateLine)
+                    .emberBody(13)
+                    .foregroundStyle(Ember.cream)
+            }
+            Spacer(minLength: 8)
+            if !isHolding {
+                Button {
+                    if let why = model.dropAnchor() { message = why }
+                } label: {
+                    Text("Drop anchor")
+                        .emberBody(13, .bold)
+                        .foregroundStyle(Ember.cream)
+                        .padding(.horizontal, 6)
+                }
+                .buttonStyle(.glassProminent)
+                .tint(Ember.ember)
+                .disabled(!anchor.hasSomethingToHold)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+        .emberCard()
+    }
+
+    private var stateLine: String {
+        let held = anchor.heldDescription
+        if isHolding, let since = anchor.anchoredAt {
+            let lift = anchor.until.map { " · lifts \(TimeFormat.clock($0))" } ?? ""
+            return "\(held) since \(since.formatted(date: .omitted, time: .shortened))\(lift)"
+        }
+        if anchor.scope == .chosen, anchor.kinds.isEmpty { return "Nothing chosen yet" }
+        if !model.phoneSeen { return "\(held) · waiting to hear from your iPhone" }
+        return "\(held) · ready"
+    }
+
+    private var scopeCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                scopeChip(.chosen, "Chosen apps")
+                scopeChip(.everythingExcept, "Everything except")
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 12)
+            Text(anchor.anchorsEverything
+                ? "Every app and website is held. Only what is listed stays open."
+                : "Only what is listed is held. Everything else keeps its own rules.")
+                .emberBody(12)
+                .foregroundStyle(Ember.muted)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.top, 10)
+                .padding(.bottom, 14)
+        }
+        .emberCard()
+    }
+
+    private func scopeChip(_ scope: AnchorProfile.Scope, _ title: String) -> some View {
+        let isOn = anchor.scope == scope
+        return Button {
+            guard !isOn else { return }
+            if anchor.kinds.isEmpty { model.setAnchorScope(scope) } else { switchingTo = scope }
+        } label: {
+            Text(title)
+                .emberBody(12, .semibold)
+                .foregroundStyle(isOn ? Ember.ground : Ember.muted)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(isOn ? Ember.amber : Color.white.opacity(0.06))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(isOn ? .clear : Ember.cardBorder, lineWidth: 1)
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(isHolding)
+    }
+
+    private var listCard: some View {
+        VStack(spacing: 0) {
+            if anchor.kinds.isEmpty {
+                Text(anchor.anchorsEverything ? "Nothing stays open." : "Nothing held yet.")
+                    .emberBody(13)
+                    .foregroundStyle(Ember.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 11)
+                if anchor.scope == .chosen, !isHolding, !model.state.config.anchorCandidates.isEmpty {
+                    CardDivider()
+                    Button {
+                        var copy = anchor
+                        copy.add(model.state.config.anchorCandidates)
+                        model.setAnchorKinds(copy.kinds)
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 12, weight: .bold))
+                            Text("Add everything you already block")
+                                .emberBody(13, .semibold)
+                        }
+                        .foregroundStyle(Ember.ember)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 11)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            ForEach(Array(anchor.kinds.enumerated()), id: \.offset) { index, kind in
+                if index > 0 { CardDivider() }
+                HStack(spacing: 10) {
+                    KindTile(kind: kind, size: 28)
+                    Text(name(of: kind))
+                        .emberBody(13, .medium)
+                        .foregroundStyle(Ember.cream)
+                        .lineLimit(1)
+                    Spacer()
+                    if !isHolding {
+                        Button {
+                            model.setAnchorKinds(anchor.kinds.filter { $0 != kind })
+                        } label: {
+                            Image(systemName: "minus.circle")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(Ember.muted)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .help("Take it off the list")
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+            }
+        }
+        .emberCard()
+    }
+
+    private var addCard: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Ember.faint)
+                TextField("Add an app", text: $query)
+                    .textFieldStyle(.plain)
+                    .emberBody(13)
+                    .foregroundStyle(Ember.cream)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            ForEach(found) { app in
+                CardDivider()
+                Button {
+                    add(.macApp(bundleID: app.bundleID))
+                    query = ""
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(nsImage: app.icon).resizable().interpolation(.high).frame(width: 24, height: 24)
+                        Text(app.name).emberBody(13, .medium).foregroundStyle(Ember.cream)
+                        Spacer()
+                        Image(systemName: "plus.circle")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(Ember.ember)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+            CardDivider()
+            HStack(spacing: 8) {
+                Image(systemName: "globe")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Ember.amber)
+                TextField("Add a website, like youtube.com", text: $host)
+                    .textFieldStyle(.plain)
+                    .emberBody(13)
+                    .foregroundStyle(Ember.cream)
+                    .onSubmit(addHost)
+                Button(action: addHost) {
+                    Text("Add")
+                        .emberBody(12, .semibold)
+                        .foregroundStyle(Hosts.normalize(host) == nil ? Ember.faint : Ember.ember)
+                }
+                .buttonStyle(.plain)
+                .disabled(Hosts.normalize(host) == nil)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+        }
+        .emberCard()
+    }
+
+    private var footnote: String {
+        if isHolding {
+            return "Scan the paired tag in Furlough on your iPhone to release it, there and here. The list cannot change until then."
+        }
+        let reach = anchor.anchorsEverything
+            ? "Everything not listed is blocked while anchored: apps are quit, and sites go to the shield page in every browser Furlough may read. Finder, the Dock and System Settings are never blocked."
+            : "Anything listed is blocked while anchored. Windows and budgets still apply the rest of the time."
+        return "\(reach) Dropping anchor here locks your iPhone too, through your iCloud account, and dropping it there locks this Mac. Only the tag on your iPhone releases either."
+    }
+
+    private func name(of kind: TargetKind) -> String {
+        switch kind {
+        case .macApp(let bundleID):
+            model.state.config.target(bundleID: bundleID)?.displayName ?? AppInfo.name(for: bundleID) ?? bundleID
+        case .host(let host):
+            host
+        }
+    }
+
+    private func add(_ kind: TargetKind) {
+        guard !anchor.contains(kind) else { return }
+        model.setAnchorKinds(anchor.kinds + [kind])
+    }
+
+    private func addHost() {
+        guard let normalized = Hosts.normalize(host) else { return }
+        add(.host(normalized))
+        host = ""
+    }
+}
+
 struct AddSiteSheet: View {
     let onAdd: (String) -> MacModel.AddOutcome
     @Environment(\.dismiss) private var dismiss
@@ -457,7 +759,7 @@ struct PendingCard: View {
                         .frame(width: 34, height: 34)
                 }
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(target?.displayName ?? "Loosening delay")
+                    Text(target?.displayName ?? PendingText.subject(of: change.kind) ?? "Loosening delay")
                         .emberDisplaySmall(13.5)
                         .foregroundStyle(Ember.cream)
                     PendingDeltaView(delta: delta)
@@ -486,6 +788,7 @@ struct SettingsSheet: View {
     @State private var result: ProposalResult?
     @State private var showLog = false
     @State private var confirmReset = false
+    @State private var confirmRemoveFilter = false
     @State private var setupFile: SetupDocument?
     @State private var setupName = ""
     @State private var exportError: String?
@@ -525,6 +828,12 @@ struct SettingsSheet: View {
             // sheet of its own, so this screen finds out on the way back in.
             showTesting = TestingTools.isShown
             #endif
+            Task { await model.enforcer.webFilter.refresh() }
+        }
+        .confirmationDialog("Remove the web filter?", isPresented: $confirmRemoveFilter, titleVisibility: .visible) {
+            Button("Remove the web filter", role: .destructive) { model.enforcer.webFilter.remove() }
+        } message: {
+            Text("Sites stay enforced in Safari and the Chromium browsers through the tab reader. Firefox, Dock web apps and everything else open up. Install it again here whenever you like.")
         }
         .alert("Delay", isPresented: Binding(get: { result != nil }, set: { if !$0 { result = nil } }), presenting: result) { _ in
             Button("OK") { result = nil }
@@ -609,6 +918,11 @@ struct SettingsSheet: View {
                 Footnote(text: "Raising the delay applies immediately. Lowering it waits out the current delay.")
                     .padding(.top, 8)
 
+                SectionLabel(text: "Web")
+                filterCard
+                Footnote(text: filterFootnote)
+                    .padding(.top, 8)
+
                 SectionLabel(text: "Browsers")
                 VStack(spacing: 0) {
                     if model.browserAccess.isEmpty {
@@ -629,7 +943,7 @@ struct SettingsSheet: View {
                     }
                 }
                 .emberCard()
-                Footnote(text: "Websites are enforced through each browser's address bar, so macOS asks once per browser. If one was refused, allow Furlough under System Settings > Privacy & Security > Automation.")
+                Footnote(text: "The tab reader: Furlough reads each browser's address bar and sends a blocked tab to its shield page, so macOS asks once per browser. If one was refused, allow Furlough under System Settings > Privacy & Security > Automation.")
                     .padding(.top, 8)
 
                 SectionLabel(text: "Enforcement")
@@ -722,6 +1036,64 @@ struct SettingsSheet: View {
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 24)
+        }
+    }
+
+    /// The web filter: its state, and the one action that state calls for.
+    @ViewBuilder
+    private var filterCard: some View {
+        let filter = model.enforcer.webFilter
+        let status = filter.status
+        VStack(spacing: 0) {
+            row("Web filter", status.label, color: filterColor(status))
+            switch status {
+            case .notInstalled, .failed:
+                CardDivider()
+                CardAction(title: "Install the web filter") { filter.install() }
+            case .awaitingApproval, .disabledInSettings:
+                CardDivider()
+                CardAction(title: "Open System Settings…") { WebFilter.openSystemSettings() }
+                CardDivider()
+                CardAction(title: "Check again", color: Ember.cream) { Task { await filter.refresh() } }
+            case .filterOff:
+                CardDivider()
+                CardAction(title: "Turn the filter on") { Task { await filter.enableFilter() } }
+            case .on:
+                CardDivider()
+                CardAction(title: "Remove the web filter", color: Ember.muted) { confirmRemoveFilter = true }
+            case .notInApplications, .installing:
+                EmptyView()
+            }
+        }
+        .emberCard()
+    }
+
+    private var filterFootnote: String {
+        let what = "The web filter is a system extension that sees every connection this Mac opens and refuses the ones to a blocked site, from any app: Firefox, a site saved to the Dock, anything that loads a site outside a browser. Those get the floating card rather than the shield page."
+        switch model.enforcer.webFilter.status {
+        case .notInApplications:
+            return what + "\n\nmacOS only loads it from an app in the Applications folder. Move Furlough there and open it again."
+        case .notInstalled:
+            return what + "\n\nmacOS asks twice: once to allow the extension, under System Settings > General > Login Items & Extensions, and once to let it filter."
+        case .awaitingApproval:
+            return what + "\n\nAllow it under System Settings > General > Login Items & Extensions > Network Extensions, then check again here."
+        case .disabledInSettings:
+            return what + "\n\nIt was switched off in System Settings. Sites are enforced by the tab reader alone until it is turned on again, under General > Login Items & Extensions > Network Extensions."
+        case .filterOff:
+            return what + "\n\nThe extension is in place but macOS is not sending it any traffic. Turning it on asks the filtering question again."
+        case .failed(let reason):
+            return what + "\n\n" + reason
+        case .installing, .on:
+            return what + "\n\nWhile something is blocked, connections that cannot be named are refused over QUIC and the browser falls back to the ordinary kind, where the name can be read. That is invisible, and only while a rule is in force."
+        }
+    }
+
+    private func filterColor(_ status: WebFilter.Status) -> Color {
+        switch status {
+        case .on: Ember.moss
+        case .awaitingApproval, .installing: Ember.pending
+        case .disabledInSettings, .filterOff, .failed, .notInApplications: Ember.ember
+        case .notInstalled: Ember.muted
         }
     }
 

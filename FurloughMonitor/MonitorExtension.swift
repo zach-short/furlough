@@ -4,12 +4,17 @@ import ManagedSettings
 import UserNotifications
 import WidgetKit
 
-/// Woken by iOS at window edges, at midnight, and when a budget threshold is reached.
-/// Every callback re-derives the shields from persisted state, so a missed or duplicated
-/// callback can never leave the shields out of sync.
+/// Woken by iOS at window edges, at midnight, when a budget threshold is reached, and — since
+/// 2026-09-09 — at the anchor's drop and lift times. Every callback re-derives the shields
+/// from persisted state, so a missed or duplicated callback can never leave the shields out
+/// of sync.
 final class MonitorExtension: DeviceActivityMonitor {
     override func intervalDidStart(for activity: DeviceActivityName) {
         super.intervalDidStart(for: activity)
+        if let event = anchorEvent(activity.rawValue, atStart: true) {
+            handle(event, activity: activity.rawValue)
+            return
+        }
         reconcile("intervalDidStart \(activity.rawValue)")
         announceOpening(activity)
     }
@@ -52,7 +57,86 @@ final class MonitorExtension: DeviceActivityMonitor {
 
     override func intervalDidEnd(for activity: DeviceActivityName) {
         super.intervalDidEnd(for: activity)
+        if let event = anchorEvent(activity.rawValue, atStart: false) {
+            handle(event, activity: activity.rawValue)
+            return
+        }
         reconcile("intervalDidEnd \(activity.rawValue)")
+    }
+
+    // MARK: The anchor's clock
+
+    /// What an anchor activity's callback means, or nil when this callback is the other end of
+    /// its interval. DeviceActivity wants a quarter of an hour, so the minute a drop or a lift
+    /// is set for is one end of a fifteen-minute activity and `ActivityNaming` says which; the
+    /// other end is only a wake, answered with the reconcile every wake gets.
+    private enum AnchorEvent {
+        case drop(minute: Int)
+        case lift
+    }
+
+    private func anchorEvent(_ raw: String, atStart: Bool) -> AnchorEvent? {
+        if raw == ActivityNaming.anchorUntil { return atStart ? nil : .lift }
+        if let minute = ActivityNaming.parseAnchorDrop(raw) {
+            return ActivityNaming.anchorInterval(minute: minute).firesAtStart == atStart ? .drop(minute: minute) : nil
+        }
+        if let minute = ActivityNaming.parseAnchorLift(raw) {
+            return ActivityNaming.anchorInterval(minute: minute).firesAtStart == atStart ? .lift : nil
+        }
+        return nil
+    }
+
+    private func handle(_ event: AnchorEvent, activity: String) {
+        switch event {
+        case .drop(let minute): scheduledDrop(minute: minute, activity: activity)
+        case .lift: liftIfDue(activity: activity)
+        }
+    }
+
+    /// The anchor drops itself: the schedule at this minute on today's weekday, if there is
+    /// one. `Policy.scheduledDrop` decides and is idempotent — a duplicated callback, or one on
+    /// a day the schedule is off, changes nothing — and every path ends in the reconciler. This
+    /// and `liftIfDue` are the monitor's two writes to `Config.anchor`, and the only ones
+    /// outside the app and the Drop Anchor intent.
+    private func scheduledDrop(minute: Int, activity: String) {
+        SharedStore.log(activity)
+        let now = SharedStore.load().now
+        var dropped: AnchorProfile?
+        SharedStore.mutate { state in
+            Policy.applyDuePending(&state, now: now)
+            if Policy.scheduledDrop(&state.config, minute: minute, now: now) != nil {
+                dropped = state.config.anchor
+            }
+        }
+        ShieldReconciler.reconcile(now: now, reason: "scheduled drop")
+        WidgetCenter.shared.reloadAllTimelines()
+        guard let dropped else { return }
+        let lift = dropped.until.map { " until \(TimeFormat.clock($0))" } ?? " until you scan your tag"
+        SharedStore.log("dropped anchor on schedule: \(dropped.heldDescription)\(lift)")
+        Notifier.post(id: "anchor-dropped", title: "Anchor dropped", body: "\(dropped.heldDescription) locked\(lift).")
+        AnchorSync.publish(dropped, origin: .drop, now: now)
+        SharedStore.announceChange()
+    }
+
+    /// A timed anchor's time has come. `Policy` has read it as released since the moment it
+    /// passed; this clears the flag, lifts the shields and says so.
+    private func liftIfDue(activity: String) {
+        SharedStore.log(activity)
+        let now = SharedStore.load().now
+        var lifted: AnchorProfile?
+        SharedStore.mutate { state in
+            Policy.applyDuePending(&state, now: now)
+            if Policy.liftExpiredAnchor(&state.config, now: now) { lifted = state.config.anchor }
+        }
+        ShieldReconciler.reconcile(now: now, reason: "anchor lift")
+        WidgetCenter.shared.reloadAllTimelines()
+        guard let lifted else { return }
+        SharedStore.log("anchor lifted by itself")
+        Notifier.post(id: "anchor-lifted", title: "Anchor lifted", body: "Everything it held is back on its own rules.")
+        // Informational: the Mac computes the same expiry from the `until` it holds, and
+        // `AnchorSync.merge` refuses this as a release.
+        AnchorSync.publish(lifted, origin: .lift, now: now)
+        SharedStore.announceChange()
     }
 
     override func eventDidReachThreshold(_ event: DeviceActivityEvent.Name, activity: DeviceActivityName) {
@@ -78,9 +162,11 @@ final class MonitorExtension: DeviceActivityMonitor {
             let day = Policy.dayKey(now)
             guard !state.runtime.isExhausted(target.id, dayKey: day) else { return }
             state.runtime.exhausted[target.id.uuidString] = day
+            Record.markSpent(target.id, in: &state, now: now)
             exhaustedName = target.displayName
         }
         ShieldReconciler.reconcile(now: now, reason: "threshold \(parsed.minutes)m")
+        LiveActivityManager.sync(state: SharedStore.load(), canStart: false)
         if let name = exhaustedName {
             Notifier.post(
                 id: "exhausted-\(parsed.targetID.uuidString)",
@@ -108,8 +194,10 @@ final class MonitorExtension: DeviceActivityMonitor {
             guard !state.runtime.wasWarned(target.id, dayKey: day),
                   !state.runtime.isExhausted(target.id, dayKey: day) else { return }
             state.runtime.warned[target.id.uuidString] = day
+            Record.markWarned(target.id, in: &state, now: now)
             warnedName = target.displayName
         }
+        LiveActivityManager.sync(state: SharedStore.load(), canStart: false)
         if let name = warnedName {
             Notifier.post(
                 id: "warning-\(parsed.targetID.uuidString)",
@@ -143,9 +231,14 @@ final class MonitorExtension: DeviceActivityMonitor {
         )
     }
 
+    /// Re-derives the shields, then brings the Lock Screen with them. `canStart: false` because
+    /// an extension may not ask for a Live Activity — only end the one whose window just closed
+    /// and update the one whose window just opened, which iOS started on the schedule the app
+    /// asked for while it was in front.
     private func reconcile(_ reason: String) {
         SharedStore.log(reason)
         ShieldReconciler.reconcile(reason: reason)
+        LiveActivityManager.sync(state: SharedStore.load(), canStart: false)
         WidgetCenter.shared.reloadAllTimelines()
     }
 }

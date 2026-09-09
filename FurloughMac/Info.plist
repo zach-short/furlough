@@ -30,5 +30,7 @@
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>Furlough reads the address of the page in front of you so it can block websites outside their windows, and sends a blocked tab to its shield page.</string>
+	<key>NSSystemExtensionUsageDescription</key>
+	<string>Furlough's web filter refuses connections to a website outside its windows from every app on this Mac, including browsers it cannot read.</string>
 </dict>
 </plist>

@@ -135,6 +135,25 @@ small codebase he fully understands over a fork. He is interactive: ask when a d
   that a pause would otherwise provide actually lives. Written up for users on the site:
   `site/src/pages/help/nfc-tags.astro` ("Why a tag and not a code") and
   `site/src/pages/help/the-anchor.astro` ("There is no pause").
+- **The first week and the undo window** (added 2026-09-09, step 27). Two mechanisms that
+  forgive a *mistake* without ever forgiving a *craving*, and neither is an unblock. The trap
+  they answer is arithmetic, not weakness: a target's first rule lands instantly because the
+  baseline is "unrestricted", while undoing that same rule is a loosening and waits a day —
+  so a curious tap costs nothing and taking it back costs a day. Zach raised it on 2026-09-09
+  ("people will mess around with the app out of curiosity and get frustrated when they lock
+  themselves out of Messenger for 24 hours"). He asked for Brick's five exemptions; a pass
+  count was argued down and refused, because people hoard passes, spend one at 11 PM on a
+  craving, and the counter becomes the thing to negotiate with. What went in instead:
+  `Config.isInTrial` caps `delayHours` at `Furlough.trialDelayHours` for `Furlough.trialDays`
+  after Screen Time access is first granted, and `Target.undo` puts an edit back *exactly as
+  it was* for `Furlough.undoWindowMinutes`. The undo is safe to be instant because it can
+  only restore the rule that was already in force: someone who wants TikTok open cannot reach
+  for it, because before the edit TikTok was shut too. The week is granted once per install —
+  `trialStartedAt` outlives the week precisely so that turning Screen Time access off and on
+  again, which is the documented way out, is not also a way to draw a fresh week every Sunday.
+  **The anchor gets neither, in that week or any other.** Nothing here touches `AnchorProfile`.
+  This amends the line above rather than replacing it: there is still no break, pause,
+  temporary access or emergency release, and there must never be one.
 - Extras that are in scope: "5 minutes left" notification, Live Activity during a window,
   home-screen widget. Websites are supported, and since 2026-09-08 in two kinds on the phone:
   one picked from Apple's picker, which is counted and wears Furlough's shield, and one typed
@@ -229,17 +248,34 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   `PendingText.swift` (`Delta`, the old → new pair a pending card shows; pure, so the phone
   and the Mac cannot word it differently),
   `AnchorCandidates.swift` (`Config.anchorCandidates`, what the Anchor offers before Apple's
-  picker, and `AnchorProfile.add`, what taking a target in adds).
+  picker, `AnchorProfile.add`, what taking a target in adds, and `Config.essentialKinds`, what
+  the everything-except allowlist starts as),
+  `AnchorSchedule.swift` (the anchor's clock: `AnchorSchedule`, `AnchorProfile.isHolding(at:)`,
+  `Policy.drop`, `scheduledDrop`, `liftExpiredAnchor`, `classify(newSchedules:against:)`,
+  `Config.anchorDelayHours`; step 24),
+  `AnchorDrop.swift` (iOS only: the one function that drops the anchor from any process),
+  `AnchorSync.swift` (the anchor across devices: `AnchorRecord`, the pure `merge` and
+  `macDrop`, and `AnchorCloud`, the iCloud key-value store; step 18),
+  `Record.swift` (the record of the contract: `accumulate` counts minutes into
+  `RuntimeState.days`, `markSpent`/`markWarned`/`queue`/`noteCancelled`/`noteLanded`/
+  `noteAnchorReleased` write the events, `card` and the copy functions are what the two screens
+  read. Pure, capped at 60 days, and never read by `Policy.decide` — see step 25).
+- `Shared/Intents`: `FurloughIntents.swift` (What's Open, both platforms), `StatusSpeech.swift`
+  (its sentence, tested), `DropAnchorIntent.swift` (iOS; compiled into the app and the widget
+  extension, see step 8).
 - `Tests/Core` (target `FurloughCoreTests`, macOS, Swift Testing, no host app): `Support.swift`
   (the pinned calendar and the fixtures), `ModelsTests`, `PolicyStatusTests`,
   `PolicyPendingTests`, `PolicySummaryTests`, `NamingTests`, `DecodingTests`, `ClockTests`,
   `QuitGraceTests`, `PendingNotificationTests`, `UtilityTests`, `UtilityPlanTests`,
   `ActivityLimitTests`, `PendingTextTests`, `CompanionsTests`, `ConfigImportTests`,
-  `HostTargetTests`, `HostImportTests`, `AnchorCandidatesTests`. 368 tests in 54 suites. It builds for **macOS**, so it
+  `HostTargetTests`, `HostImportTests`, `AnchorCandidatesTests`, `AnchorScopeTests`,
+  `AnchorScheduleTests`, `AnchorSyncTests`. 429 tests in 66 suites. It builds for **macOS**, so it
   reads the Mac's `TargetKind` and the Mac's `Decision`: the iOS `Decision.filteredHosts` and
   `ShieldReconciler.apply` cannot be reached from any test, which is why the nil-when-empty
   filter policy is a property of `Decision` rather than a line inside the reconciler.
-- `Shared/LiveActivity/FurloughActivityAttributes.swift` (app + widgets).
+- `Shared/LiveActivity/`: `FurloughActivityAttributes.swift` (app + widgets) and
+  `LiveActivityManager.swift` (app + widgets + monitor; it lived in `Furlough/Model` until
+  the monitor needed to end an activity at a window's edge, see step 10).
 - `Shared/UI/CompanionNudge.swift` (the phone's "you have one half of this" banner, on a
   named target whose other half is missing; the Mac asks at add time instead).
 - `Shared/UI/ImportReview.swift` (`ImportReviewList`, what an import would do, one view for
@@ -253,7 +289,7 @@ table. Not yet seen on the phone: install, then check the test steps in the last
 - `Furlough/` app: `Model/AppModel.swift` (`@MainActor @Observable`; `enforce()` folds in due
   pending changes, calls `Monitoring.register`, `ShieldReconciler.reconcile`, reloads widgets,
   syncs the Live Activity), `Model/Monitoring.swift` (DeviceActivity registration),
-  `Model/LiveActivityManager.swift`, `Model/TagScanner.swift` (Core NFC tag session as one
+  `Model/TagScanner.swift` (Core NFC tag session as one
   async call; the identifier is read at detection, no connect), `Views/`: `Root` (dark scheme,
   ember tint, holds the launch screen for a returning user and dissolves between launch,
   onboarding and home), `Launch` (`LaunchView`, the `Launch` timings,
@@ -289,10 +325,14 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   is wanted at the moment a shield will not lift and so must not send anyone to a browser. The
   other five topics are pages on the site: their rows are buttons that hand
   `Furlough.helpURL(_:)` to `openURL`, and wear `arrow.up.right` instead of a chevron so a tap
-  that leaves the app looks like one. The app itself still issues no network request, which is
-  what keeps "no networking code at all" true on the privacy page and in the App Store label),
+  that leaves the app looks like one. The app itself still issues no request to any server of
+  its own; since step 18 the Anchor's state goes to the user's iCloud key-value store, so the
+  privacy page no longer says "no networking code at all"),
   `Settings` + `LogView` (Settings gained the build version on 2026-09-09, because it moved out
-  of the old in-app About and the site cannot know which build is running). Screens are
+  of the old in-app About and the site cannot know which build is running),
+  `RecordCard` (the record, at the top of Settings; its Mac twin is
+  `FurloughMac/Views/MacRecord.swift`, where `MacRecordRows` is split out of
+  `MacRecordSection` so the sidebar's card can be rendered to a PNG with no app around it). Screens are
   `ScrollView`s over `EmberWall`, not `List`/`Form`; the iOS 26 toolbar supplies the glass.
 - `FurloughMonitor/MonitorExtension.swift`: every callback reconciles from shared state.
 - `FurloughShield/ShieldExtension.swift`: reads shared state, writes the copy via `ShieldText`,
@@ -356,9 +396,22 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   blocked still has no name; set a nickname to name it sooner.
 - `Policy.decide` is the union of rule shields and, while anchored, every kind in the anchor.
   `allowedApps` never contains an anchored app, so category exceptions cannot leak one through.
-  `AppModel.anchor()`, `unanchorWithTag()`, `pairTag()`, `setAnchorSelection()`,
-  `addToAnchor(targetIDs:)`, `unpairTag()` are the only writers of `Config.anchor`; the last
-  four refuse while anchored.
+  Since 2026-09-09 the anchor has a scope (step 13): under `.everythingExcept` the list is
+  the allowlist, `Decision.shieldsEverything` is set, and the allowed sets are the allowlist
+  less whatever a rule shields right now — so an allowlisted app outside its window is still
+  shut. `AnchorProfile.holds(_:)` is the one place the list is read the right way round;
+  everything that asks "is this held" (`blocks`, `Config.isAnchored`, the shield extension,
+  `anchorWarning`) goes through it, and `contains` means only "on the list".
+  `AppModel.anchor(until:)`, `unanchorWithTag()`, `pairTag()`, `setAnchorSelection()`,
+  `addToAnchor(targetIDs:)`, `unpairTag()`, `renameTag(id:to:)`, `setAnchorScope(_:)` and
+  `setAnchorSchedules(_:)` are the app's writers of `Config.anchor`; all but the first two
+  refuse while anchored. Since 2026-09-09 (step 24) there are writers outside the app, each
+  a tightening or an `until` the user chose: `AnchorDrop.drop` from the process running the
+  Drop Anchor intent, the monitor's `scheduledDrop` and `liftIfDue`, `Policy.apply` landing a
+  queued `.setAnchorSchedules`, and `Policy.liftExpiredAnchor` folded in `reconcile` and
+  `enforce`. A release still comes only from a tag scan in the app or an `until` passing.
+  Across devices (step 18) the same holds: `AnchorSync.merge` takes a release only from a
+  phone's tag scan, the Mac writes drops and never a release, and the list never travels.
 
 ## Known API facts and quirks
 
@@ -380,11 +433,28 @@ table. Not yet seen on the phone: install, then check the test steps in the last
 - Live Activities cannot animate custom views, so the hourglass in the activity and the
   island is drawn at the level of the last sync; only `Text(timerInterval:)` moves by itself.
 - ActivityKit's `Activity` is not Sendable; `LiveActivityManager` marks it
-  `@retroactive @unchecked Sendable` and does its work in a detached task. Live Activities can
-  only be started by the foreground app, so today one starts only if Zach opens Furlough while a
-  window is open. The iOS 26 `Activity.request(..., start:)` / `startDate:` overloads (see the
-  ActivityKit swiftinterface in the SDK) may allow scheduling the next window's activity ahead
-  of time; untested.
+  `@retroactive @unchecked Sendable` and does its work in a detached task. **Requesting** an
+  activity is still foreground-only, but **starting** one is not: the scheduled-start overload
+  exists, checked 2026-09-09 against
+  `$(xcrun --sdk iphoneos --show-sdk-path)/System/Library/Frameworks/ActivityKit.framework/Modules/ActivityKit.swiftmodule/arm64e-apple-ios.swiftinterface`:
+
+  ```swift
+  @available(iOS 26.0, *)
+  public static func request(
+      attributes: Attributes,
+      content: ActivityContent<Activity<Attributes>.ContentState>,
+      pushType: PushType? = nil,
+      style: ActivityStyle,
+      alertConfiguration: AlertConfiguration,
+      start: Foundation.Date
+  ) throws -> Activity<Attributes>
+  ```
+
+  The `startDate:` spelling beside it is the same call, introduced and deprecated in 26.0 —
+  use `start:`. `ActivityState.pending` (also iOS 26.0) is what a scheduled activity reads as
+  until its start arrives, and `Activity.activities` lists it while it waits, so a scheduled
+  activity is cancelled by ending it like any other. Deployment target is iOS 26.0, so no
+  `#available` is needed. See step 10.
 - Forum reports: threshold callbacks can fire a few minutes late, occasionally twice, and on
   iOS 26.2 sometimes with zero usage. The idempotent design absorbs the first two; if Zach
   reports budgets exhausting early, the activity log (Settings > Activity log) shows the raw
@@ -437,7 +507,8 @@ Open, and where each one lives:
   is still outstanding, and it is the gate on a lot of this file.
 - Third-party iOS browsers (does a web-domain shield reach Chrome on the phone?) → step 3; the
   answer goes in README's limits either way.
-- The Live Activity only starting if the app is opened during a window → step 10.
+- The Live Activity only starting if the app is opened during a window → step 10. Done
+  2026-09-09: `Activity.request(…, start:)` schedules the next window's activity ahead of time.
 - The shield icon still being the SF hourglass → **done**, 2026-09-08 evening, and not the way
   e9bfff2 tried: iOS calls `ShieldConfigurationDataSource` off the main thread, so a SwiftUI
   `ImageRenderer` behind a main-thread check never ran and the symbol fallback shipped. The
@@ -737,15 +808,52 @@ The plan for this stretch. Tick each phase off here as it lands.
    second copy, which was the design's one real bet. Whether `-g` actually keeps the reopen out
    of the user's face is still unconfirmed — he did not say either way, and he was looking at
    the app at the time, which is the worst case for noticing.
-8. **Anchor from anywhere**: `AnchorIntent`, `AppShortcutsProvider`, a Control Center
-   `ControlWidget`, a `Button(intent:)` on the medium widget. Anchoring is tightening, so every
-   surface is safe; release stays in the app behind the tag.
+8. **Anchor from anywhere.** Done 2026-09-09 (the Spotlight and Shortcuts half had landed
+   earlier as `DropAnchorIntent` in `PhoneIntents.swift`). The act of dropping is now one
+   function in `Shared/Core`, `AnchorDrop.drop(until:reason:)`: load, `Policy.drop` (pure,
+   tested), save, `ShieldReconciler.reconcile`, `SharedStore.announceChange`. `AppModel.anchor`
+   calls it and adds the one thing only the app can do, registering the wake at `until`
+   through `enforce`. `DropAnchorIntent` moved to `Shared/Intents/DropAnchorIntent.swift` and
+   is compiled into the app **and** the widget extension (`project.yml`), because a Control
+   Center control runs its intent in the extension with no app process to reach; the intent
+   never touches `AppModel`. `FurloughWidgets/DropAnchorControl.swift` is the control
+   (`ControlWidgetButton`, kind `com.zachshort.furlough.dropAnchor`, the `anchor` symbol from
+   `Ember.xcassets`), and the medium `StatusWidget` shows an Anchor `Button(intent:)` while
+   `Summary.canDropAnchor`. No release on any of these surfaces, on purpose.
+   **The widget extension now carries the Family Controls entitlement**, because the intent
+   applies the shields from that process the way the monitor does. Automatic signing adds the
+   development capability to `com.zachshort.furlough.widgets`; the *distribution* profile for
+   that bundle ID needs the distribution entitlement before the next upload (step 19).
+   **How the app finds out.** A drop from the widget or the monitor's schedule writes the
+   store while the app may be showing "Free", so `SharedStore.announceChange` posts a Darwin
+   notification (`com.zachshort.furlough.changed`) and `AppModel.observeChanges` (registered
+   once, in `activate`) reloads on it and enforces if anything changed
+   (`changedElsewhere`). The app's own writes come back through it and find nothing new.
+   Nobody has pressed the control on a phone.
 9. **Real usage on the phone**: a `FurloughReport` DeviceActivity report extension with a
    `budget` scene on the hero and in the rule editor, a `week` scene behind a History link, and
    quarter-mark threshold events if DeviceActivity accepts four events per target.
-10. **Live Activity at window start**, if the iOS 26 ActivityKit swiftinterface has a
-    scheduled-start `Activity.request`. If not, document the widget and the notification as
-    the coverage and move on.
+10. **Live Activity at window start.** Done 2026-09-09; the scheduled-start `Activity.request`
+    exists (the signature is quoted under "Known API facts and quirks"). `LiveActivityManager`
+    moved from `Furlough/Model` to `Shared/LiveActivity` so the monitor extension compiles it
+    too, and it now keeps up to two activities: the window that is open, and the window that
+    opens next, asked for with `start:` while the app is in front and appearing on its own on a
+    locked phone with Furlough closed. `Policy.Summary.nextOpenUntil` is the new piece of the
+    model — the far end of the window `nextOpenAt` opens — because scheduling needs both ends
+    of a window that has not started. It is nil for a rule with no windows, which is the same
+    set that gets no Live Activity while open (`Policy.close(of:in:from:)` guards on
+    `isAllDay`, since `windows(on:)` answers with the whole day for a rule that has none).
+    `LiveActivityManager.apply` works by matching on the attributes: two activities are the
+    same window when their start and end match, so the scheduled one simply becomes the open
+    one when its moment comes, and anything that is no longer one of the two wanted windows is
+    ended — which is how a tightening edit cancels a scheduled activity before it starts.
+    `MonitorExtension` calls `sync(state:canStart:)` with `canStart: false` at every window
+    edge, every threshold and every warning: an extension may not *request* one, but it may
+    update and end, so the activity now leaves the Lock Screen at the window's close without
+    the app being opened. **Watch for on the device:** the scheduled activity carries an
+    `AlertConfiguration` with the same sentence as the monitor's "Window opened" notification.
+    If iOS shows both, drop `announceOpening`'s `Notifier.post` in `MonitorExtension` — the
+    activity is the better of the two.
 11. **Per-weekday budgets.** Done 2026-09-09. `Rule.budgetByWeekday: [Int]?`, seven figures
     Sunday first (index = Calendar weekday − 1), nil meaning "same every day", and
     `Rule.budget(on:)` as the one accessor everything reads. `dailyBudgetMinutes` stays as the
@@ -790,7 +898,59 @@ The plan for this stretch. Tick each phase off here as it lands.
     - Nothing documents a per-activity event cap. Seven values (fourteen with a loosening
       queued) is more than we have ever registered; the "registered day + N window(s), M budget
       event(s)" log line and a run without a thrown registration would settle it.
-13. **Anchor the whole phone**: a scope on `AnchorProfile`, `.all(except:)` with an allowlist.
+13. **Anchor the whole phone.** Done 2026-09-09 as `AnchorProfile.scope`: `.chosen` (the list
+    is what goes; every store written before today decodes to it, since the key is missing) or
+    `.everythingExcept` (the list is what stays). One list, and one reader of it the right way
+    round: `AnchorProfile.holds(_:)`, which `blocks`, `Config.isAnchored(_:)`, the shield
+    extension and `anchorWarning` all go through, so nothing else knows which way the list is
+    read. `contains` still means "on the list" and is what the picker paths and
+    `anchorCandidates` use.
+    **The decision.** Under everything-except `Policy.decide` sets `Decision.shieldsEverything`
+    and replaces the allowed sets with the allowlist less what a rule shields now
+    (`allowedApps`, `allowedWeb`, and the new `allowedHosts` for typed hosts). Three computed
+    properties on the iOS `Decision` replaced `webFilterHosts` and are all the reconciler
+    writes: `appCategoryPolicy` and `webCategoryPolicy` become `.all(except:)`, and `webFilter`
+    becomes `.all(except:)` the allowlist's typed hosts by name plus its picked sites by token
+    (`WebDomain(token:)` is in the iOS 26.5 interface beside `WebDomain(domain:)`). Every
+    target off the list is `.anchored` by status, so rule shields sit on top exactly as before:
+    an allowlisted YouTube outside its window is still shut. A linked target with one door off
+    the list is held whole, as under the chosen scope. `isAnythingShielded` is true under the
+    scope even with an empty list, so `denyAppRemoval` holds. The Mac's `Decision` carries the
+    flag too, unread by its enforcer (item 4 gives the Mac an allowlist); its targets off the
+    list are `.anchored` through their status, and nothing on the Mac can set the scope yet.
+    **Why the filter as well as the shield.** `webDomainCategories = .all(except:)` can except
+    only tokens, so a typed host on the allowlist can be let through only by the filter, and
+    the filter is what reaches a browser other than Safari. **The cost, to find out on the
+    phone:** `.all(except:)` on the filter is Screen Time's "Allowed Websites Only", which may
+    block web content inside allowlisted apps. If it does, the line to drop is the
+    `shieldsEverything` branch of `Decision.webFilter`, and typed hosts leave the allowlist
+    with it.
+    **The seed.** `Config.essentialKinds` (in `AnchorCandidates.swift`): every door of every
+    target with `utilityLevel == .essential`; a table suggestion never counts.
+    `AppModel.setAnchorScope(_:)` is a new writer of `Config.anchor`, refused while anchored:
+    widening seeds the list from it, narrowing empties the list, because a list carried across
+    would turn TikTok into the one app left open. The Anchor screen asks before switching a
+    list that holds anything. `setAnchorSelection` drops category tokens under the scope
+    (`.all(except:)` excepts app and site tokens only, and the picker has already expanded a
+    category into its apps); `addToAnchor` refuses under the scope, so `AnchorFromRulesSheet`
+    is the chosen scope's offer only.
+    **Copy.** `AnchorProfile.heldDescription` ("3 items" / "Everything except 3" /
+    "Everything") feeds the Anchor screen's state line, the home card and the log; the widget
+    says "Everything anchored" off `Summary.anchorsEverything`; `StatusSpeech` and
+    `DropAnchorIntent` say "everything except 2 things".
+    **Not known, do not guess.** Which of iOS's own apps `.all(except:)` leaves reachable
+    (Phone, Settings and Clock are believed exempt, and Settings matters most, since it is the
+    escape hatch), and whether Safari shows Furlough's shield or iOS's filter page for a site
+    off the list while both policies are set. README's limits and the site's Anchor page each
+    carry a sentence saying the list is being confirmed; fill both from Zach's report.
+    **The one way the scope can loosen something, known and left.** An app on the allowlist
+    with no rule of its own that sits inside a category target is excepted from `.all` and so
+    open while anchored, where the category target shields it with the anchor up. Furlough
+    cannot see a token's category. It takes the same person putting the category in Furlough
+    and the app on the allowlist, so it is self-inflicted, but it is real.
+    Tests: `Tests/Core/AnchorScopeTests.swift`, 18 tests in 5 suites over the model, decoding,
+    the decision under each scope, the summary and the spoken answer, the seed, and the warning.
+    **Not seen on a phone.** Installed for Zach 2026-09-09; the test list is in the last message.
 14. **More than one tag.** Done 2026-09-08. Zach lives in two places and wanted a key at each,
     which is the case the anchor is for rather than a hole in it: a key three hours away is not
     a stronger lock, it is one nobody dares close. `AnchorProfile.tagID: Data?` became
@@ -859,8 +1019,81 @@ The plan for this stretch. Tick each phase off here as it lands.
     `27b1c254-594f-46fe-9b3e-232c38a9e9d2`, toned-down (in use)
     `fd975516-80d9-4941-b0c4-6cd7be8fd92a`. Planned: a transparent-background hourglass for the
     shield icon and the hero, an onboarding hero, and short README clips.
-18. **Sync the Anchor across devices** through CloudKit or the key-value store. Rules cannot
-    sync (tokens versus bundle ids). Ask Zach whether he wants it at all.
+18. **Sync the Anchor across devices.** Done 2026-09-09 (pass-off item 4), in
+    `Shared/Core/AnchorSync.swift` with `Tests/Core/AnchorSyncTests.swift` (11 tests in 2 suites).
+    Zach was not asked which transport; the pass-off recommended the iCloud key-value store
+    and that is what was built, for the reason it gave: it works when the devices are apart
+    (anchor at work, the Mac at home locks), needs no pairing screen and no server, and about
+    150 lines. If he wants zero cloud, the local-network transport replaces `AnchorCloud` only;
+    `merge` and the writers stay.
+    **What travels.** `AnchorRecord`: `sequence`, `isAnchored`, `anchoredAt`, `until`, `writer`
+    (a per-device UUID in the App Group), `platform` (phone or mac), `origin` (drop, tagScan,
+    lift), `writtenAt`. Never the list: each device keeps its own (`AnchorProfile.kinds`), and
+    the Mac's is bundle identifiers and hosts. `AnchorProfile.sequence` is the clock: every
+    drop and every tag release moves it one on, and `merge` moves it on to whatever the other
+    device last wrote, refused or not, so the next local write is past anything either has
+    seen.
+    **The merge**, `AnchorSync.merge(local:remote:now:)`, pure: highest sequence wins; a
+    release is taken only when the record says `tagScan` from a `phone` (the Mac never writes
+    one, and a `lift` is informational — each device computes a timed anchor's expiry from the
+    `until` it holds); a remote `until` is judged by `now`, which callers pass as Furlough's
+    own time, so a drop already over here does not drop here; a drop over an anchor already
+    down can only lengthen the hold (`Policy.tighterUntil`). `pull(into:now:)` reads the store,
+    skips this device's own record, and returns a note when the hold changed.
+    **Who writes.** Phone: `AnchorDrop.drop` (every drop, the widget's included), the monitor's
+    `scheduledDrop` and `liftIfDue`, `AppModel.unanchorWithTag` (the one release, origin
+    `tagScan`). Mac: `MacModel.dropAnchor` only. **Who reads.** `ShieldReconciler.reconcile`
+    pulls on every wake in every process, so the monitor's callbacks hear of a Mac drop while
+    the app is closed; `AppModel` pulls on activation and on
+    `NSUbiquitousKeyValueStore.didChangeExternallyNotification`; `MacModel` pulls in `enforce`,
+    on the same notification, and every 30 s from its ticker with a `synchronize()`, since the
+    notification is not a promise. iCloud delivers the notification to a running app only, so
+    a phone with Furlough closed and no wake due learns of a Mac drop when it next runs — a
+    limit of the store, written into README.
+    **The Mac.** `MacModel.dropAnchor` (through `AnchorSync.macDrop`: needs something to hold
+    and `AnchorSync.phoneSeen`, set the first time a phone's record is read, because a Mac
+    anchor can only ever be released by a phone's tag and a drop with no phone would be a lock
+    with no key — `Policy.DropRefusal.noPhone`), `setAnchorKinds`, `setAnchorScope`,
+    `applyRemoteAnchor`. `AnchorSheet` in `MacSheets.swift`, behind the lock in the sidebar's
+    toolbar (`MacRootView`): state, Drop anchor, the scope chips from the phone, the list with
+    app search over `AppCatalog.installed()` and a host field, and "Add everything you already
+    block" for an empty chosen list. The Mac's `Decision` gained `allowedApps`, `allowedHosts`,
+    `blocks(app:)` and `blocks(host:)`, and `Enforcer` uses them: under everything-except any
+    app with a Dock presence that is not on the list is quit, except `AppCatalog.excluded`, and
+    any site in a readable browser that is not under an allowlisted host goes to the shield
+    page under its own name with the anchored glass. `Enforcer.tick`, `MacModel.enforce` fold
+    `Policy.liftExpiredAnchor` like the phone. `MacHero`'s anchored line now says the phone's
+    tag releases it.
+    **Entitlements.** `com.apple.developer.ubiquity-kvstore-identifier` =
+    `$(TeamIdentifierPrefix)com.zachshort.furlough` on the app, the monitor, the widgets and
+    the Mac (`project.yml`), one identifier so all four read one record. The iOS App IDs get
+    iCloud from automatic signing. **The Mac needs a provisioning profile for iCloud**, which
+    the App Group never did; the Mac build line gained `-allowProvisioningDeviceRegistration`,
+    and on 2026-09-09 that registered this Mac with the team from the command line (the
+    "Device isn't registered" refusal of 2026-09-08 was the missing flag, not a wall) and
+    embedded "Mac Team Provisioning Profile: com.zachshort.furlough.mac". `codesign -d
+    --entitlements` on both the Mac app and the widget appex shows the identifier expanded to
+    `X9V4L6HR2R.com.zachshort.furlough`, and the appex carries Family Controls. So a
+    `group.`-prefixed App Group would work on the Mac now too; the team-prefixed one is kept
+    because the store already lives there.
+    **Whether the extensions can write the store** is not known: Apple does not document
+    `NSUbiquitousKeyValueStore` in app extensions either way. The monitor and the widget try
+    (`AnchorSync.publish`), and if the write does not leave the extension the app publishes
+    nothing for it until its next own write — worth one look on the phone: drop from Control
+    Center, then check whether the Mac locks before the app is opened.
+    **Privacy.** `site/src/pages/privacy.astro`, `index.astro`, `help/about.astro`,
+    `design/store/LISTING.md`, `MacHelp` and the comments in `HelpView` and `Furlough.swift`
+    no longer say "no networking code at all". The claim now: no server of ours, no analytics,
+    no third-party code; the Anchor's state alone goes to the user's own iCloud key-value
+    store, which Apple keeps under their Apple Account and Furlough cannot read. The label
+    stays "Data Not Collected" on the reading that private iCloud storage under the user's own
+    account is not collected by the developer — **verify Apple's current wording before the
+    next upload**, and carry the same sentence into
+    `~/Projects/archive/furlough/testflight-deployment/DEPLOYMENT.md`, which still says "no
+    network code" three times and belongs to item 1's session.
+    **Debug reset** clears the iCloud record too (`AnchorCloud.clear`), or a stale drop would
+    anchor the phone again on its next pull.
+    **Not seen on either device.** The two-device test list is in the last message.
 19. **TestFlight, then the App Store.** Started 2026-09-08; `~/Projects/archive/furlough/testflight-deployment/DEPLOYMENT.md` is the map and the
     status table. Done so far: `Shared/PrivacyInfo.xcprivacy` (Data Not Collected; the two
     required-reason APIs are UserDefaults `1C8F.1`/`CA92.1` and system boot time `35F9.1` for
@@ -1254,16 +1487,6 @@ The plan for this stretch. Tick each phase off here as it lands.
     **Nobody has used this on the phone yet.** Installed 2026-09-08. What to check is in the last
     message.
 
-    (b) **"This app and This app is worth having around."** From Zach's Anchor screenshot the same
-    day: two faults in one sentence. `UtilityText.fallback` hardcoded singular verbs for all three
-    tiers while `anchoring` is the one function here that can be about several things, so it now
-    takes the count and picks the verb — "are how this phone does its job", "go the moment you
-    anchor". The one-app `detail` is dropped once there is more than one name: `anchorWarning` hands
-    over the first it finds, and "Messages is where your codes land" cannot stand as the sentence
-    for Messages *and* Phone. `anchorWarning` also collapses duplicate names, so the exact sentence
-    Zach saw cannot come back even where the tables cannot name anything. Tests in `UtilityTests`
-    cover one, two and three names at every tier that speaks.
-
 23. **Apps the picker will not show, and the no-QR/no-pause decisions.** Done 2026-09-09, from
     the pass-off's items 8a and 10 in one session, no Xcode.
 
@@ -1301,6 +1524,318 @@ The plan for this stretch. Tick each phase off here as it lands.
     `bun run build` in `site/` is clean (see the message this step ends with for the output).
     Nothing here touches `Shared/Core`, so no test target and no Xcode build were needed, matching
     the pass-off's note that this item wants neither.
+24. **The Anchor's clock.** Done 2026-09-09 (pass-off item 2), in `Shared/Core/AnchorSchedule.swift`
+    beside `Models.swift`, with `Tests/Core/AnchorScheduleTests.swift` (32 tests in 5 suites).
+
+    **A timed drop.** `AnchorProfile.until: Date?`. "Anchor until 6 PM" drops now and lifts by
+    itself then, or sooner with the tag. The rule every reader follows: `AnchorProfile
+    .isHolding(at:)` is false once `until` has passed, whatever `isAnchored` still says, and
+    `blocks(_:at:)`, `Config.isAnchored(_:at:)`, `Policy.status`, `decide`, `summary` and the
+    shield extension all take the moment. `Policy.nextTransition` returns `until` when it comes
+    before the next window edge, so the widget timeline shows the lift. The flag is cleared by
+    `Policy.liftExpiredAnchor`, folded wherever due pending changes are folded —
+    `ShieldReconciler.reconcile` and `AppModel.enforce` — and the monitor's wake at `until`
+    (`ActivityNaming.anchorUntil`, a non-repeating quarter-hour activity ending at `until`,
+    registered on the device's clock) is what makes sure some process folds it on time. A
+    timed drop needs at least `Furlough.minimumWindowMinutes` (`Policy.DropRefusal.tooSoon`),
+    because DeviceActivity will not wake for less. The Anchor screen's **Lifts by itself**
+    toggle and time make the next drop timed (`AnchorToggleButton(until:)`); the home card,
+    the state line, the hero and the widget say "lifts 6:00 PM". **Zach has not said whether
+    the lift should notify; it does** ("Anchor lifted", the shape of "Window opened"), as the
+    pass-off recommended, and so does a scheduled drop ("Anchor dropped"). Both are one
+    `Notifier.post` in `MonitorExtension` if he wants either gone.
+
+    **A scheduled drop.** `AnchorProfile.schedules: [AnchorSchedule]` — a minute of the day, a
+    `Weekdays` set, and an optional `liftMinuteOfDay` (nil is the tag alone; a lift earlier
+    in the day than the drop is the next morning, `liftDate(afterDropAt:)`). One repeating
+    activity per distinct drop minute (`anchor:<minute>`) and one per distinct lift minute
+    (`anchor-lift:<minute>`), whatever days they are on, the way windows share activities;
+    the monitor checks the weekday when it fires. **The quarter-hour rule**: DeviceActivity
+    wants 15 minutes, so the minute is one *end* of a 15-minute activity and
+    `ActivityNaming.anchorInterval(minute:)` says which — the end, except in the first quarter
+    hour after midnight, where it is the start — and `MonitorExtension.anchorEvent` acts on
+    that callback only; the other end is a plain reconcile. `Policy.scheduledDrop` is the
+    monitor's decision and is idempotent: nothing on a day the schedule is off, nothing
+    without a tag or a list, and with the anchor already down it only ever lengthens the
+    hold (`Policy.tighterUntil`: nil beats any time, later beats earlier). The lift is counted
+    from the minute the schedule names, not the callback, so a late wake cannot push it. The
+    lift activities call `Policy.liftExpiredAnchor` and do nothing when nothing is due.
+    `ActivityLimit.activities(in:)` now counts window spans plus the anchor's times (drop
+    minutes, lift minutes, and one for a timed `until`), saved schedules and queued ones
+    together; `Monitoring.register` refuses on that total, registers the anchor's activities
+    after the windows and each on its own, logging a refusal rather than throwing it, so one
+    refused wake cannot cost the windows. Every `ActivityLimit.reason` sees the total, and
+    `reason(schedules:in:)` is the schedule editor's.
+    **Zach has not said whether removing a schedule should queue; it does**, as the pass-off
+    recommended: `Policy.classify(newSchedules:against:)` calls it tightening when every old
+    drop still happens on every old day with a lift no earlier (nil the latest of all), and
+    loosening otherwise — so adding a drop, a day, or a later lift lands now, and removing a
+    drop, a day, a lift's lateness, or *moving* a drop earlier queues as
+    `PendingKind.setAnchorSchedules` behind `Config.anchorDelayHours` (the longest delay among
+    the targets the anchor holds, since a dropped schedule loosens the hold over all of them;
+    the base when it holds none). Moving 10 PM to 9 PM queues on purpose: the 10 PM drop is
+    gone and a tag scanned at half past nine would leave it uncovered; add 9 PM and let 10 PM's
+    removal wait. `AppModel.setAnchorSchedules` does the queueing, refuses while anchored, and
+    treats saving the schedule the anchor already has as cancelling a queued change, the way
+    a saved tier chosen back cancels a queued tier. `Policy.apply`, `PendingText.delta`,
+    `PendingText.subject` ("Anchor schedule", the card's heading), `PendingNotifications
+    .describe` and `TimeFormat.anchorSchedules` carry the new kind; both pending cards use
+    `subject`. If Zach says no, the change is to make `setAnchorSchedules` always land.
+    `AnchorScheduleSheet` (in `AnchorView.swift`) edits the set as one draft with one Save and
+    the `EffectBanner` above it, `ScheduleDraftRow` reusing `TimeChip`, `TimePickerSheet` and
+    `DayStrip` from the rule editor; the Anchor screen lists the schedule and the next drop.
+
+    **Writers, now.** `Config.anchor` is written by the app's `AppModel` methods (the list in
+    "How enforcement works"), by `AnchorDrop.drop` from whichever process runs the Drop Anchor
+    intent, by the monitor's `scheduledDrop` and `liftIfDue`, by `Policy.apply` landing a
+    queued `.setAnchorSchedules`, and by the expiry fold in `reconcile` and `enforce`. Nothing
+    else, and nothing outside the app writes a release except an `until` the user chose.
+
+    **Not seen on a phone.** Installed 2026-09-09; the test list is in the last message, and
+    it includes a drop two minutes out with the app closed, the widget button and the control.
+
+    (b) **"This app and This app is worth having around."** From Zach's Anchor screenshot the same
+    day: two faults in one sentence. `UtilityText.fallback` hardcoded singular verbs for all three
+    tiers while `anchoring` is the one function here that can be about several things, so it now
+    takes the count and picks the verb — "are how this phone does its job", "go the moment you
+    anchor". The one-app `detail` is dropped once there is more than one name: `anchorWarning` hands
+    over the first it finds, and "Messages is where your codes land" cannot stand as the sentence
+    for Messages *and* Phone. `anchorWarning` also collapses duplicate names, so the exact sentence
+    Zach saw cannot come back even where the tables cannot name anything. Tests in `UtilityTests`
+    cover one, two and three names at every tier that speaks.
+
+25. **The record.** Done 2026-09-09. Foqos shows streaks and session history; Furlough shows the
+    record of the contract instead — the numbers only a commitment device can produce.
+    `Shared/Core/Record.swift` is the whole of it, pure and with a `calendar:` on everything that
+    touches a day boundary, and `RuntimeState.days: [String: DayRecord]` (by `Policy.dayKey`, 60
+    days, pruned on every write) is where it lives. The activity log is free text and capped, so
+    nothing parses it.
+
+    **What is written, and where.** `DayRecord` holds, per target id, whether the budget was
+    spent, whether the warning fired, and minutes open / shut / anchored; and per day, loosenings
+    queued, cancelled and landed, plus the longest Anchor stretch that ended that day. Every
+    write sits on an event that already happened: `Record.markSpent`/`markWarned` beside the two
+    lines that stamp `runtime.exhausted`/`runtime.warned` (the monitor's threshold callbacks on
+    the phone, `Enforcer.apply` on the Mac); `Record.queue` *replaces* `state.pending.append`
+    everywhere, so a new queueing site cannot forget to count itself; `noteCancelled` in both
+    models' `cancelPending`; `noteLanded` inside `Policy.applyDuePending`, the one place a
+    loosening lands; `noteAnchorReleased` in `AppModel.unanchorWithTag` while `anchoredAt` still
+    says when the stretch began, so one that ran over midnight stays one number.
+
+    **The minutes.** `Record.accumulate` runs inside `ShieldReconciler.reconcile` on the phone and
+    `Enforcer.apply` on the Mac — the two places everything already funnels through. It counts
+    whole minutes from `runtime.recordedThrough` and carries the remainder, so once a second and
+    once an hour come to the same total, and it cuts the span at every `Policy.nextTransition`
+    (which is also every midnight), so a phone catching up over hours is counted edge by edge
+    rather than sampled once. A gap longer than a day counts at most a day: a phone that was off
+    for a week was not holding anything shut. What it cannot do is see **use**: without the iOS
+    26.4 data-access entitlement the phone knows only whether a budget ran out, so `spent` is the
+    honest limit and the copy does not pretend otherwise (`UsageReader` could add real minutes if
+    that entitlement ever lands — see step 9).
+
+    **The screens.** A card at the top of Settings on the phone and a section at the foot of the
+    Mac sidebar, both drawing the same five rows from the same `Record` copy functions so neither
+    platform can word it differently: no budget spent, held shut this week, anchored (only when
+    there was), loosenings cancelled against landed, longest anchor. A number is Geist Mono, an
+    absence is muted body text, and the card draws nothing at all until there is something to
+    say. Nothing is celebratory: a streak that broke reads "Back to day one." and the day a
+    budget goes reads "Not today." Home was left alone deliberately — it is lane A's file this
+    week, and the record is not a thing to put in front of somebody every time they open the app.
+
+    **Two things worth knowing.** `RuntimeState` and the two new records now have tolerant
+    `init(from:)`s: a synthesised decoder throws on a missing key rather than falling back to the
+    property's default, and a phone that has been running since before the record existed has no
+    `days` key. And "held shut" adds up across every app, so it is app-hours rather than hours;
+    the footnote under the card says which numbers are this week and which are the whole record.
+    `SharedStore.reset` already clears it with the rest of the runtime, so Testing > Reset
+    everything forgets it.
+26. **The Mac web filter (item 8b, lane E).** Built 2026-09-09 on branch `lane-e-mac-filter`:
+    compiled in Debug and Release, 21 new tests, the built bundle read back — and **not yet run
+    on a Mac**, because installing a system extension takes two approvals in front of the
+    screen. The test list is at the end of this step.
+
+    **Why it was built without the distribution answer the pass-off asked for.** The gate was
+    a premise, and the premise was wrong. Apple's DTS (Quinn, developer forums 816877 and
+    67613): "There is no approval process for this… the one for content filters [has been]
+    available to all (paid) developers" since November 2016. A development-signed system
+    extension loads from an app in `/Applications` with SIP on (forums 725805, 765931), which
+    is exactly the `ditto` install this Mac already uses. And the archive's DEPLOYMENT.md
+    section 3 had already settled the Mac's road as Developer ID plus notarization, with only
+    *when* open. So nothing about distribution blocks the build; what it blocks is strangers
+    installing it, which was true before this step. Everything is on the branch and touches
+    nothing on `main` until Zach merges it.
+
+    **What it is.** A `NEFilterDataProvider` system extension, `FurloughMacFilter` (bundle
+    `com.zachshort.furlough.mac.filter`, `type: system-extension` in `project.yml`, embedded by
+    XcodeGen's "Embed System Extensions" phase at `Contents/Library/SystemExtensions/`). It sits
+    beside the tab reader, not instead of it: `Browsers` still redirects Safari and the Chromium
+    family to the shield page, and the filter drops the connection everywhere the reader cannot
+    see — Firefox, a site saved to the Dock as an app, an app loading a site on its own. Those
+    get the floating card, which the extension asks for over XPC.
+
+    - `Shared/Core/FlowRules.swift`, pure and tested (`Tests/Core/FlowRulesTests.swift`):
+      `FilterRules` (the hosts, a horizon, a version; to and from the `vendorConfiguration`
+      dictionary), `FlowRules.newFlow` (the verdict as a connection opens), `FlowRules.inspect`
+      (the verdict after looking at its first bytes), and the two parsers: the TLS ClientHello's
+      server name, reassembled across records, and HTTP/1's Host header. The TLS fixtures are
+      real hellos written by OpenSSL 3.6 through Python's `MemoryBIO` with no network, with
+      X25519MLKEM768 key shares, so they are as large as a hello gets.
+    - `FurloughMacFilter/FilterDataProvider.swift`: the shell. Reads the rules out of
+      `filterConfiguration.vendorConfiguration` at start and on every KVO change, keeps a
+      per-flow buffer while peeking, reports drops. `FilterReporter` is the XPC listener on
+      `X9V4L6HR2R.com.zachshort.furlough.filter` (the name must start with one of the
+      extension's App Groups, which is the only reason it carries one). `main.swift` calls
+      `NEProvider.startSystemExtensionMode()`. `FilterXPC.swift` holds the two `@objc`
+      protocols and the names, and is compiled into the app too.
+    - `FurloughMac/Model/WebFilter.swift`: the app's side. `ExtensionRequest` wraps one
+      `OSSystemExtensionRequest` as an async call; `WebFilter` installs, removes, refreshes
+      (`propertiesRequest` plus `NEFilterManager.loadFromPreferences`), pushes rules, and
+      holds the `FilterLink` XPC client with a five-second reconnect. `Status` is what
+      Settings > Web shows: not in Applications, not installed, installing, waiting for
+      approval, off in System Settings, installed but not filtering, on, failed.
+    - `Enforcer` pushes `decision.blockedHosts` after every tick through `WebFilter.sync`,
+      which saves only when the list or the horizon changed; `noteFiltered` shows the card for
+      a drop from anything that is not a browser the reader covers, and logs every drop.
+    - Settings > Browsers became Settings > Web: the filter card with its one action per
+      state, then the browser rows as before. Onboarding gained a second pane offering the
+      filter, with Not now. Help's "How blocking works here" and About say what it reads.
+
+    **The four decisions, made here and worth Zach's eye.**
+    - **Every block still derives from `Policy.decide`, including its expiry.** The rules carry
+      `until` = `Policy.nextTransition` (on the device's clock, shifted by the drift), and the
+      extension blocks nothing past it. So a force-quit Furlough leaves at most one window's
+      worth of blocking behind, and the watchdog has it back in ten seconds anyway. Foqos
+      instead enforces its last list forever; this is the honest version of README's "Force
+      Quit lifts every block", and README now says exactly what it lifts.
+    - **Nameless QUIC is refused while anything is blocked.** macOS names a flow only when the
+      app connected by name (`remoteHostname`; Safari and Firefox do, the Chromium browsers
+      resolve first and connect to the address, so theirs are nameless — DTS, forums 767285).
+      A nameless TCP flow on 443 or 80 is peeked for its TLS server name or Host header. A
+      nameless UDP 443 flow is QUIC, whose first bytes cannot be read the same way, so it is
+      dropped and the browser falls back to TCP on its own. Only while `blockedHosts` is
+      non-empty, so a Mac with nothing blocked right now filters nothing at all. Foqos drops
+      UDP 443 outright, always.
+    - **Removing the filter is not held behind the loosening delay**, for the reason the
+      watchdog toggle is not: System Settings can switch the extension off regardless, and a
+      button that pretended otherwise would lie. The tab reader keeps enforcing either way.
+    - **No budget counting from flows.** The front-app counter already counts a site in the
+      front tab, and a flow says nothing about what is in front, so counting flows would
+      double-count exactly the sites the reader sees. Left alone, as the pass-off allowed.
+
+    **What the build changed outside the repo, by automatic signing.** The portal now has App
+    IDs `com.zachshort.furlough.mac` (Network Extensions, System Extension) and
+    `com.zachshort.furlough.mac.filter` (Network Extensions), and a Mac Team Provisioning
+    Profile for each, provisioned to this Mac (`00008132-001148422103001C`, which was already
+    registered). The app carries `embedded.provisionprofile` for the first time; the profile's
+    entitlement list includes `content-filter-provider`, read back with `security cms -D`. The
+    entitlement value is the plain `content-filter-provider` on both bundles — right for
+    development and the App Store; only a Developer ID build wants
+    `content-filter-provider-systemextension` (DTS, forums 737894). `ENABLE_DEBUG_DYLIB` is
+    off on the extension because a system extension must be one Mach-O; the app keeps its
+    Debug split. `-allowProvisioningDeviceRegistration` was added to the build line in case,
+    and turned out unnecessary.
+
+    **Distribution, when Zach wants strangers to have it** (none of this is needed on this Mac):
+    a Developer ID Application certificate (Account Holder only: Xcode > Settings > Accounts >
+    Manage Certificates); two Developer ID profiles from the portal, app and extension, with
+    the Network Extension capability; a second pair of entitlements files carrying
+    `content-filter-provider-systemextension`; re-sign inside-out by hand — extension, then
+    app — with the hardened runtime, because Xcode 26's Direct Distribution is broken for
+    system extensions (DTS, r.108838909, fixed in Xcode 27 beta); notarize with `notarytool`
+    on key `L6A2R4SBXQ`; staple; ship a DMG whose background says to drag it to Applications,
+    which is where Foqos's own releases learned that lesson. Foqos, for the record, is a
+    notarized DMG on GitHub with Sparkle, and its release notes are where "macOS sometimes does
+    not enable it" comes from: their fix was to detect the drift, which `WebFilter.start` does
+    here and says in Settings > Web and the log.
+
+    **Known limits, none of them regressions.** A name hidden by Encrypted Client Hello (Firefox
+    with DNS over HTTPS, on sites that support it) or a connection to a bare address gets
+    through the filter — the reader still catches it in the browsers it reads. The XPC listener
+    checks nothing about who connects, because all a client can do is be told which hosts were
+    dropped. `OSSystemExtensionProperties` is not Sendable, so `ExtensionRequest` copies what it
+    needs into a struct.
+
+    **Supersedes**: the Firefox sentence in "The Mac" above, and step 7's note that Safari web
+    apps in the Dock bypass host rules. Lane D's help page ("what the Mac cannot reach") was
+    written for the day before this landed and needs its Mac paragraph redone once Zach has
+    seen the filter work.
+
+    **Not yet seen by anyone: any of it running.** Zach's list, in order:
+    1. Install the branch's Debug build into `/Applications` (the running copy is force-quit
+       for it, as in step 3) and open Furlough. Settings > Web should read **Not installed**
+       and nothing should prompt.
+    2. Settings > Web > **Install the web filter**. macOS: "System Extension Blocked" or the
+       newer approval sheet; then System Settings > General > Login Items & Extensions >
+       Network Extensions > allow Furlough; then "Furlough would like to filter network
+       content" > Allow. Settings > Web should go Waiting for approval → **On**, the log should
+       say "web filter extension is active", "web filter on", "web filter link up", and
+       `systemextensionsctl list` should show it enabled.
+    3. Firefox (not on this Mac; install it): add a rule for a site blocked now, open it in
+       Firefox. The page should fail to load, the floating card should say why, and the log
+       should carry "blocked <host> in Firefox (web filter)".
+    4. A Dock web app: Safari > File > Add to Dock on a blocked site, open it. Same three signs.
+    5. Chrome on a blocked site: still the shield page, no card (the reader's), and the log
+       shows both the redirect and the drop.
+    6. The window opening: within a second or two Firefox loads the site (the log's "web
+       filter: n host(s) blocked until …" line changes).
+    7. System Settings > turn the extension off: Settings > Web reads **Off in System
+       Settings**, the log says so on the next launch, Firefox opens, Chrome is still redirected.
+    8. Force Quit with a site blocked: Firefox stays blocked until the watchdog brings
+       Furlough back (ten seconds) — and if the watchdog is off too, until the next window edge.
+    9. Settings > Web > **Remove the web filter**: macOS may ask once more; status returns to
+       Not installed and Firefox is open.
+    Anything QUIC-shaped worth a look while there: with a site blocked, YouTube should still
+    play in Safari and in Chrome (Chrome over TCP after a refused QUIC attempt, invisibly).
+27. **Forgiveness for a mistake, never for a craving.** Done 2026-09-09, on branch
+    `lane-f-forgiveness`. See the "Settled" bullet above for what it is and why a pass count
+    was refused. What is where:
+
+    - `Shared/Core/Forgiveness.swift` — `startTrial` (once per install, guarded on
+      `trialStartedAt`), `expire` (ends the week, forgets unreachable undos), `trialDaysLeft`
+      (rounds up, so the last afternoon reads "1 day left"), `record`/`undo`/`revert`.
+    - `Shared/Core/Consequence.swift` — the two sentences the editor says before a rule is
+      saved: what today looks like under it, and what changing your mind costs. Nil for a
+      loosening (the effect banner already answers those), for an invalid rule, and for no
+      change. The cheapest forgiveness is the kind nobody needs, which is why this exists.
+    - `Config.isInTrial` is a **stored fact**, not a comparison against the clock, for the
+      same reason a due pending change is not folded in until something folds it:
+      `delayHours` is asked from a dozen places with no business knowing the time.
+      `Policy.applyDuePending` is the one place that moves it forward, and every enforce,
+      every widget read and every `effectiveConfig` goes through it. That is why **no delay
+      call site had to thread a date** — about 25 of them, across files three other lanes own.
+      The bounded cost: a config read without a prior pass can see a week that ended minutes
+      ago, and the error direction is "slightly more forgiving", which is the right way to be
+      wrong.
+    - `Config.fullDelayHours` is the uncapped number, kept because the editor names *both*
+      while the week runs. The cliff at the end must not be a surprise the first time a delay
+      is real.
+    - `AppModel.startTrialIfNeeded` runs at `requestAuthorization`, which is the only moment
+      it can: before access there is nothing to be forgiven for, and every path back there
+      goes through Settings. Debug's `resetEverything` grants one too, or the feature could
+      not be tested on a phone whose access is already granted.
+    - `AppModel.assign` records the undo only where a rule lands *now*. A loosening arriving
+      after its delay needs none: undoing a loosening is a tightening, and those are instant.
+    - UI: `UndoCard` (high in `RuleEditorView`, above the nickname — someone who opens the
+      editor because they are locked out should not have to scroll to the way back) and
+      `ConsequenceCard` (under the effect banner, where the decision is made). Onboarding
+      states the week; `SettingsView`'s delay card counts it down, because while it runs every
+      other countdown in the app already says the capped number and without that line the
+      delay above reads as if it is not being applied.
+    - Tests: `Tests/Core/ForgivenessTests.swift` and `ConsequenceTests.swift`, 25 of them. The
+      one that matters most is `undoIsOneStepBackAndNeverReachesUnrestricted`: a second edit
+      inside the window *replaces* the note rather than stacking on it, because a history to
+      walk would eventually reach "unrestricted", which must never be reachable.
+
+    **The Mac has its own App Group and so its own `Config`, and nothing grants it a week.**
+    `isInTrial` stays false there and Mac delays are exactly as they were. If the Mac should
+    have one, it is a call to `Forgiveness.startTrial` at its onboarding finish — deliberately
+    not made, because nobody has asked for it.
+
+    **Not seen on the phone yet.** iOS and Mac both build warning-free and all 400 Core tests
+    pass. What to check is in the last message.
+
+    **Item 10 of `PASSOFF.md` changes.** Its no-pause paragraph now has to name these two and
+    say why neither is an unblock, rather than claiming Furlough has nothing of the kind.
 
 ## Style rules
 
@@ -1425,5 +1960,6 @@ name `Furlough`, macOS 26, non-sandboxed, hardened runtime with the
   can click Edit Widgets; `pluginkit -m -i com.zachshort.furlough.mac.widgets` shows it is
   registered). Ask Zach. Seen by a person 2026-09-08: the Pending sheet's cards, including
   the old → new pair.
-- Build check for the Mac: the README's `xcodebuild … -scheme FurloughMac` line; keep it
-  warning-free like the phone.
+- Build check for the Mac: the README's `xcodebuild … -scheme FurloughMac` line, plus
+  `-allowProvisioningDeviceRegistration` since step 18 gave the Mac an iCloud entitlement,
+  which needs a profile and so a registered Mac; keep it warning-free like the phone.

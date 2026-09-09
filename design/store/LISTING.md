@@ -116,7 +116,7 @@ A home screen widget and a Live Activity counting down the open window. Notifica
 
 PRIVACY
 
-No account, no server, no analytics, no third-party code. There is no networking in the app at all. Apple's Screen Time API is built so Furlough is never told which apps you picked. Rules stay on the iPhone that made them and are not synced anywhere.
+No account, no server, no analytics, no third-party code. Apple's Screen Time API is built so Furlough is never told which apps you picked. Rules stay on the iPhone that made them and are not synced anywhere; the one thing that leaves it is the Anchor's state, to your own iCloud, so Furlough on your Mac locks with it.
 
 REQUIREMENTS
 
@@ -420,7 +420,7 @@ A website chosen from Apple's picker is shielded like an app. A website typed in
 
 NO ACCOUNT, NO NETWORK, NO DATA COLLECTION
 
-Furlough has no server, no accounts and no network code at all: no URLSession, no analytics, no third-party SDKs. Rules and the opaque activity tokens never leave the device. The privacy answer is Data Not Collected. There are no demo credentials because there is nothing to sign in to.
+Furlough has no server, no accounts, no analytics and no third-party SDKs. Rules and the opaque activity tokens never leave the device. The one thing written off the device is the Anchor's state (down or not, since when, until when), to the user's own iCloud key-value store, so Furlough on the user's Mac can lock and unlock with the iPhone; Furlough has no server that could read it. The privacy answer is Data Not Collected, since private iCloud storage under the user's own account is not collected by us. There are no demo credentials because there is nothing to sign in to.
 ```
 
 **Sign-in required: No.** There is no account, so leave the demo account fields empty.

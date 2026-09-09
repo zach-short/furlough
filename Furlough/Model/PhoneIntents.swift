@@ -1,40 +1,10 @@
 import AppIntents
 import Foundation
 
-/// Drops the anchor without opening Furlough.
-///
-/// Safe to run from anywhere precisely because it only tightens. Anchoring needs no tag —
-/// weighing anchor does — so this is the one half that can happen in the background, and it
-/// is the half worth having at the end of a Spotlight search or on a Shortcuts automation
-/// ("at 10pm, drop anchor"). Nothing here can let anything through.
-struct DropAnchorIntent: AppIntent {
-    static let title: LocalizedStringResource = "Drop Anchor"
-    static let description = IntentDescription(
-        "Locks everything the Anchor holds. Only the paired tag lifts it again.",
-        categoryName: "Anchor",
-        searchKeywords: ["anchor", "lock", "block", "brick"]
-    )
-    static let openAppWhenRun = false
-
-    func perform() async throws -> some IntentResult & ProvidesDialog {
-        let answer = await MainActor.run { () -> String in
-            let model = AppModel.shared
-            model.reload()
-            let anchor = model.state.config.anchor
-            guard !anchor.isAnchored else { return "Already anchored." }
-            switch model.anchor() {
-            case .anchored:
-                return "Anchored. \(anchor.count) \(anchor.count == 1 ? "thing" : "things")"
-                    + " locked until you scan your tag."
-            case .failed(let why):
-                return why
-            default:
-                return "Nothing changed."
-            }
-        }
-        return .result(dialog: "\(answer)")
-    }
-}
+// `DropAnchorIntent` moved to `Shared/Intents/DropAnchorIntent.swift` on 2026-09-09, so the
+// widget extension can run it behind a Control Center control and a widget button. It drops
+// through `AnchorDrop` in `Shared/Core` and never reaches `AppModel`; the app hears of the
+// drop through `SharedStore.announceChange`.
 
 /// Weighs anchor — which means opening Furlough and asking for the tag.
 ///

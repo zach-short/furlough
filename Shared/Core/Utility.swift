@@ -69,10 +69,24 @@ extension Config {
     /// Rounded to whole hours so the copy ("waits 6 hours") and the date a change actually
     /// lands cannot disagree, and floored at `Furlough.minimumLoosenDelayHours` so a small
     /// base plus an essential target can never add up to no delay at all.
+    /// While the first week runs it is capped instead, so that nothing a beginner does to
+    /// themselves out of curiosity costs more than a lunch break. The cap is applied here, at
+    /// the one place the number is worked out, so every countdown, every "waits 4 days" line
+    /// and every `effectiveAt` agrees with it without being told.
     func delayHours(for utility: Utility) -> Int {
+        let hours = fullDelayHours(for: utility)
+        return isInTrial ? min(hours, Furlough.trialDelayHours) : hours
+    }
+
+    /// What this tier waits once the first week is over. The same number as `delayHours` for
+    /// all but those seven days, and the one the editor names while they run, because the
+    /// point of saying it early is that the cliff at the end of the week is not a surprise.
+    func fullDelayHours(for utility: Utility) -> Int {
         let scaled = Double(loosenDelayHours) * utility.delayMultiplier
         return max(Furlough.minimumLoosenDelayHours, Int(scaled.rounded()))
     }
+
+    func fullDelayHours(for target: Target?) -> Int { fullDelayHours(for: target?.utility ?? .unset) }
 
     func delayHours(for target: Target?) -> Int { delayHours(for: target?.utility ?? .unset) }
 
@@ -91,10 +105,12 @@ extension Config {
     ///
     /// Only anchored kinds that are also targets can be named — an anchor may hold apps
     /// Furlough has no rule for, and on the phone those are opaque tokens with no name attached.
-    /// So this warns about what it can see, which is the part Zach chose deliberately.
+    /// So this warns about what it can see, which is the part Zach chose deliberately. Read
+    /// through `holds`, so an anchor over the whole phone warns about the essential target its
+    /// allowlist leaves out, and not about one it keeps.
     var anchorWarning: (utility: Utility, names: [String], detail: String?)? {
         let held = targets
-            .filter { target in target.kinds.contains { anchor.contains($0) } && target.utility.warnsBeforeAnchoring }
+            .filter { target in target.kinds.contains { anchor.holds($0) } && target.utility.warnsBeforeAnchoring }
             .sorted { $0.utility.rawValue < $1.utility.rawValue }
         guard let worst = held.first?.utility else { return nil }
         let named = held.filter { $0.utility == worst }

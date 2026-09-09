@@ -73,8 +73,10 @@ enum Monitoring {
             }
         }
 
-        guard windows.count <= ActivityLimit.maxSpans else {
-            throw RegistrationError(message: "Too many distinct windows (\(windows.count)). iOS allows \(ActivityLimit.maxSpans).")
+        let anchorMinutes = ActivityLimit.anchorMinutes(in: state)
+        let needed = ActivityLimit.activities(in: state)
+        guard needed <= ActivityLimit.maxSpans else {
+            throw RegistrationError(message: "Too many windows and anchor times (\(needed)). iOS allows \(ActivityLimit.maxSpans).")
         }
 
         let day = DeviceActivitySchedule(
@@ -94,7 +96,57 @@ enum Monitoring {
             )
             try center.startMonitoring(DeviceActivityName(ActivityNaming.window(window)), during: schedule)
         }
-        SharedStore.log("registered day + \(windows.count) window(s), \(events.count) budget event(s)")
+
+        // The anchor's clock. A drop or a lift minute is one end of a quarter-hour activity
+        // (`ActivityNaming.anchorInterval`), repeating daily like a window; the monitor checks
+        // the weekday when it fires. Each is registered on its own, after the windows, so that
+        // one iOS refuses — a timed anchor's `until` too close to now for a quarter hour —
+        // costs nothing that was already registered.
+        var anchorCount = 0
+        for minute in anchorMinutes.drops {
+            anchorCount += start(ActivityNaming.anchorDrop(minute: minute), during: anchorSchedule(minute), with: center)
+        }
+        for minute in anchorMinutes.lifts {
+            anchorCount += start(ActivityNaming.anchorLift(minute: minute), during: anchorSchedule(minute), with: center)
+        }
+        if state.config.anchor.isAnchored, let until = state.config.anchor.until {
+            // On the device's clock, which is the one DeviceActivity keeps: a quarter hour
+            // ending at the lift, one time only.
+            let deviceUntil = state.clock().device(until)
+            if deviceUntil > .now {
+                let parts: Set<Calendar.Component> = [.year, .month, .day, .hour, .minute, .second]
+                let begins = deviceUntil.addingTimeInterval(-TimeInterval(Furlough.minimumWindowMinutes * 60))
+                let once = DeviceActivitySchedule(
+                    intervalStart: Calendar.current.dateComponents(parts, from: begins),
+                    intervalEnd: Calendar.current.dateComponents(parts, from: deviceUntil),
+                    repeats: false
+                )
+                anchorCount += start(ActivityNaming.anchorUntil, during: once, with: center)
+            }
+        }
+        SharedStore.log("registered day + \(windows.count) window(s), \(events.count) budget event(s), \(anchorCount) anchor time(s)")
+    }
+
+    /// Starts one anchor activity, logging a refusal rather than throwing it: the windows are
+    /// registered by now, and one refused wake must not cost them. `Policy` reads a timed
+    /// anchor as released once its time passes whether or not the wake arrives.
+    private static func start(_ name: String, during schedule: DeviceActivitySchedule, with center: DeviceActivityCenter) -> Int {
+        do {
+            try center.startMonitoring(DeviceActivityName(name), during: schedule)
+            return 1
+        } catch {
+            SharedStore.log("could not schedule \(name): \(error.localizedDescription)")
+            return 0
+        }
+    }
+
+    private static func anchorSchedule(_ minute: Int) -> DeviceActivitySchedule {
+        let interval = ActivityNaming.anchorInterval(minute: minute)
+        return DeviceActivitySchedule(
+            intervalStart: components(interval.start),
+            intervalEnd: components(interval.end),
+            repeats: true
+        )
     }
 
     static func components(_ minute: Int) -> DateComponents {

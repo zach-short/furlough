@@ -633,7 +633,7 @@ extension ConfigImport {
                 state.pending.removeAll { supersedes(change.kind, $0.kind) }
                 var change = change
                 change.effectiveAt = change.effectiveAt.addingTimeInterval(read)
-                state.pending.append(change)
+                Record.queue(change, in: &state, now: now)
             }
         }
     }

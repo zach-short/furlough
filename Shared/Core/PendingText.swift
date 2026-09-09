@@ -55,6 +55,21 @@ enum PendingText {
                 now: "\(TimeFormat.rule(target?.rule, calendar: calendar)), \(half) too",
                 becomes: "\(half) no longer blocked"
             )
+        case .setAnchorSchedules(let schedules):
+            return Delta(
+                now: TimeFormat.anchorSchedules(config.anchor.schedules, calendar: calendar),
+                becomes: TimeFormat.anchorSchedules(schedules, calendar: calendar)
+            )
+        }
+    }
+
+    /// The line at the top of a card for a change that is about no one target: the delay, or
+    /// the anchor's schedule. Nil for a change a target's name heads.
+    static func subject(of kind: PendingKind) -> String? {
+        switch kind {
+        case .setDelay: "Loosening delay"
+        case .setAnchorSchedules: "Anchor schedule"
+        case .setRule, .removeTarget, .setUtility, .unlink: nil
         }
     }
 

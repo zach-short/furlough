@@ -72,7 +72,77 @@ final class MacModel {
         refreshBrowserAccess()
         // Force Quit is still the way out, but it should not last until the next login.
         if isOnboarded { Watchdog.enableIfNeeded() }
+        observeCloud()
+        AnchorCloud.synchronize()
         enforce(reason: "launch")
+    }
+
+    // MARK: The anchor across devices
+
+    @ObservationIgnored private var cloudObserver: (any NSObjectProtocol)?
+    @ObservationIgnored private var cloudPolls = 0
+
+    /// Listens for the phone's writes, once. iCloud posts the change to a running app, which
+    /// on the Mac is always, and the ticker asks again every half minute in case it did not.
+    private func observeCloud() {
+        guard cloudObserver == nil else { return }
+        cloudObserver = NotificationCenter.default.addObserver(
+            forName: AnchorCloud.changeNotification, object: nil, queue: .main
+        ) { _ in
+            Task { @MainActor in MacModel.shared.applyRemoteAnchor(reason: "iCloud changed") }
+        }
+    }
+
+    /// Merges what the phone wrote, through `AnchorSync.merge`, and enforces if it changed
+    /// anything.
+    func applyRemoteAnchor(reason: String) {
+        var current = SharedStore.load()
+        guard let note = AnchorSync.pull(into: &current.config, now: current.now) else { return }
+        SharedStore.save(current)
+        SharedStore.log("iCloud anchor (\(reason)): \(note)")
+        enforce(reason: "iCloud anchor")
+    }
+
+    /// Whether a phone has written the record this Mac reads: the one thing that could ever
+    /// release an anchor dropped here.
+    var phoneSeen: Bool { AnchorSync.phoneSeen }
+
+    /// Drops the anchor on this Mac and tells the phone. No tag here, so no timed drop and no
+    /// release: only the phone's tag, arriving through iCloud, lifts it. Returns why not.
+    func dropAnchor() -> String? {
+        var current = SharedStore.load()
+        let now = current.now
+        if let refusal = AnchorSync.macDrop(&current.config, now: now, phoneSeen: phoneSeen) {
+            return refusal.message
+        }
+        SharedStore.save(current)
+        SharedStore.log("anchored (Mac): \(current.config.anchor.heldDescription)")
+        enforce(reason: "anchor")
+        AnchorSync.publish(current.config.anchor, origin: .drop, now: now)
+        return nil
+    }
+
+    /// Replaces the anchor's list: bundle identifiers and hosts, what it holds or, under the
+    /// everything-except scope, what it lets through. Refused while anchored.
+    func setAnchorKinds(_ kinds: [TargetKind]) {
+        var current = SharedStore.load()
+        guard !current.config.anchor.isHolding(at: current.now), kinds != current.config.anchor.kinds else { return }
+        current.config.anchor.kinds = kinds
+        SharedStore.save(current)
+        SharedStore.log("anchor: now \(current.config.anchor.anchorsEverything ? "lets through" : "holds") \(kinds.count) item(s)")
+        enforce(reason: "anchor edit")
+    }
+
+    /// The phone's `setAnchorScope`, with the same rule: the list does not survive the switch.
+    /// Widening starts the allowlist from every target tiered Essential, narrowing empties it.
+    func setAnchorScope(_ scope: AnchorProfile.Scope) {
+        var current = SharedStore.load()
+        guard !current.config.anchor.isHolding(at: current.now), current.config.anchor.scope != scope else { return }
+        current.config.anchor.scope = scope
+        current.config.anchor.kinds = scope == .everythingExcept ? current.config.essentialKinds : []
+        SharedStore.save(current)
+        SharedStore.log("anchor: scope is now \(scope.rawValue); the list starts with \(current.config.anchor.count) item(s)")
+        enforce(reason: "anchor scope")
     }
 
     func finishOnboarding() {
@@ -138,6 +208,13 @@ final class MacModel {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 self.now = self.clock.now
+                // The key-value store is read locally and cheaply; iCloud is asked to refresh
+                // it every half minute, since its own change notification is not a promise.
+                self.cloudPolls += 1
+                if self.cloudPolls % 30 == 0 {
+                    AnchorCloud.synchronize()
+                    self.applyRemoteAnchor(reason: "poll")
+                }
             }
         }
         timer.tolerance = 0.2
@@ -153,6 +230,12 @@ final class MacModel {
         let now = clock.now
         if Policy.applyDuePending(&current, now: now) {
             SharedStore.log("applied due pending changes (\(reason))")
+        }
+        if Policy.liftExpiredAnchor(&current.config, now: now) {
+            SharedStore.log("a timed anchor's time had passed; lifted it (\(reason))")
+        }
+        if let note = AnchorSync.pull(into: &current.config, now: now) {
+            SharedStore.log("iCloud anchor (\(reason)): \(note)")
         }
         current.runtime.lastRegistration = now
         SharedStore.save(current)
@@ -376,7 +459,7 @@ final class MacModel {
             return .appliedNow
         }
         let effectiveAt = state.now.addingTimeInterval(state.config.delay(for: target))
-        state.pending.append(PendingChange(kind: .setRule(targetID: id, rule: rule), effectiveAt: effectiveAt))
+        Record.queue(PendingChange(kind: .setRule(targetID: id, rule: rule), effectiveAt: effectiveAt), in: &state, now: state.now)
         return .scheduled(effectiveAt)
     }
 
@@ -390,7 +473,7 @@ final class MacModel {
             result = .appliedNow
         } else if !current.pending.contains(where: { $0.kind == .removeTarget(targetID: id) }) {
             let effectiveAt = current.now.addingTimeInterval(current.config.delay(for: target))
-            current.pending.append(PendingChange(kind: .removeTarget(targetID: id), effectiveAt: effectiveAt))
+            Record.queue(PendingChange(kind: .removeTarget(targetID: id), effectiveAt: effectiveAt), in: &current, now: current.now)
             result = .scheduled(effectiveAt)
         }
         SharedStore.save(current)
@@ -426,7 +509,7 @@ final class MacModel {
             result = .appliedNow
         } else {
             let effectiveAt = current.now.addingTimeInterval(current.config.delay(for: target))
-            current.pending.append(PendingChange(kind: .setUtility(targetID: id, level: level), effectiveAt: effectiveAt))
+            Record.queue(PendingChange(kind: .setUtility(targetID: id, level: level), effectiveAt: effectiveAt), in: &current, now: current.now)
             result = .scheduled(effectiveAt)
         }
         SharedStore.save(current)
@@ -436,7 +519,11 @@ final class MacModel {
     }
 
     func cancelPending(id: UUID) {
-        SharedStore.mutate { $0.pending.removeAll { $0.id == id } }
+        SharedStore.mutate { state in
+            let before = state.pending.count
+            state.pending.removeAll { $0.id == id }
+            Record.noteCancelled(before - state.pending.count, in: &state, now: state.now)
+        }
         SharedStore.log("cancelled pending change \(id)")
         enforce(reason: "cancel pending")
     }
@@ -453,7 +540,7 @@ final class MacModel {
         } else {
             // The base multiplies out to every target, so cutting it loosens the slowest one too.
             let effectiveAt = current.now.addingTimeInterval(current.config.longestDelay)
-            current.pending.append(PendingChange(kind: .setDelay(hours: clamped), effectiveAt: effectiveAt))
+            Record.queue(PendingChange(kind: .setDelay(hours: clamped), effectiveAt: effectiveAt), in: &current, now: current.now)
             result = .scheduled(effectiveAt)
         }
         SharedStore.save(current)
@@ -471,6 +558,7 @@ final class MacModel {
     func resetEverything() {
         SharedStore.reset()
         enforcer.resetUsage()
+        AnchorCloud.clear()
         SharedStore.log("reset everything (Debug build)")
         lastError = nil
         enforce(reason: "reset")

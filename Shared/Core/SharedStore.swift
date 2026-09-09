@@ -114,6 +114,23 @@ enum SharedStore {
     static func logEntries() -> [String] { defaults.stringArray(forKey: logKey) ?? [] }
     static func clearLog() { defaults.removeObject(forKey: logKey) }
 
+    /// The Darwin notification posted after a write another process may be showing: a drop
+    /// from Control Center, the monitor's schedule firing. The app listens
+    /// (`AppModel.changedElsewhere`) so its screen does not say Free over an anchored phone
+    /// until the next activation. It carries nothing; the listener reloads and looks. Every
+    /// process hears it, the poster included, and the listener finds nothing new in that case.
+    static let changeNotification = "com.zachshort.furlough.changed"
+
+    static func announceChange() {
+        CFNotificationCenterPostNotification(
+            CFNotificationCenterGetDarwinNotifyCenter(),
+            CFNotificationName(changeNotification as CFString),
+            nil,
+            nil,
+            true
+        )
+    }
+
     private static var processTag: String {
         let id = Bundle.main.bundleIdentifier ?? "?"
         return id.hasSuffix(Furlough.bundleID) ? "app" : String(id.split(separator: ".").last ?? "?")

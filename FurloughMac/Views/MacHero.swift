@@ -121,8 +121,9 @@ struct TargetHero: View {
             }
             return Line(eyebrow: "Used up today", color: Ember.ember, big: .quiet("spent"), sub: "\(budget) a day")
         case .anchored:
-            // Only the phone can anchor, and rules are per device, so this never shows on a Mac.
-            return Line(eyebrow: "Anchored", color: Ember.ember, big: .quiet("locked"), sub: RowCopy.detail(target: target, status: status, now: now))
+            // Since 2026-09-09 the Mac anchors too: dropped here, or on the phone and arrived
+            // through iCloud. Only the phone's tag releases it.
+            return Line(eyebrow: "Anchored", color: Ember.ember, big: .quiet("locked"), sub: "Your iPhone's tag releases it · \(RowCopy.detail(target: target, status: status, now: now))")
         case .blockedAllDay:
             return Line(eyebrow: "Always blocked", color: Ember.muted, big: .quiet("all day"), sub: "No budget · set one below")
         case .unconfigured:

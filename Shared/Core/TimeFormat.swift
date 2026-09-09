@@ -47,6 +47,12 @@ enum TimeFormat {
             : self.minute(minute, calendar: calendar)
     }
 
+    /// A day as a date rather than a time: "Sep 16". For the few things that are days away
+    /// rather than hours — the date the first week ends on.
+    static func day(_ date: Date, calendar: Calendar = .current) -> String {
+        date.formatted(style(calendar).month(.abbreviated).day())
+    }
+
     static func window(_ window: TimeWindow, calendar: Calendar = .current) -> String {
         "\(minute(window.startMinute, calendar: calendar))–\(minute(window.endMinute, calendar: calendar))"
     }
@@ -122,6 +128,30 @@ enum TimeFormat {
                 return "\(amount) \(daysInline(group.days, calendar: calendar))"
             }
             .joined(separator: ", ")
+    }
+
+    /// The anchor's drop times, earliest in the day first: "10:00 PM weekdays, lifts 7:00 AM ·
+    /// 11:00 PM weekends, until the tag". "No scheduled drops" when there are none.
+    static func anchorSchedules(_ schedules: [AnchorSchedule], calendar: Calendar = .current) -> String {
+        guard !schedules.isEmpty else { return "No scheduled drops" }
+        return schedules
+            .sorted { ($0.minuteOfDay, $0.days.rawValue) < ($1.minuteOfDay, $1.days.rawValue) }
+            .map { schedule in
+                let when = "\(minute(schedule.minuteOfDay, calendar: calendar)) \(anchorDays(schedule.days, calendar: calendar))"
+                let lift = schedule.liftMinuteOfDay.map { "lifts \(minute($0, calendar: calendar))" } ?? "until the tag"
+                return "\(when), \(lift)"
+            }
+            .joined(separator: " · ")
+    }
+
+    /// `days` in the middle of a sentence: the three named groups lose their capital.
+    private static func anchorDays(_ days: Weekdays, calendar: Calendar) -> String {
+        switch days {
+        case .all: "every day"
+        case .weekdays: "weekdays"
+        case .weekend: "weekends"
+        default: self.days(days, calendar: calendar)
+        }
     }
 
     /// "Every day", "Weekdays", "Weekends", or the days compressed into runs: "Mon–Thu, Sat".

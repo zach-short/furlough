@@ -50,6 +50,48 @@ enum ActivityLimit {
         return spans
     }
 
+    /// The minutes the anchor's activities sit at: every schedule's drop minute and every lift
+    /// minute, saved schedules and queued ones together, the way `spans` takes saved rules and
+    /// queued ones — a queued schedule change can carry a minute of its own before it lands.
+    static func anchorMinutes(in state: SharedState) -> (drops: Set<Int>, lifts: Set<Int>) {
+        var schedules = state.config.anchor.schedules
+        for change in state.pending {
+            if case .setAnchorSchedules(let queued) = change.kind { schedules += queued }
+        }
+        return (Set(schedules.map(\.minuteOfDay)), Set(schedules.compactMap(\.liftMinuteOfDay)))
+    }
+
+    /// How many activities the anchor's clock needs: one per distinct drop minute, one per
+    /// distinct lift minute, and one for a timed anchor's own `until` while it holds.
+    static func anchorActivities(in state: SharedState) -> Int {
+        let minutes = anchorMinutes(in: state)
+        let timed = state.config.anchor.isAnchored && state.config.anchor.until != nil ? 1 : 0
+        return minutes.drops.count + minutes.lifts.count + timed
+    }
+
+    /// Everything besides the day activity: the window spans and the anchor's times. This is
+    /// the number the ceiling is judged against.
+    static func activities(in state: SharedState) -> Int {
+        spans(in: state).count + anchorActivities(in: state)
+    }
+
+    /// Named when the count includes the anchor's times, so the sentence is not a lie.
+    private static func anchorClause(_ state: SharedState) -> String {
+        anchorActivities(in: state) > 0 ? " and the Anchor's drop and lift times" : ""
+    }
+
+    /// Nil when the anchor's drop times fit alongside the windows. Otherwise why not, for the
+    /// banner above the schedule's Save. Counted with the current schedules still in place,
+    /// the way a queued rule counts beside the saved one: a loosening leaves both live until
+    /// it lands, and a tightening that adds a minute needs it from the moment it is saved.
+    static func reason(schedules: [AnchorSchedule], in state: SharedState) -> String? {
+        var copy = state
+        copy.pending.append(PendingChange(kind: .setAnchorSchedules(schedules), effectiveAt: .distantFuture))
+        let needed = activities(in: copy)
+        guard needed > maxSpans else { return nil }
+        return "That would need \(needed) windows and anchor times across everything Furlough manages, and iOS allows \(maxSpans). Drop a time, or give it a minute another drop or lift already uses."
+    }
+
     /// The state as saving `rule` for each of `targetIDs` would leave it, following the same
     /// tightening-lands / loosening-queues rule the model uses. Nothing is persisted.
     static func projecting(_ rule: Rule, appliedTo targetIDs: [UUID], in state: SharedState) -> SharedState {
@@ -76,9 +118,10 @@ enum ActivityLimit {
 
     /// Nil when the rule fits once saved. Otherwise why it does not, for the banner above Save.
     static func reason(applying rule: Rule, to targetIDs: [UUID], in state: SharedState) -> String? {
-        let needed = spans(in: projecting(rule, appliedTo: targetIDs, in: state)).count
+        let projected = projecting(rule, appliedTo: targetIDs, in: state)
+        let needed = activities(in: projected)
         guard needed > maxSpans else { return nil }
-        return "That would need \(needed) different windows across everything Furlough manages, and iOS allows \(maxSpans). Merge or drop a window, or give this app hours another app already uses."
+        return "That would need \(needed) different windows across everything Furlough manages\(anchorClause(projected)), and iOS allows \(maxSpans). Merge or drop a window, or give this app hours another app already uses."
     }
 
     /// The state as applying a whole import would leave it.
@@ -105,8 +148,9 @@ enum ActivityLimit {
     /// the loosenings in a file press against the ceiling from the moment Apply is pressed,
     /// a day before any of them are in force.
     static func reason(applying plan: ImportPlan, in state: SharedState) -> String? {
-        let needed = spans(in: projecting(plan, in: state)).count
+        let projected = projecting(plan, in: state)
+        let needed = activities(in: projected)
         guard needed > maxSpans else { return nil }
-        return "This setup would need \(needed) different windows across everything Furlough manages, and iOS allows \(maxSpans). Leave some of these rows out, or merge windows where two apps could share hours, and open the file again."
+        return "This setup would need \(needed) different windows across everything Furlough manages\(anchorClause(projected)), and iOS allows \(maxSpans). Leave some of these rows out, or merge windows where two apps could share hours, and open the file again."
     }
 }

@@ -10,6 +10,8 @@
 	<array>
 		<string>TAG</string>
 	</array>
+	<key>com.apple.developer.ubiquity-kvstore-identifier</key>
+	<string>$(TeamIdentifierPrefix)com.zachshort.furlough</string>
 	<key>com.apple.security.application-groups</key>
 	<array>
 		<string>group.com.zachshort.furlough</string>

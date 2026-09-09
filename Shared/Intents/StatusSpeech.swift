@@ -20,9 +20,13 @@ enum StatusSpeech {
         now: Date,
         calendar: Calendar = .current
     ) -> String {
-        guard hasTargets || summary.anchoredCount > 0 else { return "Nothing is in Furlough yet." }
+        guard hasTargets || summary.anchoredCount > 0 || summary.anchorsEverything else { return "Nothing is in Furlough yet." }
         var lines: [String] = []
-        if summary.isAnchored, summary.anchoredCount > 0 {
+        if summary.anchorsEverything {
+            // The count is what stays open here, so it is said as an exception, not a total.
+            let kept = summary.anchoredCount > 0 ? " except \(things(summary.anchoredCount))" : ""
+            lines.append("Anchored: everything\(kept) is locked until you scan your tag.")
+        } else if summary.isAnchored, summary.anchoredCount > 0 {
             lines.append("Anchored: \(things(summary.anchoredCount)) locked until you scan your tag.")
         }
         lines.append(open(summary, now: now, calendar: calendar))

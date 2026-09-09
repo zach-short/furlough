@@ -3,26 +3,27 @@ import Base from '../layouts/Base.astro';
 import { site } from '../site';
 ---
 
-<Base title="Privacy Policy" description="Furlough collects nothing. No account, no server, no analytics, no networking code at all.">
+<Base title="Privacy Policy" description="Furlough collects nothing. No account, no server, no analytics. The one thing that leaves your iPhone is the Anchor's state, to your own iCloud.">
   <section class="wrap page">
     <header class="head" data-reveal>
       <div class="eyebrow moss">Privacy policy</div>
       <h1 class="display">Furlough collects nothing.</h1>
-      <p class="sub">Furlough for iPhone · last updated {site.policyUpdated}</p>
+      <p class="sub">Furlough for iPhone and Mac · last updated {site.policyUpdated}</p>
     </header>
 
     <article class="card prose body" data-reveal style="--d: .1s">
       <p><strong>Furlough collects nothing.</strong> Not anonymously, not in aggregate, not for analytics. There is no account to make and no server to sign in to, because Furlough does not have a server.</p>
 
-      <h2>There is no network</h2>
-      <p>Furlough contains no networking code at all: no <code>URLSession</code>, no third-party SDKs, no analytics or crash-reporting library. It cannot send your data anywhere because it has no way to send anything anywhere.</p>
+      <h2>There is no server</h2>
+      <p>Furlough has no server of its own, no third-party SDKs, and no analytics or crash-reporting library. Nothing it knows is sent to anyone.</p>
+      <p>One thing leaves your device, and only if you use the Anchor on more than one: the Anchor's <em>state</em> — whether it is down, since when, and until when — which Furlough writes to your own iCloud key-value store so that Furlough on your Mac and on your iPhone lock and unlock together. That store belongs to your Apple Account and is kept by Apple; Furlough has no server that could read it, and there is nothing in it but those three facts. No rule, no app, no website, and no tag identifier is ever written there. If your devices are not signed in to iCloud, the Anchor simply stays per device.</p>
 
       <h2>What stays on your iPhone</h2>
-      <p>Everything Furlough knows lives in its own storage container on your device:</p>
+      <p>Everything else Furlough knows lives in its own storage container on your device:</p>
       <ul>
         <li>The apps, categories and websites you chose to limit, and the windows and daily budgets you set for them.</li>
         <li>Pending changes waiting out their delay, and a short activity log of Furlough's own enforcement, which you can read in Settings.</li>
-        <li>The identifier of the NFC tag you paired, if you use the Anchor.</li>
+        <li>The identifiers of the NFC tags you paired, and the Anchor's list and schedule, if you use the Anchor.</li>
       </ul>
       <p>Deleting Furlough deletes all of it.</p>
 
@@ -35,7 +36,7 @@ import { site } from '../site';
         <li>Usually, only Furlough's report extension ever sees a number. Apple runs it in a sandbox isolated from the rest of the app, and nothing can be passed back out of it: not the hours, not which app they belong to, not even that you tapped a button.</li>
         <li>Where Apple makes that history available to apps directly, and only if you approve it when iOS asks, Furlough reads the fourteen days itself and draws the cards without the extension.</li>
       </ul>
-      <p>Either way the reading happens on your iPhone, is used only to draw that screen, and is not kept afterwards or sent anywhere. Furlough has no networking code, so it has no way to send it.</p>
+      <p>Either way the reading happens on your iPhone, is used only to draw that screen, and is not kept afterwards or sent anywhere. Nothing in Furlough writes anywhere but your device and, for the Anchor's state alone, your own iCloud.</p>
 
       <h2>Children</h2>
       <p>Furlough is a tool for restricting your own device and asks for individual Screen Time authorization, which iOS grants only to an adult account. It is not a parental-control product and does not monitor anyone else.</p>

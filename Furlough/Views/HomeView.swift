@@ -359,7 +359,7 @@ struct HeroPage: View {
                 eyebrow: since.map { "Anchored · since \($0.formatted(date: .omitted, time: .shortened))" } ?? "Anchored",
                 color: Ember.ember,
                 big: since.map { .countUp(from: $0) } ?? .quiet("locked"),
-                sub: "Unanchor with your tag · \(RowCopy.detail(target: target, status: status, now: now))"
+                sub: "\(anchor.until.map { "Lifts \(TimeFormat.clock($0)), or sooner with your tag" } ?? "Unanchor with your tag") · \(RowCopy.detail(target: target, status: status, now: now))"
             )
         case .blockedAllDay:
             return Line(

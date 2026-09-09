@@ -308,7 +308,7 @@ struct HelpPage: View {
         case .stuck:
             "Furlough re-derives every block from saved state once a second, so drift is rare and short. If something still looks wrong:"
         case .about:
-            "A personal app blocker with no unblock button. It has no account, no server and no analytics, because it has no network code at all."
+            "A personal app blocker with no unblock button. It has no account, no server and no analytics. The one thing it writes off this Mac is the Anchor's state, to your own iCloud, so the iPhone and the Mac lock together."
         }
     }
 
@@ -415,8 +415,9 @@ struct HelpPage: View {
         SectionLabel(text: "A blocked site")
         HelpPoints([
             .init("Every browser, not just the front one", "Furlough reads the address of each window's front tab in Safari and the Chromium browsers — Chrome, Arc, Brave, Edge, Vivaldi, Opera, Dia — and sends the ones showing a blocked site to its shield page."),
-            .init("macOS asks once per browser", "The first time Furlough reads that browser while a site has a rule. Refusing means that browser is not enforced; Settings > Browsers shows which are allowed, and System Settings > Privacy & Security > Automation is where to change it."),
-            .init("Firefox", "Not scriptable this way, so it cannot be enforced. A site with a rule is open in Firefox."),
+            .init("macOS asks once per browser", "The first time Furlough reads that browser while a site has a rule. Refusing means that browser is not enforced; Settings > Web shows which are allowed, and System Settings > Privacy & Security > Automation is where to change it."),
+            .init("Everywhere else: the web filter", "A system extension that sees every connection this Mac opens and refuses the ones to a blocked site, from any app — Firefox, a site saved to the Dock, anything that loads a site outside a browser. Those get the floating card rather than the shield page. macOS asks twice before it runs, and Settings > Web says whether it is on."),
+            .init("What the filter cannot see", "A connection with no name on it. An app that hides the name with Encrypted Client Hello, or connects to a bare address, gets through the filter; the tab reader still catches it in the browsers it can read."),
         ])
 
         SectionLabel(text: "Underneath")
@@ -456,7 +457,7 @@ struct HelpPage: View {
         SectionLabel(text: "What to try")
         HelpPoints([
             .init("Re-apply enforcement now", "Settings > Enforcement. Does the whole pass again on demand rather than waiting for the next tick."),
-            .init("A site is not blocked", "Settings > Browsers. A browser marked Refused is not enforced; Ask for browser access now puts the question again, and System Settings > Privacy & Security > Automation is where a past refusal is undone."),
+            .init("A site is not blocked", "Settings > Web. A browser marked Refused is not enforced; Ask for browser access now puts the question again, and System Settings > Privacy & Security > Automation is where a past refusal is undone. If the web filter says Off in System Settings, General > Login Items & Extensions > Network Extensions is where it went."),
             .init("Activity log", "Settings > Activity log. Says what Furlough has been doing and when, including every block it applied and every browser it could not read."),
         ])
 
@@ -474,7 +475,7 @@ struct HelpPage: View {
         SectionLabel(text: "What stays on this Mac")
         HelpPoints([
             .init("Everything", "Your apps, sites, rules and today's minutes live in a container this app and its widget share, under ~/Library/Group Containers. Nothing is uploaded and nothing syncs."),
-            .init("What Furlough reads", "The name of the app in front, and the address of each browser window's front tab. Both are read to decide one thing — whether to block — and neither is stored or sent."),
+            .init("What Furlough reads", "The name of the app in front, the address of each browser window's front tab, and, with the web filter on, the name of the site each connection is opened to. All of it is read to decide one thing — whether to block — and none of it is stored or sent."),
             .init("Rules are per device", "The phone knows an app as an opaque Screen Time token; this Mac knows it as a bundle identifier. Neither means anything to the other, so the two are set up separately."),
         ])
 
@@ -490,7 +491,7 @@ struct HelpPage: View {
                 .contentShape(Rectangle())
                 .onTapGesture { noteVersionClick() }
             CardDivider()
-            row("Enforced by", "AppKit, Apple Events, launchd")
+            row("Enforced by", "AppKit, Apple Events, launchd, a network filter")
             CardDivider()
             row("Type", "Bricolage Grotesque, Onest, Geist Mono")
         }

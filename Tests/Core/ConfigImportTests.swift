@@ -330,7 +330,12 @@ struct ConfigImportTests {
         ConfigImport.apply(plan(export, before), to: &before, now: now)
 
         #expect(before.config.anchor == anchorBefore)
-        #expect(before.runtime == runtimeBefore)
+        // The file's runtime is not read in: what was spent and warned here today stands. The
+        // record does move — an import queues loosenings like any edit does, and the record
+        // counts them — so what the file could have set is compared field by field.
+        #expect(before.runtime.exhausted == runtimeBefore.exhausted)
+        #expect(before.runtime.warned == runtimeBefore.warned)
+        #expect(before.runtime.clock == runtimeBefore.clock)
         // The file's own queue is not the device's: nothing it listed is waiting here.
         #expect(before.pending.allSatisfy { $0.effectiveAt > now })
         #expect(before.config.loosenDelayHours == 24)

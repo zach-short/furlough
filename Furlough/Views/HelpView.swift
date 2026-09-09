@@ -125,8 +125,8 @@ struct HelpView: View {
     /// A row that leaves the app. The topics with no live data in them are written on the site
     /// rather than compiled in, so a sentence that turns out to be wrong can be fixed the same
     /// day instead of waiting on a review. Tapping one hands the address to Safari; Furlough
-    /// makes no request itself, which is why the About page can still say it has no network
-    /// code at all.
+    /// makes no request itself. (Since 2026-09-09 the Anchor's state does go to the user's own
+    /// iCloud key-value store, so "no network code at all" is no longer claimed anywhere.)
     private func linkRow<Icon: View>(
         _ title: String,
         _ detail: String,

@@ -29,6 +29,8 @@ struct SettingsView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
+                    RecordCard()
+
                     delayCard
 
                     enforcementCard
@@ -158,6 +160,16 @@ struct SettingsView: View {
                 .opacity(delayHours == model.state.config.loosenDelayHours ? 0.4 : 1)
         }
         .emberCard()
+        if let left = Forgiveness.trialDaysLeft(model.state.config, at: model.clock.now),
+           let ends = model.state.config.trialEndsAt {
+            // While the week runs, every countdown in the app is already saying the capped
+            // number. Without this line that reads like the delay above is not being applied.
+            CautionBanner(
+                text: "First week: \(left == 1 ? "1 day" : "\(left) days") left. Until \(TimeFormat.day(ends)) a loosening waits \(TimeFormat.delay(hours: Furlough.trialDelayHours)), whatever this says. After that the full delay applies and cannot be put off.",
+                isSevere: false
+            )
+            .padding(.top, 8)
+        }
         Footnote(text: "Raising the delay applies immediately. Lowering it waits out the current delay.")
             .padding(.top, 8)
     }

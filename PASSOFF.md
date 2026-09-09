@@ -507,6 +507,15 @@ Foqos offers QR codes as keys, and breaks, pauses, temporary access and an emerg
 unblock. Furlough offers none of these on purpose, and the reasons are not written anywhere
 a future session or a curious user would find them.
 
+**Changed 2026-09-09 by the `lane-f-forgiveness` session — read HANDOFF step 27 first.**
+Furlough now has two things that were not there when this prompt was written: a first week
+with capped delays, and a 15-minute undo that restores the rule an edit replaced. Neither is
+a break, a pause, temporary access or an emergency release, and the paragraph below has to
+say *why* rather than claiming there is nothing of the kind: forgiveness that can only ever
+restore the state you were already in is not a door out, and a pass count — which is what
+Zach first asked for — was refused on the grounds that people hoard passes and spend them on
+cravings.
+
 1. HANDOFF, under "Settled: what Furlough is": one paragraph. No QR or barcode keys,
    because a code is a photograph away from being a copy and the tag's whole value is that
    it is somewhere else. No breaks, pauses, temporary access or emergency unblock, because

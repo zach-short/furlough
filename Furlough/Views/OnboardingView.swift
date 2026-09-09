@@ -28,6 +28,10 @@ struct OnboardingView: View {
                     .emberBody(15)
                     .foregroundStyle(Ember.muted)
                     .padding(.top, 10)
+                Text("Your first \(Furlough.trialDays) days are gentler: a loosening waits \(TimeFormat.delay(hours: Furlough.trialDelayHours)) instead, so nothing you try out can cost you a day. The week starts when you allow access, and it cannot be extended.")
+                    .emberBody(15)
+                    .foregroundStyle(Ember.muted)
+                    .padding(.top, 10)
                 if model.authorization == .denied {
                     Text("Screen Time access was denied. Turn it on in Settings > Screen Time > Apps with Screen Time Access > Furlough.")
                         .emberBody(12)

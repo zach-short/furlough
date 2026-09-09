@@ -163,7 +163,7 @@ struct LinkedEnforcementTests {
         // Only the website is in the anchor, and the app is open all day by its rule.
         config.anchor.kinds = [.host("youtube.com")]
         config.anchor.isAnchored = true
-        #expect(config.isAnchored(config.targets[0]))
+        #expect(config.isAnchored(config.targets[0], at: at(8, 21)))
         let decision = Policy.decide(config: config, runtime: RuntimeState(), now: at(8, 21), calendar: cal)
         #expect(decision.statuses[config.targets[0].id] == .anchored)
         #expect(decision.blockedApps == ["com.google.ios.youtube"])

@@ -55,6 +55,10 @@ targets:
           - TAG
         com.apple.security.application-groups:
           - group.com.zachshort.furlough
+        # The Anchor across devices (HANDOFF step 18): one record in the iCloud key-value
+        # store, under one identifier on every target that writes or reads it — the app, the
+        # monitor, the widgets and the Mac. Automatic signing adds iCloud to the App IDs.
+        com.apple.developer.ubiquity-kvstore-identifier: $(TeamIdentifierPrefix)com.zachshort.furlough
     info:
       path: Furlough/Info.plist
       properties:
@@ -102,6 +106,9 @@ targets:
     sources:
       - path: FurloughMonitor
       - path: Shared/Core
+      # The monitor is what is awake at a window's edges, so it is what updates and ends the
+      # Live Activity there. It never starts one: only a foreground app may.
+      - path: Shared/LiveActivity
       - path: Shared/PrivacyInfo.xcprivacy
         buildPhase: resources
     entitlements:
@@ -110,6 +117,7 @@ targets:
         com.apple.developer.family-controls: true
         com.apple.security.application-groups:
           - group.com.zachshort.furlough
+        com.apple.developer.ubiquity-kvstore-identifier: $(TeamIdentifierPrefix)com.zachshort.furlough
     info:
       path: FurloughMonitor/Info.plist
       properties:
@@ -177,6 +185,9 @@ targets:
           - ShieldReconciler.swift
       - path: Shared/LiveActivity
       - path: Shared/UI
+      # The Drop Anchor intent runs here for the Control Center control and the widget
+      # button, and in the app for Spotlight and Shortcuts: one file, both targets.
+      - path: Shared/Intents/DropAnchorIntent.swift
       - path: Furlough/Fonts
         buildPhase: resources
       - path: Shared/PrivacyInfo.xcprivacy
@@ -184,8 +195,14 @@ targets:
     entitlements:
       path: FurloughWidgets/FurloughWidgets.entitlements
       properties:
+        # Since 2026-09-09: the Drop Anchor intent applies the shields from this process
+        # (AnchorDrop → ShieldReconciler), which needs Family Controls here as it does in the
+        # monitor. Automatic signing adds the development capability; the distribution
+        # profile for this bundle ID needs the distribution entitlement before the next upload.
+        com.apple.developer.family-controls: true
         com.apple.security.application-groups:
           - group.com.zachshort.furlough
+        com.apple.developer.ubiquity-kvstore-identifier: $(TeamIdentifierPrefix)com.zachshort.furlough
     info:
       path: FurloughWidgets/Info.plist
       properties:
@@ -317,12 +334,27 @@ targets:
           copyFiles:
             destination: wrapper
             subpath: Contents/Library/LaunchAgents
+      # What the app and the web filter say to each other over XPC: one file, compiled into both.
+      - path: FurloughMacFilter/FilterXPC.swift
     entitlements:
       path: FurloughMac/FurloughMac.entitlements
       properties:
         com.apple.security.automation.apple-events: true
         com.apple.security.application-groups:
           - X9V4L6HR2R.com.zachshort.furlough
+        # The same iCloud key-value store as the phone (HANDOFF step 18). Unlike the App
+        # Group, iCloud needs a provisioning profile on the Mac, so the build below passes
+        # -allowProvisioningDeviceRegistration to register this Mac with the team.
+        com.apple.developer.ubiquity-kvstore-identifier: $(TeamIdentifierPrefix)com.zachshort.furlough
+        # The web filter (FurloughMacFilter): the app activates the system extension and owns
+        # its filter configuration. Both are restricted entitlements, so from here on the app
+        # carries a provisioning profile; automatic signing mints a Mac development one, which
+        # needs this Mac registered with the team (it is). The value is the plain one, right for
+        # development and the App Store; a Developer ID build re-signs with
+        # content-filter-provider-systemextension by hand. See HANDOFF step 26.
+        com.apple.developer.system-extension.install: true
+        com.apple.developer.networking.networkextension:
+          - content-filter-provider
     info:
       path: FurloughMac/Info.plist
       properties:
@@ -332,6 +364,7 @@ targets:
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
         LSApplicationCategoryType: public.app-category.productivity
         NSAppleEventsUsageDescription: Furlough reads the address of the page in front of you so it can block websites outside their windows, and sends a blocked tab to its shield page.
+        NSSystemExtensionUsageDescription: Furlough's web filter refuses connections to a website outside its windows from every app on this Mac, including browsers it cannot read.
         ATSApplicationFontsPath: Fonts
         ITSAppUsesNonExemptEncryption: false
     settings:
@@ -347,6 +380,56 @@ targets:
         ENABLE_PREVIEWS: YES
     dependencies:
       - target: FurloughMacWidgets
+      - target: FurloughMacFilter
+
+  # The web filter: a network content filter macOS runs as a system extension, dropping every
+  # connection to a blocked host from any process — Firefox, a site saved to the Dock as an
+  # app, an app that loads a site outside a browser. It sits beside the tab reader in
+  # Enforcer, not instead of it: the reader still draws the shield page, the filter closes the
+  # holes the reader cannot see. Sandboxed, as every network extension must be; the App Group
+  # is only there to prefix its Mach service name. Every decision it makes is
+  # Shared/Core/FlowRules.swift, which is pure and tested; the extension is the shell.
+  # ENABLE_DEBUG_DYLIB is off because a system extension has to be one Mach-O, and Xcode's
+  # Debug split into a stub plus a dylib is not.
+  FurloughMacFilter:
+    type: system-extension
+    platform: macOS
+    sources:
+      - path: FurloughMacFilter
+      - path: Shared/Core/Hosts.swift
+      - path: Shared/Core/FlowRules.swift
+    entitlements:
+      path: FurloughMacFilter/FurloughMacFilter.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.developer.networking.networkextension:
+          - content-filter-provider
+        com.apple.security.application-groups:
+          - X9V4L6HR2R.com.zachshort.furlough
+    info:
+      path: FurloughMacFilter/Info.plist
+      properties:
+        CFBundleDisplayName: Furlough Web Filter
+        CFBundlePackageType: SYSX
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        # What NEProvider.startSystemExtensionMode reads: the Mach service the extension
+        # listens on for the app, and the provider class for the content-filter extension point.
+        NetworkExtension:
+          NEMachServiceName: X9V4L6HR2R.com.zachshort.furlough.filter
+          NEProviderClasses:
+            com.apple.networkextension.filter-data: $(PRODUCT_MODULE_NAME).FilterDataProvider
+    settings:
+      base:
+        # A system extension's bundle is named after its identifier, and its module cannot be.
+        PRODUCT_NAME: com.zachshort.furlough.mac.filter
+        PRODUCT_MODULE_NAME: FurloughMacFilter
+        PRODUCT_BUNDLE_IDENTIFIER: com.zachshort.furlough.mac.filter
+        MACOSX_DEPLOYMENT_TARGET: "26.0"
+        ENABLE_HARDENED_RUNTIME: YES
+        ENABLE_APP_SANDBOX: YES
+        ENABLE_DEBUG_DYLIB: NO
 
   # The Mac's desktop widget: the phone's home-screen widget, through WidgetKit on macOS. It
   # reads the app's store through the App Group, which is why the Mac app carries one too.
