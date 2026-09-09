@@ -21,6 +21,7 @@ already in progress, so item 1 is the tail of that, not the start.
 | 9 | iPad | Opus | Gated | 1 approved; 4 or the no-NFC rule | `project.yml`, every iOS view that presents a sheet or popover |
 | 10 | Write down the no-QR, no-pause decisions | Opus | D | nothing | `HANDOFF.md`, `site/src/pages/help/nfc-tags.astro` |
 | 11 | More companion pairs, every one confirmed | **Sonnet** | F | nothing | `Companions.swift`, `CompanionsTests.swift`, new `design/companions-sources.md` |
+| 12 | Suggested rules by hazard tier, and an audit for quality-of-life defaults like it | Opus | G | nothing | new `Shared/Core/RuleSuggestion.swift`, `RuleEditorView`, `Tests/Core` |
 
 **Lanes run in parallel with each other; tasks inside a lane run one after another.**
 A, B, C, D and E can all be open at once, each in its own worktree. Inside A the order is
@@ -633,3 +634,92 @@ Zach is in the US; prefer what he would plausibly install.
 
 Hand back: how many pairs you added, how many candidates you rejected and why, any pair
 that went in with no bundle identifier, and the test run's output.
+
+---
+
+## 12. Suggested rules by hazard tier, and an audit for quality-of-life defaults like it
+
+**Model: Opus. Lane: its own; parallel-safe with everything. Waits on nothing.**
+
+You are picking up Furlough, Zach's iOS and Mac app blocker. Read `HANDOFF.md`, then
+`README.md`, then `design/DESIGN.md`. Session rules: never run `git commit` or `git push`;
+when the work is ready run `git status --short` and print two bash blocks for Zach — `git
+add <only the files this session touched>` and a short all-lowercase `git commit -m "..."`
+— with no `Co-Authored-By` line and no "Generated with" line. Every change to `Shared/Core`
+gets tests in `Tests/Core`. Ask Zach before anything opinionated ships broadly; this whole
+item is opinionated, so read the "Decide with Zach" note below before writing the table.
+
+`Shared/Core/AppUtility.swift` already guesses a hazard tier for a target — essential,
+useful, idle, hazard — and `RuleEditorView.swift:113` offers it as a default, only while
+Zach "has not answered for himself" (`suggestion`, same file). It says nothing about the
+*rule* itself: what budget, what windows. Right now the only help with that is
+`copyCandidates`/`applyCandidates` (`RuleEditorView.swift:135-143`), and both require a
+target Zach has *already* configured — the first hazard app anyone adds has nothing to copy
+from. This item is the same suggestion pattern, one property over: alongside the tier,
+propose a starting `Rule` — a budget, and windows if the tier warrants them — offered the
+same non-coercive way the tier already is. Never applied automatically; one tap to take it,
+one to ignore it; never overwrites a rule that already exists.
+
+**Decide with Zach first: the actual numbers.** A bundle identifier has a verifiably correct
+answer; "TikTok gets 20 minutes, not 30" does not. Do not silently invent a specific figure
+for all 200-some entries in `AppUtility`. Instead:
+
+1. Propose one starting rule **per tier**, not per app, as the default: essential suggests
+   nothing (blocking it is the risk Furlough warns about, not a habit to budget); useful
+   suggests nothing or a generous, unwindowed budget (a work tool does not have a "healthy
+   amount"); idle suggests a moderate daily budget with no window restriction unless a
+   specific app earns one; hazard suggests a tight budget, plus a window that excludes the
+   first and last hour of the day, matching how Zach described Instagram versus how he
+   described Telegram in conversation — a contact app should look like `.useful` even at
+   `.essential`-adjacent tiers of "real reach," not like the feed sitting next to it in
+   `.hazard` or `.idle`.
+2. Read through `AppUtility.names`, `bundleIDs` and `hosts` for tier-default mismatches worth
+   a named exception — a `.useful` messaging app (Telegram, Messenger, WhatsApp) almost
+   certainly wants "no suggestion" rather than the generic useful default, the same way
+   `Companions`' pairs and `AppUtility`'s essentials already carry per-entry detail instead of
+   a bare tier. List every exception you propose, with the one-line reason, and stop there —
+   do not extend exceptions to apps you have not looked at individually.
+3. Take both the tier defaults and the exception list to Zach before wiring them into the
+   table. This is the step every other item in this file skips because its facts are
+   checkable; this one's are not, so do not skip it here.
+
+**Once the numbers are agreed, the shape:**
+
+- A new file, `Shared/Core/RuleSuggestion.swift`, keyed the same way `AppUtility` already is
+  (by name, bundle identifier and host, reusing `AppUtility.byName`/`byBundleID`/`byHost`'s
+  matching rather than re-deriving it) but answering a suggested `Rule` fragment — budget
+  minutes and, where the tier calls for one, a window — not folded into `Advice`. Keep it
+  separate from the tier table on purpose: Zach may want to retune a suggested figure without
+  touching what is otherwise a table of verified facts.
+- `RuleEditorView`: beside the existing `suggestion` (tier) property, a sibling that offers
+  the rule fragment under the same guard — only while the target has no rule of its own yet.
+  Applying it fills the budget and window fields already in the editor; it is a starting
+  draft the person can still change before saving, not a second rule layered on top of one.
+- Nothing here changes `Policy.decide` or anything the shield reads: this is a UI-layer
+  default, same as the tier suggestion is today.
+
+**The second half of this item — do not skip it.** Zach likes small quality-of-life defaults
+in this same spirit: offered once, easy to ignore, never a second system to maintain. Read
+`RuleEditorView.swift`, `AddChoice.swift` and `Furlough/Views/AddTargets.swift` end to end
+looking for other cold-start gaps like the one above — a place where Furlough already knows
+something useful (a tier, a proper name, a companion pairing, a window someone else set up)
+but only offers it once a person has done the harder work first. Two seeds, not a limit:
+whether a target's `nickname` could default to `Companions`/`AppUtility`'s confirmed proper
+name instead of staying blank until the shield learns one; whether `copyCandidates` could
+also offer a *tier's* own suggested rule as a candidate, so a second hazard app has more to
+copy from than just the first. Propose two or three more, each with the same test: does it
+require Zach to accept anything, or does it just remove a step for the same choice he would
+have made anyway.
+
+Keep: every suggestion here is offered, never applied, and never overwrites what is already
+set; `Policy.decide` is untouched; the tier table and the rule-suggestion table stay separate
+files so one can be re-tuned without touching the other's verified facts.
+
+Tests: `Tests/Core/RuleSuggestionTests.swift` for the lookup (by name, bundle identifier and
+host, mirroring `AppUtilityTests`' structure), a test that an existing rule is never
+overwritten, and one per named exception confirming it does not fall through to its tier's
+bare default.
+
+Hand back: the agreed tier defaults and exception list (with Zach's sign-off noted), the
+suggestion mechanism, two or three other quality-of-life proposals from the second half with
+Zach's answer on each, and the test run's output.
