@@ -14,6 +14,12 @@ import ServiceManagement
 /// one, which is what made a plain `KeepAlive` agent unusable here: launchd and a user launch
 /// would race and leave two enforcers ticking against one store. And `-g` leaves Furlough in
 /// the background, so a reopen never steals focus from whatever the user is doing.
+///
+/// It runs that only when Furlough is not already up. launchd fires the job on its interval
+/// whatever the app is doing, and the handoff to a running copy is not free: it arrives as the
+/// same reopen Apple Event a Dock click sends, and `applicationShouldHandleReopen` answers it
+/// by raising the window and making Furlough a regular app again. Unguarded, that put the
+/// window back on screen every ten seconds — minimised or closed, it came straight back.
 enum Watchdog {
     static let label = "com.zachshort.furlough.mac.watchdog"
 
@@ -24,9 +30,9 @@ enum Watchdog {
 
     /// Bumped whenever the bundled plist changes. `SMAppService` hands launchd a copy of the
     /// job at registration and does not re-read it when the app is replaced, so an agent
-    /// registered by an older build would keep running the old command — here, one with no
-    /// `--background`, which would put the window back on every watchdog reopen.
-    private static let plistVersion = 3
+    /// registered by an older build would keep running the old command — here, one that pokes
+    /// a running Furlough every ten seconds and puts the window back with it.
+    private static let plistVersion = 4
     private static let versionKey = "furlough.watchdog.plistVersion"
 
     /// Bundled at `Contents/Library/LaunchAgents/` by the copy-files phase in `project.yml`.

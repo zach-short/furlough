@@ -5,19 +5,27 @@
 	<!-- Must match the file name, and Watchdog.label. -->
 	<key>Label</key>
 	<string>com.zachshort.furlough.mac.watchdog</string>
-	<!-- `open` hands off to a running copy instead of starting a second enforcer; -g leaves it
-	     in the background so a reopen never steals focus. `--background` reaches the app as a
-	     launch argument (Watchdog.backgroundFlag) and tells it this reopen is the agent's, not
-	     a person's, so it comes back with no window. Bump Watchdog.plistVersion on any change
-	     here, or an agent registered by an older build keeps running the old command. -->
+	<!-- Only opens Furlough when it is not running. The guard is the whole job: launchd runs
+	     this every StartInterval seconds whatever the state of the app, and `open` against a
+	     copy that is already running is not a no-op — it sends the same reopen Apple Event a
+	     Dock click does. That reached applicationShouldHandleReopen every ten seconds, which
+	     raised the window and pulled the app to the front; -g stopped `open` activating it,
+	     but the app then activated itself. So the poke has to stop before it is sent.
+
+	     `pgrep -x` matches the executable name exactly, which is the question being asked.
+	     A `pgrep -f` over the bundle path would also count anything that merely mentions it —
+	     a build, a tail on a log, an editor — and quietly decide Furlough was up when it was
+	     not, which is the one way this guard can fail dangerously.
+
+	     When it does fire, `open` hands off rather than starting a second enforcer, and
+	     `--background` reaches the app as a launch argument (Watchdog.backgroundFlag) so the
+	     fresh copy comes back with no window. Bump Watchdog.plistVersion on any change here,
+	     or an agent registered by an older build keeps running the old command. -->
 	<key>ProgramArguments</key>
 	<array>
-		<string>/usr/bin/open</string>
-		<string>-g</string>
-		<string>-b</string>
-		<string>com.zachshort.furlough.mac</string>
-		<string>--args</string>
-		<string>--background</string>
+		<string>/bin/sh</string>
+		<string>-c</string>
+		<string>pgrep -x Furlough &gt;/dev/null || exec /usr/bin/open -g -b com.zachshort.furlough.mac --args --background</string>
 	</array>
 	<key>RunAtLoad</key>
 	<true/>
