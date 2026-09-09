@@ -23,6 +23,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     /// The 120 × 160 drawing at menu bar height. Under 40 pt it draws its bolder chip form,
     /// the same picture the 12 pt row chips wear, and it stays inside one menu bar slot.
     private static let glassSize = NSSize(width: 13.5, height: 18)
+    /// How long to wait for macOS to place the item before giving up on saying where it went:
+    /// twenty tenths of a second. It is usually there within one or two.
+    private static let placementAttempts = 20
+    private static let placementRetry: TimeInterval = 0.1
 
     init(model: MacModel) {
         self.model = model
@@ -40,7 +44,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         self.item = item
         refresh()
         // Deferred, because a status item's button frame is (0, 0, w, 0) until macOS lays it
-        // out — measuring at creation is what made this take a session to diagnose.
+        // out — measuring at creation is what made this take a session to diagnose. One turn
+        // is not always enough either; `reportPlacement` waits for a frame worth reading.
         DispatchQueue.main.async { MainActor.assumeIsolated { self.reportPlacement() } }
         // The same shape as the enforcer's tick. Nothing counts down in the bar any more, but
         // the glass still has to fill and empty as windows open and close.
@@ -119,8 +124,30 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     /// camera housing*, where `isVisible` is `true`, the frame is real, and nothing is on
     /// screen. The screen's two auxiliary areas are the usable strips either side of the notch,
     /// so an item intersecting neither is behind it.
-    private func reportPlacement() {
-        guard let frame = item?.button?.window?.frame, let screen = NSScreen.main else { return }
+    ///
+    /// The catch is that the frame arrives late. macOS places the item's window a few turns
+    /// after the item is made, and until it does the frame reads (0, 0, w, 0) — which sits at
+    /// the bottom of the screen, intersects neither strip, and so is indistinguishable from an
+    /// item under the notch. Asking once, a turn after install, is why this warned about a
+    /// perfectly visible hourglass on some launches and not others. So it waits for a frame
+    /// that has been laid out, and a frame that never comes says nothing at all rather than
+    /// something wrong.
+    private func reportPlacement(attempt: Int = 0) {
+        let frame = item?.button?.window?.frame ?? .zero
+        // An unplaced item has no height and sits at the origin; a placed one is up in the
+        // menu bar. Either test alone would do, together they cannot be fooled.
+        guard frame.height > 0, frame.origin.y > 0 else {
+            guard attempt < Self.placementAttempts else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.placementRetry) {
+                MainActor.assumeIsolated { self.reportPlacement(attempt: attempt + 1) }
+            }
+            return
+        }
+        // The screen the item actually landed on, not whichever one is frontmost: on a Mac
+        // driving an external display the menu bar may be over there, and that screen has no
+        // notch and so no auxiliary areas to miss.
+        guard let screen = NSScreen.screens.first(where: { $0.frame.intersects(frame) }) ?? NSScreen.main
+        else { return }
         let beside = [screen.auxiliaryTopLeftArea, screen.auxiliaryTopRightArea].compactMap { $0 }
         guard !beside.isEmpty else {
             SharedStore.log("menu bar: item added")
