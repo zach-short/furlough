@@ -127,9 +127,10 @@ fi
 # Apple's Screen Time scan, run here first. App Review's automated pass rejected build
 # 202609090423 on 2026-09-09 (guideline 2.5.1): every bundle that links FamilyControls,
 # ManagedSettings or DeviceActivity must carry com.apple.developer.family-controls, and the
-# widget linked ManagedSettings through Shared/Core while carrying nothing. It no longer links
-# it (NO_SCREEN_TIME on the FurloughWidgets target in project.yml); this checks every bundle in
-# the archive against that rule, so the next such slip fails here rather than in review.
+# widget linked ManagedSettings through Shared/Core while carrying nothing. It still links it —
+# the Drop Anchor intent runs in that extension and applies the shields — and now carries the
+# entitlement (see the FurloughWidgets target in project.yml); this checks every bundle in the
+# archive against that rule, so the next such slip fails here rather than in review.
 # Same shape as above: each tool's output lands in a variable before anything probes it.
 echo "==> Checking that every bundle linking a Screen Time framework is entitled for it"
 APP_DIR="$ARCHIVE/Products/Applications/Furlough.app"
