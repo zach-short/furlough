@@ -4,7 +4,6 @@ import UniformTypeIdentifiers
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.openURL) private var openURL
     @State private var delayHours = Furlough.defaultLoosenDelayHours
     @State private var result: ProposalResult?
     @State private var confirmReset = false
@@ -256,10 +255,10 @@ struct SettingsView: View {
             .padding(.top, 6)
     }
 
-    /// The version, and the way to the rest of About. The number is the one thing the site
-    /// cannot print: only the running copy knows which build it is, and it is the first thing
-    /// a support mail needs. Everything else — what Furlough keeps, what it is built on — is a
-    /// page rather than a screen, so it can be corrected without shipping a build.
+    /// The version, and the way to the rest of About. The number is the first thing a support
+    /// mail needs and the one thing only the running copy knows; everything else — what
+    /// Furlough keeps, what it is built on — is the About page, the same one the help screen
+    /// reaches, so there is one copy of it rather than two.
     @ViewBuilder
     private var aboutCard: some View {
         SectionLabel(text: "About")
@@ -268,12 +267,24 @@ struct SettingsView: View {
                 .contentShape(Rectangle())
                 .onTapGesture { noteVersionTap() }
             CardDivider()
-            action("About Furlough") {
-                if let url = Furlough.helpURL("about") { openURL(url) }
+            NavigationLink { AboutHelp() } label: {
+                HStack {
+                    Text("About Furlough")
+                        .emberBody(13)
+                        .foregroundStyle(Ember.cream)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Ember.faint)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 11)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
         }
         .emberCard()
-        Footnote(text: "Opens furloughapp.com, where what stays on this phone and what Furlough is built on are written out in full.")
+        Footnote(text: "What stays on this phone, what the setup file holds, and what Furlough is built on.")
             .padding(.top, 8)
     }
 

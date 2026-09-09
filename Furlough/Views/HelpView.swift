@@ -3,14 +3,13 @@ import SwiftUI
 /// What the app will not stop to explain while you are using it: what a rule means, why a
 /// change waits, and the one way out. Reached from the question mark beside the gear on Home.
 ///
-/// Eight topics, one idea each, in the app's own voice. Two are pages in the app and six open
-/// furloughapp.com — the split is in `HelpTopics.swift`, and it is the difference between a
-/// topic that has to read this phone's own settings and one that is the same on every phone.
-/// Anything with a number in it reads the number out of the config rather than repeating the
+/// Eight pages, one idea each, in the app's own voice, and all eight of them here rather than
+/// on the site — the pages are in `HelpTopics.swift`. Help is wanted at the moment the app is
+/// in the way, which is no time to be handed to a browser that may itself be shielded, and
+/// anything with a number in it reads the number out of the config rather than repeating the
 /// default, so a phone with a week-long delay is not told about 24 hours.
 struct HelpView: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.openURL) private var openURL
 
     var body: some View {
         NavigationStack {
@@ -23,7 +22,7 @@ struct HelpView: View {
                     beyondCard
                     SectionLabel(text: "If you need it")
                     needCard
-                    Footnote(text: "Rows with an arrow open furloughapp.com in Safari, where a page can be corrected without an app update. The two that stay here need no connection: one reads the delay off your own settings, and the other is what you want when a shield sticks, which is no time to go looking for a browser.")
+                    Footnote(text: "Every page here is in the app and needs no connection. The same topics are on furloughapp.com for anyone deciding whether to install Furlough; these are the copies that quote your own settings, and the ones still there when a shield sticks.")
                         .padding(.top, 10)
                 }
                 .padding(.horizontal, 16)
@@ -78,30 +77,45 @@ struct HelpView: View {
             }
             .buttonStyle(.plain)
             CardDivider()
-            linkRow("Windows and budgets", "Hours you allow, minutes a day", page: "windows-and-budgets") {
-                HelpTile(symbol: "clock")
+            NavigationLink { WindowsHelp() } label: {
+                HelpRow(title: "Windows and budgets", detail: "Hours you allow, minutes a day") {
+                    HelpTile(symbol: "clock")
+                }
             }
+            .buttonStyle(.plain)
             CardDivider()
-            linkRow("Apps and websites", "What Furlough can hold, and how to add it", page: "apps-and-websites") {
-                HelpTile(symbol: "square.grid.2x2")
+            NavigationLink { TargetsHelp() } label: {
+                HelpRow(title: "Apps and websites", detail: "What Furlough can hold, and how to add it") {
+                    HelpTile(symbol: "square.grid.2x2")
+                }
             }
+            .buttonStyle(.plain)
             CardDivider()
-            linkRow("Apps the picker will not show", "Safari, Settings, the App Store, Phone", page: "beyond-the-picker") {
-                HelpTile(symbol: "eye.slash")
+            NavigationLink { PickerHelp() } label: {
+                HelpRow(title: "Apps the picker will not show", detail: "Safari, Settings, the App Store, Phone") {
+                    HelpTile(symbol: "eye.slash")
+                }
             }
+            .buttonStyle(.plain)
         }
         .emberCard()
     }
 
     private var beyondCard: some View {
         VStack(spacing: 0) {
-            linkRow("The Anchor", "One tap to lock. The tag to unlock.", page: "the-anchor") {
-                AnchorGlyph(isAnchored: false)
+            NavigationLink { AnchorHelp() } label: {
+                HelpRow(title: "The Anchor", detail: "One tap to lock. The tag to unlock.") {
+                    AnchorGlyph(isAnchored: false)
+                }
             }
+            .buttonStyle(.plain)
             CardDivider()
-            linkRow("Outside the app", "Notifications, the widget, the lock screen", page: "outside-the-app") {
-                HelpTile(symbol: "bell")
+            NavigationLink { ElsewhereHelp() } label: {
+                HelpRow(title: "Outside the app", detail: "Notifications, the widget, the lock screen") {
+                    HelpTile(symbol: "bell")
+                }
             }
+            .buttonStyle(.plain)
         }
         .emberCard()
     }
@@ -115,31 +129,14 @@ struct HelpView: View {
             }
             .buttonStyle(.plain)
             CardDivider()
-            linkRow("About Furlough", "What it keeps, and what leaves the phone", page: "about") {
-                HelpTile(symbol: "info.circle")
+            NavigationLink { AboutHelp() } label: {
+                HelpRow(title: "About Furlough", detail: "What it keeps, and what leaves the phone") {
+                    HelpTile(symbol: "info.circle")
+                }
             }
+            .buttonStyle(.plain)
         }
         .emberCard()
-    }
-
-    /// A row that leaves the app. The topics with no live data in them are written on the site
-    /// rather than compiled in, so a sentence that turns out to be wrong can be fixed the same
-    /// day instead of waiting on a review. Tapping one hands the address to Safari; Furlough
-    /// makes no request itself. (Since 2026-09-09 the Anchor's state does go to the user's own
-    /// iCloud key-value store, so "no network code at all" is no longer claimed anywhere.)
-    private func linkRow<Icon: View>(
-        _ title: String,
-        _ detail: String,
-        page: String,
-        @ViewBuilder icon: () -> Icon
-    ) -> some View {
-        Button {
-            if let url = Furlough.helpURL(page) { openURL(url) }
-        } label: {
-            HelpRow(title: title, detail: detail, isExternal: true, icon: icon)
-        }
-        .buttonStyle(.plain)
-        .accessibilityHint("Opens furloughapp.com in Safari")
     }
 }
 
@@ -171,15 +168,11 @@ struct HelpTile: View {
 struct HelpRow<Icon: View>: View {
     let title: String
     let detail: String
-    /// Whether the row opens the site rather than pushing a page. Only the chevron changes:
-    /// an arrow leaving the corner is the one bit of chrome that says a tap leaves the app.
-    let isExternal: Bool
     let icon: Icon
 
-    init(title: String, detail: String, isExternal: Bool = false, @ViewBuilder icon: () -> Icon) {
+    init(title: String, detail: String, @ViewBuilder icon: () -> Icon) {
         self.title = title
         self.detail = detail
-        self.isExternal = isExternal
         self.icon = icon()
     }
 
@@ -197,7 +190,7 @@ struct HelpRow<Icon: View>: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 8)
-            Image(systemName: isExternal ? "arrow.up.right" : "chevron.right")
+            Image(systemName: "chevron.right")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(Ember.faint)
         }
@@ -289,6 +282,58 @@ struct HelpPoints: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
                 .accessibilityElement(children: .combine)
+            }
+        }
+        .emberCard()
+    }
+}
+
+/// A card of numbered steps, for the few places help has to be followed in order rather than
+/// read. The numeral is the one `AddWebsiteGuideView` draws, so a set of steps looks the same
+/// wherever the app gives them.
+struct HelpSteps: View {
+    struct Step: Identifiable {
+        let title: String
+        let detail: String
+        var id: String { title }
+
+        init(_ title: String, _ detail: String) {
+            self.title = title
+            self.detail = detail
+        }
+    }
+
+    let steps: [Step]
+
+    init(_ steps: [Step]) { self.steps = steps }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(steps.enumerated()), id: \.element.id) { index, step in
+                if index > 0 { CardDivider() }
+                HStack(alignment: .top, spacing: 12) {
+                    Text("\(index + 1)")
+                        .font(EmberFont.numerals(13))
+                        .monospacedDigit()
+                        .foregroundStyle(Ember.amber)
+                        .frame(width: 26, height: 26)
+                        .background(Color.white.opacity(0.07), in: Circle())
+                        .overlay(Circle().strokeBorder(Ember.cardBorder, lineWidth: 1))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(step.title)
+                            .emberDisplaySmall(14)
+                            .foregroundStyle(Ember.cream)
+                        Text(step.detail)
+                            .emberBody(12)
+                            .foregroundStyle(Ember.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Step \(index + 1). \(step.title). \(step.detail)")
             }
         }
         .emberCard()
