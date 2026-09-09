@@ -55,14 +55,14 @@ struct TokenName: View {
     }
 }
 
-/// The real app icon, scaled to fill `size`. The system view is always 32 pt and its artwork
-/// fills about two thirds of it, so the tile measures the view and scales past the padding.
-/// No frame of our own: the artwork brings its rounded square.
+/// The real app icon, scaled to fill `size`. The system view is always 32 pt, but how much of
+/// it the artwork actually covers depends on the kind of token, so the tile measures the view
+/// and scales past whatever padding that kind is known to have. No frame of our own: the
+/// artwork brings its rounded square.
 struct TokenTile: View {
     let kind: TargetKind
     var size: CGFloat = 34
     @State private var natural = CGSize.zero
-    private static let artworkFraction: CGFloat = 0.655
     /// A typed site has no artwork of its own, and this is the glyph the + button already uses
     /// for Website, so the two say the same thing.
     static let hostSymbol = "globe"
@@ -86,13 +86,27 @@ struct TokenTile: View {
                 )
         } else {
             let longest = max(natural.width, natural.height)
-            let scale = longest > 0 ? size / (longest * Self.artworkFraction) : 1
+            let scale = longest > 0 ? size / (longest * Self.artworkFraction(of: kind)) : 1
             TokenLabel(kind: kind)
                 .labelStyle(.iconOnly)
                 .onGeometryChange(for: CGSize.self) { $0.size } action: { natural = $0 }
                 .scaleEffect(scale)
                 .frame(width: size, height: size)
         }
+    }
+
+    /// How much of Apple's 32 pt icon view the artwork of `kind` really covers.
+    ///
+    /// An app icon is a squircle sitting inside padding and fills 0.655 of the view — measured
+    /// on the device in the sizing lab of 2026-09-07 — so its tile scales past that padding to
+    /// bring the squircle itself up to `size`. Nothing else has been measured, and everything
+    /// else Apple draws for a token is a glyph on a filled rounded rect running edge to edge,
+    /// so the rest are left alone. Scaling a view that is already full past padding it does not
+    /// have is what made a category come out half again too big, overflowing its frame and
+    /// lapping its neighbours in the Anchor grid. Only scale past padding you have measured.
+    private static func artworkFraction(of kind: TargetKind) -> CGFloat {
+        if case .application = kind { return 0.655 }
+        return 1
     }
 }
 

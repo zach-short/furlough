@@ -99,14 +99,17 @@ private struct ReportTile: View {
     let entry: UsageEntry
     var size: CGFloat = 34
     @State private var natural = CGSize.zero
-    private static let artworkFraction: CGFloat = 0.655
+    /// An app icon fills 0.655 of Apple's 32 pt view and is scaled past that padding; anything
+    /// else Apple draws runs edge to edge and is left alone. `TokenTile.artworkFraction` says
+    /// the same thing in the app, where the measurement was made.
+    private var artworkFraction: CGFloat { entry.applicationToken != nil ? 0.655 : 1 }
 
     private var hasToken: Bool { entry.applicationToken != nil || entry.webDomainToken != nil }
 
     var body: some View {
         if hasToken {
             let longest = max(natural.width, natural.height)
-            let scale = longest > 0 ? size / (longest * Self.artworkFraction) : 1
+            let scale = longest > 0 ? size / (longest * artworkFraction) : 1
             icon
                 .labelStyle(.iconOnly)
                 .onGeometryChange(for: CGSize.self) { $0.size } action: { natural = $0 }
