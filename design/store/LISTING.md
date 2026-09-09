@@ -559,9 +559,12 @@ Per the handoff, wording problems belong here rather than in a quiet edit.
 
 One thing, and it is not copy.
 
-~~1. Real screenshots.~~ **Done 2026-09-09.** All ten captures are in `design/store/raw/` and
-   the upload set is `build/store-shots/01.jpg` to `10.jpg` after `scripts/store-shots.sh`.
-   Nothing blocks the upload.
+~~1. Real screenshots.~~ **Done and uploaded 2026-09-09.** All ten captures are in
+   `design/store/raw/`, `scripts/store-shots.sh` renders them to `build/store-shots/01.jpg` to
+   `10.jpg`, and `scripts/store-upload.sh` sent those to the en-US localization of version 1.0
+   as the iPhone 6.9-inch set (`APP_IPHONE_67`), through the same API key as the review notes.
+   The script replaces whatever set the version has, so a re-render plus a re-run is how a
+   frame gets changed; nothing about it has to be done in the web form.
 
 ~~2. A deploy of `site/` to `furloughapp.com`.~~ **Done 2026-09-08**; see the URLs section.
 
