@@ -222,6 +222,8 @@ module channel(z0, z1) {
     ]);
 }
 
+// The channels sweep backwards from each drop-in slot, so that once the cap is
+// flipped over onto the cup it tightens clockwise — the way every lid does.
 module cap() {
     difference() {
         rotate_extrude()
@@ -240,8 +242,10 @@ module cap() {
 
         for (i = [0 : lugs - 1])
             rotate([0, 0, i * 360/lugs]) {
-                rotate_extrude(angle = entry_arc) channel(run_z0, cap_h + eps);
-                rotate_extrude(angle = entry_arc + lock_arc) channel(run_z0, run_z1);
+                rotate([0, 0, -entry_arc])
+                    rotate_extrude(angle = entry_arc) channel(run_z0, cap_h + eps);
+                rotate([0, 0, -entry_arc - lock_arc])
+                    rotate_extrude(angle = entry_arc + lock_arc) channel(run_z0, run_z1);
             }
 
         if (logo) logo_cut();
@@ -250,7 +254,7 @@ module cap() {
     // The lug rides over this on the way home and has to be turned back past it.
     if (detent > 0)
         for (i = [0 : lugs - 1])
-            rotate([0, 0, i * 360/lugs + entry_arc + lock_arc - lug_arc/2])
+            rotate([0, 0, i * 360/lugs - entry_arc - lock_arc + lug_arc])
                 translate([lug_od/2, 0, run_z0])
                     cylinder(d = detent, h = run_z1 - run_z0);
 }

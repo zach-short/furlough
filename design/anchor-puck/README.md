@@ -168,6 +168,10 @@ Two details worth knowing if you change anything:
   fight and it rocks.
 - A lug's underside is a 45° ramp so it prints without support; its flat top is the
   face that bears against the channel, so `lug_h` must stay larger than `lug_out`.
+- The channels sweep **backwards** from each drop-in slot. The cap is printed face
+  down and then flipped onto the cup, which mirrors its handedness — sweep them the
+  obvious way and the finished puck locks anticlockwise, against every instinct
+  anyone has about lids.
 
 If the detent is too stiff to turn, drop `detent` to 0.3 or set it to 0. If the cap
 unscrews itself in a pocket, raise it to 0.5.

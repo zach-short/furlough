@@ -237,3 +237,123 @@ if os.path.exists("mark.json"):
     print("face done")
 else:
     print("no mark.json here — run export-mark.swift first; skipping the face view")
+
+
+# --- twist variant --------------------------------------------------------
+# The lugs and the bayonet channels are not solids of revolution, but they are
+# still lathe work: the profile just changes with the angle. One revolve that
+# takes a profile *function* draws both, and the walls at each feature's ends
+# fall out of the mesh for free.
+
+seat, foot_h = 0.2, 1.6
+bay_gap, lug_out, skirt_wall = 0.35, 1.2, 1.65
+lugs, lug_arc, lock_arc = 3, 26.0, 30.0
+lug_h, lug_inset = 1.6, 0.6
+
+cap_face = lid_t + tag_t + 0.4
+skirt_h = height - cap_face - foot_h
+cup_h = foot_h + skirt_h - seat
+cap_h = cap_face + skirt_h
+cup_od = outer_d - 2 * (skirt_wall + bay_gap + lug_out)
+lug_od = cup_od + 2 * lug_out
+cap_bore = cup_od + 2 * bay_gap
+slot_od = lug_od + 2 * bay_gap
+cup_bore = cup_od - 2 * wall
+lug_z = cup_h - lug_inset - lug_h
+bay_arc = math.degrees(bay_gap / (lug_od / 2))
+entry_arc = lug_arc + 2 * bay_arc
+run_z0 = cap_face + seat + lug_inset - bay_gap / 2
+run_z1 = run_z0 + lug_h + bay_gap
+
+
+def within(t, a0, a1):
+    return (t - a0) % 360.0 <= (a1 - a0)
+
+
+def cup_profile(t):
+    """A lug bulges the collar out between lug_z and lug_z + lug_h, with a 45
+    degree ramp underneath. Off a lug the four points collapse onto the wall."""
+    r = cup_od/2
+    for i in range(lugs):
+        a0 = i * 360/lugs + bay_arc
+        if within(t, a0, a0 + lug_arc):
+            r = lug_od/2
+    return [(0, 0), (outer_d/2 - chamfer, 0), (outer_d/2, chamfer), (outer_d/2, foot_h),
+            (cup_od/2, foot_h), (cup_od/2, lug_z),
+            (r, lug_z + lug_out), (r, lug_z + lug_h), (cup_od/2, lug_z + lug_h),
+            (cup_od/2, cup_h - 0.4), (cup_od/2 - 0.4, cup_h),
+            (cup_bore/2, cup_h), (cup_bore/2, floor_t), (0, floor_t)]
+
+
+def cap_profile(t):
+    """Inside the skirt: the drop-in channel runs from the rim down to run_z0,
+    the turn runs on from there between run_z0 and run_z1."""
+    r_rim = r_slot = cap_bore/2
+    for i in range(lugs):
+        a0 = i * 360/lugs
+        if within(t, a0 - entry_arc, a0):
+            r_rim = r_slot = slot_od/2
+        elif within(t, a0 - entry_arc - lock_arc, a0):
+            r_slot = slot_od/2
+    return [(0, 0), (outer_d/2 - chamfer, 0), (outer_d/2, chamfer), (outer_d/2, cap_h),
+            (r_rim, cap_h), (r_rim, run_z1), (r_slot, run_z1), (r_slot, run_z0),
+            (cap_bore/2, run_z0), (cap_bore/2, cap_face),
+            (pocket_d/2, cap_face), (pocket_d/2, lid_t), (0, lid_t)]
+
+
+def revolve_fn(profile_fn, albedo, segments=300, breaks=()):
+    """Lathe a profile that varies with the angle. Normals are smoothed around
+    the axis but kept flat along the profile, so a feature's end wall stays sharp."""
+    th = list(np.linspace(0, 360, segments, endpoint=False))
+    for b in breaks:                       # land exactly either side of each edge
+        th += [b - 0.03, b + 0.03]
+    th = np.array(sorted({round(x % 360, 4) for x in th}))
+    S = len(th)
+    P = np.array([profile_fn(t) for t in th])            # (S, n, 2)
+    rad = np.radians(th)
+    V = np.stack([P[:, :, 0] * np.cos(rad)[:, None],
+                  P[:, :, 0] * np.sin(rad)[:, None],
+                  P[:, :, 1]], axis=-1)                  # (S, n, 3)
+    k = np.arange(S)
+    kn = (k + 1) % S
+    tris, norms = [], []
+    for j in range(P.shape[1]):
+        a, b = V[:, j, :], V[:, (j + 1) % P.shape[1], :]
+        nf = np.cross(b[kn] - a[k], b[k] - a[k])         # outward, per quad
+        nf /= np.maximum(np.linalg.norm(nf, axis=1, keepdims=True), 1e-12)
+        nv = nf[(k - 1) % S] + nf[k]                     # smooth around the axis only
+        nv /= np.maximum(np.linalg.norm(nv, axis=1, keepdims=True), 1e-12)
+        tris.append(np.stack([a[k], b[k], b[kn]], axis=1))
+        norms.append(np.stack([nv[k], nv[k], nv[kn]], axis=1))
+        tris.append(np.stack([a[k], b[kn], a[kn]], axis=1))
+        norms.append(np.stack([nv[k], nv[kn], nv[kn]], axis=1))
+    Vt = np.concatenate(tris, axis=0)
+    return Vt, np.concatenate(norms, axis=0), np.tile(albedo, (len(Vt), 1))
+
+
+def shift(mesh, dx=0.0, dy=0.0, dz=0.0):
+    V, N, A = mesh
+    return V + np.array([dx, dy, dz]), N, A
+
+
+cup_breaks = [i*360/lugs + bay_arc + d for i in range(lugs) for d in (0, lug_arc)]
+cap_breaks = [i*360/lugs + d for i in range(lugs) for d in (0, -entry_arc, -entry_arc - lock_arc)]
+
+cup = revolve_fn(cup_profile, GRAPHITE, breaks=cup_breaks)
+cap = revolve_fn(cap_profile, GRAPHITE, breaks=cap_breaks)
+# the detent pins, each a stubby cylinder standing in its channel
+PIN = [(0, 0), (0.4/2, 0), (0.4/2, run_z1 - run_z0), (0, run_z1 - run_z0)]
+pins = [shift(revolve(PIN, GRAPHITE, segments=24),
+              dx=lug_od/2 * math.cos(math.radians(ang)),
+              dy=lug_od/2 * math.sin(math.radians(ang)),
+              dz=run_z0)
+        for ang in [i*360/lugs - entry_arc - lock_arc + lug_arc for i in range(lugs)]]
+
+render([shift(cup, dx=-22), shift(cap, dx=22)] + [shift(p, dx=22) for p in pins],
+       eye=(0, -80, 96), target=(0, 0, 3.5), size=(1500, 940),
+       frame=0.94).save("anchor-puck-twist.png")
+print("twist done")
+
+render([cup], eye=(30, -54, 46), target=(0, 0, 4.6), size=(1300, 1000),
+       frame=0.86).save("anchor-puck-lugs.png")
+print("lugs done")
