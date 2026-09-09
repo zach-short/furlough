@@ -32,7 +32,7 @@ enum Watchdog {
     /// job at registration and does not re-read it when the app is replaced, so an agent
     /// registered by an older build would keep running the old command — here, one that pokes
     /// a running Furlough every ten seconds and puts the window back with it.
-    private static let plistVersion = 4
+    private static let plistVersion = 5
     private static let versionKey = "furlough.watchdog.plistVersion"
 
     /// Bundled at `Contents/Library/LaunchAgents/` by the copy-files phase in `project.yml`.
@@ -71,10 +71,45 @@ enum Watchdog {
             SharedStore.log("watchdog is switched off in System Settings > General > Login Items")
             return
         }
-        if isOn, SharedStore.defaults.integer(forKey: versionKey) != plistVersion {
-            SharedStore.log("watchdog: the agent changed, registering it again")
-            set(false)
+        guard SharedStore.defaults.integer(forKey: versionKey) != plistVersion else {
+            if set(true) { SharedStore.defaults.set(plistVersion, forKey: versionKey) }
+            return
         }
-        if set(true) { SharedStore.defaults.set(plistVersion, forKey: versionKey) }
+        SharedStore.log("watchdog: the agent changed, registering it again")
+        Task.detached { await replaceRegistration() }
+    }
+
+    /// Takes the agent away and puts it back, for a launch that finds the bundled plist changed.
+    ///
+    /// Registering over a job launchd already holds updates its arguments but not the code
+    /// requirement the job was pinned to when it first went in. Change the program — as the
+    /// guard did, from `open` to `sh` — and the job stops running at all: launchd reports
+    /// `spawn failed` and every run exits 78, while `status` still cheerfully says `.enabled`,
+    /// so `set(true)` sees an agent that is already on and does nothing. A Mac in that state
+    /// has no watchdog and no sign of it. Hence unregistering first, and waiting for it to
+    /// land: `unregister()` returns before launchd has let go, and registering back into that
+    /// window is what leaves the old pin in place.
+    private static func replaceRegistration() async {
+        if isOn {
+            // The async `unregister()` waits for launchd to actually let go, where the throwing
+            // one returns straight away; in here it is the overload the compiler picks anyway.
+            do { try await service.unregister() } catch {
+                SharedStore.log("watchdog: \(error.localizedDescription)")
+            }
+            // Belt and braces: `status` is read back through Background Task Management, which
+            // can still be a step behind the job itself.
+            var waited = 0
+            while isOn, waited < 40 {
+                try? await Task.sleep(for: .milliseconds(100))
+                waited += 1
+            }
+        }
+        do {
+            try service.register()
+            SharedStore.defaults.set(plistVersion, forKey: versionKey)
+            SharedStore.log("watchdog on: Furlough reopens within seconds of being quit")
+        } catch {
+            SharedStore.log("watchdog: \(error.localizedDescription)")
+        }
     }
 }
