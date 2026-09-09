@@ -36,12 +36,12 @@
     <div class="eyebrow seclabel">Later today</div>
     <div class="card rows">
       <div class="row">
-        <span class="tile" style="--c: #cc2b2b">Y</span>
+        <span class="tile yt" style="--c: #fff"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#f00" d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8Z"/><path fill="#fff" d="M9.55 15.57V8.43L15.82 12z"/></svg></span>
         <span class="who"><span class="n">YouTube</span><span class="r">8:00–10:00 PM · 30 min</span></span>
         <span class="chip amber"><canvas width="12" height="16" data-hourglass="comingSoon:60" data-still></canvas>8:00 PM</span>
       </div>
       <div class="row">
-        <span class="tile" style="--c: #e0552b">R</span>
+        <span class="tile rd" style="--c: #ff4500"><svg viewBox="0 0 24 24" aria-hidden="true"><g fill="#fff"><circle cx="16.4" cy="3.2" r="2"/><path d="M12.05 10.1 13.6 4a.75.75 0 0 1 .9-.55l1.6.35-.3 1.42-1-.22-1.35 5.32z"/><ellipse cx="12" cy="15.4" rx="7.5" ry="6.2"/><circle cx="3.1" cy="12.6" r="2.8"/><circle cx="20.9" cy="12.6" r="2.8"/></g><g fill="#ff4500"><circle cx="9" cy="14.6" r="1.6"/><circle cx="15" cy="14.6" r="1.6"/></g><path d="M8.8 17.9a4.5 4.5 0 0 0 6.4 0" fill="none" stroke="#ff4500" stroke-width="1.4" stroke-linecap="round"/></svg></span>
         <span class="who"><span class="n">Reddit</span><span class="r">9:00–10:00 PM · 20 min</span></span>
         <span class="chip amber"><canvas width="12" height="16" data-hourglass="comingSoon:200" data-still></canvas>9:00 PM</span>
       </div>
@@ -49,7 +49,7 @@
     <div class="eyebrow seclabel">Tomorrow</div>
     <div class="card rows">
       <div class="row">
-        <span class="tile" style="--c: #b0202a">N</span>
+        <span class="tile nf" style="--c: #000"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#e50914" d="M4.5 2h4.5l6 11.4V2h4.5v20H15L9 10.6V22H4.5z"/></svg></span>
         <span class="who"><span class="n">Netflix</span><span class="r">Fri–Sun 9:00–11:00 PM · 60 min</span></span>
         <span class="chip muted"><canvas width="12" height="16" data-hourglass="doneForToday" data-still></canvas>Fri</span>
       </div>
@@ -57,7 +57,7 @@
     <div class="eyebrow seclabel">Always blocked</div>
     <div class="card rows">
       <div class="row">
-        <span class="tile" style="--c: #2a2a2e">T</span>
+        <span class="tile tt" style="--c: #000"><svg viewBox="-2 -2 28 28" aria-hidden="true"><g><path fill="#25f4ee" transform="translate(-1.3 -1)" d="M16.6 5.82A4.28 4.28 0 0 1 15.54 3h-3.09v12.4a2.59 2.59 0 1 1-1.84-2.48V9.66a5.66 5.66 0 1 0 4.93 5.61V8.99a7.3 7.3 0 0 0 4.27 1.37V7.27a4.29 4.29 0 0 1-3.21-1.45"/><path fill="#fe2c55" transform="translate(1.3 1)" d="M16.6 5.82A4.28 4.28 0 0 1 15.54 3h-3.09v12.4a2.59 2.59 0 1 1-1.84-2.48V9.66a5.66 5.66 0 1 0 4.93 5.61V8.99a7.3 7.3 0 0 0 4.27 1.37V7.27a4.29 4.29 0 0 1-3.21-1.45"/><path fill="#fff" d="M16.6 5.82A4.28 4.28 0 0 1 15.54 3h-3.09v12.4a2.59 2.59 0 1 1-1.84-2.48V9.66a5.66 5.66 0 1 0 4.93 5.61V8.99a7.3 7.3 0 0 0 4.27 1.37V7.27a4.29 4.29 0 0 1-3.21-1.45"/></g></svg></span>
         <span class="who"><span class="n">TikTok</span><span class="r">Social · no windows</span></span>
         <span class="chip grey"><canvas width="12" height="16" data-hourglass="alwaysBlocked" data-still></canvas>all day</span>
       </div>
@@ -102,6 +102,11 @@
   .row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
   .row + .row { border-top: 1px solid var(--edge); }
   .tile { width: 34px; height: 34px; border-radius: 9px; background: var(--c); display: grid; place-items: center; font-family: var(--display); font-weight: 700; font-size: 15px; color: #fff; flex: 0 0 auto; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1); }
+  .tile svg { display: block; width: 21px; height: 21px; }
+  .tile.yt svg { width: 24px; height: 24px; }
+  .tile.nf svg { width: 19px; height: 19px; }
+  .tile.tt svg { width: 22px; height: 22px; }
+  .tile.nf, .tile.tt { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16); }
   .who { display: flex; flex-direction: column; min-width: 0; }
   .n { font-family: var(--display-small); font-weight: 600; font-size: 13.5px; line-height: 1.15; color: var(--cream); }
   .r { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
