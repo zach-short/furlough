@@ -557,7 +557,24 @@ Per the handoff, wording problems belong here rather than in a quiet edit.
 
 ## What still blocks a submission
 
-One thing, and it is not copy.
+**State on Apple's side, read back through the API on 2026-09-09 at 00:30.** Build `202609090423`
+(the first with the website sheet's Done button and the widget fix) was archived, passed the
+release check, uploaded and is VALID; the version still has `202609090224` attached. Set and
+matching this document: name, subtitle, promotional text, description, keywords, support URL,
+privacy policy URL, copyright, categories, age rating 4+, and all ten screenshots. **Not set**,
+and each one refuses the Submit button: no price schedule; no territory availability; the App
+Review contact and notes are **empty** (the 2026-09-08 note above that they were written does
+not match what the API returns now, so treat that as undone); and the marketing URL reads
+`https://furloughapp.com/privacy` where the URLs section says `https://furloughapp.com`.
+
+`scripts/store-submit.sh` does all of that in one run and, with `--submit`, submits: it wants
+`PRICE` (free, or a USD price) and the review contact as `REVIEW_FIRST`, `REVIEW_LAST`,
+`REVIEW_EMAIL`, `REVIEW_PHONE`, and reads the notes from this file. The one thing no API reaches
+is the App Privacy questionnaire; if it is unanswered the submission is refused with a message
+saying so, and it is one screen in the web form ("Data Not Collected", per the PRIVACY
+paragraph).
+
+The history of this section:
 
 ~~1. Real screenshots.~~ **Done and uploaded 2026-09-09.** All ten captures are in
    `design/store/raw/`, `scripts/store-shots.sh` renders them to `build/store-shots/01.jpg` to
