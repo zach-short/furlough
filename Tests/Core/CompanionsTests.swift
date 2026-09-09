@@ -108,4 +108,40 @@ struct CompanionsTests {
             }
         }
     }
+
+    /// Two pairs claiming the same host is a bug: `pair(forHost:)` answers with the first and
+    /// the second becomes unreachable from the web side. A *subdomain* of another pair's host is
+    /// the one legal overlap — music.youtube.com is YouTube Music, not YouTube — because the
+    /// longest match wins, and that is tested above.
+    @Test("No host or identifier is claimed by two pairs")
+    func nothingIsClaimedTwice() {
+        var hosts: [String: String] = [:]
+        var bundleIDs: [String: String] = [:]
+        for pair in Companions.pairs {
+            for host in pair.hosts {
+                #expect(hosts[host] == nil, "\(host) is claimed by both \(hosts[host] ?? "") and \(pair.title)")
+                hosts[host] = pair.title
+            }
+            for bundleID in pair.bundleIDs {
+                #expect(bundleIDs[bundleID] == nil, "\(bundleID) is claimed by both \(bundleIDs[bundleID] ?? "") and \(pair.title)")
+                bundleIDs[bundleID] = pair.title
+            }
+        }
+    }
+
+    /// A name that normalizes to nothing would match every app whose name the shield has not
+    /// learned yet, so the table must never carry one.
+    @Test("Every name survives normalizing, and no pair is listed twice")
+    func namesAreRealAndPairsAreDistinct() {
+        var seen: [String: String] = [:]
+        for pair in Companions.pairs {
+            for name in pair.names {
+                let key = Companions.normalize(name: name)
+                #expect(!key.isEmpty, "\(pair.title) carries an empty name")
+                #expect(seen[key] == nil, "\(name) names both \(seen[key] ?? "") and \(pair.title)")
+                seen[key] = pair.title
+            }
+        }
+        #expect(Set(Companions.pairs).count == Companions.pairs.count, "the table lists a pair twice")
+    }
 }

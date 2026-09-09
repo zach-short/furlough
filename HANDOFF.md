@@ -1871,7 +1871,10 @@ The plan for this stretch. Tick each phase off here as it lands.
     **The Mac has its own App Group and so its own `Config`, and nothing grants it a week.**
     `isInTrial` stays false there and Mac delays are exactly as they were. If the Mac should
     have one, it is a call to `Forgiveness.startTrial` at its onboarding finish — deliberately
-    not made, because nobody has asked for it.
+    not made, because nobody has asked for it. `MacModel.resetEverything` does not make it
+    either, and that is the one place it would be tempting: the phone's reset starts a week
+    because a fresh phone install gets one, and copying that line across would hand the Mac a
+    week only a reset can produce.
 
     **The site pass, added 2026-09-09** (this step shipped without one, and for a day the public
     pages said the absolutes — "there is no unblock button", "no break, no temporary access" —
@@ -1962,6 +1965,36 @@ The plan for this stretch. Tick each phase off here as it lands.
     is uncounted. Whether it should count is a judgement about what the number means. `Record`'s
     `queue` doc comment now names the only legitimate bare append — a state that is thrown away,
     which is `ActivityLimit`'s two projections — so the next one is easier to spot.
+
+30. **The companion table, 33 pairs to 83 (item 11).** Done 2026-09-09. `Companions.pairs` was
+    too thin to fire: most of what Zach added on the phone offered no website because it was not
+    in the table. **Every one of the 50 added was confirmed by an App Store lookup actually run**,
+    and `design/companions-sources.md` is the audit trail — one row per pair with the bundle
+    identifier as Apple returns it, the seller, the host, the `sellerUrl` that links the two, and
+    the listing. It also records what was rejected and why, so the next pass does not re-spend
+    those lookups. The method is the one in the pass-off, and it was sanity-checked first against
+    a pair already in the table (Slack → `com.tinyspeck.slackmacgap`).
+
+    New groups: news and sport, dating, betting, AI chat, and music. Three existing entries moved
+    into the groups they belong to rather than changing — ChatGPT to AI chat, Spotify to music,
+    DraftKings and FanDuel to betting.
+
+    **What the lookups taught, beyond the names.** A bundle identifier is often a company's old
+    name, and looks wrong until you check: StockX ships as `com.Campless.Campless`, Depop as
+    `com.garageitaly.garage`, SHEIN as `zzkko.com.ZZKKO`, BeReal as `AlexisBarreyat.BeReal`. All
+    are lowercased in the table, because `Pair.matches` normalizes what it is *handed* but compares
+    against the table as written — a capital letter is an entry that can never match. Two rejections
+    are worth remembering: `com.microsoft.officemobile` is returned for **Microsoft Copilot**, one
+    identifier serving two products, and `com.espn.bet` now returns **theScore Bet** after a
+    rebrand, so `espnbet.com` is confirmed by nothing and the pair went in under the host its own
+    seller URL names.
+
+    Tests: `tableIsConsistent` already walked the whole table for four of the five invariants, so
+    the additions were self-checking on arrival. The one it could not catch is now
+    `nothingIsClaimedTwice` — two pairs claiming one host, where `pair(forHost:)` answers with the
+    first and the second is unreachable from the web side. It caught a real duplicate immediately:
+    Spotify had been left in its old group *and* added to the new music one. `namesAreRealAndPairsAreDistinct`
+    covers the rest. 571 Core tests pass.
 
 ## Style rules
 
@@ -2064,8 +2097,21 @@ name `Furlough`, macOS 26, non-sandboxed, hardened runtime with the
   of the editor, with "n of m min used today" from `MacModel.usedSeconds`) and a copy of the
   phone's `HomeGroups` (no Anchored section) that the sidebar uses.
 - Debug builds carry Settings > Testing > Reset everything (`MacModel.resetEverything`,
-  `Enforcer.resetUsage`, `QuitGrace.forgetAll`, all `#if DEBUG || TESTING_TOOLS`), like the
-  phone. A Release build of the Mac carries it when built with
+  `Enforcer.resetUsage`, `QuitGrace.forgetAll`, `Watchdog.forget`, `AnchorSync.forgetPhone`,
+  all `#if DEBUG || TESTING_TOOLS`), like the phone. Since 2026-09-09 it goes all the way back
+  rather than stopping at the setup, because Zach asked: on top of the targets, rules, pending
+  changes, the Anchor and today's ledger it clears `furlough.mac.onboarded`, unregisters the
+  login item, unregisters the watchdog **and forgets `furlough.watchdog.plistVersion`** (so the
+  next onboarding registers down a fresh install's path rather than the shortcut a remembered
+  version opens), and clears `furlough.sync.phoneSeen` (so `macDrop`'s lock-with-no-key refusal
+  is reachable again). Two things are deliberately left standing, and they are the same line
+  the phone draws when it keeps Screen Time access: the **web filter** system extension with
+  its `furlough.mac.filter.wanted` flag, and the per-browser **Automation** grants — macOS
+  wants them approved by hand and the app cannot give them back. `furlough.testing.shown` is
+  untouched for the reason `TestingTools` gives, and the activity log is kept as on the phone.
+  It does **not** call `Forgiveness.startTrial`: nothing grants the Mac a first week (see the
+  step 27 note above), so starting one here would make the reset the only route to a Mac state
+  no real install can reach. A Release build of the Mac carries it when built with
   `SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) TESTING_TOOLS'`, and then hides it until
   five clicks on Version under Help > About — the Mac's About lives in the Help sheet, so the
   reveal is there and the section it opens is in Settings.
