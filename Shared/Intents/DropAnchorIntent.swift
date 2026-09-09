@@ -30,11 +30,15 @@ struct DropAnchorIntent: AppIntent {
         case .anchored(let anchor) where anchor.anchorsEverything:
             answer = "Anchored. \(anchor.heldDescription) is locked until you scan your tag."
         case .anchored(let anchor):
-            answer = "Anchored. \(anchor.count) \(anchor.count == 1 ? "thing" : "things") locked until you scan your tag."
+            answer = "Anchored. \(anchor.blockedDescription) until you scan your tag."
         case .refused(let why):
             answer = why.message
         }
         WidgetCenter.shared.reloadAllTimelines()
+        // The control draws the anchor's state, so it has to be told the state moved — a
+        // Control Center button that still says "Drop Anchor" after a drop is the one thing
+        // this whole path cannot afford, since there is no app on screen to check against.
+        ControlCenter.shared.reloadControls(ofKind: Furlough.anchorControlKind)
         return .result(dialog: "\(answer)")
     }
 }

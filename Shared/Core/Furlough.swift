@@ -9,6 +9,10 @@ enum Furlough {
     static let macAppGroupID = "X9V4L6HR2R.com.zachshort.furlough"
     static let storeName = "furlough"
     static let bundleID = "com.zachshort.furlough"
+    /// The Control Center control's kind. Here rather than on `DropAnchorControl` because the
+    /// thing that has to ask for a redraw is the drop itself, which runs in the app as well as
+    /// in the widget extension where the control lives.
+    static let anchorControlKind = "com.zachshort.furlough.dropAnchor"
     static let minutesPerDay = 1440
     /// DeviceActivity rejects schedules shorter than 15 minutes.
     static let minimumWindowMinutes = 15

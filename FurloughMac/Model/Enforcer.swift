@@ -176,6 +176,11 @@ final class Enforcer {
                       seconds >= Double((budget - Furlough.warningMinutes) * 60),
                       !state.runtime.wasWarned(used.id, dayKey: dayKey) {
                 state.runtime.warned[used.id.uuidString] = dayKey
+                // Written wherever `warned` is, so the two never disagree about whether the
+                // moment is known. The Mac has nothing that counts it down yet — the phone's
+                // Live Activity does — but a half-set pair is the kind of thing that is only
+                // found much later, by whatever reads it next.
+                state.runtime.warnedAt[used.id.uuidString] = now
                 Record.markWarned(used.id, in: &state, now: now)
                 SharedStore.log("5 minutes of budget left: \(used.displayName)")
                 Notifier.post(

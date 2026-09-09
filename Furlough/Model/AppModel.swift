@@ -269,6 +269,7 @@ final class AppModel {
         // rescheduled from the saved state on every enforce rather than only when queued.
         PendingNotifications.sync(state: current, now: clock.now, drift: clock.drift)
         WidgetCenter.shared.reloadAllTimelines()
+        ControlCenter.shared.reloadControls(ofKind: Furlough.anchorControlKind)
         reload()
         LiveActivityManager.sync(state: state)
     }

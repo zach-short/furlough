@@ -54,6 +54,13 @@ final class ShieldExtension: ShieldConfigurationDataSource {
         var glass: HourglassState?
         if let target, let status {
             glass = HourglassState.of(target, status: status, runtime: state.runtime, now: now)
+        } else if status == .anchored {
+            // Something the anchor holds that Furlough has no rule for: there is no target to
+            // read a sand level from, but the anchored glass does not have one — it is stopped,
+            // with the anchor across the neck. Without this the shield fell through to the flat
+            // SF hourglass below, so the one screen that should look most like Furlough looked
+            // least like it (seen on the phone, 2026-09-09).
+            glass = .anchored
         }
         return ShieldConfiguration(
             // The app's own ground over the most opaque dark material: the shield reads as a

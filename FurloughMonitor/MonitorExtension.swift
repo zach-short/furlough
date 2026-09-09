@@ -194,6 +194,9 @@ final class MonitorExtension: DeviceActivityMonitor {
             guard !state.runtime.wasWarned(target.id, dayKey: day),
                   !state.runtime.isExhausted(target.id, dayKey: day) else { return }
             state.runtime.warned[target.id.uuidString] = day
+            // Furlough's own time, the same `now` every guard above was judged on, so the
+            // deadline the Live Activity counts to cannot be moved by touching the clock.
+            state.runtime.warnedAt[target.id.uuidString] = now
             Record.markWarned(target.id, in: &state, now: now)
             warnedName = target.displayName
         }

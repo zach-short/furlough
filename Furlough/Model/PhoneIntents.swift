@@ -46,10 +46,14 @@ struct FurloughShortcuts: AppShortcutsProvider {
                 "Lock my apps with \(.applicationName)"
             ],
             shortTitle: "Drop Anchor",
-            // Not a system image: SF Symbols has no anchor, and a shortcut takes a name and
-            // nothing else, so the app ships one custom symbol drawn from the same path as
-            // the mark in the app. See scripts/make-anchor-symbol.swift.
-            systemImageName: "anchor"
+            // SF Symbols has no anchor, and this slot takes an SF Symbol name and nothing else:
+            // the system draws the row beside the app's name in Spotlight, out of our process,
+            // where the app's own `anchor` symbol (Shared/UI/Ember.xcassets, drawn by
+            // scripts/make-anchor-symbol.swift) cannot be reached. Naming it here drew an empty
+            // circle — seen in Spotlight on the phone, 2026-09-09. A lock is what the drop
+            // does, and it is the one honest symbol Apple ships for it. The custom anchor is
+            // still right in `DropAnchorControl`, which renders inside our own extension.
+            systemImageName: "lock.fill"
         )
         AppShortcut(
             intent: WeighAnchorIntent(),

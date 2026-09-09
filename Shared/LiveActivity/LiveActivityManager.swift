@@ -45,7 +45,15 @@ enum LiveActivityManager {
 
         if let openUntil = summary.openUntil, !summary.openNames.isEmpty, openUntil > now {
             let contentState = FurloughActivityAttributes.ContentState(
-                openNames: summary.openNames, note: "Open", warned: summary.openWarned
+                openNames: summary.openNames,
+                note: "Open",
+                warned: summary.openWarned,
+                budgetMinutes: summary.openBudgetMinutes,
+                // Five minutes from the warning, and only from a warning that really fired:
+                // this is the one budget deadline Screen Time ever makes knowable.
+                budgetDeadline: summary.openWarnedAt.map {
+                    $0.addingTimeInterval(TimeInterval(Furlough.warningMinutes * 60))
+                }
             )
             wanted.append(Wanted(
                 attributes: FurloughActivityAttributes(
@@ -62,7 +70,8 @@ enum LiveActivityManager {
         if let start = summary.nextOpenAt, let end = summary.nextOpenUntil,
            !summary.nextOpenNames.isEmpty, start > now, end > start {
             let contentState = FurloughActivityAttributes.ContentState(
-                openNames: summary.nextOpenNames, note: "Open", warned: false
+                openNames: summary.nextOpenNames, note: "Open", warned: false,
+                budgetMinutes: summary.nextOpenBudgetMinutes
             )
             wanted.append(Wanted(
                 attributes: FurloughActivityAttributes(windowStart: start, windowEnd: end),

@@ -454,6 +454,17 @@ enum TargetKind: Codable, Hashable {
         #endif
         return false
     }
+
+    /// An app, on whichever platform is asking. Read where a sentence has to name what it is
+    /// holding rather than count it — see `AnchorProfile.blockedDescription`.
+    var isApplication: Bool {
+        #if os(iOS)
+        if case .application = self { return true }
+        #else
+        if case .macApp = self { return true }
+        #endif
+        return false
+    }
 }
 
 /// The rule an edit replaced, and when it landed. What makes a change takeable-back for
@@ -666,6 +677,15 @@ struct AnchorProfile: Codable, Equatable {
         case .everythingExcept: kinds.isEmpty ? "Everything" : "Everything except \(kinds.count)"
         }
     }
+    /// What the drop just shut, for the sentence an intent says back: "1 application blocked",
+    /// "3 applications blocked", and "items" when the list is not all apps. Worth naming rather
+    /// than counting, because a drop from Control Center or Spotlight has no app on screen —
+    /// this line is the whole of the confirmation. `heldDescription` is the other half, for the
+    /// allowlist scope, where what matters is what stays open.
+    var blockedDescription: String {
+        let noun = kinds.allSatisfy(\.isApplication) ? "application" : "item"
+        return "\(kinds.count) \(noun)\(kinds.count == 1 ? "" : "s") blocked"
+    }
     /// The paired tag a scan matches, if any.
     func tag(matching scanned: Data) -> PairedTag? { tags.first { $0.id == scanned } }
     /// A placeholder for a tag just paired, never a duplicate of one already here, because a
@@ -801,6 +821,12 @@ struct PendingChange: Codable, Hashable, Identifiable {
 struct RuntimeState: Codable, Equatable {
     var exhausted: [String: String] = [:]
     var warned: [String: String] = [:]
+    /// The moment each warning fired, beside the day it fired on. Screen Time hands Furlough
+    /// two facts about a budget and no others — "about five minutes left" and "spent" — so this
+    /// is the only instant at which the minutes remaining are actually known. From it the Live
+    /// Activity gets a real deadline to count down to; without it there is nothing to count.
+    /// Since 2026-09-09; a store without it warns exactly as before, with no countdown.
+    var warnedAt: [String: Date] = [:]
     /// Both clocks as they stood at the last save, so a wall clock moved forward is visible.
     var clock: ClockMark?
     var lastReconcile: Date?
@@ -817,6 +843,12 @@ struct RuntimeState: Codable, Equatable {
 
     func isExhausted(_ id: UUID, dayKey: String) -> Bool { exhausted[id.uuidString] == dayKey }
     func wasWarned(_ id: UUID, dayKey: String) -> Bool { warned[id.uuidString] == dayKey }
+    /// When today's warning fired, or nil if it has not — or if it fired before this was
+    /// recorded, which is the same thing to everything that reads it.
+    func warnedMoment(_ id: UUID, dayKey: String) -> Date? {
+        guard wasWarned(id, dayKey: dayKey) else { return nil }
+        return warnedAt[id.uuidString]
+    }
 
     /// Tolerant, like `Config`'s: a phone that has been running since before the record existed
     /// has no `days` key, and a synthesised decoder would throw on it rather than fall back to
@@ -826,6 +858,7 @@ struct RuntimeState: Codable, Equatable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         exhausted = try container.decodeIfPresent([String: String].self, forKey: .exhausted) ?? [:]
         warned = try container.decodeIfPresent([String: String].self, forKey: .warned) ?? [:]
+        warnedAt = try container.decodeIfPresent([String: Date].self, forKey: .warnedAt) ?? [:]
         clock = try container.decodeIfPresent(ClockMark.self, forKey: .clock)
         lastReconcile = try container.decodeIfPresent(Date.self, forKey: .lastReconcile)
         lastRegistration = try container.decodeIfPresent(Date.self, forKey: .lastRegistration)

@@ -238,6 +238,17 @@ struct RuleEditorView: View {
             }
         }
         .onAppear(perform: load)
+        // "No budget" only means something while windows narrow the day. Take the last window
+        // away and the same rule would enforce nothing at all, which is a removal wearing a
+        // slider — so the budget comes back to the top of the ordinary range instead.
+        .onChange(of: drafts.isEmpty) { _, isEmpty in
+            guard isEmpty else { return }
+            let ceiling = BudgetSlider.anchors.last ?? 240
+            if budget >= BudgetSlider.noBudget { budget = ceiling }
+            for index in dayBudgets.indices where dayBudgets[index] >= BudgetSlider.noBudget {
+                dayBudgets[index] = ceiling
+            }
+        }
         .confirmationDialog(
             "Block something essential?",
             isPresented: $confirmBlockEssential,
@@ -568,27 +579,34 @@ struct RuleEditorView: View {
         VStack(alignment: .leading, spacing: 0) {
             if budgetByDay {
                 ForEach(Weekdays.ordered(), id: \.self) { weekday in
-                    DayBudgetRow(weekday: weekday, minutes: dayBudget(weekday))
+                    DayBudgetRow(weekday: weekday, minutes: dayBudget(weekday), allowsNoBudget: !drafts.isEmpty)
                     CardDivider()
                 }
             } else {
                 VStack(alignment: .leading, spacing: 0) {
                     HStack(alignment: .firstTextBaseline) {
-                        HStack(alignment: .firstTextBaseline, spacing: 5) {
-                            Text("\(budget)")
-                                .emberNumerals(30)
-                                .contentTransition(.numericText())
-                            Text("MIN")
-                                .font(EmberFont.label(10.5))
-                                .tracking(0.06 * 10.5)
-                                .foregroundStyle(Ember.muted)
+                        if budget >= BudgetSlider.noBudget {
+                            Text("No budget")
+                                .emberDisplay(26)
+                                .foregroundStyle(Ember.cream)
+                        } else {
+                            HStack(alignment: .firstTextBaseline, spacing: 5) {
+                                Text("\(budget)")
+                                    .emberNumerals(30)
+                                    .contentTransition(.numericText())
+                                Text("MIN")
+                                    .font(EmberFont.label(10.5))
+                                    .tracking(0.06 * 10.5)
+                                    .foregroundStyle(Ember.muted)
+                            }
                         }
                         Spacer()
-                        Text(drafts.isEmpty ? "for the whole day" : "across all windows")
+                        Text(budgetNote)
                             .emberBody(11)
                             .foregroundStyle(Ember.muted)
+                            .multilineTextAlignment(.trailing)
                     }
-                    BudgetSlider(value: $budget)
+                    BudgetSlider(value: $budget, allowsNoBudget: !drafts.isEmpty)
                         .padding(.top, 12)
                 }
                 .padding(.horizontal, 14)
@@ -609,6 +627,13 @@ struct RuleEditorView: View {
             .padding(.vertical, 8)
         }
         .emberCard()
+    }
+
+    /// What the figure above the slider is measured against. "No budget" needs saying what it
+    /// does *not* lift — the windows still close — or it reads as no rule at all.
+    private var budgetNote: String {
+        if budget >= BudgetSlider.noBudget { return "the windows still close" }
+        return drafts.isEmpty ? "for the whole day" : "across all windows"
     }
 
     /// One day's slider, bound into `dayBudgets` by Calendar's weekday number.
@@ -651,7 +676,7 @@ struct RuleEditorView: View {
                 loaded = false
                 load()
             }
-            .padding(.top, 12)
+            .padding(.top, 18)
         }
     }
 
@@ -1365,9 +1390,10 @@ struct UndoCard: View {
                 .foregroundStyle(Ember.muted)
                 .fixedSize(horizontal: false, vertical: true)
             GhostButton(title: "Undo this change", color: Ember.pending, action: action)
+                .padding(.top, 2)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 16)
         .emberCard()
     }
 }

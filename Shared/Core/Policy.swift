@@ -535,6 +535,13 @@ enum Policy {
         var openStart: Date?
         /// That target has had its 5-minute budget warning.
         var openWarned = false
+        /// Today's budget for that target, in minutes, or nil where there is no real limit.
+        var openBudgetMinutes: Int?
+        /// When its warning fired, so a countdown can run to the moment the budget is spent.
+        /// This is the only budget deadline iOS ever makes knowable: before the warning there
+        /// is no figure at all, because Screen Time reports usage to nobody but its own report
+        /// extension. Nil until the warning, and nil for a warning recorded before 2026-09-09.
+        var openWarnedAt: Date?
         /// Open with no windows of their own: usable all day, up to the budget. Kept apart from
         /// `openNames` so they get no closing countdown and no Live Activity.
         var allDayNames: [String] = []
@@ -580,6 +587,7 @@ enum Policy {
             var copy = self
             copy.openUntil = openUntil?.addingTimeInterval(drift)
             copy.openStart = openStart?.addingTimeInterval(drift)
+            copy.openWarnedAt = openWarnedAt?.addingTimeInterval(drift)
             copy.nextOpenAt = nextOpenAt?.addingTimeInterval(drift)
             copy.anchorUntil = anchorUntil?.addingTimeInterval(drift)
             copy.nextOpenUntil = nextOpenUntil?.addingTimeInterval(drift)
@@ -598,7 +606,7 @@ enum Policy {
         summary.canDropAnchor = !summary.isAnchored && config.anchor.hasSomethingToHold && config.anchor.isPaired
         let minute = minuteOfDay(now, calendar: calendar)
         let weekday = weekday(now, calendar: calendar)
-        var soonestOpen: (until: Int, start: Int, warned: Bool)?
+        var soonestOpen: (until: Int, start: Int, warned: Bool, budget: Int?, warnedAt: Date?)?
         var soonest: (date: Date, until: Date?, names: [String], budget: Int?, exhausted: Bool)?
         // Targets still called "This app" go to the end of every list, after the loop, so a
         // widget that shows one name and a count shows a name somebody recognises.
@@ -615,7 +623,8 @@ enum Policy {
             case .blockedAllDay:
                 summary.blockedCount += 1
             case .open(let until):
-                let warned = state.runtime.wasWarned(target.id, dayKey: dayKey(now, calendar: calendar))
+                let day = dayKey(now, calendar: calendar)
+                let warned = state.runtime.wasWarned(target.id, dayKey: day)
                 if target.rule?.isAllDay ?? false {
                     if target.isNamed { summary.allDayNames.append(target.displayName) }
                     else { unnamedAllDay.append(target.displayName) }
@@ -625,7 +634,13 @@ enum Policy {
                     else { unnamedOpen.append(target.displayName) }
                     if soonestOpen == nil || until < soonestOpen!.until {
                         let start = target.rule?.window(containing: minute, on: weekday)?.startMinute ?? 0
-                        soonestOpen = (until, start, warned)
+                        soonestOpen = (
+                            until,
+                            start,
+                            warned,
+                            target.rule?.limit(on: weekday),
+                            state.runtime.warnedMoment(target.id, dayKey: day)
+                        )
                     }
                 }
             case .exhausted(let next):
@@ -665,6 +680,8 @@ enum Policy {
             summary.openUntil = date(atMinute: soonestOpen.until, of: now, calendar: calendar)
             summary.openStart = date(atMinute: soonestOpen.start, of: now, calendar: calendar)
             summary.openWarned = soonestOpen.warned
+            summary.openBudgetMinutes = soonestOpen.budget
+            summary.openWarnedAt = soonestOpen.warnedAt
         }
         summary.allDayNames += unnamedAllDay
         summary.openNames += unnamedOpen
