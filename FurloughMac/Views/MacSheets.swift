@@ -926,9 +926,13 @@ struct SettingsSheet: View {
                 filterCard
                 Footnote(text: WebFilter.explainer)
                     .padding(.top, 8)
-                FilterDirections(guidance: model.enforcer.webFilter.status.guidance, size: 11.5)
-                    .padding(.horizontal, 8)
-                    .padding(.top, 10)
+                FilterDirections(
+                    guidance: model.enforcer.webFilter.status.guidance,
+                    size: 11.5,
+                    perform: model.enforcer.webFilter.perform
+                )
+                .padding(.horizontal, 8)
+                .padding(.top, 10)
 
                 SectionLabel(text: "Browsers")
                 VStack(spacing: 0) {
@@ -1066,14 +1070,10 @@ struct SettingsSheet: View {
             case .notInstalled, .failed:
                 CardDivider()
                 CardAction(title: "Install the web filter") { filter.install() }
-            case .awaitingApproval, .disabledInSettings:
-                CardDivider()
-                CardAction(title: "Open System Settings…") { WebFilter.openSystemSettings() }
-                CardDivider()
-                CardAction(title: "Check again", color: Ember.cream) { Task { await filter.refresh() } }
-            case .filterOff:
-                CardDivider()
-                CardAction(title: "Turn the filter on") { Task { await filter.enableFilter() } }
+            // Nothing for the states in the middle of the walk: their buttons belong to the step
+            // that calls for them, in the walkthrough below this card.
+            case .awaitingApproval, .disabledInSettings, .filterOff:
+                EmptyView()
             case .on:
                 CardDivider()
                 CardAction(title: "Remove the web filter", color: Ember.muted) { confirmRemoveFilter = true }

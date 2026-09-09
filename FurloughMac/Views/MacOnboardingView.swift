@@ -99,7 +99,7 @@ struct MacOnboardingView: View {
                     .foregroundStyle(status.isOn ? Ember.moss : Ember.pending)
                     .padding(.top, 14)
             }
-            FilterDirections(guidance: status.guidance)
+            FilterDirections(guidance: status.guidance, perform: filter.perform)
                 .padding(.top, 14)
             HStack(spacing: 10) {
                 switch status {
@@ -110,22 +110,10 @@ struct MacOnboardingView: View {
                         .keyboardShortcut(.defaultAction)
                     Button("Not now") { model.finishOnboarding() }
                         .buttonStyle(.glass)
-                case .awaitingApproval, .disabledInSettings:
-                    // Check again is step 5, so it has to be on this screen and not only in
-                    // Settings > Web. A step that names a button the person cannot see is how
-                    // this pane went wrong in the first place.
-                    Button("Open System Settings…") { WebFilter.openSystemSettings() }
-                        .buttonStyle(.glassProminent)
-                        .tint(Ember.ember)
-                    Button("Check again") { Task { await filter.refresh() } }
-                        .buttonStyle(.glass)
-                    Button("Continue") { model.finishOnboarding() }
-                        .buttonStyle(.glass)
-                        .keyboardShortcut(.defaultAction)
-                case .filterOff:
-                    Button("Turn the filter on") { Task { await filter.enableFilter() } }
-                        .buttonStyle(.glassProminent)
-                        .tint(Ember.ember)
+                case .awaitingApproval, .disabledInSettings, .filterOff:
+                    // No Open System Settings or Check again here: the walkthrough puts each of
+                    // them on the step that calls for it, and a second copy down here would be
+                    // a button to press at the wrong time.
                     Button("Continue") { model.finishOnboarding() }
                         .buttonStyle(.glass)
                         .keyboardShortcut(.defaultAction)

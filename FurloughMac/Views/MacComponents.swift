@@ -262,50 +262,286 @@ struct SheetFrame<Content: View>: View {
     }
 }
 
-/// The web filter's directions for whatever state it is in: where you stand, the steps out, and
-/// the trap, drawn from `WebFilter.Status.guidance` so onboarding and Settings > Web cannot word
-/// them differently. The numbers are the point — the two approvals are several scrolls apart in
-/// System Settings and one of them is under a heading you reach only by going past a list that
-/// looks like the end of the page.
+/// The web filter's directions, one instruction at a time.
+///
+/// Two rounds of this were a paragraph and then a numbered list, and both failed the same way:
+/// there is one step that decides whether any of it works — Network Extensions lives under **By
+/// Category** and does not exist under By App — and a step like that is invisible in a list you
+/// skim. So the walkthrough shows a single instruction, a drawing of the control it means, the
+/// trap it carries if it has one, and a button that does the thing where a button can. Both
+/// onboarding and Settings > Web draw it from `WebFilter.Status.guidance`.
 struct FilterDirections: View {
     let guidance: WebFilter.Guidance
-    /// Onboarding has room to talk; the Settings card is a footnote under a row.
     var size: CGFloat = 12.5
+    let perform: (WebFilter.Guidance.Action) -> Void
+    @State private var index = 0
+
+    private var current: WebFilter.Guidance.Step? {
+        guard !guidance.steps.isEmpty else { return nil }
+        return guidance.steps[min(index, guidance.steps.count - 1)]
+    }
+
+    private var isLast: Bool { index >= guidance.steps.count - 1 }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             Text(guidance.lead)
                 .emberBody(size)
                 .foregroundStyle(Ember.muted)
                 .fixedSize(horizontal: false, vertical: true)
-            if !guidance.steps.isEmpty {
-                VStack(alignment: .leading, spacing: 7) {
-                    ForEach(Array(guidance.steps.enumerated()), id: \.offset) { index, step in
-                        HStack(alignment: .firstTextBaseline, spacing: 9) {
-                            Text("\(index + 1)")
-                                .emberBody(size - 1, .semibold)
-                                .monospacedDigit()
-                                .foregroundStyle(Ember.amber)
-                                .frame(width: 12, alignment: .trailing)
-                            Text(step)
-                                .emberBody(size)
-                                .foregroundStyle(Ember.cream)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                }
+            if let current { stepCard(current) }
+            if let caution = guidance.caution { warning(caution, size: size - 1) }
+        }
+        // A status change is a different walkthrough, so it starts at its own first step.
+        .onChange(of: guidance) { _, _ in index = 0 }
+    }
+
+    private func stepCard(_ step: WebFilter.Guidance.Step) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Eyebrow(text: "Step \(index + 1) of \(guidance.steps.count)", color: Ember.amber, size: 9.5)
+                Spacer()
+                pips
             }
-            if let caution = guidance.caution {
-                HStack(alignment: .firstTextBaseline, spacing: 7) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: size - 2.5, weight: .bold))
-                        .foregroundStyle(Ember.pending)
-                    Text(caution)
-                        .emberBody(size - 1)
-                        .foregroundStyle(Ember.faint)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+            Text(step.text)
+                .emberBody(size + 2.5, .semibold)
+                .foregroundStyle(Ember.cream)
+                .fixedSize(horizontal: false, vertical: true)
+            if let figure = step.figure {
+                StepFigure(kind: figure)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if let note = step.note { warning(note, size: size - 1.5) }
+            controls(step)
+        }
+        .padding(14)
+        .emberCard()
+    }
+
+    /// One dot per step, so the length of the walk is visible without reading it.
+    private var pips: some View {
+        HStack(spacing: 4) {
+            ForEach(guidance.steps.indices, id: \.self) { position in
+                Circle()
+                    .fill(position == index ? Ember.amber : Ember.cardBorder)
+                    .frame(width: 5, height: 5)
             }
         }
+    }
+
+    private func controls(_ step: WebFilter.Guidance.Step) -> some View {
+        HStack(spacing: 8) {
+            if let action = step.action {
+                Button(action.title) {
+                    perform(action)
+                    if !isLast { index += 1 }
+                }
+                .buttonStyle(.glassProminent)
+                .tint(Ember.ember)
+            } else if !isLast {
+                Button("Next") { index += 1 }
+                    .buttonStyle(.glassProminent)
+                    .tint(Ember.ember)
+            }
+            if index > 0 {
+                Button("Back") { index -= 1 }
+                    .buttonStyle(.glass)
+            }
+            Spacer(minLength: 0)
+        }
+        .controlSize(.small)
+        .padding(.top, 2)
+    }
+
+    private func warning(_ text: String, size: CGFloat) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 7) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: size - 1, weight: .bold))
+                .foregroundStyle(Ember.pending)
+            Text(text)
+                .emberBody(size)
+                .foregroundStyle(Ember.faint)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+/// A small drawing of the part of System Settings a step is about, in Furlough's own tokens.
+///
+/// Deliberately not screenshots. A screenshot of System Settings goes stale at every macOS
+/// redesign, carries a whole window of things that are not the point, and cannot emphasise the
+/// one control that matters. These show that control and little else, with the thing to click
+/// picked out in Ember.
+struct StepFigure: View {
+    let kind: WebFilter.Guidance.Figure
+
+    var body: some View {
+        Group {
+            switch kind {
+            case .systemSettings: systemSettings
+            case .general: general
+            case .scrollDown: scrollDown
+            case .byCategory: byCategory
+            case .networkExtensionsRow: networkExtensionsRow
+            case .furloughToggle: furloughToggle
+            case .allowDialog: allowDialog
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.black.opacity(0.25), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Ember.cardBorder, lineWidth: 1)
+        )
+    }
+
+    // MARK: The figures
+
+    private var systemSettings: some View {
+        HStack(spacing: 9) {
+            glyph("gearshape.fill", tint: Ember.muted)
+            Text("System Settings").emberBody(12, .medium).foregroundStyle(Ember.cream)
+        }
+    }
+
+    private var general: some View {
+        HStack(spacing: 10) {
+            VStack(spacing: 3) {
+                sidebarRow("Appearance", picked: false)
+                sidebarRow("General", picked: true)
+                sidebarRow("Accessibility", picked: false)
+            }
+            .frame(width: 108)
+            Image(systemName: "arrow.right")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(Ember.faint)
+            pane("Login Items & Extensions", picked: true)
+        }
+    }
+
+    private var scrollDown: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            pane("Open at Login", picked: false)
+            pane("App Background Activity", picked: false)
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.down")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(Ember.amber)
+                Text("keep scrolling").emberBody(9.5).foregroundStyle(Ember.faint)
+            }
+            .padding(.leading, 2)
+            pane("Extensions", picked: true)
+        }
+    }
+
+    private var byCategory: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Extensions").emberBody(10, .semibold).foregroundStyle(Ember.muted)
+            HStack(spacing: 0) {
+                segment("By App", picked: false)
+                segment("By Category", picked: true)
+            }
+            .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        }
+    }
+
+    private var networkExtensionsRow: some View {
+        HStack(spacing: 9) {
+            glyph("network", tint: Ember.muted)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Network Extensions").emberBody(11.5, .medium).foregroundStyle(Ember.cream)
+                Text("Furlough Web Filter").emberBody(9.5).foregroundStyle(Ember.faint)
+            }
+            Spacer(minLength: 8)
+            Image(systemName: "info.circle")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Ember.ember)
+                .padding(3)
+                .background(Ember.ember.opacity(0.18), in: Circle())
+        }
+    }
+
+    private var furloughToggle: some View {
+        HStack(spacing: 9) {
+            glyph("hourglass", tint: Ember.amber)
+            Text("Furlough Web Filter").emberBody(11.5, .medium).foregroundStyle(Ember.cream)
+            Spacer(minLength: 8)
+            Capsule()
+                .fill(Ember.ember)
+                .frame(width: 30, height: 17)
+                .overlay(alignment: .trailing) {
+                    Circle().fill(.white).frame(width: 13, height: 13).padding(.trailing, 2)
+                }
+        }
+    }
+
+    private var allowDialog: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("“Furlough” would like to filter network content.")
+                .emberBody(10.5, .medium)
+                .foregroundStyle(Ember.cream)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 6) {
+                Spacer(minLength: 0)
+                pill("Don't Allow", picked: false)
+                pill("Allow", picked: true)
+            }
+        }
+    }
+
+    // MARK: Parts
+
+    private func glyph(_ symbol: String, tint: Color) -> some View {
+        Image(systemName: symbol)
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(tint)
+            .frame(width: 22, height: 22)
+            .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+    }
+
+    private func sidebarRow(_ title: String, picked: Bool) -> some View {
+        Text(title)
+            .emberBody(9.5, picked ? .semibold : .regular)
+            .foregroundStyle(picked ? Ember.cream : Ember.faint)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(picked ? Ember.ember : Color.clear, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+    }
+
+    private func pane(_ title: String, picked: Bool) -> some View {
+        Text(title)
+            .emberBody(10, picked ? .semibold : .regular)
+            .foregroundStyle(picked ? Ember.cream : Ember.faint)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(picked ? Ember.ember.opacity(0.22) : Color.white.opacity(0.05))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .strokeBorder(picked ? Ember.ember : Color.clear, lineWidth: 1)
+            )
+    }
+
+    private func segment(_ title: String, picked: Bool) -> some View {
+        Text(title)
+            .emberBody(10, picked ? .semibold : .regular)
+            .foregroundStyle(picked ? Ember.cream : Ember.faint)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 5)
+            .background(picked ? Ember.ember : Color.clear, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+    }
+
+    private func pill(_ title: String, picked: Bool) -> some View {
+        Text(title)
+            .emberBody(9.5, picked ? .semibold : .regular)
+            .foregroundStyle(picked ? Ember.cream : Ember.muted)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(picked ? Ember.ember : Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
     }
 }

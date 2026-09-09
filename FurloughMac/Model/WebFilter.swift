@@ -45,27 +45,30 @@ final class WebFilter {
 
         var isOn: Bool { self == .on }
 
-        /// What to do next, in the order it has to be done.
+        /// What to do next: one action at a time, in the order it has to be done.
         ///
         /// Onboarding and Settings > Web both draw these rather than wording it twice, because
-        /// the one place this copy matters is the one place it was easy to get lost. On
-        /// 2026-09-09 the direction was a single sentence — "allow it under System Settings >
-        /// General > Login Items & Extensions > Network Extensions" — and Zach followed it,
-        /// landed on a page listing Furlough twice under *other* headings, found no Network
-        /// Extensions row without scrolling past a long list, and stopped. So the steps now say
-        /// where to scroll, what to click, what the switch is called, and which two rows are not
-        /// it. `failed` says the opposite of all that on purpose: when the activation is refused
-        /// nothing was ever asked of the person, and sending them to System Settings to look for
-        /// a prompt that was never made is the worst thing this screen can do.
+        /// this is the copy that had to be right and was not. Two rounds of it on 2026-09-09:
+        /// first a single sentence — "allow it under System Settings > General > Login Items &
+        /// Extensions > Network Extensions" — which sent Zach to a page listing Furlough twice
+        /// under *other* headings; then a six-line list that still missed the step that actually
+        /// hid the row. **Network Extensions exists only under By Category.** Under By App, the
+        /// segment macOS may well open on, there is no such row at all — there is a Furlough
+        /// entry, which is not the same thing and leads nowhere. That is step 4, and it is the
+        /// whole reason this walkthrough shows one step at a time instead of a list to skim.
+        ///
+        /// `failed` says the opposite of all of it on purpose: when the activation is refused
+        /// nothing was ever asked of the person, and sending them into System Settings to hunt
+        /// for a prompt that was never made is the worst thing this screen can do.
         var guidance: Guidance {
             switch self {
             case .notInApplications:
                 Guidance(
                     lead: "macOS loads a system extension only from an app in the Applications folder.",
                     steps: [
-                        "Quit Furlough.",
-                        "Move Furlough into Applications.",
-                        "Open it again and install the filter from Settings > Web."
+                        Guidance.Step(text: "Quit Furlough."),
+                        Guidance.Step(text: "Move Furlough into your Applications folder."),
+                        Guidance.Step(text: "Open it again, then install the filter from Settings > Web."),
                     ]
                 )
             case .notInstalled:
@@ -77,21 +80,19 @@ final class WebFilter {
             case .awaitingApproval:
                 Guidance(
                     lead: "macOS is waiting for you in System Settings. Nothing is filtered until this is done.",
-                    steps: Self.approvalSteps(verb: "Switch on"),
-                    caution: Self.notTheseTwo
+                    steps: Self.approvalSteps(verb: "Switch on")
                 )
             case .disabledInSettings:
                 Guidance(
                     lead: "The extension is installed and switched off, so websites are enforced by the tab reader alone.",
-                    steps: Self.approvalSteps(verb: "Switch back on"),
-                    caution: Self.notTheseTwo
+                    steps: Self.approvalSteps(verb: "Switch back on")
                 )
             case .filterOff:
                 Guidance(
                     lead: "macOS has the extension but is sending it nothing to look at.",
                     steps: [
-                        "Press Turn the filter on.",
-                        "Answer macOS's question, “Furlough would like to filter network content”, with Allow."
+                        Guidance.Step(text: "Turn the filter on.", action: .turnFilterOn),
+                        Guidance.Step(text: "Click Allow.", figure: .allowDialog),
                     ]
                 )
             case .on:
@@ -101,34 +102,92 @@ final class WebFilter {
             case .failed(let reason):
                 Guidance(
                     lead: reason,
-                    caution: "Nothing was asked of you, and nothing is waiting in System Settings — the install was refused before macOS ever put a question up. There is nothing to allow until this is fixed."
+                    caution: "Nothing was asked of you, and nothing is waiting in System Settings \u{2014} the install was refused before macOS ever put a question up. There is nothing to allow until this is fixed."
                 )
             }
         }
 
-        /// The walk through System Settings, which is the same either way; only the switch's
-        /// position differs. Step 2 is the one that matters: the row sits under its own heading
-        /// below a list long enough to look like the end of the page.
-        private static func approvalSteps(verb: String) -> [String] {
+        /// The walk through System Settings. One action each, because every one of them is a
+        /// place to go wrong: the row is below a list that looks like the end of the page, and
+        /// then it is behind a segmented control that may not be on the half you are looking at.
+        private static func approvalSteps(verb: String) -> [Guidance.Step] {
             [
-                "Open System Settings > General > Login Items & Extensions.",
-                "Scroll that page to the very bottom, past Open at Login and past the whole App Background Activity list.",
-                "Click the ⓘ button beside Network Extensions.",
-                "\(verb) Furlough Web Filter, and give macOS your password.",
-                "Come back here and press Check again.",
-                "Answer macOS's last question, “Furlough would like to filter network content”, with Allow. If it does not appear, press Turn the filter on."
+                Guidance.Step(text: "Open System Settings.", figure: .systemSettings, action: .openSystemSettings),
+                Guidance.Step(text: "Click General, then Login Items & Extensions.", figure: .general),
+                Guidance.Step(
+                    text: "Scroll all the way down, to Extensions.",
+                    note: "Furlough appears twice on the way down, under Open at Login and under App Background Activity. Those are the app and its watchdog. Keep going past both.",
+                    figure: .scrollDown
+                ),
+                Guidance.Step(
+                    text: "Click By Category.",
+                    note: "This is the one everybody misses. Under By App there is no Network Extensions row at all \u{2014} just a Furlough entry, which is a different thing and leads nowhere.",
+                    figure: .byCategory
+                ),
+                Guidance.Step(text: "Click the \u{24D8} beside Network Extensions.", figure: .networkExtensionsRow),
+                Guidance.Step(text: "\(verb) Furlough Web Filter. macOS asks for your password.", figure: .furloughToggle),
+                Guidance.Step(text: "Come back here.", action: .checkAgain),
             ]
         }
-
-        private static let notTheseTwo = "Furlough is listed twice further up that page, under Open at Login and under App Background Activity. Those are the app itself and the agent that reopens it after a Force Quit. Neither one is the filter, and switching them on does nothing for it."
     }
 
-    /// One state's directions: a line that says where you stand, the steps out of it, and the
-    /// trap it has, if it has one.
+    /// One state's directions: a line saying where you stand, the steps out of it taken one at a
+    /// time, and the trap it has when it has no steps at all.
     struct Guidance: Equatable {
         var lead: String
-        var steps: [String] = []
+        var steps: [Step] = []
         var caution: String?
+
+        /// One thing to do, at most one thing to press, and a picture of what to look for.
+        struct Step: Equatable {
+            var text: String
+            /// The trap in this particular step, said where it is met rather than in a block at
+            /// the bottom that is read after the mistake.
+            var note: String?
+            /// What this step looks like on screen. Drawn by `StepFigure` in Furlough's own
+            /// tokens rather than shipped as screenshots of macOS: a screenshot goes stale with
+            /// every System Settings redesign, and a drawing can point at the one control that
+            /// matters instead of showing a whole window to search.
+            var figure: Figure?
+            var action: Action?
+        }
+
+        /// The part of System Settings a step is about.
+        enum Figure: Equatable {
+            case systemSettings
+            case general
+            case scrollDown
+            /// The segmented control that hid Network Extensions. The reason for all of this.
+            case byCategory
+            case networkExtensionsRow
+            case furloughToggle
+            case allowDialog
+        }
+
+        /// What a step's button does. An enum rather than a closure so the directions stay a
+        /// value the model owns, and so a step cannot mean one thing in onboarding and another
+        /// in Settings.
+        enum Action: Equatable {
+            case openSystemSettings, checkAgain, turnFilterOn
+
+            var title: String {
+                switch self {
+                case .openSystemSettings: "Open System Settings"
+                case .checkAgain: "Check again"
+                case .turnFilterOn: "Turn the filter on"
+                }
+            }
+        }
+    }
+
+    /// Runs what a step's button says it does, so both screens wire the same step to the same
+    /// thing.
+    func perform(_ action: Guidance.Action) {
+        switch action {
+        case .openSystemSettings: Self.openSystemSettings()
+        case .checkAgain: Task { await refresh() }
+        case .turnFilterOn: Task { await enableFilter() }
+        }
     }
 
     /// What the filter is, for the two screens that offer it. Separate from `Guidance`, which
