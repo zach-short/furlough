@@ -7,7 +7,7 @@ enum Ember {
     static let amber = Color(hex: 0xF59E4A)
     static let cream = Color(hex: 0xF5EFE6)
     static let muted = Color(hex: 0xB8AFA3)
-    static let faint = Color(hex: 0x7E766B)
+    static let faint = Color(hex: 0x90877B)
     static let moss = Color(hex: 0x7BC96F)
     static let pending = Color(hex: 0xF2B544)
     /// Lightest sand grain in the hourglass and the top of the budget slider fill.

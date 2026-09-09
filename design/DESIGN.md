@@ -18,7 +18,7 @@ countdown and the glowing hourglass.
 | Amber | `#F59E4A` | Highlights, lock-screen eyebrows, glow |
 | Cream | `#F5EFE6` | Primary text, countdown |
 | Muted | `#B8AFA3` | Secondary text |
-| Faint | `#7E766B` | Tertiary text, section labels, slider ticks |
+| Faint | `#90877B` | Tertiary text, section labels, slider ticks |
 | Moss | `#7BC96F` | "Open now" state, tightening banner |
 | Pending | `#F2B544` | Pending-change state |
 | Glass fill | white 15% → 5% (160° gradient) | Glass controls |

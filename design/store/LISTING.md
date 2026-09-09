@@ -185,17 +185,14 @@ work on any host. Privacy policy and support URLs are both **required** fields.
 
 Apple requires the protocol in the field, so keep the `https://`. No trailing slashes.
 
-**`site/astro.config.mjs` does not set `site`, and now needs to.** Without it `Astro.site` is
-undefined, so `Base.astro` emits no `<link rel="canonical">` at all and resolves the `og:image`
-against `Astro.url` instead, which in a static build is not the public origin. One line fixes
-both, and it is left for Zach rather than changed here:
+**`site/astro.config.mjs` now sets `site`, fixed 2026-09-08.** Without it `Astro.site` was
+undefined, so `Base.astro` emitted no `<link rel="canonical">` at all and resolved the `og:image`
+against a build-time URL rather than the public origin. Verified in a rebuild: all three pages
+carry a canonical, and `og:image` is `https://furloughapp.com/icon-1024.png`.
 
-```
-export default defineConfig({
-  site: 'https://furloughapp.com',
-  output: 'static',
-});
-```
+Astro writes the canonical in its trailing-slash form (`https://furloughapp.com/privacy/`). The
+App Store fields above are the slashless form, which every static host redirects to it. Either
+is accepted; do not mix them within one field.
 
 Once the listing is public, set `appStoreURL` in `site/src/site.ts`, which is currently `null`.
 The Apple ID is already known, so the value is:
@@ -291,16 +288,17 @@ Apple asks that they be kept up to date.
 |---|---|
 | **Dark Interface** | The app is dark by construction. `Ember.ground` is `#0F0D0B` and there is no light appearance to fall out of. |
 | **Reduced Motion** | Honoured deliberately at both of the app's continuous animations: `Shared/UI/Theme.swift:108-140` parks the drifting ember at a resting point and pauses its `TimelineView`, and `Shared/UI/Hourglass.swift:348-358` stops the living hourglass. Nothing else animates continuously. |
+| **Sufficient Contrast** | Every palette token now clears 4.5:1 against both the ground and the card fill. `Ember.faint` was the one failure at 3.80:1 and was raised on 2026-09-08; see the table below. |
 
 ### Do not claim: no such content
 
 **Captions** and **Audio Descriptions**. Furlough has no audio and no video anywhere, so there is
 nothing to caption or describe. Leave both unchecked.
 
-### Blocked on one fix
+### The contrast measurements
 
-**Sufficient Contrast.** The palette is strong almost everywhere. Measured against `Ember.ground`
-and against the card fill (white at 6%, which resolves to `#1D1C1A`):
+Measured against `Ember.ground` and against the card fill (white at 6%, which resolves to
+`#1D1C1A`). WCAG AA for normal text is 4.5:1.
 
 | Token | On ground | On card | |
 |---|---|---|---|
@@ -311,12 +309,18 @@ and against the card fill (white at 6%, which resolves to `#1D1C1A`):
 | `amber` `#F59E4A` | 9.12:1 | 8.00:1 | pass |
 | `muted` `#B8AFA3` | 8.96:1 | 7.86:1 | pass |
 | `ember` `#E5563D` | 5.29:1 | 4.65:1 | pass |
-| **`faint` `#7E766B`** | **4.33:1** | **3.80:1** | **below 4.5:1** |
+| **`faint` `#90877B`** | **5.48:1** | **4.81:1** | **pass, raised from `#7E766B` (4.33:1 / 3.80:1)** |
 
-`Ember.faint` is the one failure, and it is used for small secondary text, including the
-unselected weekday letters in the rule editor's day strip at 10 pt
-(`Furlough/Views/RuleEditorView.swift:749`). Raising it to `#8B8276`, the same hue at a higher
-value, reaches 4.50:1 on card and 5.13:1 on ground. That is an app change, so it is not made here.
+`Ember.faint` was the one failure. It carries small secondary text, including the unselected
+weekday letters in the rule editor's day strip at 10 pt (`Furlough/Views/RuleEditorView.swift:749`),
+where 3.80:1 was well under the bar.
+
+**Fixed 2026-09-08**: raised to `#90877B`, the same hue at a higher value, chosen for margin over
+the threshold rather than the minimum that clears it. It stays clearly below `muted` (7.86:1 on
+card), so the tertiary tone still reads as tertiary. The token is duplicated across the design
+system, so all eight definitions moved together: `Shared/UI/Theme.swift`, `design/DESIGN.md`,
+`site/src/styles/global.css`, `site/src/lib/hourglass.ts`, `design/store/board.html`,
+`design/hourglass-board.html` and `FurloughMac/Resources/Shield.html`.
 
 ### Blocked on a device pass
 
