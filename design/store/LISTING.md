@@ -272,6 +272,67 @@ app UI and typography; nothing in them raises it.
 
 ---
 
+## Accessibility Nutrition Labels (iPhone)
+
+Apple's bar, from the
+[overview page](https://developer.apple.com/help/app-store-connect/manage-app-accessibility/overview-of-accessibility-nutrition-labels):
+a feature may be claimed only if **users can complete all of the app's common tasks using it**.
+Common tasks are the primary functionality plus onboarding, settings and finding help. Guideline
+2.3 applies, and App Review can ask for a label to be corrected.
+
+**Answer Yes to "Does your app support any of the above features on iPhone?"**, then check only
+what is listed as ready below. Answering No suppresses every label, including the two the app has
+genuinely earned. The labels are metadata: they can be revised later without a new build, and
+Apple asks that they be kept up to date.
+
+### Ready to claim now
+
+| Feature | Evidence |
+|---|---|
+| **Dark Interface** | The app is dark by construction. `Ember.ground` is `#0F0D0B` and there is no light appearance to fall out of. |
+| **Reduced Motion** | Honoured deliberately at both of the app's continuous animations: `Shared/UI/Theme.swift:108-140` parks the drifting ember at a resting point and pauses its `TimelineView`, and `Shared/UI/Hourglass.swift:348-358` stops the living hourglass. Nothing else animates continuously. |
+
+### Do not claim: no such content
+
+**Captions** and **Audio Descriptions**. Furlough has no audio and no video anywhere, so there is
+nothing to caption or describe. Leave both unchecked.
+
+### Blocked on one fix
+
+**Sufficient Contrast.** The palette is strong almost everywhere. Measured against `Ember.ground`
+and against the card fill (white at 6%, which resolves to `#1D1C1A`):
+
+| Token | On ground | On card | |
+|---|---|---|---|
+| `cream` `#F5EFE6` | 16.97:1 | 14.90:1 | pass |
+| `sandLight` `#FFD59A` | 14.07:1 | 12.35:1 | pass |
+| `pending` `#F2B544` | 10.59:1 | 9.30:1 | pass |
+| `moss` `#7BC96F` | 9.63:1 | 8.45:1 | pass |
+| `amber` `#F59E4A` | 9.12:1 | 8.00:1 | pass |
+| `muted` `#B8AFA3` | 8.96:1 | 7.86:1 | pass |
+| `ember` `#E5563D` | 5.29:1 | 4.65:1 | pass |
+| **`faint` `#7E766B`** | **4.33:1** | **3.80:1** | **below 4.5:1** |
+
+`Ember.faint` is the one failure, and it is used for small secondary text, including the
+unselected weekday letters in the rule editor's day strip at 10 pt
+(`Furlough/Views/RuleEditorView.swift:749`). Raising it to `#8B8276`, the same hue at a higher
+value, reaches 4.50:1 on card and 5.13:1 on ground. That is an app change, so it is not made here.
+
+### Blocked on a device pass
+
+These three cannot be settled from source. Each needs the feature switched on and the common tasks
+walked on the phone: onboarding and Screen Time access, adding an app, writing a rule, the week
+grid, the pending list, Settings, and the Anchor.
+
+| Feature | What source says, and what is unresolved |
+|---|---|
+| **VoiceOver** | Partly built already: labels and values on the budget slider, the day strip, the week grid, the add-website steps and the add-choice buttons, and the hourglass correctly `accessibilityHidden(true)` with the status carried in adjacent text. But only 8 `accessibilityLabel` calls exist across the app, and much of the UI is custom-drawn. Walk it before claiming. |
+| **Voice Control** | Follows from the same work: every control needs a name that can be spoken. Custom `Button` labels built from shapes rather than text are the risk. |
+| **Larger Text** | Better than it looks. `EmberFont` uses `Font.custom(_:size:)`, which scales with Dynamic Type relative to body, so the text does grow. The open question is whether the layouts survive it at the largest accessibility sizes: the hero, the seven-column week grid, and the 26 pt fixed-size day circles are where it would break first. |
+| **Differentiate Without Color Alone** | Looks genuinely satisfied and should be confirmed by eye. Status is never carried by hue alone: the hourglass changes fill level and shape as well as colour, every row carries `RowCopy.detail` text, and the day strip separates on and off by fill brightness with the chosen days also spelled out in words beside it. |
+
+---
+
 ## Copyright
 
 **15 chars.** Apple adds the © symbol itself, so do not type one.
