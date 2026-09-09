@@ -28,6 +28,11 @@ final class WebFilter {
         /// nothing. Turning it on again asks macOS's "filter network content" question again.
         case filterOff
         case on
+        /// The extension is installed and switched on, and macOS refused the *second* question
+        /// — the one that lets it see traffic. A different failure from `failed` and the one
+        /// that reads most like a lie if they are conflated: System Settings shows the toggle
+        /// on, so telling somebody nothing was ever asked of them is plainly false.
+        case filterDenied(String, prompted: Bool)
         case failed(String)
 
         var label: String {
@@ -38,6 +43,7 @@ final class WebFilter {
             case .awaitingApproval: "Waiting for approval"
             case .disabledInSettings: "Off in System Settings"
             case .filterOff: "Installed, not filtering"
+            case .filterDenied: "Not allowed to filter"
             case .on: "On"
             case .failed: "Failed"
             }
@@ -99,10 +105,32 @@ final class WebFilter {
                 Guidance(
                     lead: "The web filter is on. Firefox, a site saved to the Dock, and anything else that opens a blocked address are refused the connection.\n\nWhile something is blocked, connections that cannot be named are refused over QUIC and the browser falls back to the ordinary kind, where the name can be read. That is invisible, and only while a rule is in force."
                 )
+            case .filterDenied(let reason, let prompted) where prompted:
+                Guidance(
+                    lead: "The extension is installed and switched on. What was refused is the second permission, the one that lets it look at traffic: \u{201C}\(reason)\u{201D}.",
+                    steps: [
+                        Guidance.Step(text: "Turn the filter on. macOS asks again.", action: .turnFilterOn),
+                        Guidance.Step(text: "Click Allow.", figure: .allowDialog),
+                    ],
+                    caution: "Login Items & Extensions is already right \u{2014} the switch you turned on there is the extension, and it is on. Nothing on that page needs another visit."
+                )
+            case .filterDenied(let reason, _):
+                Guidance(
+                    lead: "The extension is installed and switched on, but macOS refused to let it filter without asking you anything: \u{201C}\(reason)\u{201D}. It came back too fast for a question to have been put up, so there is no prompt you missed.",
+                    steps: [
+                        Guidance.Step(text: "Open System Settings, then Network.", action: .openSystemSettings),
+                        Guidance.Step(
+                            text: "Look for a Furlough filter left there by an earlier attempt, and remove it.",
+                            note: "A configuration left behind is the usual reason macOS refuses on its own. While one is there the question is never asked again."
+                        ),
+                        Guidance.Step(text: "Come back and turn the filter on.", action: .turnFilterOn),
+                    ],
+                    caution: "Login Items & Extensions is already right \u{2014} the switch you turned on there is the extension, and it is on. If this keeps happening, Copy diagnostics below says what the extension and the permission each look like from in here."
+                )
             case .failed(let reason):
                 Guidance(
                     lead: reason,
-                    caution: "Nothing was asked of you, and nothing is waiting in System Settings \u{2014} the install was refused before macOS ever put a question up. There is nothing to allow until this is fixed."
+                    caution: "This failed before macOS put any question up, so there is nothing waiting in System Settings to allow. Copy diagnostics under Settings > Web says what the extension and the filter each look like from here."
                 )
             }
         }
@@ -180,6 +208,79 @@ final class WebFilter {
         }
     }
 
+    // MARK: Diagnostics
+
+    /// Everything this Mac can say about the filter, in one block of text.
+    ///
+    /// The web filter is the one part of Furlough whose state lives almost entirely outside the
+    /// app — macOS owns the extension, and `NEFilterManager` owns the permission — so when it
+    /// goes wrong the app's one-line status is not enough to work from. Twice on 2026-09-09 the
+    /// status said one thing and System Settings showed another: first an activation refused for
+    /// a missing Info.plist key, then "Failed" over an extension that was plainly switched on,
+    /// because the *filter permission* had been refused and both landed in the same case.
+    /// This says which half is which.
+    func diagnostics() async -> String {
+        var lines: [String] = []
+        lines.append("Furlough web filter diagnostics")
+        lines.append("status: \(status.label)")
+        if case .failed(let reason) = status { lines.append("  reason: \(reason)") }
+        if case .filterDenied(let reason, let prompted) = status {
+            lines.append("  reason: \(reason)")
+            lines.append("  a dialog was put up: \(prompted)")
+        }
+        lines.append("asked for (isWanted): \(isWanted)")
+        lines.append("app: \(Bundle.main.bundleURL.path)")
+        lines.append("in /Applications: \(Self.isInApplications)")
+        lines.append("extension bundled with this build: \(Self.bundledVersion ?? "none found")")
+        lines.append("extension id: \(FilterXPC.extensionID)")
+
+        lines.append("")
+        lines.append("What macOS says about the extension:")
+        do {
+            let found = try await ExtensionRequest.properties()
+            if found.isEmpty {
+                lines.append("  none installed")
+            }
+            for info in found {
+                lines.append("  version \(info.bundleVersion): enabled=\(info.isEnabled) awaitingApproval=\(info.isAwaitingUserApproval)")
+            }
+        } catch let error as OSSystemExtensionError where error.code == .extensionNotFound {
+            lines.append("  none installed (extensionNotFound)")
+        } catch {
+            lines.append("  could not ask: \(error.localizedDescription)")
+        }
+
+        lines.append("")
+        lines.append("What macOS says about the filter permission:")
+        let manager = NEFilterManager.shared()
+        do {
+            try await manager.loadFromPreferences()
+            lines.append("  enabled: \(manager.isEnabled)")
+            lines.append("  configuration: \(manager.providerConfiguration == nil ? "none" : "present")")
+            if let configuration = manager.providerConfiguration {
+                lines.append("  provider: \(configuration.filterDataProviderBundleIdentifier ?? "unset")")
+                lines.append("  sockets: \(configuration.filterSockets)")
+                lines.append("  rules: \(FilterRules(vendorConfiguration: configuration.vendorConfiguration) == nil ? "unreadable" : "readable")")
+            }
+        } catch {
+            lines.append("  could not load: \(error.localizedDescription)")
+        }
+
+        lines.append("")
+        lines.append("Read at \(Date.now.formatted(date: .numeric, time: .standard))")
+        return lines.joined(separator: "\n")
+    }
+
+    /// Puts the same block in the activity log, so a failure leaves its evidence behind whether
+    /// or not anybody thought to press Copy diagnostics.
+    func logDiagnostics(because reason: String) async {
+        let report = await diagnostics()
+        SharedStore.log("web filter diagnostics (\(reason)):")
+        for line in report.split(separator: "\n") where !line.isEmpty {
+            SharedStore.log("  \(line)")
+        }
+    }
+
     /// Runs what a step's button says it does, so both screens wire the same step to the same
     /// thing.
     func perform(_ action: Guidance.Action) {
@@ -243,7 +344,7 @@ final class WebFilter {
                 SharedStore.log("web filter is switched off in System Settings > General > Login Items & Extensions; sites are enforced by the tab reader alone")
             case .awaitingApproval:
                 SharedStore.log("web filter: still waiting for approval in System Settings")
-            case .notInApplications, .installing, .failed:
+            case .notInApplications, .installing, .failed, .filterDenied:
                 break
             }
         }
@@ -315,6 +416,7 @@ final class WebFilter {
         } catch {
             status = .failed(error.localizedDescription)
             SharedStore.log("web filter: \(error.localizedDescription)")
+            await logDiagnostics(because: "the extension would not activate")
         }
     }
 
@@ -322,6 +424,8 @@ final class WebFilter {
     /// network content; refusing lands here as an error and the status says so.
     func enableFilter() async {
         let manager = NEFilterManager.shared()
+        // Outside the `do` so the catch can read it; see the note where it is set.
+        var asked = Date.now
         do {
             try await manager.loadFromPreferences()
             let configuration = manager.providerConfiguration ?? NEFilterProviderConfiguration()
@@ -334,14 +438,25 @@ final class WebFilter {
             manager.providerConfiguration = configuration
             manager.localizedDescription = "Furlough"
             manager.isEnabled = true
+            // Timed, because the two ways this fails need opposite directions and they are
+            // otherwise identical. A refusal that comes back faster than a person could read a
+            // dialog and click Don't Allow is macOS saying no on its own — no question was put
+            // up — and telling somebody to go click Allow in that case sends them hunting for a
+            // prompt that never existed. That mistake has already been made twice on this
+            // screen; this is the app knowing the difference instead of guessing.
+            asked = Date.now
             try await manager.saveToPreferences()
             status = .on
             lastPushed = nil
             link.connect()
             SharedStore.log("web filter on")
         } catch {
-            status = .failed(error.localizedDescription)
-            SharedStore.log("web filter: \(error.localizedDescription)")
+            // Not `.failed`: reaching here means the extension activated and it is the filter
+            // permission that was refused, which is a different screen and a different fix.
+            let prompted = Date.now.timeIntervalSince(asked) >= 1.5
+            status = .filterDenied(error.localizedDescription, prompted: prompted)
+            SharedStore.log("web filter: not allowed to filter: \(error.localizedDescription) (macOS \(prompted ? "asked and was refused" : "refused without asking"))")
+            await logDiagnostics(because: "the filter permission was refused")
         }
     }
 

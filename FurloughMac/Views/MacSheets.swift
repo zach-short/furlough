@@ -789,6 +789,8 @@ struct SettingsSheet: View {
     @State private var showLog = false
     @State private var confirmReset = false
     @State private var confirmRemoveFilter = false
+    /// Two seconds of "Copied" after the diagnostics go to the pasteboard.
+    @State private var copiedDiagnostics = false
     @State private var setupFile: SetupDocument?
     @State private var setupName = ""
     @State private var exportError: String?
@@ -1072,13 +1074,25 @@ struct SettingsSheet: View {
                 CardAction(title: "Install the web filter") { filter.install() }
             // Nothing for the states in the middle of the walk: their buttons belong to the step
             // that calls for them, in the walkthrough below this card.
-            case .awaitingApproval, .disabledInSettings, .filterOff:
+            case .awaitingApproval, .disabledInSettings, .filterOff, .filterDenied:
                 EmptyView()
             case .on:
                 CardDivider()
                 CardAction(title: "Remove the web filter", color: Ember.muted) { confirmRemoveFilter = true }
             case .notInApplications, .installing:
                 EmptyView()
+            }
+            CardDivider()
+            CardAction(title: copiedDiagnostics ? "Copied" : "Copy diagnostics", symbol: "doc.on.doc", color: Ember.muted) {
+                Task {
+                    let report = await filter.diagnostics()
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(report, forType: .string)
+                    await filter.logDiagnostics(because: "asked for from Settings > Web")
+                    copiedDiagnostics = true
+                    try? await Task.sleep(for: .seconds(2))
+                    copiedDiagnostics = false
+                }
             }
         }
         .emberCard()
@@ -1088,7 +1102,7 @@ struct SettingsSheet: View {
         switch status {
         case .on: Ember.moss
         case .awaitingApproval, .installing: Ember.pending
-        case .disabledInSettings, .filterOff, .failed, .notInApplications: Ember.ember
+        case .disabledInSettings, .filterOff, .failed, .filterDenied, .notInApplications: Ember.ember
         case .notInstalled: Ember.muted
         }
     }

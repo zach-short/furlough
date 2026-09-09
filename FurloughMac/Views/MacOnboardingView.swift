@@ -110,7 +110,7 @@ struct MacOnboardingView: View {
                         .keyboardShortcut(.defaultAction)
                     Button("Not now") { model.finishOnboarding() }
                         .buttonStyle(.glass)
-                case .awaitingApproval, .disabledInSettings, .filterOff:
+                case .awaitingApproval, .disabledInSettings, .filterOff, .filterDenied:
                     // No Open System Settings or Check again here: the walkthrough puts each of
                     // them on the step that calls for it, and a second copy down here would be
                     // a button to press at the wrong time.
