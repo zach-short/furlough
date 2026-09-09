@@ -558,7 +558,22 @@ Per the handoff, wording problems belong here rather than in a quiet edit.
 
 ---
 
-## What still blocks a submission
+## Submitted
+
+**Version 1.0 was submitted to App Review on 2026-09-09 at 01:01 ET** (05:01 UTC), by Zach in
+the web form, with build `202609090423`. Read back through the API a minute later: review
+submission `d1fe0e5e-be41-4aed-9377-7af5aaad2398` is WAITING_FOR_REVIEW, the version is
+WAITING_FOR_REVIEW, the ten 6.9-inch screenshots are still attached, content rights are
+declared as no third-party content, and the release type is AFTER_APPROVAL, so approval
+publishes it without another click. When it goes live, set `appStoreURL` in `site/src/site.ts`
+(see the URLs section) and redeploy the site. Switzerland, Iceland and Belarus are still off in
+the territories and can be turned on at any time without a new review.
+
+The last two things the web form asked for before Add for Review went through, neither in the
+API's list of required fields: the **Content Rights** declaration on App Information, and the
+review notes pasted from the file rather than a stale copy.
+
+## What still blocked a submission, before that
 
 **State on Apple's side, read back through the API on 2026-09-09 at 00:30.** Build `202609090423`
 (the first with the website sheet's Done button and the widget fix) was archived, passed the
