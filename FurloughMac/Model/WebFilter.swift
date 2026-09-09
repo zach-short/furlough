@@ -329,7 +329,13 @@ final class WebFilter {
     func start() {
         link.onBlocked = { [weak self] host, app in self?.onBlocked?(host, app) }
         Task {
+            // Two plain lines around the ask, because on 2026-09-09 a launch wrote no filter
+            // line at all — not even the one that is supposed to be unconditional — and there
+            // was no way to tell a macOS that answered "nothing is wrong" from a macOS that
+            // never answered. These say which.
+            SharedStore.log("web filter: asking macOS for its state")
             let installed = await refresh()
+            SharedStore.log("web filter: macOS says \(status.label)")
             guard isWanted else { return }
             switch status {
             case .notInstalled:
@@ -346,6 +352,12 @@ final class WebFilter {
                 SharedStore.log("web filter: still waiting for approval in System Settings")
             case .notInApplications, .installing, .failed, .filterDenied:
                 break
+            }
+            // Asked for and not running is the case worth a record. The filter's state lives
+            // outside the app, so by the time anyone looks at a launch that went wrong the
+            // evidence is in macOS rather than here — unless it was written down at the time.
+            if !status.isOn {
+                await logDiagnostics(because: "the filter is asked for and is not running")
             }
         }
     }
@@ -600,13 +612,37 @@ private final class ExtensionRequest: NSObject, OSSystemExtensionRequestDelegate
         return outcome
     }
 
+    /// macOS was asked and said nothing. A state of its own, because it is not the same as an
+    /// answer of "no extension" and must not be reported as one.
+    struct Silence: LocalizedError {
+        var errorDescription: String? { "macOS did not answer when asked about the extension." }
+    }
+
     /// Every copy macOS knows about, enabled or not. Throws `.extensionNotFound` on a Mac that
-    /// has never had one.
-    static func properties() async throws -> [Info] {
-        let request = ExtensionRequest(properties: true)
-        let answer = try await request.submit(.propertiesRequest(forExtensionWithIdentifier: FilterXPC.extensionID, queue: .main))
-        guard case .found(let infos) = answer else { return [] }
-        return infos
+    /// has never had one, and `Silence` when macOS does not answer at all.
+    ///
+    /// The deadline is not defensive habit; it is a bug that was watched happening. On
+    /// 2026-09-09 this call never returned at launch: the log read "web filter: asking macOS
+    /// for its state" and then nothing, ever. `start()` never finished its Task, so the status
+    /// was never read, the version check never ran, and the diagnostics written unconditionally
+    /// on a launch that finds the filter off were never reached — the one place they were most
+    /// wanted. A request macOS ignores has to become a line on the screen, not a hang.
+    static func properties(within seconds: Double = 10) async throws -> [Info] {
+        try await withThrowingTaskGroup(of: [Info].self) { group in
+            group.addTask {
+                let request = ExtensionRequest(properties: true)
+                let answer = try await request.submit(.propertiesRequest(forExtensionWithIdentifier: FilterXPC.extensionID, queue: .main))
+                guard case .found(let infos) = answer else { return [] }
+                return infos
+            }
+            group.addTask {
+                try await Task.sleep(for: .seconds(seconds))
+                throw Silence()
+            }
+            defer { group.cancelAll() }
+            guard let answered = try await group.next() else { return [] }
+            return answered
+        }
     }
 
     private func submit(_ request: OSSystemExtensionRequest) async throws -> Answer {
