@@ -1,0 +1,68 @@
+---
+import '../styles/global.css';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+import { site } from '../site';
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const { title, description = site.description } = Astro.props;
+const fullTitle = title ? `${title} · ${site.name}` : `${site.name} — ${site.tagline}`;
+// `site` in astro.config.mjs; without it the pages carry no canonical link or Open Graph image.
+const origin = Astro.site?.origin ?? '';
+const canonical = origin ? `${origin}${Astro.url.pathname.replace(/\/$/, '') || '/'}` : undefined;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#0F0D0B" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="apple-mobile-web-app-title" content={site.name} />
+    {canonical && <link rel="canonical" href={canonical} />}
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={site.name} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    {origin && <meta property="og:image" content={`${origin}/icon-1024.png`} />}
+    {origin && <meta property="og:url" content={canonical} />}
+    <meta name="twitter:card" content="summary" />
+    <link rel="preload" href="/fonts/BricolageGrotesque_72pt-Bold.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/Onest-Regular.woff2" as="font" type="font/woff2" crossorigin />
+    <slot name="head" />
+  </head>
+  <body>
+    <div class="wall" aria-hidden="true" data-wall>
+      <div class="wall-ember"></div>
+      <div class="wall-amber"></div>
+      <div class="wall-grain"></div>
+    </div>
+    <Nav />
+    <main>
+      <slot />
+    </main>
+    <Footer />
+    <script>
+      import { startWall } from '../lib/wall';
+      import { startReveal } from '../lib/reveal';
+      import { mountHourglasses } from '../lib/hourglass';
+      const wall = document.querySelector<HTMLElement>('[data-wall]');
+      if (wall) startWall(wall);
+      startReveal();
+      mountHourglasses();
+    </script>
+  </body>
+</html>
+
+<style is:global>
+  main { position: relative; z-index: 1; }
+</style>

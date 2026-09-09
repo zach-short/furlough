@@ -1,0 +1,407 @@
+---
+import Base from '../layouts/Base.astro';
+import HeroPage from '../components/HeroPage.astro';
+import StoreButton from '../components/StoreButton.astro';
+import { site } from '../site';
+
+const legend = [
+  { state: 'open:0.62', label: 'Open now', note: 'The window drains with the countdown' },
+  { state: 'open:0.2:warned', label: '5 minutes left', note: 'The budget warning turns the glass amber' },
+  { state: 'comingSoon:4', label: 'Coming soon', note: 'A grain slips through as the window nears' },
+  { state: 'doneForToday', label: 'Done for today', note: 'Every grain settled, the glow low' },
+  { state: 'usedUp', label: 'Used up', note: 'The budget spent: ember, still' },
+  { state: 'alwaysBlocked', label: 'Always blocked', note: 'A category with no windows' },
+  { state: 'unconfigured', label: 'Needs a schedule', note: 'Added, nothing enforced yet' },
+  { state: 'anchored', label: 'Anchored', note: 'The stream stopped dead until the tag' },
+];
+---
+
+<Base>
+  <!-- Hero -->
+  <section class="hero wrap">
+    <div class="hero-text" data-reveal>
+      <div class="eyebrow amber">Furlough · for iPhone</div>
+      <h1 class="display">No unblock button.</h1>
+      <p class="lede">
+        A personal app blocker. Pick the apps and sites that eat your time, give each a daily budget and the hours it's allowed, and the only way to loosen a rule is to wait.
+      </p>
+      <div class="actions">
+        <StoreButton />
+        <a class="glass large" href="#how">How it works</a>
+      </div>
+      <p class="fine faint">iOS 26 or later. Built on Apple's Screen Time API. Nothing collected.</p>
+    </div>
+    <div class="hero-demo" data-reveal style="--d: .15s">
+      <HeroPage />
+    </div>
+  </section>
+
+  <!-- The idea -->
+  <section class="wrap idea" id="how">
+    <div class="steps">
+      <div class="step card" data-reveal>
+        <div class="num mono">01</div>
+        <h3 class="display">Pick the apps</h3>
+        <p>Apps, categories and websites, from Apple's own picker. Furlough is never told which ones; iOS keeps that to itself.</p>
+      </div>
+      <div class="step card" data-reveal style="--d: .1s">
+        <div class="num mono">02</div>
+        <h3 class="display">Give each a rule</h3>
+        <p>A daily budget in minutes, and if you want, the hours it's allowed, the same every day or different per weekday.</p>
+      </div>
+      <div class="step card" data-reveal style="--d: .2s">
+        <div class="num mono">03</div>
+        <h3 class="display">Wait to loosen</h3>
+        <p>Tightening is instant. Anything that gives you back time waits a delay you set in advance, and you can cancel it while it does.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Budgets -->
+  <section class="wrap feature" id="budgets">
+    <div class="copy" data-reveal>
+      <div class="eyebrow amber">Budgets</div>
+      <h2 class="display">Thirty minutes. Then it's gone.</h2>
+      <p class="lede">Every app gets a daily budget, counted across all its windows and spent whenever it's in front. Five minutes before it runs out you get a warning. At zero, iOS shields the app until midnight.</p>
+    </div>
+    <div class="demo" data-reveal style="--d: .1s">
+      <div class="card budget">
+        <div class="eyebrow">Daily budget</div>
+        <div class="value"><span class="mono big">30</span><span class="eyebrow unit">min</span></div>
+        <div class="hint">across all windows</div>
+        <div class="slider" aria-hidden="true">
+          <div class="track"></div>
+          <div class="fill"></div>
+          <div class="knob"></div>
+          <div class="ticks">
+            <span style="left: 0%">5</span><span style="left: 10.64%">30</span><span style="left: 23.4%">60</span><span style="left: 48.94%">120</span><span style="left: 100%">240</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Windows -->
+  <section class="wrap feature flip" id="windows">
+    <div class="copy" data-reveal>
+      <div class="eyebrow amber">Windows</div>
+      <h2 class="display">Open only when you said so.</h2>
+      <p class="lede">Eight to ten on school nights. Later on weekends. A window can run past midnight, and each one can have its own days. Outside the windows, the app is shielded.</p>
+    </div>
+    <div class="demo" data-reveal style="--d: .1s">
+      <div class="card week" aria-label="A week of windows: 8 PM to midnight most nights, until 2 AM on Friday and Saturday" role="img">
+        <div class="days">
+          <span class="eyebrow">M</span><span class="eyebrow">T</span><span class="eyebrow amber">W</span><span class="eyebrow">T</span><span class="eyebrow">F</span><span class="eyebrow">S</span><span class="eyebrow">S</span>
+        </div>
+        <div class="grid">
+          <div class="gutter mono">
+            <span style="top: 0%">12a</span><span style="top: 12.5%">3</span><span style="top: 25%">6</span><span style="top: 37.5%">9</span><span style="top: 50%">12p</span><span style="top: 62.5%">3</span><span style="top: 75%">6</span><span style="top: 87.5%">9</span>
+          </div>
+          <div class="cols">
+            <div class="col"><i class="w" style="--s: 20; --e: 24">8:00</i></div>
+            <div class="col"><i class="w" style="--s: 20; --e: 24">8:00</i></div>
+            <div class="col today"><i class="w" style="--s: 20; --e: 24">8:00</i></div>
+            <div class="col"><i class="w" style="--s: 20; --e: 24">8:00</i></div>
+            <div class="col"><i class="w" style="--s: 20; --e: 24">8:00</i></div>
+            <div class="col"><i class="w" style="--s: 0; --e: 2"></i><i class="w" style="--s: 20; --e: 24">8:00</i></div>
+            <div class="col"><i class="w" style="--s: 0; --e: 2"></i><i class="w" style="--s: 20; --e: 24">8:00</i></div>
+          </div>
+        </div>
+        <div class="words">8 PM to midnight on Sun–Thu · 8 PM to 2 AM on Fri and Sat</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- The delay -->
+  <section class="wrap feature" id="delay">
+    <div class="copy" data-reveal>
+      <div class="eyebrow pending">The delay</div>
+      <h2 class="display">Loosening waits a day.</h2>
+      <p class="lede">A longer window, a bigger budget, removing an app: each waits out a delay you set in advance, and you can cancel it while it does. Apps you mark <strong>Hazard</strong> wait four times as long. Apps you mark <strong>Essential</strong> wait a quarter.</p>
+    </div>
+    <div class="demo" data-reveal style="--d: .1s">
+      <div class="card pending-card">
+        <div class="eyebrow pending">Pending · lands in <span class="mono" data-lands>22:41:06</span></div>
+        <div class="prow">
+          <span class="tile" style="--c: #d63a6e">I</span>
+          <span class="who"><span class="n">Instagram</span><span class="r">More time, so it waits 1 day</span></span>
+        </div>
+        <div class="delta">
+          <div class="side">
+            <div class="eyebrow">Now</div>
+            <div class="mono v">30 min</div>
+            <div class="small">8:00–8:30 PM</div>
+          </div>
+          <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          <div class="side then">
+            <div class="eyebrow pending">Waiting</div>
+            <div class="mono v">60 min</div>
+            <div class="small">8:00–9:00 PM</div>
+          </div>
+        </div>
+        <div class="bar" aria-hidden="true"><div class="prog"></div></div>
+        <div class="pactions"><span class="glass">Cancel</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- The Anchor -->
+  <section class="wrap feature flip" id="anchor">
+    <div class="copy" data-reveal>
+      <div class="eyebrow ember">The Anchor</div>
+      <h2 class="display">Locked till you tap the tag.</h2>
+      <p class="lede">A second list of apps you lock in one tap, from anywhere. The only thing that unlocks it is holding your phone to an NFC tag you paired. Leave the tag at home and your phone stays anchored until you're back.</p>
+    </div>
+    <div class="demo" data-reveal style="--d: .1s">
+      <div class="card anchor">
+        <div class="ahero">
+          <canvas class="aglass" width="84" height="112" data-hourglass="anchored" aria-hidden="true"></canvas>
+          <div class="text">
+            <div class="eyebrow ember">Anchored · since 6:12 PM</div>
+            <div class="name">Anchor</div>
+            <div class="count mono" data-since>2:14:09</div>
+            <div class="sub">Instagram, Safari, YouTube +3</div>
+          </div>
+        </div>
+        <div class="aactions">
+          <span class="glass prominent">
+            <svg viewBox="0 0 80 100" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="40" cy="15" r="10.5"/><path d="M40 26v56M17 38h46M12 58c0 16 12 26 28 26s28-10 28-26"/><path d="M7 41L2 59l16 9zM73 41l5 18-16 9z" fill="currentColor" stroke-width="2"/></svg>
+            Anchor
+          </span>
+          <span class="glass">Unanchor with the tag</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- The shield -->
+  <section class="wrap feature" id="shield">
+    <div class="copy" data-reveal>
+      <div class="eyebrow ember">The shield</div>
+      <h2 class="display">Nothing to tap but Close.</h2>
+      <p class="lede">The block screen says which app is closed and when it opens next. That is the whole conversation. No snooze, no "one more minute", no code to type. The app can't be deleted while it's shielded, either.</p>
+    </div>
+    <div class="demo" data-reveal style="--d: .1s">
+      <div class="shield" role="img" aria-label="The shield: Instagram is closed, opens tomorrow at 8:00 PM, one Close button">
+        <canvas class="sglass" width="90" height="120" data-hourglass="usedUp" aria-hidden="true"></canvas>
+        <div class="stitle">Instagram is closed</div>
+        <div class="ssub">Opens tomorrow at 8:00 PM</div>
+        <div class="close">Close</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Legend -->
+  <section class="wrap legend" id="hourglass">
+    <div class="head" data-reveal>
+      <div class="eyebrow">The living hourglass</div>
+      <h2 class="display">One glass, every status.</h2>
+      <p class="lede">The top bulb is the window and drains with the countdown. The pile carries the budget: sand while there's plenty, amber after the warning, ember once it's spent. The same glass sits in every row, the widget and the Live Activity.</p>
+    </div>
+    <div class="swatches">
+      {legend.map((l, i) => (
+        <div class="swatch" data-reveal style={`--d: ${(i % 4) * 0.07}s`}>
+          <canvas width="60" height="80" data-hourglass={l.state} aria-hidden="true"></canvas>
+          <div class="l"><b>{l.label}</b>{l.note}</div>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <!-- Privacy and the way out -->
+  <section class="wrap twin" id="trust">
+    <div class="card panel" data-reveal>
+      <div class="eyebrow moss">Privacy</div>
+      <h2 class="display">Furlough collects nothing.</h2>
+      <p>No account, no server, no analytics. There is no networking code in the app at all. Apple's Screen Time API never even tells Furlough which apps you picked.</p>
+      <a class="glass" href="/privacy">Read the privacy policy</a>
+    </div>
+    <div class="card panel" data-reveal style="--d: .1s">
+      <div class="eyebrow">The way out</div>
+      <h2 class="display">There is one escape, and it's Apple's.</h2>
+      <p><span class="path">Settings › Screen Time › Apps with Screen Time Access › Furlough › off.</span> It lifts every shield at once. Furlough can't prevent it, and says so on purpose.</p>
+      <a class="glass" href="/support">Support</a>
+    </div>
+  </section>
+
+  <!-- Download -->
+  <section class="wrap download" id="download">
+    <div class="card cta" data-reveal>
+      <img class="appicon" src="/icon-512.png" width="96" height="96" alt="The Furlough app icon: a glass hourglass with glowing sand" />
+      <div class="ctext">
+        <h2 class="display">Ready when you are.</h2>
+        <p class="lede">Free of accounts, free of servers, and free of an unblock button. It only works if you mean it.</p>
+        <div class="cactions">
+          <StoreButton />
+        </div>
+        <p class="fine faint">Furlough for Mac is open source. <a href={site.githubURL} rel="noopener">Build it from GitHub.</a></p>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    // Two small clocks on the page: the pending change landing, and the anchor counting up.
+    const two = (n: number) => String(n).padStart(2, '0');
+    const fmt = (s: number) => {
+      const t = Math.max(0, Math.floor(s));
+      const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), sec = t % 60;
+      return h > 0 ? `${h}:${two(m)}:${two(sec)}` : `${m}:${two(sec)}`;
+    };
+    const lands = document.querySelector<HTMLElement>('[data-lands]');
+    const since = document.querySelector<HTMLElement>('[data-since]');
+    const t0 = Date.now();
+    const tick = () => {
+      const dt = (Date.now() - t0) / 1000;
+      if (lands) lands.textContent = fmt(22 * 3600 + 41 * 60 + 6 - dt);
+      if (since) since.textContent = fmt(2 * 3600 + 14 * 60 + 9 + dt);
+    };
+    tick();
+    setInterval(tick, 1000);
+  </script>
+</Base>
+
+<style>
+  /* Hero */
+  .hero { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 48px; align-items: center; padding: clamp(32px, 7vh, 88px) 0 clamp(48px, 9vh, 112px); min-height: min(calc(100svh - 64px), 820px); }
+  .hero-text .lede { margin-top: 22px; }
+  .hero-text h1 { margin-top: 14px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; align-items: center; }
+  .fine { font-size: 13px; margin-top: 18px; }
+  .hero-demo { perspective: 1800px; }
+  .hero-demo :global(.phone) { transform: rotateY(-7deg) rotateX(2.5deg); transform-origin: 60% 50%; }
+  @media (prefers-reduced-motion: no-preference) {
+    .hero-demo :global(.phone) { animation: float 9s ease-in-out infinite; }
+    @keyframes float { 0%, 100% { transform: rotateY(-7deg) rotateX(2.5deg) translateY(0); } 50% { transform: rotateY(-7deg) rotateX(2.5deg) translateY(-8px); } }
+  }
+  @media (max-width: 900px) {
+    .hero { grid-template-columns: 1fr; gap: 40px; min-height: 0; text-align: left; }
+    .hero-demo :global(.phone) { transform: none; animation: none; }
+  }
+
+  /* Steps */
+  .idea { scroll-margin-top: 80px; }
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .step { padding: 22px 22px 24px; }
+  .step .num { color: var(--amber); font-size: 12px; letter-spacing: 0.04em; }
+  .step h3 { margin-top: 12px; }
+  .step p { color: var(--muted); font-size: 14.5px; margin-top: 8px; }
+  @media (max-width: 760px) { .steps { grid-template-columns: 1fr; } }
+
+  /* Features */
+  .feature, .legend, .twin, .download { scroll-margin-top: 72px; }
+  .feature { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(28px, 6vw, 80px); align-items: center; padding: clamp(56px, 9vh, 104px) 0 0; }
+  .feature.flip .copy { order: 2; }
+  .feature .copy h2 { margin-top: 12px; }
+  .feature .copy .lede { margin-top: 16px; font-size: 17px; }
+  .feature .demo { display: flex; justify-content: center; }
+  @media (max-width: 820px) {
+    .feature { grid-template-columns: 1fr; gap: 28px; }
+    .feature.flip .copy { order: 0; }
+  }
+
+  .tile { width: 34px; height: 34px; border-radius: 9px; background: var(--c); display: grid; place-items: center; font-family: var(--display); font-weight: 700; font-size: 15px; color: #fff; flex: 0 0 auto; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1); }
+  .who { display: flex; flex-direction: column; }
+  .n { font-family: var(--display-small); font-weight: 600; font-size: 14px; color: var(--cream); }
+  .r { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* Budget */
+  .budget { width: min(420px, 100%); padding: 20px 22px 26px; }
+  .budget .value { display: flex; align-items: baseline; gap: 8px; margin-top: 8px; }
+  .budget .big { font-size: 34px; line-height: 1; color: var(--cream); }
+  .budget .unit { color: var(--amber); }
+  .budget .hint { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+  .slider { position: relative; height: 28px; margin: 22px 0 18px; }
+  .slider .track { position: absolute; left: 0; right: 0; top: 11px; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.08); }
+  .slider .fill { position: absolute; left: 0; top: 11px; height: 6px; border-radius: 3px; width: 0; background: linear-gradient(90deg, var(--ember), var(--amber)); transition: width 1.2s var(--ease) 0.3s; }
+  .slider .knob { position: absolute; top: 0; left: 0; width: 28px; height: 28px; margin-left: -14px; border-radius: 50%; background: linear-gradient(160deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.1)); border: 1px solid rgba(255, 255, 255, 0.5); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4); transition: left 1.2s var(--ease) 0.3s; }
+  :global([data-reveal].in) .slider .fill { width: 10.64%; }
+  :global([data-reveal].in) .slider .knob { left: 10.64%; }
+  .ticks { position: absolute; left: 0; right: 0; top: 30px; }
+  .ticks span { position: absolute; transform: translateX(-50%); font-family: var(--mono); font-size: 10.5px; color: var(--faint); }
+  .ticks span::before { content: ''; position: absolute; left: 50%; top: -9px; width: 1px; height: 5px; background: var(--faint); opacity: 0.6; }
+
+  /* Week */
+  .week { width: min(420px, 100%); padding: 18px 18px 16px; }
+  .days { display: grid; grid-template-columns: 40px repeat(7, 1fr); gap: 0; text-align: center; }
+  .days .eyebrow { font-size: 9.5px; grid-column: auto; }
+  .days .eyebrow:first-child { grid-column: 2; }
+  .grid { display: grid; grid-template-columns: 40px 1fr; margin-top: 8px; height: 264px; }
+  .gutter { position: relative; font-size: 8.5px; color: var(--faint); }
+  .gutter span { position: absolute; right: 8px; transform: translateY(-50%); }
+  .gutter span:first-child { transform: none; }
+  .cols { position: relative; display: grid; grid-template-columns: repeat(7, 1fr); gap: 0; border-left: 1px solid var(--edge);
+    background-image: repeating-linear-gradient(180deg, var(--edge) 0 1px, transparent 1px 12.5%); }
+  .col { position: relative; border-right: 1px solid var(--edge); }
+  .col.today { background: rgba(245, 158, 74, 0.07); }
+  .w { position: absolute; left: 2px; right: 2px; top: calc(var(--s) / 24 * 100%); height: calc((var(--e) - var(--s)) / 24 * 100%); border-radius: 5px; background: rgba(245, 158, 74, 0.92);
+    font-family: var(--mono); font-style: normal; font-size: 8px; color: var(--ground); padding: 2px 0 0 3px; overflow: hidden;
+    transform: scaleY(0); transform-origin: top; transition: transform 0.7s var(--ease); }
+  .col:nth-child(1) .w { transition-delay: 0.1s; } .col:nth-child(2) .w { transition-delay: 0.17s; } .col:nth-child(3) .w { transition-delay: 0.24s; } .col:nth-child(4) .w { transition-delay: 0.31s; }
+  .col:nth-child(5) .w { transition-delay: 0.38s; } .col:nth-child(6) .w { transition-delay: 0.45s; } .col:nth-child(7) .w { transition-delay: 0.52s; }
+  :global([data-reveal].in) .w { transform: scaleY(1); }
+  .words { margin-top: 12px; font-size: 12.5px; color: var(--muted); text-align: center; }
+
+  /* Pending */
+  .pending-card { width: min(420px, 100%); padding: 18px 20px 20px; }
+  .prow { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+  .delta { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; margin-top: 16px; padding: 14px 16px; border-radius: 14px; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--edge); }
+  .delta .v { font-size: 20px; color: var(--cream); margin-top: 4px; }
+  .delta .small { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .delta .then .v { color: var(--pending); }
+  .delta .arrow { width: 20px; height: 20px; color: var(--faint); }
+  .bar { position: relative; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.08); margin-top: 16px; overflow: hidden; }
+  .bar .prog { height: 100%; width: 0; background: var(--pending); transition: width 1.4s var(--ease) 0.3s; }
+  :global([data-reveal].in) .bar .prog { width: 5.5%; }
+  .pactions { display: flex; justify-content: flex-end; margin-top: 14px; }
+  .pactions .glass { color: var(--ember); cursor: default; }
+
+  /* Anchor */
+  .anchor { width: min(420px, 100%); padding: 22px 22px 20px; }
+  .ahero { display: flex; align-items: center; gap: 16px; }
+  .aglass { width: 84px; height: 112px; flex: 0 0 auto; }
+  .anchor .name { font-family: var(--display); font-weight: 700; font-size: 24px; letter-spacing: -0.025em; line-height: 1.05; margin-top: 5px; }
+  .anchor .count { font-size: 36px; line-height: 1; margin-top: 8px; }
+  .anchor .sub { font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .aactions { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+  .aactions .glass { cursor: default; }
+  .aactions .glass:hover { transform: none; }
+
+  /* Shield */
+  .shield { width: min(300px, 100%); height: 440px; border-radius: 36px; padding: 40px 28px 28px; display: flex; flex-direction: column; align-items: center; text-align: center;
+    background: rgba(229, 86, 61, 0.22); border: 1px solid rgba(255, 255, 255, 0.14); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px);
+    box-shadow: 0 30px 70px rgba(0, 0, 0, 0.5); }
+  .sglass { width: 90px; height: 120px; margin-top: 36px; }
+  .stitle { font-family: var(--display-small); font-weight: 600; font-size: 20px; color: var(--cream); margin-top: 28px; }
+  .ssub { font-size: 14px; color: var(--muted); margin-top: 6px; }
+  .close { margin-top: auto; width: 100%; padding: 14px 0; border-radius: 999px; background: var(--cream); color: var(--ground); font-weight: 600; font-size: 15px; }
+
+  /* Legend */
+  .legend { padding-top: clamp(64px, 10vh, 120px); }
+  .legend .head h2 { margin-top: 12px; }
+  .legend .head .lede { margin-top: 14px; max-width: 64ch; }
+  .swatches { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 32px; }
+  .swatch { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 20px 12px 16px; border-radius: 16px; background: var(--ground); border: 1px solid rgba(255, 255, 255, 0.07);
+    background-image: radial-gradient(ellipse 90% 60% at 30% 115%, rgba(229, 86, 61, 0.22), transparent 60%); }
+  .swatch canvas { width: 60px; height: 80px; }
+  .swatch .l { font-size: 12px; color: var(--muted); text-align: center; line-height: 1.35; }
+  .swatch .l b { display: block; color: var(--cream); font-weight: 600; font-size: 13px; margin-bottom: 2px; }
+  @media (max-width: 820px) { .swatches { grid-template-columns: repeat(2, 1fr); } }
+
+  /* Twin panels */
+  .twin { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding-top: clamp(56px, 9vh, 104px); }
+  .panel { padding: 26px 26px 28px; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+  .panel h2 { font-size: clamp(24px, 2.6vw, 30px); }
+  .panel p { color: var(--muted); font-size: 15.5px; }
+  .panel .glass { margin-top: 6px; }
+  .path { color: var(--cream); font-weight: 600; }
+  @media (max-width: 760px) { .twin { grid-template-columns: 1fr; } }
+
+  /* Download */
+  .download { padding-top: clamp(56px, 9vh, 104px); }
+  .cta { display: flex; align-items: center; gap: 28px; padding: 34px 36px; background-image: radial-gradient(ellipse 60% 120% at 0% 100%, rgba(229, 86, 61, 0.18), transparent 60%); }
+  .appicon { width: 96px; height: 96px; border-radius: 22%; flex: 0 0 auto; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), 0 0 60px rgba(229, 86, 61, 0.25); }
+  .cta .lede { margin-top: 10px; font-size: 16.5px; }
+  .cactions { margin-top: 20px; }
+  .cta .fine { font-size: 13px; margin-top: 14px; }
+  @media (max-width: 640px) { .cta { flex-direction: column; align-items: flex-start; padding: 26px 22px; } }
+</style>

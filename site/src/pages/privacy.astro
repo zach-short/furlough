@@ -1,0 +1,49 @@
+---
+import Base from '../layouts/Base.astro';
+import { site } from '../site';
+---
+
+<Base title="Privacy Policy" description="Furlough collects nothing. No account, no server, no analytics, no networking code at all.">
+  <section class="wrap page">
+    <header class="head" data-reveal>
+      <div class="eyebrow moss">Privacy policy</div>
+      <h1 class="display">Furlough collects nothing.</h1>
+      <p class="sub">Furlough for iPhone · last updated {site.policyUpdated}</p>
+    </header>
+
+    <article class="card prose body" data-reveal style="--d: .1s">
+      <p><strong>Furlough collects nothing.</strong> Not anonymously, not in aggregate, not for analytics. There is no account to make and no server to sign in to, because Furlough does not have a server.</p>
+
+      <h2>There is no network</h2>
+      <p>Furlough contains no networking code at all: no <code>URLSession</code>, no third-party SDKs, no analytics or crash-reporting library. It cannot send your data anywhere because it has no way to send anything anywhere.</p>
+
+      <h2>What stays on your iPhone</h2>
+      <p>Everything Furlough knows lives in its own storage container on your device:</p>
+      <ul>
+        <li>The apps, categories and websites you chose to limit, and the windows and daily budgets you set for them.</li>
+        <li>Pending changes waiting out their delay, and a short activity log of Furlough's own enforcement, which you can read in Settings.</li>
+        <li>The identifier of the NFC tag you paired, if you use the Anchor.</li>
+      </ul>
+      <p>Deleting Furlough deletes all of it.</p>
+
+      <h2>Screen Time data</h2>
+      <p>Furlough uses Apple's Screen Time APIs (Family Controls, Managed Settings and Device Activity) with your explicit permission, to apply the limits you set for yourself. Apple designs these so apps like Furlough never see which apps you use or for how long: your choices are represented by opaque tokens that cannot be turned back into app names, and usage is reported only as anonymous "a limit was reached" signals. That information stays on your device and is never transmitted.</p>
+
+      <h2>Children</h2>
+      <p>Furlough is a tool for restricting your own device and asks for individual Screen Time authorization, which iOS grants only to an adult account. It is not a parental-control product and does not monitor anyone else.</p>
+
+      <h2>Changes</h2>
+      <p>If this policy ever changes, the updated version will be posted at this address with a new date above.</p>
+
+      <p class="contact">Questions: <a href={`mailto:${site.email}`}>{site.email}</a></p>
+    </article>
+  </section>
+</Base>
+
+<style>
+  .page { padding: clamp(24px, 6vh, 64px) 0 0; max-width: 760px; }
+  .head h1 { margin-top: 12px; font-size: clamp(34px, 5vw, 56px); }
+  .sub { color: var(--faint); font-size: 14px; margin-top: 14px; }
+  .body { margin-top: 28px; padding: clamp(22px, 4vw, 36px); }
+  .contact { margin-top: 32px; padding-top: 18px; border-top: 1px solid var(--edge); font-size: 14px; }
+</style>

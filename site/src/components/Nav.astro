@@ -1,0 +1,42 @@
+---
+import { site } from '../site';
+const path = Astro.url.pathname.replace(/\/$/, '') || '/';
+const cta = site.appStoreURL ? { href: site.appStoreURL, label: 'Get the app' } : { href: '/#download', label: 'Get the app' };
+---
+
+<header class="nav">
+  <div class="wrap bar">
+    <a class="wordmark" href="/" aria-label="Furlough home">
+      <canvas class="mark" width="14" height="18" data-hourglass="open:0.6" data-still aria-hidden="true"></canvas>
+      <span>Furlough</span>
+    </a>
+    <nav class="links" aria-label="Site">
+      <a class="glass" href="/support" aria-current={path === '/support' ? 'page' : undefined}>Support</a>
+      <a class="glass" href="/privacy" aria-current={path === '/privacy' ? 'page' : undefined}>Privacy</a>
+      <a class="glass prominent" href={cta.href}>{cta.label}</a>
+    </nav>
+  </div>
+</header>
+
+<style>
+  .nav { position: sticky; top: 0; z-index: 20; padding: 14px 0; }
+  .nav::before {
+    content: ''; position: absolute; inset: 0; z-index: -1;
+    background: linear-gradient(180deg, rgba(15, 13, 11, 0.85), rgba(15, 13, 11, 0.55) 70%, rgba(15, 13, 11, 0));
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    -webkit-mask: linear-gradient(#000 60%, transparent); mask: linear-gradient(#000 60%, transparent);
+  }
+  .bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .wordmark {
+    display: inline-flex; align-items: center; gap: 9px; color: var(--cream); text-decoration: none;
+    font-family: var(--display-small); font-weight: 600; font-size: 18px; letter-spacing: -0.01em;
+  }
+  .wordmark:hover { text-decoration: none; }
+  .mark { width: 14px; height: 18px; }
+  .links { display: flex; align-items: center; gap: 8px; }
+  .links .glass { min-height: 36px; padding: 0 14px; font-size: 13px; }
+  .links a[aria-current='page'] { background: linear-gradient(160deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.1)); }
+  @media (max-width: 560px) {
+    .links .glass:not(.prominent) { display: none; }
+  }
+</style>

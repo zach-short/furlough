@@ -1,0 +1,27 @@
+---
+import { site } from '../site';
+interface Props { large?: boolean }
+const { large = true } = Astro.props;
+---
+
+{site.appStoreURL ? (
+  <a class:list={['glass', 'prominent', 'store', { large }]} href={site.appStoreURL} rel="noopener">
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M16.37 12.64c-.02-2.3 1.88-3.4 1.96-3.45-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.15-2.76.83-3.48.83-.72 0-1.83-.81-3.01-.79-1.55.02-2.98.9-3.78 2.29-1.61 2.79-.41 6.92 1.16 9.19.77 1.11 1.68 2.36 2.87 2.31 1.15-.05 1.59-.75 2.98-.75 1.39 0 1.78.75 3 .72 1.24-.02 2.02-1.13 2.78-2.24.88-1.29 1.24-2.54 1.26-2.6-.03-.01-2.41-.93-2.42-3.71zM14.1 5.9c.63-.77 1.06-1.83.94-2.9-.91.04-2.02.61-2.67 1.37-.58.67-1.1 1.76-.96 2.8 1.02.08 2.05-.52 2.69-1.27z"/></svg>
+    <span class="text"><small>Download on the</small>App Store</span>
+  </a>
+) : (
+  <span class:list={['glass', 'store', 'soon', { large }]} aria-disabled="true" title="The App Store listing is on its way">
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M16.37 12.64c-.02-2.3 1.88-3.4 1.96-3.45-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.15-2.76.83-3.48.83-.72 0-1.83-.81-3.01-.79-1.55.02-2.98.9-3.78 2.29-1.61 2.79-.41 6.92 1.16 9.19.77 1.11 1.68 2.36 2.87 2.31 1.15-.05 1.59-.75 2.98-.75 1.39 0 1.78.75 3 .72 1.24-.02 2.02-1.13 2.78-2.24.88-1.29 1.24-2.54 1.26-2.6-.03-.01-2.41-.93-2.42-3.71zM14.1 5.9c.63-.77 1.06-1.83.94-2.9-.91.04-2.02.61-2.67 1.37-.58.67-1.1 1.76-.96 2.8 1.02.08 2.05-.52 2.69-1.27z"/></svg>
+    <span class="text"><small>Coming soon to the</small>App Store</span>
+  </span>
+)}
+
+<style>
+  .store { gap: 10px; }
+  .store.large { min-height: 56px; padding: 0 22px 0 18px; }
+  .store svg { width: 22px; height: 22px; }
+  .store .text { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.05; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+  .store .text small { font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.8; margin-bottom: 2px; }
+  .store.soon { cursor: default; color: var(--cream); }
+  .store.soon:hover { transform: none; }
+</style>

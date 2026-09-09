@@ -1,0 +1,54 @@
+---
+import Base from '../layouts/Base.astro';
+import { site } from '../site';
+---
+
+<Base title="Support" description="How Furlough works, the one way out, and what to do if a shield seems stuck.">
+  <section class="wrap page">
+    <header class="head" data-reveal>
+      <div class="eyebrow amber">Support</div>
+      <h1 class="display">If you need out, the way out is Apple's.</h1>
+      <p class="sub">Furlough for iPhone</p>
+    </header>
+
+    <article class="card prose body" data-reveal style="--d: .1s">
+      <p>Furlough shields the apps and websites you choose outside the hours you allowed them, and holds any change that would give you more time until a delay you set in advance has passed.</p>
+
+      <div class="note">
+        <p><strong>There is no unblock button, and that is deliberate.</strong> If it could be undone the moment you wanted it undone, it would not be doing anything.</p>
+      </div>
+
+      <h2>If you need out</h2>
+      <p>The way out is Apple's, not ours, and it always works: <span class="path">Settings › Screen Time › Apps with Screen Time Access › Furlough › off.</span> Every shield lifts immediately and app deletion is re-enabled. Your rules are kept: turn access back on and Furlough picks up where it left off.</p>
+
+      <h2>If a shield seems stuck</h2>
+      <ol>
+        <li>Open Furlough and tap <span class="path">Settings › Re-apply enforcement now</span>. This re-registers every schedule and re-applies shields from saved state.</li>
+        <li>Check <span class="path">Settings › Activity log</span> to see what Furlough has been doing.</li>
+        <li>If that does not help, use the Screen Time switch above, then turn it back on.</li>
+      </ol>
+
+      <h2>Things worth knowing</h2>
+      <ul>
+        <li>Windows must be at least 15 minutes. A night that runs past midnight is kept as two windows, one either side of it, and each half needs its own fifteen.</li>
+        <li>An app cannot be deleted while it is shielded. That is intentional, and the Screen Time switch above releases it.</li>
+        <li>Moving your iPhone's clock forward does not buy time: queued changes are held while the clock runs ahead, and released when it is set back.</li>
+        <li>The Anchor needs an NFC tag you have paired. Everything else works without one.</li>
+        <li>Apple's Screen Time API does not exist on the Mac. Furlough for Mac enforces on its own and is open source: <a href={site.githubURL} rel="noopener">build it from GitHub</a>.</li>
+      </ul>
+
+      <h2>Still stuck?</h2>
+      <p>Email <a href={`mailto:${site.email}`}>{site.email}</a> with what you were doing and what happened. The activity log in Settings is the most useful thing to describe.</p>
+
+      <p class="contact"><a href="/privacy">Privacy policy</a></p>
+    </article>
+  </section>
+</Base>
+
+<style>
+  .page { padding: clamp(24px, 6vh, 64px) 0 0; max-width: 760px; }
+  .head h1 { margin-top: 12px; font-size: clamp(34px, 5vw, 56px); }
+  .sub { color: var(--faint); font-size: 14px; margin-top: 14px; }
+  .body { margin-top: 28px; padding: clamp(22px, 4vw, 36px); }
+  .contact { margin-top: 32px; padding-top: 18px; border-top: 1px solid var(--edge); font-size: 14px; }
+</style>

@@ -1,0 +1,195 @@
+---
+// The app's Home screen, as a working demo: the hero page with the living hourglass, the
+// strip of status hourglasses that turns the pages, and a couple of rows under it. The
+// script plays one evening on a loop, twelve seconds to the second.
+---
+
+<div class="phone" data-hero aria-label="Furlough's home screen: the living hourglass and today's countdown" role="img">
+  <div class="statusbar"><span class="mono">9:41</span><span class="signal" aria-hidden="true"><i></i><i></i><i></i><i></i></span></div>
+  <div class="toolbar" aria-hidden="true">
+    <span class="glass icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></span>
+    <span class="right">
+      <span class="glass pill">1 pending</span>
+      <span class="glass icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
+    </span>
+  </div>
+
+  <div class="hero-page">
+    <canvas class="glass-canvas" width="96" height="128" data-hero-glass aria-hidden="true"></canvas>
+    <div class="text">
+      <div class="eyebrow moss" data-hero-eyebrow>Open now · until 8:30 PM</div>
+      <div class="name">Instagram</div>
+      <div class="count mono" data-hero-count>30:00</div>
+      <div class="sub" data-hero-sub>30 min budget today</div>
+    </div>
+  </div>
+
+  <div class="indicator" aria-hidden="true">
+    <canvas class="on" width="11" height="15" data-hero-mini></canvas>
+    <canvas width="11" height="15" data-hourglass="comingSoon:60" data-still></canvas>
+    <canvas width="11" height="15" data-hourglass="comingSoon:200" data-still></canvas>
+    <canvas width="11" height="15" data-hourglass="alwaysBlocked" data-still></canvas>
+    <canvas width="11" height="15" data-hourglass="anchored" data-still></canvas>
+  </div>
+
+  <div class="list" aria-hidden="true">
+    <div class="eyebrow seclabel">Later today</div>
+    <div class="card rows">
+      <div class="row">
+        <span class="tile" style="--c: #cc2b2b">Y</span>
+        <span class="who"><span class="n">YouTube</span><span class="r">8:00–10:00 PM · 30 min</span></span>
+        <span class="chip amber"><canvas width="12" height="16" data-hourglass="comingSoon:60" data-still></canvas>8:00 PM</span>
+      </div>
+      <div class="row">
+        <span class="tile" style="--c: #e0552b">R</span>
+        <span class="who"><span class="n">Reddit</span><span class="r">9:00–10:00 PM · 20 min</span></span>
+        <span class="chip amber"><canvas width="12" height="16" data-hourglass="comingSoon:200" data-still></canvas>9:00 PM</span>
+      </div>
+    </div>
+    <div class="eyebrow seclabel">Tomorrow</div>
+    <div class="card rows">
+      <div class="row">
+        <span class="tile" style="--c: #b0202a">N</span>
+        <span class="who"><span class="n">Netflix</span><span class="r">Fri–Sun 9:00–11:00 PM · 60 min</span></span>
+        <span class="chip muted"><canvas width="12" height="16" data-hourglass="doneForToday" data-still></canvas>Fri</span>
+      </div>
+    </div>
+    <div class="eyebrow seclabel">Always blocked</div>
+    <div class="card rows">
+      <div class="row">
+        <span class="tile" style="--c: #2a2a2e">T</span>
+        <span class="who"><span class="n">TikTok</span><span class="r">Social · no windows</span></span>
+        <span class="chip grey"><canvas width="12" height="16" data-hourglass="alwaysBlocked" data-still></canvas>all day</span>
+      </div>
+    </div>
+  </div>
+  <div class="fade"></div>
+</div>
+
+<style>
+  .phone {
+    position: relative; width: min(350px, 100%); height: 640px; margin-inline: auto; overflow: hidden;
+    border-radius: 44px; border: 1px solid rgba(255, 255, 255, 0.16); background: var(--ground);
+    background-image:
+      radial-gradient(ellipse 70% 42% at 28% 104%, rgba(229, 86, 61, 0.6), transparent 62%),
+      radial-gradient(ellipse 60% 40% at 90% -4%, rgba(245, 158, 74, 0.14), transparent 60%);
+    box-shadow: 0 40px 90px rgba(0, 0, 0, 0.55), 0 0 120px rgba(229, 86, 61, 0.1), inset 0 0 0 1px rgba(0, 0, 0, 0.6);
+    padding: 0 16px;
+  }
+  .statusbar { display: flex; justify-content: space-between; align-items: center; padding: 18px 14px 0; font-size: 14px; font-weight: 600; }
+  .signal { display: inline-flex; gap: 2px; align-items: flex-end; }
+  .signal i { width: 3px; background: var(--cream); border-radius: 1px; }
+  .signal i:nth-child(1) { height: 4px; } .signal i:nth-child(2) { height: 6px; } .signal i:nth-child(3) { height: 8px; } .signal i:nth-child(4) { height: 10px; }
+  .toolbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 0 0; }
+  .toolbar .right { display: flex; gap: 8px; }
+  .toolbar .glass { min-height: 36px; font-size: 13px; cursor: default; }
+  .toolbar .glass:hover { transform: none; }
+  .toolbar .pill { color: var(--pending); padding: 0 12px; }
+
+  .hero-page { display: flex; align-items: center; gap: 16px; padding: 26px 6px 8px; }
+  .glass-canvas { width: 96px; height: 128px; flex: 0 0 auto; }
+  .text { min-width: 0; }
+  .name { font-family: var(--display); font-weight: 700; font-size: 26px; letter-spacing: -0.025em; line-height: 1.05; margin-top: 5px; color: var(--cream); }
+  .count { font-size: 42px; line-height: 1; margin-top: 8px; color: var(--cream); }
+  .sub { font-size: 12px; color: var(--muted); margin-top: 8px; }
+
+  .indicator { display: flex; justify-content: center; align-items: center; gap: 10px; height: 34px; padding-bottom: 4px; }
+  .indicator canvas { width: 11px; height: 15px; opacity: 0.5; transition: transform 0.25s, opacity 0.25s; }
+  .indicator canvas.on { opacity: 1; transform: scale(1.35); }
+
+  .seclabel { padding: 12px 8px 6px; }
+  .rows { display: flex; flex-direction: column; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
+  .row + .row { border-top: 1px solid var(--edge); }
+  .tile { width: 34px; height: 34px; border-radius: 9px; background: var(--c); display: grid; place-items: center; font-family: var(--display); font-weight: 700; font-size: 15px; color: #fff; flex: 0 0 auto; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1); }
+  .who { display: flex; flex-direction: column; min-width: 0; }
+  .n { font-family: var(--display-small); font-weight: 600; font-size: 13.5px; line-height: 1.15; color: var(--cream); }
+  .r { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .chip { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .chip.amber { color: var(--amber); } .chip.grey { color: var(--faint); } .chip.muted { color: var(--muted); }
+  .chip canvas { width: 12px; height: 16px; }
+  .fade { position: absolute; left: 0; right: 0; bottom: 0; height: 72px; background: linear-gradient(180deg, transparent, rgba(15, 13, 11, 0.96)); pointer-events: none; }
+</style>
+
+<script>
+  import { LivingHourglass, States, blendStates, type HourglassState } from '../lib/hourglass';
+
+  const root = document.querySelector<HTMLElement>('[data-hero]');
+  if (root) {
+    const canvas = root.querySelector<HTMLCanvasElement>('[data-hero-glass]')!;
+    const miniCanvas = root.querySelector<HTMLCanvasElement>('[data-hero-mini]')!;
+    const eyebrowEl = root.querySelector<HTMLElement>('[data-hero-eyebrow]')!;
+    const countEl = root.querySelector<HTMLElement>('[data-hero-count]')!;
+    const subEl = root.querySelector<HTMLElement>('[data-hero-sub]')!;
+
+    // One evening, played twelve times faster than life. The window is 8:00–8:30 PM with a
+    // 30-minute budget spent all the way through it, so the last five minutes carry the
+    // budget warning and the glass runs empty as the window closes.
+    const SPEED = 12;
+    const PRE = 5, WINDOW = 1800 / SPEED, DONE = 8;
+    const CYCLE = PRE + WINDOW + DONE;
+    const TOMORROW = 23.5 * 3600;
+    const BUDGET = '30 min';
+
+    const glass = new LivingHourglass(canvas, States.comingSoon(1));
+    const mini = new LivingHourglass(miniCanvas, States.comingSoon(1), { still: true });
+
+    const countdown = (seconds: number) => {
+      const total = Math.max(0, Math.floor(seconds));
+      const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60), s = total % 60;
+      const two = (n: number) => String(n).padStart(2, '0');
+      return h > 0 ? `${h}:${two(m)}:${two(s)}` : `${m}:${two(s)}`;
+    };
+    const setText = (el: HTMLElement, text: string) => { if (el.textContent !== text) el.textContent = text; };
+    const setEyebrow = (text: string, color: string) => {
+      setText(eyebrowEl, text);
+      const cls = `eyebrow ${color}`;
+      if (eyebrowEl.className !== cls) eyebrowEl.className = cls;
+    };
+
+    type Beat = { key: string; state: HourglassState; eyebrow: string; color: string; count: string; sub: string };
+    const beat = (t: number): Beat => {
+      if (t < PRE) {
+        const toOpen = (PRE - t) * SPEED;
+        return { key: 'pre', state: States.comingSoon(toOpen / 60), eyebrow: 'Next window', color: 'amber', count: countdown(toOpen), sub: `opens at 8:00 PM · ${BUDGET} a day` };
+      }
+      if (t < PRE + WINDOW) {
+        const left = 1800 - (t - PRE) * SPEED;
+        const warned = left <= 300;
+        return {
+          key: warned ? 'warn' : 'open', state: States.open(left / 1800, warned),
+          eyebrow: warned ? 'Open now · 5 min left' : 'Open now · until 8:30 PM', color: warned ? 'amber' : 'moss',
+          count: countdown(left), sub: warned ? `${BUDGET} budget · under 5 min left` : `${BUDGET} budget today`,
+        };
+      }
+      const toTomorrow = TOMORROW - (t - PRE - WINDOW) * SPEED;
+      return { key: 'done', state: States.doneForToday, eyebrow: 'Next window', color: 'amber', count: countdown(toTomorrow), sub: `opens tomorrow 8:00 PM · ${BUDGET} a day` };
+    };
+
+    const start = performance.now();
+    let lastKey = '';
+    let from: HourglassState | null = null;
+    let changedAt = 0;
+    let lastMini = -1;
+
+    const frame = (now: number) => {
+      requestAnimationFrame(frame);
+      const t = ((now - start) / 1000) % CYCLE;
+      const b = beat(t);
+      if (b.key !== lastKey) {
+        from = lastKey ? glass.state : null;
+        changedAt = now;
+        lastKey = b.key;
+      }
+      const k = from ? (now - changedAt) / 800 : 1;
+      const shown = from && k < 1 ? blendStates(from, b.state, k) : b.state;
+      glass.set(shown);
+      setEyebrow(b.eyebrow, b.color);
+      setText(countEl, b.count);
+      setText(subEl, b.sub);
+      const second = Math.floor(now / 1000);
+      if (second !== lastMini) { lastMini = second; mini.set(shown); }
+    };
+    requestAnimationFrame(frame);
+  }
+</script>
