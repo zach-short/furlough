@@ -64,8 +64,15 @@ final class MonitorExtension: DeviceActivityMonitor {
         SharedStore.mutate { state in
             Policy.applyDuePending(&state, now: now)
             guard let target = state.config.target(id: parsed.targetID), let rule = target.rule else { return }
-            guard rule.isEverAllowed, parsed.minutes >= rule.effectiveBudgetMinutes else {
-                SharedStore.log("ignored stale threshold \(parsed.minutes) < budget \(rule.effectiveBudgetMinutes)")
+            // Today's budget, not the rule's: every distinct budget in the week is registered,
+            // so on a 30-minute Monday the 2-hour weekend event is live too. A threshold below
+            // today's is another day's and is ignored — which is the same guard that already
+            // threw out a stale event left over from an edit, now extended to the six other
+            // budgets this rule holds.
+            let weekday = Policy.weekday(now)
+            let budget = rule.effectiveBudget(on: weekday)
+            guard rule.isEverAllowed(on: weekday), parsed.minutes >= budget else {
+                SharedStore.log("ignored stale threshold \(parsed.minutes) < today's budget \(budget)")
                 return
             }
             let day = Policy.dayKey(now)
@@ -93,7 +100,10 @@ final class MonitorExtension: DeviceActivityMonitor {
         SharedStore.mutate { state in
             Policy.applyDuePending(&state, now: now)
             guard let target = state.config.target(id: parsed.targetID), let rule = target.rule else { return }
-            guard rule.isEverAllowed, parsed.minutes == rule.effectiveBudgetMinutes else { return }
+            // Exactly today's, so only the day's own budget warns: a Monday must not get its
+            // "5 minutes left" 25 minutes early because the weekend's larger event is loaded.
+            let weekday = Policy.weekday(now)
+            guard rule.isEverAllowed(on: weekday), parsed.minutes == rule.effectiveBudget(on: weekday) else { return }
             let day = Policy.dayKey(now)
             guard !state.runtime.wasWarned(target.id, dayKey: day),
                   !state.runtime.isExhausted(target.id, dayKey: day) else { return }

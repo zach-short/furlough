@@ -320,7 +320,7 @@ struct HeroPage: View {
     }
 
     private func line(now: Date) -> Line {
-        let budget = target.rule.map { TimeFormat.budget($0.dailyBudgetMinutes) } ?? ""
+        let budget = target.rule.map { TimeFormat.budget($0.budget(on: Policy.weekday(now))) } ?? ""
         switch status {
         case .open(let until):
             let end = Policy.date(atMinute: until, of: now)

@@ -85,8 +85,9 @@ struct TargetHero: View {
     }
 
     private func line() -> Line {
-        let budget = target.rule.map { TimeFormat.budget($0.dailyBudgetMinutes) } ?? ""
-        let used = "\(usedSeconds / 60) of \(target.rule?.dailyBudgetMinutes ?? 0) min used today"
+        let today = Policy.weekday(now)
+        let budget = target.rule.map { TimeFormat.budget($0.budget(on: today)) } ?? ""
+        let used = "\(usedSeconds / 60) of \(target.rule?.budget(on: today) ?? 0) min used today"
         switch status {
         case .open(let until):
             let end = Policy.date(atMinute: until, of: now)

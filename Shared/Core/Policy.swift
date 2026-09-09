@@ -478,8 +478,10 @@ enum Policy {
         func consider(_ date: Date, _ target: Target, exhausted: Bool) {
             let name = target.displayName
             // nil where there is no real limit, so the widget says what is blocked instead of
-            // offering "24 hours budget" as if it were one.
-            let budget = target.rule?.limitMinutes
+            // offering "24 hours budget" as if it were one. Read on the day it next opens, not
+            // today: a rule that is shut all Sunday and worth two hours on Monday is offering
+            // the two hours, and saying today's nothing would be a countdown to a closed door.
+            let budget = target.rule?.limit(on: Policy.weekday(date, calendar: calendar))
             if let current = soonest {
                 if date < current.date {
                     soonest = (date, [], budget, exhausted)

@@ -5,6 +5,9 @@ import SwiftUI
 /// gets half of the width, which is also why the ticks sit evenly spaced.
 struct BudgetSlider: View {
     @Binding var value: Int
+    /// The anchor figures under the track. Off in the per-day rows, where seven copies of the
+    /// same five numbers would be noise and each row already says its own figure.
+    var showsTicks = true
     @State private var dragging = false
 
     static let anchors = [5, 30, 60, 120, 240]
@@ -45,7 +48,7 @@ struct BudgetSlider: View {
                 )
             }
             .frame(height: knob)
-            ticks
+            if showsTicks { ticks }
         }
         .animation(.easeOut(duration: 0.15), value: dragging)
         .sensoryFeedback(.selection, trigger: value) { _, _ in dragging }
@@ -97,5 +100,40 @@ struct BudgetSlider: View {
         let upper = Double(anchors[index + 1])
         let raw = lower + (scaled - Double(index)) * (upper - lower)
         return Int((raw / Double(step)).rounded()) * step
+    }
+}
+
+/// One weekday's budget: its name, its figure, and a slider. The per-day half of the rule
+/// editor's budget card on both platforms.
+struct DayBudgetRow: View {
+    let weekday: Int
+    @Binding var minutes: Int
+
+    private var name: String {
+        let symbols = Calendar.current.standaloneWeekdaySymbols
+        return symbols.indices.contains(weekday - 1) ? symbols[weekday - 1] : ""
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(name)
+                    .emberBody(13)
+                    .foregroundStyle(Ember.cream)
+                Spacer()
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text("\(minutes)")
+                        .emberNumerals(15)
+                        .contentTransition(.numericText())
+                    Text("MIN")
+                        .font(EmberFont.label(9))
+                        .tracking(0.06 * 9)
+                        .foregroundStyle(Ember.muted)
+                }
+            }
+            BudgetSlider(value: $minutes, showsTicks: false)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
     }
 }

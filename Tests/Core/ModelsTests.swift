@@ -140,14 +140,14 @@ struct RuleTests {
         #expect(Rule.alwaysBlocked.isTighterOrEqual(to: .unrestricted))
         #expect(!Rule.unrestricted.isTighterOrEqual(to: .alwaysBlocked))
         #expect(!Rule.alwaysBlocked.isEverAllowed)
-        #expect(Rule.alwaysBlocked.effectiveBudgetMinutes == 0)
+        #expect(Rule.alwaysBlocked.effectiveBudget(on: 1) == 0)
     }
 
     @Test("windows with no days at all are never allowed")
     func noDays() {
         let rule = Rule(windows: [window(1200, 1320, [])], dailyBudgetMinutes: 30)
         #expect(!rule.isEverAllowed)
-        #expect(rule.effectiveBudgetMinutes == 0)
+        #expect(rule.effectiveBudget(on: 1) == 0)
         #expect(rule.isTighterOrEqual(to: .alwaysBlocked))
     }
 

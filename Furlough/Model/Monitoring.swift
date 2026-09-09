@@ -49,12 +49,19 @@ enum Monitoring {
                 }
             }
             guard !apps.isEmpty || !web.isEmpty else { return }
-            let minutes = rule.dailyBudgetMinutes
-            let name = DeviceActivityEvent.Name(ActivityNaming.budgetEvent(targetID: target.id, minutes: minutes))
-            let threshold = DateComponents(hour: minutes / 60, minute: minutes % 60)
-            events[name] = DeviceActivityEvent(
-                applications: apps, webDomains: web, threshold: threshold, includesPastActivity: true
-            )
+            // One event per distinct budget the week asks for, not one per day. A threshold
+            // event is not a schedule — it watches the day activity, which repeats — so the
+            // seven days share whichever events they need, and a week of 30/30/30/30/30/120/120
+            // costs two. The monitor decides which of them is today's; registering all of them
+            // is what lets it, and `Set` is what stops five weekdays from registering five
+            // copies of the same name.
+            for minutes in Set((1...7).map { rule.effectiveBudget(on: $0) }).sorted() where minutes > 0 {
+                let name = DeviceActivityEvent.Name(ActivityNaming.budgetEvent(targetID: target.id, minutes: minutes))
+                let threshold = DateComponents(hour: minutes / 60, minute: minutes % 60)
+                events[name] = DeviceActivityEvent(
+                    applications: apps, webDomains: web, threshold: threshold, includesPastActivity: true
+                )
+            }
         }
 
         for target in state.config.targets {

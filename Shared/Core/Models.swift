@@ -236,6 +236,12 @@ extension TimeWindow {
 struct Rule: Codable, Hashable {
     var windows: [TimeWindow] = []
     var dailyBudgetMinutes: Int = Furlough.defaultBudgetMinutes
+    /// Seven minute counts, Sunday first, when the week is not one number; nil when
+    /// `dailyBudgetMinutes` is the whole answer. Read it through `budget(on:)` rather than
+    /// directly: everything that limits a person reads today's, and only that accessor knows
+    /// which day is today. Anything but seven entries decodes as nil, so a hand-edited or
+    /// truncated file falls back to the one budget rather than to a day with no limit at all.
+    var budgetByWeekday: [Int]?
 
     /// Midnight to midnight: what a rule without windows allows on every day.
     static let allDay = TimeWindow(startMinute: 0, endMinute: Furlough.minutesPerDay)
@@ -248,32 +254,96 @@ struct Rule: Codable, Hashable {
     /// No windows of its own, so open all day up to the budget.
     var isAllDay: Bool { windows.isEmpty }
     /// Allowed at some minute of some day.
-    var isEverAllowed: Bool { dailyBudgetMinutes > 0 && (isAllDay || windows.contains { !$0.days.isEmpty }) }
-    var effectiveBudgetMinutes: Int { isEverAllowed ? dailyBudgetMinutes : 0 }
+    var isEverAllowed: Bool { (1...7).contains { isEverAllowed(on: $0) } }
     /// The daily limit, or nil when there is not really one. A whole day of budget is no
     /// budget at all — `Rule.unrestricted` has always carried one — and on iOS a typed host
     /// always does, because DeviceActivity counts only tokens and so nothing counts it. Read
     /// this rather than `dailyBudgetMinutes` wherever a limit is being shown to a person.
-    var limitMinutes: Int? { dailyBudgetMinutes < Furlough.minutesPerDay ? dailyBudgetMinutes : nil }
+    func limit(on weekday: Int) -> Int? {
+        let minutes = budget(on: weekday)
+        return minutes < Furlough.minutesPerDay ? minutes : nil
+    }
     var sortedWindows: [TimeWindow] { windows.sorted() }
     /// Every window applies every day, so one list describes the whole week.
     var isSameEveryDay: Bool { windows.allSatisfy { $0.days == .all } }
 
-    /// The same rule whatever order the windows are listed in.
+    // MARK: The budget, day by day
+
+    /// The minutes allowed on `weekday` (Calendar's 1…7). Every reading of the budget goes
+    /// through here: a rule with one number answers it seven times over, so a caller never has
+    /// to know which kind it is holding.
+    func budget(on weekday: Int) -> Int {
+        guard let byWeekday = budgetByWeekday, byWeekday.count == 7, (1...7).contains(weekday) else {
+            return dailyBudgetMinutes
+        }
+        return byWeekday[weekday - 1]
+    }
+
+    /// One number describes the week. True for a rule that never grew a per-day budget, and for
+    /// one whose seven entries happen to agree.
+    var isSameBudgetEveryDay: Bool {
+        guard let byWeekday = budgetByWeekday, byWeekday.count == 7 else { return true }
+        return byWeekday.allSatisfy { $0 == byWeekday[0] }
+    }
+
+    /// The same rule with the per-day budget dropped when it says nothing the one number does
+    /// not. Editors save through this, so seven equal days and no array at all are one rule
+    /// rather than two that only `isEquivalent` can tell apart.
+    var normalized: Rule {
+        guard !isSameBudgetEveryDay else {
+            var copy = self
+            copy.dailyBudgetMinutes = budget(on: 1)
+            copy.budgetByWeekday = nil
+            return copy
+        }
+        return self
+    }
+
+    /// The one figure that stands for the week, for an editor collapsing seven sliders back
+    /// into one: the budget most days already carry, and the smaller of two that tie. Read
+    /// instead of `dailyBudgetMinutes`, which is only a shadow once a per-day budget is set —
+    /// in an imported or hand-written rule it can be any figure at all, and a person turning
+    /// "Same budget every day" back on should be shown their ordinary day, not that shadow.
+    var representativeBudget: Int {
+        guard budgetByWeekday != nil else { return dailyBudgetMinutes }
+        var counts: [Int: Int] = [:]
+        for weekday in 1...7 { counts[budget(on: weekday), default: 0] += 1 }
+        return counts.max { ($0.value, -$0.key) < ($1.value, -$1.key) }?.key ?? dailyBudgetMinutes
+    }
+
+    /// The budget that will really be spent on `weekday`: zero on a day nothing is allowed,
+    /// so a day with hours but no budget and a day with budget but no hours read alike.
+    func effectiveBudget(on weekday: Int) -> Int {
+        isEverAllowed(on: weekday) ? budget(on: weekday) : 0
+    }
+
+    /// Allowed at some minute of `weekday`: budget to spend, and hours to spend it in.
+    func isEverAllowed(on weekday: Int) -> Bool {
+        guard budget(on: weekday) > 0 else { return false }
+        return isAllDay || windows.contains { $0.applies(on: weekday) }
+    }
+
+    /// The same rule whatever order the windows are listed in, and whichever way its budget is
+    /// written down: seven equal days are the one number they add up to.
     func isEquivalent(to other: Rule) -> Bool {
-        dailyBudgetMinutes == other.dailyBudgetMinutes && sortedWindows == other.sortedWindows
+        (1...7).allSatisfy { budget(on: $0) == other.budget(on: $0) } && sortedWindows == other.sortedWindows
     }
 
     /// The windows that apply on `weekday` (Calendar's 1…7), in order: the whole day when
-    /// the rule has none of its own.
+    /// the rule has none of its own, and none at all on a day with no budget. A day worth no
+    /// minutes has no open hours to speak of, so the status, the next-open search and the row
+    /// copy all say "closed today" from the hours alone. `allowedMask` and `window(containing:)`
+    /// still guard on `isEverAllowed(on:)` as well: both are read by the shield's own decision,
+    /// and the one place worth saying a thing twice is the one that decides what is locked.
     func windows(on weekday: Int) -> [TimeWindow] {
-        isAllDay ? [Self.allDay] : sortedWindows.filter { $0.applies(on: weekday) }
+        guard budget(on: weekday) > 0 else { return [] }
+        return isAllDay ? [Self.allDay] : sortedWindows.filter { $0.applies(on: weekday) }
     }
 
     /// One flag per minute of `weekday`; true where use is permitted.
     func allowedMask(on weekday: Int) -> [Bool] {
         var mask = [Bool](repeating: false, count: Furlough.minutesPerDay)
-        guard isEverAllowed else { return mask }
+        guard isEverAllowed(on: weekday) else { return mask }
         for window in windows(on: weekday) {
             let lower = max(0, window.startMinute)
             let upper = min(Furlough.minutesPerDay, window.endMinute)
@@ -302,11 +372,14 @@ struct Rule: Codable, Hashable {
     }
 
     func window(containing minute: Int, on weekday: Int) -> TimeWindow? {
-        guard isEverAllowed else { return nil }
+        guard isEverAllowed(on: weekday) else { return nil }
         return windows(on: weekday).first { $0.contains(minuteOfDay: minute) }
     }
 
-    /// True when this rule allows no minute of any day that `other` forbids and has no larger budget.
+    /// True when this rule allows no minute of any day that `other` forbids and, on every day
+    /// of the week, no more minutes than `other` does. Budgets are compared day by day rather
+    /// than in total: two hours moved off Saturday onto Monday leaves the week the same size
+    /// and Monday looser, and a looser Monday is a loosening.
     func isTighterOrEqual(to other: Rule) -> Bool {
         for weekday in 1...7 {
             let mine = allowedMask(on: weekday)
@@ -314,8 +387,9 @@ struct Rule: Codable, Hashable {
             for minute in 0..<Furlough.minutesPerDay where mine[minute] && !theirs[minute] {
                 return false
             }
+            if effectiveBudget(on: weekday) > other.effectiveBudget(on: weekday) { return false }
         }
-        return effectiveBudgetMinutes <= other.effectiveBudgetMinutes
+        return true
     }
 
     /// Problems that make the rule unusable, or nil.
@@ -333,6 +407,20 @@ struct Rule: Codable, Hashable {
             }
         }
         return nil
+    }
+}
+
+extension Rule {
+    /// `budgetByWeekday` arrived after the first stored rules, so its absence means the one
+    /// daily figure covers the week. A list that is not seven long is read as absent too: the
+    /// safe reading of a damaged field is the budget the rule already had, never a day left
+    /// without one.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        windows = try container.decodeIfPresent([TimeWindow].self, forKey: .windows) ?? []
+        dailyBudgetMinutes = try container.decode(Int.self, forKey: .dailyBudgetMinutes)
+        let byWeekday = try? container.decodeIfPresent([Int].self, forKey: .budgetByWeekday)
+        budgetByWeekday = (byWeekday?.count == 7) ? byWeekday : nil
     }
 }
 

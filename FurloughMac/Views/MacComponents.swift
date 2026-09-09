@@ -211,13 +211,17 @@ enum RowCopy {
     static func detail(target: Target, status: TargetStatus, now: Date = .now) -> String {
         guard let rule = target.rule else { return "Not enforced yet" }
         guard rule.isEverAllowed else { return "Blocked all day" }
-        let budget = TimeFormat.budget(rule.dailyBudgetMinutes)
+        // Today's budget beside today's hours: the row is a statement about right now.
+        let budget = TimeFormat.budget(rule.budget(on: Policy.weekday(now)))
         if case .exhausted = status { return "Used up today · \(budget)" }
-        if rule.isSameEveryDay {
+        if rule.isSameEveryDay, rule.isSameBudgetEveryDay {
             return "\(TimeFormat.schedule(rule)) · \(budget)"
         }
         let today = rule.windows(on: Policy.weekday(now)).map { TimeFormat.window($0) }
-        return today.isEmpty ? "Not today · \(budget)" : "Today \(today.joined(separator: ", ")) · \(budget)"
+        // A day worth nothing has no hours and no figure worth printing: "Not today · 0 min"
+        // offers a budget that is not on offer.
+        guard !today.isEmpty else { return "Not today" }
+        return "Today \(today.joined(separator: ", ")) · \(budget)"
     }
 
     static func pendingLine(_ change: PendingChange) -> String {

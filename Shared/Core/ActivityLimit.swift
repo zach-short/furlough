@@ -21,6 +21,12 @@ import Foundation
 /// edit that overflows through.
 enum ActivityLimit {
     /// One of the 20 is always the daily budget tracker.
+    ///
+    /// Per-weekday budgets do not press on this ceiling. A budget is a `DeviceActivityEvent`
+    /// carried *by* the day activity, not an activity of its own, so a rule that asks for seven
+    /// different budgets still costs the one activity every rule costs — only the event count
+    /// inside it grows. The 20 is spent on the day tracker plus one per distinct window span,
+    /// and that is why this counts spans and nothing else.
     static var maxSpans: Int { Furlough.maxActivities - 1 }
 
     /// Every distinct span the state would ask iOS to monitor. Mirrors what

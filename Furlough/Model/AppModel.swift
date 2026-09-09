@@ -617,8 +617,12 @@ final class AppModel {
     /// pinned at its maximum. The default takes its place, which is what any new rule gets, and it
     /// is a tightening, so it lands with the rest of the merge.
     private static func budgeted(_ rule: Rule?, counted: Bool) -> Rule? {
-        guard counted, var rule, rule.limitMinutes == nil, rule.isEverAllowed else { return rule }
+        // No real limit on any day of the week, however the week is written: seven days of the
+        // sentinel is the same sentinel, and the default replaces the lot of them.
+        guard counted, var rule, (1...7).allSatisfy({ rule.limit(on: $0) == nil }), rule.isEverAllowed
+        else { return rule }
         rule.dailyBudgetMinutes = Furlough.defaultBudgetMinutes
+        rule.budgetByWeekday = nil
         return rule
     }
 

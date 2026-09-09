@@ -146,7 +146,7 @@ final class Enforcer {
             let seconds = (ledger.seconds[used.id] ?? 0) + elapsed
             ledger.seconds[used.id] = seconds
             ledger.save()
-            let budget = rule.dailyBudgetMinutes
+            let budget = rule.budget(on: Policy.weekday(now))
             if seconds >= Double(budget * 60), !state.runtime.isExhausted(used.id, dayKey: dayKey) {
                 state.runtime.exhausted[used.id.uuidString] = dayKey
                 SharedStore.log("budget spent: \(used.displayName)")

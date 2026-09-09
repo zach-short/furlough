@@ -137,7 +137,11 @@ enum ConfigImport {
             return "It has \(rule.windows.count) windows. Furlough writes at most \(maxWindowsPerRule)."
         }
         if let error = rule.validationError { return error }
-        guard (0...Furlough.minutesPerDay).contains(rule.dailyBudgetMinutes) else {
+        // Every day of the week, so a per-day budget is checked figure by figure. A file that
+        // is seven entries long has already been read as seven by the decoder; one that is not
+        // decoded as no per-day budget at all, and `budget(on:)` answers the daily figure for
+        // all seven, which is exactly the range this checked before per-day budgets existed.
+        guard (1...7).allSatisfy({ (0...Furlough.minutesPerDay).contains(rule.budget(on: $0)) }) else {
             return "A daily budget has to be between 0 and \(Furlough.minutesPerDay) minutes."
         }
         return nil

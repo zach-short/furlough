@@ -10,6 +10,12 @@ struct MacRuleEditor: View {
     @State private var nickname = ""
     @State private var drafts: [DraftWindow] = []
     @State private var budget = Furlough.defaultBudgetMinutes
+    /// On when the week is seven figures rather than one, mirroring `byDay` for the windows.
+    @State private var budgetByDay = false
+    /// Seven budgets, Sunday first so the index is Calendar's weekday minus one. Only read
+    /// while `budgetByDay` is on; `budget` keeps the single figure so turning the toggle back
+    /// on restores what the rule said before it was split.
+    @State private var dayBudgets = [Int](repeating: Furlough.defaultBudgetMinutes, count: 7)
     @State private var byDay = false
     @State private var loaded = false
     @State private var showApply = false
@@ -63,7 +69,9 @@ struct MacRuleEditor: View {
     private var target: Target? { model.state.config.target(id: targetID) }
     /// The rows as Furlough stores them: a night becomes its evening and the morning after.
     private var windows: [TimeWindow] { drafts.flatMap { $0.window.split } }
-    private var draft: Rule { Rule(windows: windows, dailyBudgetMinutes: budget) }
+    private var draft: Rule {
+        Rule(windows: windows, dailyBudgetMinutes: budget, budgetByWeekday: budgetByDay ? dayBudgets : nil).normalized
+    }
     private var trimmedNickname: String { nickname.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var hasChanges: Bool {
         guard let target else { return false }
@@ -113,6 +121,37 @@ struct MacRuleEditor: View {
                 byDay = !merged.allSatisfy { $0.days == .all }
             }
         )
+    }
+
+    /// Turning it on returns to the single figure the editor still holds, discarding the seven;
+    /// turning it off seeds all seven from that figure, so the first thing a person sees is the
+    /// week they already had, not seven defaults.
+    private var sameBudgetEveryDay: Binding<Bool> {
+        Binding(
+            get: { !budgetByDay },
+            set: { on in
+                withAnimation(.snappy) {
+                    budgetByDay = !on
+                    if !on { dayBudgets = [Int](repeating: budget, count: 7) }
+                }
+            }
+        )
+    }
+
+    /// One day's slider, bound into `dayBudgets` by Calendar's weekday number.
+    private func dayBudget(_ weekday: Int) -> Binding<Int> {
+        Binding(
+            get: { dayBudgets.indices.contains(weekday - 1) ? dayBudgets[weekday - 1] : budget },
+            set: { if dayBudgets.indices.contains(weekday - 1) { dayBudgets[weekday - 1] = $0 } }
+        )
+    }
+
+    /// The week's figures into the seven sliders, and the toggle to match. Seeded even when the
+    /// rule has one budget, so switching the toggle off shows that budget on all seven days
+    /// rather than the default.
+    private func seedBudgets(_ rule: Rule) {
+        budgetByDay = !rule.isSameBudgetEveryDay
+        dayBudgets = (1...7).map { rule.budget(on: $0) }
     }
 
     private var sameEveryDay: Binding<Bool> {
@@ -326,36 +365,56 @@ struct MacRuleEditor: View {
 
     private func budgetCard(_ target: Target) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline) {
-                HStack(alignment: .firstTextBaseline, spacing: 5) {
-                    Text("\(budget)")
-                        .emberNumerals(30)
-                        .contentTransition(.numericText())
-                    Text("MIN")
-                        .font(EmberFont.label(10.5))
-                        .tracking(1.4)
-                        .foregroundStyle(Ember.faint)
+            if budgetByDay {
+                ForEach(Weekdays.ordered(), id: \.self) { weekday in
+                    DayBudgetRow(weekday: weekday, minutes: dayBudget(weekday))
+                    CardDivider()
                 }
-                Spacer()
-                Text(drafts.isEmpty ? "for the whole day" : "across all windows")
-                    .emberBody(11.5)
-                    .foregroundStyle(Ember.muted)
-            }
-            .padding(.horizontal, 12)
-            .padding(.top, 12)
-            BudgetSlider(value: $budget)
+            } else {
+                HStack(alignment: .firstTextBaseline) {
+                    HStack(alignment: .firstTextBaseline, spacing: 5) {
+                        Text("\(budget)")
+                            .emberNumerals(30)
+                            .contentTransition(.numericText())
+                        Text("MIN")
+                            .font(EmberFont.label(10.5))
+                            .tracking(1.4)
+                            .foregroundStyle(Ember.faint)
+                    }
+                    Spacer()
+                    Text(drafts.isEmpty ? "for the whole day" : "across all windows")
+                        .emberBody(11.5)
+                        .foregroundStyle(Ember.muted)
+                }
                 .padding(.horizontal, 12)
-                .padding(.top, 10)
-                .padding(.bottom, 12)
-            CardDivider()
-            HStack(spacing: 6) {
-                ForEach([15, 30, 60, 120], id: \.self) { preset in
-                    Button("\(preset)") { withAnimation(.snappy) { budget = preset } }
-                        .buttonStyle(.glass)
-                        .controlSize(.small)
-                        .tint(budget == preset ? Ember.amber : Ember.cream)
+                .padding(.top, 12)
+                BudgetSlider(value: $budget)
+                    .padding(.horizontal, 12)
+                    .padding(.top, 10)
+                    .padding(.bottom, 12)
+                CardDivider()
+                HStack(spacing: 6) {
+                    ForEach([15, 30, 60, 120], id: \.self) { preset in
+                        Button("\(preset)") { withAnimation(.snappy) { budget = preset } }
+                            .buttonStyle(.glass)
+                            .controlSize(.small)
+                            .tint(budget == preset ? Ember.amber : Ember.cream)
+                    }
+                    Spacer()
                 }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                CardDivider()
+            }
+            HStack(spacing: 12) {
+                Text("Same budget every day")
+                    .emberBody(12.5)
+                    .foregroundStyle(Ember.cream)
                 Spacer()
+                Toggle("Same budget every day", isOn: sameBudgetEveryDay)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .tint(Ember.ember)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
@@ -415,7 +474,8 @@ struct MacRuleEditor: View {
         }.first
         let rule = pendingRule ?? target.rule ?? Rule()
         tier = pendingTier ?? target.utility
-        budget = rule.dailyBudgetMinutes > 0 ? rule.dailyBudgetMinutes : Furlough.defaultBudgetMinutes
+        budget = rule.representativeBudget > 0 ? rule.representativeBudget : Furlough.defaultBudgetMinutes
+        seedBudgets(rule)
         drafts = TimeWindow.grouped(TimeWindow.folded(rule.windows)).map { DraftWindow(window: $0) }
         byDay = !rule.isSameEveryDay
     }
@@ -424,7 +484,8 @@ struct MacRuleEditor: View {
     private func adopt(_ rule: Rule) {
         withAnimation(.snappy) {
             drafts = TimeWindow.grouped(TimeWindow.folded(rule.windows)).map { DraftWindow(window: $0) }
-            budget = rule.dailyBudgetMinutes > 0 ? rule.dailyBudgetMinutes : Furlough.defaultBudgetMinutes
+            budget = rule.representativeBudget > 0 ? rule.representativeBudget : Furlough.defaultBudgetMinutes
+            seedBudgets(rule)
             byDay = !rule.isSameEveryDay
         }
     }
@@ -667,5 +728,39 @@ struct BudgetSlider: View {
         let upper = Double(anchors[index + 1])
         let raw = lower + (scaled - Double(index)) * (upper - lower)
         return Int((raw / Double(step)).rounded()) * step
+    }
+}
+
+/// One weekday's budget: its name, its figure, and a slider. The Mac's copy of the phone's row,
+/// the way `BudgetSlider` above is its copy of the phone's slider.
+struct DayBudgetRow: View {
+    let weekday: Int
+    @Binding var minutes: Int
+
+    private var name: String {
+        let symbols = Calendar.current.standaloneWeekdaySymbols
+        return symbols.indices.contains(weekday - 1) ? symbols[weekday - 1] : ""
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(name)
+                .emberBody(12.5)
+                .foregroundStyle(Ember.cream)
+                .frame(width: 82, alignment: .leading)
+            BudgetSlider(value: $minutes)
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text("\(minutes)")
+                    .emberNumerals(14)
+                    .contentTransition(.numericText())
+                Text("MIN")
+                    .font(EmberFont.label(9))
+                    .tracking(1.2)
+                    .foregroundStyle(Ember.faint)
+            }
+            .frame(width: 62, alignment: .trailing)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
     }
 }

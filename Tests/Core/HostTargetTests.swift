@@ -25,10 +25,10 @@ struct HostTargetTests {
 
     @Test("a whole day of budget is not a limit")
     func fullDayIsNoLimit() {
-        #expect(Rule(windows: [], dailyBudgetMinutes: noLimit).limitMinutes == nil)
-        #expect(Rule.unrestricted.limitMinutes == nil)
-        #expect(Rule(windows: [], dailyBudgetMinutes: 30).limitMinutes == 30)
-        #expect(Rule.alwaysBlocked.limitMinutes == 0)
+        #expect(Rule(windows: [], dailyBudgetMinutes: noLimit).limit(on: 1) == nil)
+        #expect(Rule.unrestricted.limit(on: 1) == nil)
+        #expect(Rule(windows: [], dailyBudgetMinutes: 30).limit(on: 1) == 30)
+        #expect(Rule.alwaysBlocked.limit(on: 1) == 0)
     }
 
     @Test("a rule with hours and no limit still opens and closes on its windows")
@@ -48,7 +48,7 @@ struct HostTargetTests {
     func neverExhausted() {
         let rule = Rule(windows: [window(1200, 1320)], dailyBudgetMinutes: noLimit)
         #expect(rule.isEverAllowed)
-        #expect(rule.effectiveBudgetMinutes == noLimit)
+        #expect(rule.effectiveBudget(on: 1) == noLimit)
     }
 
     @Test("a rule saying nothing but hours reads back without a budget clause")

@@ -314,11 +314,16 @@ table. Not yet seen on the phone: install, then check the test steps in the last
 ## How enforcement works (do not break these invariants)
 
 - One repeating DeviceActivity "day" (00:00 to 23:59:59, warningTime 5 min) carries one
-  threshold event per target with a rule, named `budget:<uuid>:<minutes>`, with
-  `includesPastActivity: true` so re-registering mid-day does not reset the day's usage.
-  Pending (not yet effective) rules are registered too, so a loosening that lands while the
-  app is closed is still enforced. The monitor ignores a threshold smaller than the currently
-  effective budget.
+  threshold event per **distinct budget** a target's week asks for, named
+  `budget:<uuid>:<minutes>`, with `includesPastActivity: true` so re-registering mid-day does
+  not reset the day's usage. Since per-weekday budgets (2026-09-09) that is up to seven events
+  for one target rather than one, all of them live every day, and the monitor is what decides
+  which is today's: it ignores a threshold **smaller than today's effective budget**
+  (`Rule.effectiveBudget(on:)`), and warns only on one exactly equal to it. A budget is an event
+  carried by the day activity, not an activity of its own, so none of this presses on the
+  20-activity ceiling — `ActivityLimit` counts window spans and nothing else. Pending (not yet
+  effective) rules are registered too, so a loosening that lands while the app is closed is
+  still enforced.
 - One repeating activity per distinct span, named `window:<start>-<end>` in minutes of day,
   whatever days the span applies on (`TimeWindow.span` drops the days before deduping). A
   callback on a day the window is off just reconciles to the same shields. iOS allows 20
@@ -741,9 +746,50 @@ The plan for this stretch. Tick each phase off here as it lands.
 10. **Live Activity at window start**, if the iOS 26 ActivityKit swiftinterface has a
     scheduled-start `Activity.request`. If not, document the widget and the notification as
     the coverage and move on.
-11. **Per-weekday budgets**: `budgetByWeekday: [Int]?`, `Rule.budget(on:)`, a "Same budget every
-    day" toggle, one `budget:` event per distinct value, the monitor filtering by today's.
-12. **Rules for categories** instead of always-blocked. Ask Zach first.
+11. **Per-weekday budgets.** Done 2026-09-09. `Rule.budgetByWeekday: [Int]?`, seven figures
+    Sunday first (index = Calendar weekday − 1), nil meaning "same every day", and
+    `Rule.budget(on:)` as the one accessor everything reads. `dailyBudgetMinutes` stays as the
+    fallback and becomes a *shadow* once the array is set: read `budget(on:)` for enforcement,
+    `representativeBudget` when an editor collapses seven sliders back to one, and never the
+    raw field, because in an imported rule the shadow can be any figure at all.
+    - `windows(on:)` returns none on a day worth 0 minutes, so a zero day is closed without
+      anything checking the budget twice; `isEverAllowed` stayed "on some day" (a category is
+      still `.blockedAllDay`) and gained `isEverAllowed(on:)` for one day.
+    - `isTighterOrEqual` compares budgets **day by day**, so moving Saturday's hour onto Monday
+      is a loosening even though the week is the same size. `isEquivalent` likewise, which is
+      what makes seven equal days and one figure the same rule; `normalized` drops the array in
+      that case so the editors cannot save a rule that differs only on paper.
+    - Old stored rules read as "same every day"; a `budgetByWeekday` that is not seven long
+      decodes as nil rather than as a day with no budget. `ConfigExport`/`ConfigImport` carry it
+      for free (the field is on `Rule`), and `ConfigImport.problem` range-checks all seven.
+    - `TimeFormat.budgets` is the compact grammar: "30 min/day", "2 hours weekends, 30 min
+      weekdays", then "varies by day" at three groups. Clause order is `Weekdays.groupOrder`,
+      the same order `schedule` uses for the hours in that very sentence, so on a Sunday-first
+      calendar the weekend leads. That is deliberate — do not reorder one half of the line.
+    - Tests: `Tests/Core/WeekdayBudgetTests.swift`, 25 of them, including a night that runs into
+      a Sunday worth nothing (it stops at midnight, because `continuation` reads Sunday's empty
+      list). Reviewed by Fable before install; what it flagged is under step 12's note below.
+12. **Rules for categories.** Settled 2026-09-09: **no.** Zach's call, asked before any code was
+    written. A category stays an always-blocked container (`Rule.alwaysBlocked`, zero budget),
+    and hours for something inside one come from picking the app itself, which
+    `includeEntireCategory: true` already expands into per-app targets. Do not re-ask. The
+    proposal was that a category carry windows and a budget like an app — ManagedSettings
+    supports it (`applicationCategories = .specific(_, except:)`) and DeviceActivity takes a
+    category in a threshold event — so it is buildable if it ever comes back; it was declined,
+    not blocked.
+
+    **Left over from step 11, for the device pass.** Fable's review could not construct a
+    loosening that lands early or a real change that reads as none, but named three
+    DeviceActivity-side unknowns that only the phone can settle:
+    - Does a budget event whose name already fired today fire *again* after a mid-day
+      re-registration? Tightening Saturday from 120 to 30 after 40 minutes of use depends on it.
+      The activity log answers it: after an exhaustion, does re-opening the app log another
+      `eventDidReachThreshold` for the same name?
+    - A week now has up to seven live event names per target, so the iOS 26.2 zero-usage firing
+      has more ways to exhaust a day early. The `>=` guard is still the right one.
+    - Nothing documents a per-activity event cap. Seven values (fourteen with a loosening
+      queued) is more than we have ever registered; the "registered day + N window(s), M budget
+      event(s)" log line and a run without a thrown registration would settle it.
 13. **Anchor the whole phone**: a scope on `AnchorProfile`, `.all(except:)` with an allowlist.
 14. **More than one tag.** Done 2026-09-08. Zach lives in two places and wanted a key at each,
     which is the case the anchor is for rather than a hole in it: a key three hours away is not

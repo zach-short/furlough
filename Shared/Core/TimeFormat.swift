@@ -87,6 +87,43 @@ enum TimeFormat {
         return "\(minutes) min"
     }
 
+    /// The days as they read inside a sentence. "Weekdays", "weekends" and "every day" are
+    /// ordinary words and lose their capital there; "Mon–Thu" is a list of names and keeps its.
+    static func daysInline(_ days: Weekdays, calendar: Calendar = .current) -> String {
+        let named = self.days(days, calendar: calendar)
+        switch days {
+        case .all, .weekdays, .weekend: return named.lowercased()
+        default: return named
+        }
+    }
+
+    /// The week's budgets in one phrase: "30 min/day" while one figure covers it,
+    /// "30 min weekdays, 2 h weekends" when two do, and "varies by day" once it would take
+    /// three clauses to say — a row has room for a phrase, not for a table, and the editor is
+    /// where the seven figures belong. Nil when no day has a real limit, so a caller can leave
+    /// the budget out of the line entirely.
+    static func budgets(_ rule: Rule, calendar: Calendar = .current) -> String? {
+        var groups: [(days: Weekdays, minutes: Int)] = []
+        for weekday in 1...7 {
+            let minutes = rule.budget(on: weekday)
+            if let index = groups.firstIndex(where: { $0.minutes == minutes }) {
+                groups[index].days.insert(Weekdays(weekday: weekday))
+            } else {
+                groups.append((Weekdays(weekday: weekday), minutes))
+            }
+        }
+        guard groups.contains(where: { $0.minutes < Furlough.minutesPerDay }) else { return nil }
+        if groups.count == 1 { return "\(budget(groups[0].minutes))/day" }
+        guard groups.count == 2 else { return "varies by day" }
+        groups.sort { $0.days.groupOrder(calendar: calendar) < $1.days.groupOrder(calendar: calendar) }
+        return groups
+            .map { group in
+                let amount = group.minutes < Furlough.minutesPerDay ? budget(group.minutes) : "no limit"
+                return "\(amount) \(daysInline(group.days, calendar: calendar))"
+            }
+            .joined(separator: ", ")
+    }
+
     /// "Every day", "Weekdays", "Weekends", or the days compressed into runs: "Mon–Thu, Sat".
     static func days(_ days: Weekdays, calendar: Calendar = .current) -> String {
         if days == .all { return "Every day" }
@@ -144,8 +181,8 @@ enum TimeFormat {
         guard let rule else { return "Not configured yet" }
         guard rule.isEverAllowed else { return "Blocked all day" }
         let hours = schedule(rule, calendar: calendar)
-        guard let limit = rule.limitMinutes else { return hours }
-        return "\(hours) · \(budget(limit))/day"
+        guard let limit = budgets(rule, calendar: calendar) else { return hours }
+        return "\(hours) · \(limit)"
     }
 
     /// The name of the day `daysAhead` days from now.
@@ -220,12 +257,15 @@ enum ShieldText {
         name: String,
         status: TargetStatus?,
         rule: Rule?,
+        now: Date = .now,
         calendar: Calendar = .current
     ) -> (title: String, subtitle: String) {
         guard let status else {
             return ("Blocked by Furlough", "This is part of a blocked category.")
         }
-        let budget = rule.map { TimeFormat.budget($0.dailyBudgetMinutes) } ?? ""
+        // Today's, because the shield is read today. "You used your 30 min" over an app that
+        // gets two hours tomorrow would be true of the wrong day.
+        let budget = rule.map { TimeFormat.budget($0.budget(on: Policy.weekday(now, calendar: calendar))) } ?? ""
         switch status {
         case .anchored:
             return ("\(name) is anchored", "Unanchor with your tag in Furlough.")
@@ -239,7 +279,13 @@ enum ShieldText {
             let when = next.map { "Opens \(TimeFormat.nextOpen($0, calendar: calendar))." } ?? ""
             return ("Time's up for today", "You used your \(budget) for \(name). \(when)")
         case .closed(let next):
-            return ("\(name) opens \(TimeFormat.nextOpen(next, calendar: calendar))", "You get \(budget) per day.")
+            // The budget of the day it opens on, which is the one being promised. Today's would
+            // be a stranger figure still on a day the rule shuts out entirely, where today's is
+            // zero and the door is opening on two hours.
+            let opens = rule.map {
+                TimeFormat.budget($0.budget(on: Policy.weekday(Policy.date(at: next, from: now, calendar: calendar), calendar: calendar)))
+            } ?? ""
+            return ("\(name) opens \(TimeFormat.nextOpen(next, calendar: calendar))", "You get \(opens) per day.")
         }
     }
 }
