@@ -60,6 +60,7 @@ const topics = [
 <Base title="Help" description="How windows and budgets work, what Furlough can hold, using the Anchor and sourcing a tag, and what Furlough keeps.">
   <section class="wrap page">
     <header class="head" data-reveal>
+      <canvas class="mark" width="60" height="80" data-hourglass="open:0.85" data-still aria-hidden="true"></canvas>
       <div class="eyebrow amber">Help</div>
       <h1 class="display">The short answers.</h1>
       <p class="sub">Furlough for iPhone and Mac</p>
@@ -86,6 +87,7 @@ const topics = [
 
 <style>
   .page { padding: clamp(24px, 6vh, 64px) 0 0; max-width: 760px; }
+  .mark { width: 60px; height: 80px; margin-bottom: 20px; }
   .head h1 { margin-top: 12px; font-size: clamp(34px, 5vw, 56px); }
   .sub { color: var(--faint); font-size: 14px; margin-top: 14px; }
   .topics { display: grid; gap: 12px; margin-top: 32px; }
