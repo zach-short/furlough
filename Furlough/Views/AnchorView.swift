@@ -11,6 +11,9 @@ struct AnchorView: View {
     @Environment(AppModel.self) private var model
     @State private var showPicker = false
     @State private var selection = FamilyActivitySelection(includeEntireCategory: true)
+    @State private var showFromRules = false
+    /// The rules sheet was left for Apple's picker, which opens once the sheet is gone.
+    @State private var pickerAfterSheet = false
     @State private var message: String?
     @State private var forgetting: PairedTag?
     @State private var renaming: PairedTag?
@@ -61,6 +64,17 @@ struct AnchorView: View {
         .onChange(of: showPicker) { _, presented in
             guard !presented else { return }
             model.setAnchorSelection(selection)
+        }
+        .sheet(isPresented: $showFromRules, onDismiss: {
+            guard pickerAfterSheet else { return }
+            pickerAfterSheet = false
+            openPicker()
+        }) {
+            AnchorFromRulesSheet(candidates: model.state.config.anchorCandidates) { ids in
+                model.addToAnchor(targetIDs: ids)
+            } onPickOthers: {
+                pickerAfterSheet = true
+            }
         }
         .alert("Anchor", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
             Button("OK") { message = nil }
@@ -163,8 +177,15 @@ struct AnchorView: View {
             if !anchor.isAnchored {
                 CardDivider()
                 Button {
-                    selection = model.anchorSelection
-                    showPicker = true
+                    // An empty list starts from the rules: what Furlough already blocks is
+                    // offered first, and Apple's picker, which lists every app on the phone,
+                    // is one tap further on. Once the anchor holds anything, straight to the
+                    // picker, filled in with the list.
+                    if anchor.kinds.isEmpty, !model.state.config.anchorCandidates.isEmpty {
+                        showFromRules = true
+                    } else {
+                        openPicker()
+                    }
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "plus")
@@ -283,6 +304,11 @@ struct AnchorView: View {
 
     private var tagCount: String { "\(anchor.tags.count) of \(Furlough.maxAnchorTags)" }
 
+    private func openPicker() {
+        selection = model.anchorSelection
+        showPicker = true
+    }
+
     private func pair() async {
         switch await model.pairTag() {
         // Straight into the name: an identifier's last four digits are not a place, and the
@@ -302,6 +328,161 @@ struct AnchorView: View {
 
     private func count(_ n: Int) -> String {
         "\(n) \(n == 1 ? "item" : "items")"
+    }
+}
+
+/// The Anchor's first offer, before Apple's picker: the apps and sites Furlough already blocks,
+/// every one checked to start, with All / None and a row each to change that. Adding takes in
+/// what is checked; "Choose from all apps instead" goes on to the picker. Shown while the
+/// anchor holds nothing and something has a rule, so a list that starts empty starts with what
+/// matters rather than with the whole phone.
+struct AnchorFromRulesSheet: View {
+    let candidates: [Target]
+    let onAdd: ([UUID]) -> Void
+    let onPickOthers: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var selected: Set<UUID>
+
+    init(candidates: [Target], onAdd: @escaping ([UUID]) -> Void, onPickOthers: @escaping () -> Void) {
+        self.candidates = candidates
+        self.onAdd = onAdd
+        self.onPickOthers = onPickOthers
+        _selected = State(initialValue: Set(candidates.map(\.id)))
+    }
+
+    private var chosen: [Target] { candidates.filter { selected.contains($0.id) } }
+    private var allChosen: Bool { selected.count == candidates.count }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Everything you already block. Anchored, each one is shut at any hour; free, it keeps its windows.")
+                        .emberBody(13)
+                        .foregroundStyle(Ember.muted)
+                        .padding(.horizontal, 8)
+                        .padding(.bottom, 12)
+                    VStack(spacing: 0) {
+                        ForEach(Array(candidates.enumerated()), id: \.element.id) { index, target in
+                            if index > 0 { CardDivider() }
+                            row(target)
+                        }
+                    }
+                    .emberCard()
+                    .sensoryFeedback(.selection, trigger: selected)
+                    Footnote(text: summary, alignment: .center)
+                        .padding(.top, 10)
+                    ProminentButton(title: buttonTitle) {
+                        onAdd(chosen.map(\.id))
+                        dismiss()
+                    }
+                    .disabled(selected.isEmpty)
+                    .padding(.top, 14)
+                    GhostButton(title: "Choose from all apps instead", color: Ember.muted) {
+                        onPickOthers()
+                        dismiss()
+                    }
+                    .padding(.top, 4)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 32)
+            }
+            .background(EmberWall())
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("Already blocked")
+                        .emberBody(15, .semibold)
+                        .foregroundStyle(Ember.cream)
+                }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                        .tint(Ember.cream)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(allChosen ? "None" : "All") {
+                        withAnimation(.snappy(duration: 0.2)) {
+                            selected = allChosen ? [] : Set(candidates.map(\.id))
+                        }
+                    }
+                    .tint(Ember.cream)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Ember.ground)
+    }
+
+    private func row(_ target: Target) -> some View {
+        let on = selected.contains(target.id)
+        return Button {
+            withAnimation(.snappy(duration: 0.2)) {
+                if on { selected.remove(target.id) } else { selected.insert(target.id) }
+            }
+        } label: {
+            HStack(spacing: 10) {
+                TokenTile(kind: target.kind, size: 34)
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        TokenName(kind: target.kind)
+                        if !target.nickname.isEmpty {
+                            Text(target.nickname)
+                                .emberBody(11.5)
+                                .foregroundStyle(Ember.muted)
+                                .lineLimit(1)
+                        }
+                    }
+                    Text(TimeFormat.rule(target.rule))
+                        .emberBody(11.5)
+                        .foregroundStyle(Ember.muted)
+                        .lineLimit(2)
+                }
+                Spacer(minLength: 8)
+                Image(systemName: on ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(on ? Ember.amber : Ember.faint)
+                    .contentTransition(.symbolEffect(.replace))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+
+    private var summary: String {
+        let count = chosen.count
+        guard count > 0 else { return "Nothing chosen." }
+        return "\(count) of \(candidates.count) will be held while anchored."
+    }
+
+    private var buttonTitle: String {
+        let count = chosen.count
+        guard count > 0 else { return "Add" }
+        return "Add \(count) \(noun)"
+    }
+
+    /// What the chosen rows are, the way "Apply to 3 apps" says it: the app and site kinds
+    /// have a word each, and a category in the mix makes the lot "items".
+    private var noun: String {
+        var apps = 0, sites = 0, other = 0
+        for target in chosen {
+            switch target.kind {
+            case .application: apps += 1
+            case .webDomain, .host: sites += 1
+            case .category: other += 1
+            }
+        }
+        let count = chosen.count
+        return switch (apps, sites, other) {
+        case (count, _, _): count == 1 ? "app" : "apps"
+        case (_, count, _): count == 1 ? "site" : "sites"
+        case (_, _, 0): "apps and sites"
+        default: count == 1 ? "item" : "items"
+        }
     }
 }
 

@@ -90,6 +90,15 @@ small codebase he fully understands over a fork. He is interactive: ask when a d
   set of kinds that "Anchor" shields instantly without a tag, and that only scanning the paired
   NFC tag in the app can weigh anchor. While anchored, the list and the tag are locked. Anchoring is
   refused until a tag is paired. When the anchor is off, apps fall back to their rules.
+  Since 2026-09-08 the list starts from the rules (Zach's ask): while the anchor holds nothing
+  and something has a rule, **Choose apps** opens `AnchorFromRulesSheet` — every target with a
+  rule, all checked, All / None, a row each — before Apple's picker, which is one tap further
+  on ("Choose from all apps instead", opened from the sheet's `onDismiss` so the two never
+  overlap). Once the anchor holds anything the button reads **Change apps** and goes straight
+  to the picker, filled in. `Config.anchorCandidates` (a rule, and a door the anchor does not
+  hold — a linked target held by half is still offered) and `AnchorProfile.add` (every door,
+  after what is held, never twice) are in `Shared/Core/AnchorCandidates.swift`, so the phone
+  only shows the offer; `AppModel.addToAnchor(targetIDs:)` lands it, refused while anchored.
   It was called the Brick until 2026-09-08 and was renamed because that is another product's
   name. Stored state keeps working: `Config.init(from:)` reads `anchor` and falls back to the
   old `brick` key, and `AnchorProfile.init(from:)` reads `isAnchored`/`anchoredAt` and falls
@@ -199,13 +208,15 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   `apply` performs, `matches(for:config:)` is the Mac's own resolver and `preresolved` is the
   phone's, which answers only the website rows a host can be read from; see the section below),
   `PendingText.swift` (`Delta`, the old → new pair a pending card shows; pure, so the phone
-  and the Mac cannot word it differently).
+  and the Mac cannot word it differently),
+  `AnchorCandidates.swift` (`Config.anchorCandidates`, what the Anchor offers before Apple's
+  picker, and `AnchorProfile.add`, what taking a target in adds).
 - `Tests/Core` (target `FurloughCoreTests`, macOS, Swift Testing, no host app): `Support.swift`
   (the pinned calendar and the fixtures), `ModelsTests`, `PolicyStatusTests`,
   `PolicyPendingTests`, `PolicySummaryTests`, `NamingTests`, `DecodingTests`, `ClockTests`,
   `QuitGraceTests`, `PendingNotificationTests`, `UtilityTests`, `UtilityPlanTests`,
   `ActivityLimitTests`, `PendingTextTests`, `CompanionsTests`, `ConfigImportTests`,
-  `HostTargetTests`, `HostImportTests`. 305 tests in 40 suites. It builds for **macOS**, so it
+  `HostTargetTests`, `HostImportTests`, `AnchorCandidatesTests`. 368 tests in 54 suites. It builds for **macOS**, so it
   reads the Mac's `TargetKind` and the Mac's `Decision`: the iOS `Decision.filteredHosts` and
   `ShieldReconciler.apply` cannot be reached from any test, which is why the nil-when-empty
   filter policy is a property of `Decision` rather than a line inside the reconciler.
@@ -228,7 +239,7 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   ember tint, holds the launch screen for a returning user and dissolves between launch,
   onboarding and home), `Launch` (`LaunchView`, the `Launch` timings,
   `HourglassState.launching`), `Onboarding`, `Anchor` (`AnchorView`, `AnchorCard` on Home, `AnchorToggleButton`,
-  `AnchorGlyph`),
+  `AnchorGlyph`, `AnchorFromRulesSheet`),
   `Home` (`HomeContent` holds the featured page id, `HomeGroups` for the sections including
   "Later this week" and `ordered` for the page order, `HeroPager`, `HeroPage` ticking once a
   second, `HeroIndicator`, `EmptyHero`, `TargetRow`; the + button shows `AddChoicePopover`
@@ -301,8 +312,9 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   blocked still has no name; set a nickname to name it sooner.
 - `Policy.decide` is the union of rule shields and, while anchored, every kind in the anchor.
   `allowedApps` never contains an anchored app, so category exceptions cannot leak one through.
-  `AppModel.anchor()`, `unanchorWithTag()`, `pairTag()`, `setAnchorSelection()`, `unpairTag()`
-  are the only writers of `Config.anchor`; the last three refuse while anchored.
+  `AppModel.anchor()`, `unanchorWithTag()`, `pairTag()`, `setAnchorSelection()`,
+  `addToAnchor(targetIDs:)`, `unpairTag()` are the only writers of `Config.anchor`; the last
+  four refuse while anchored.
 
 ## Known API facts and quirks
 

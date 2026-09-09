@@ -131,6 +131,7 @@ struct AnchorHelp: View {
         ) {
             SectionLabel(text: "Using it")
             HelpPoints([
+                .init("Choose apps", "The first time, the anchor offers what you already block, every one checked. Keep what it should hold, or go on to the picker for anything else. After that, Change apps opens the picker with the list filled in."),
                 .init("Pair a tag", "Hold the phone to any NTAG sticker, or the tag from a Brick if you already own one. Furlough reads its hardware identifier and writes nothing to it. Up to three can be paired, so a key can live at each place you do — name each one for its place."),
                 .init("Anchor", "Everything on the list is shielded immediately. No tag is needed to lock and no delay applies, because anchoring only ever takes things away."),
                 .init("Unanchor", "Opens the reader. Only a tag you paired lifts the anchor, and any of them does, at once. This is the one unblock in Furlough, and it exists only here."),

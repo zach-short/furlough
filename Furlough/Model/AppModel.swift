@@ -899,6 +899,20 @@ final class AppModel {
         enforce(reason: "anchor edit")
     }
 
+    /// Takes what `targetIDs` cover into the anchor, on top of what it holds. This is the
+    /// Anchor screen's first offer — the targets Furlough already blocks, chosen from
+    /// `Config.anchorCandidates` — landing; Apple's picker is the other way in, through
+    /// `setAnchorSelection`. Refused while anchored, like every other change to the list.
+    func addToAnchor(targetIDs: [UUID]) {
+        var current = SharedStore.load()
+        guard !current.config.anchor.isAnchored else { return }
+        let chosen = current.config.targets.filter { targetIDs.contains($0.id) }
+        guard current.config.anchor.add(chosen) else { return }
+        SharedStore.save(current)
+        SharedStore.log("anchor: took in \(chosen.count) of the rules; now holds \(current.config.anchor.count) item(s)")
+        enforce(reason: "anchor edit")
+    }
+
     /// Anchoring is tightening, so it needs no tag. It does need a paired tag to exist, or there
     /// would be no way back.
     func anchor() -> AnchorOutcome {

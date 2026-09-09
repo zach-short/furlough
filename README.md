@@ -47,6 +47,7 @@ lands, while there is still time to cancel it, and one when it lands.
 ### The Anchor
 
 - The Anchor holds its own list of apps, sites, and categories, chosen with the same picker. An app can be in the Anchor and have windows too.
+- Setting it up starts with what you already block. The first time you choose apps, the Anchor offers every app and site that has a rule, all checked, with **All** / **None** and a row each. Add them in one tap, or go on to Apple's picker for anything else; after that, **Change apps** opens the picker with the list filled in.
 - Tap **Anchor** in the app and everything in the list is shielded immediately, no tag needed. Anchoring is tightening.
 - **Unanchor** opens the NFC reader; only the tag you paired releases the anchor, instantly. This is the one unblock in Furlough, and it exists only for the Anchor. Rule-based targets never get one.
 - While anchored, the list and the paired tag cannot be changed, so nothing can loosen under the lock. Anchoring is refused until a tag is paired, so there is always a way back.
