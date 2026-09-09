@@ -2002,6 +2002,18 @@ The plan for this stretch. Tick each phase off here as it lands.
     Spotify had been left in its old group *and* added to the new music one. `namesAreRealAndPairsAreDistinct`
     covers the rest. 571 Core tests pass.
 
+31. **The Mac's reset goes all the way back.** Done 2026-09-09, because Zach asked: Settings >
+    Testing > Reset everything used to stop at the setup, leaving a Mac that was still
+    onboarded, still a login item and still watched, which is a state no fresh install has. It
+    now returns to the first run. The full note — every key it clears, the two permissions it
+    deliberately keeps and why, and what it does *not* do — is the Reset everything bullet under
+    "The Mac" below, where the rest of the Mac's behaviour lives; it is not repeated here.
+    Touched `MacModel.resetEverything`, `Watchdog.forget`, `AnchorSync.forgetPhone` and the
+    Settings sheet's copy. No `Shared/Core` behaviour changed, so no new tests; 571 still pass,
+    and iOS, Mac Debug, Mac Release and Mac Release + `TESTING_TOOLS` all build warning-free.
+    **Nobody has run it on the Mac yet** — doing so wipes the real App Group state, so it is
+    Zach's to trigger, and the `/Applications` copy predates it.
+
 ## Style rules
 
 Swift 6 language mode with approachable concurrency, SwiftUI, `@Observable`, async/await, no

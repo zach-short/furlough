@@ -1,27 +1,41 @@
-# Pass-off prompts: the ten items after the Foqos comparison
+# Pass-off prompts: the items after the Foqos comparison
 
-Written 2026-09-09. Each numbered section below is a complete prompt for a fresh Claude
-session: paste one section, nothing else. The board says which model to run it on, which
-lane it belongs to, and what it waits on. Submission to the App Store (HANDOFF step 19) is
-already in progress, so item 1 is the tail of that, not the start.
+Written 2026-09-09, ten items, and grown to twelve the same day. Each numbered section below
+is a complete prompt for a fresh Claude session: paste one section, nothing else. The board
+says which model to run it on, which lane it belongs to, what it waits on, and — since the
+afternoon of 2026-09-09 — **whether it has already been done**, which is the first thing to
+check, because most of them have. Submission to the App Store (HANDOFF step 19) is already in
+progress, so item 1 is the tail of that, not the start.
 
 ## The board
 
-| # | Task | Model | Lane | Waits on | Files it owns |
-|---|------|-------|------|----------|---------------|
-| 1 | Land the submission, then put the Mac back on Release | Opus | Gated | Zach's ASC access | `DEPLOYMENT.md` (archive), `README.md`, `HANDOFF.md` |
-| 2 | Scheduled and timed Anchor, plus Control Center and the widget button | **Fable** | A (2nd) | 3 | `AnchorProfile`, `Policy`, `Monitoring`, `MonitorExtension`, `AnchorView`, `PhoneIntents`, `FurloughWidgets` |
-| 3 | Anchor everything except an allowlist | **Fable** | A (1st) | nothing | `AnchorProfile`, `Policy.decide`, `Decision`, `ShieldReconciler`, `AnchorView` |
-| 4 | Sync the Anchor across devices | **Fable** | A (3rd) | 2 and 3 | new `Shared/Core/AnchorSync.swift`, `AppModel`, `MacModel`, entitlements, privacy page |
-| 5 | Per-weekday budgets, then rules for categories | Opus, Fable reviews | B | nothing | `Rule`, `Policy`, `Monitoring`, `ActivityLimit`, `RuleEditorView`, Mac editor, `ConfigExport` |
-| 6 | The record: streaks, minutes shielded, loosenings cancelled | Opus | C | nothing | new `Shared/Core/Record.swift`, `RuntimeState`, `SettingsView`, Mac sidebar |
-| 7 | Live Activity at window start | Opus | C | nothing | `LiveActivityManager`, `MonitorExtension` |
-| 8a | Help pages: blocking Safari, Settings and the App Store; what the Mac cannot reach | Opus | D | nothing | `site/src/pages/help/` |
-| 8b | Mac content filter (network extension) | **Fable** | E | Zach's go-ahead | new `FurloughMacFilter` target, `project.yml`, `MacModel` |
-| 9 | iPad | Opus | Gated | 1 approved; 4 or the no-NFC rule | `project.yml`, every iOS view that presents a sheet or popover |
-| 10 | Write down the no-QR, no-pause decisions | Opus | D | nothing | `HANDOFF.md`, `site/src/pages/help/nfc-tags.astro` |
-| 11 | More companion pairs, every one confirmed | **Sonnet** | F | nothing | `Companions.swift`, `CompanionsTests.swift`, new `design/companions-sources.md` |
-| 12 | Suggested rules by hazard tier, and an audit for quality-of-life defaults like it | Opus | G | nothing | new `Shared/Core/RuleSuggestion.swift`, `RuleEditorView`, `Tests/Core` |
+**Where it stands, 2026-09-09.** Ten of the twelve have landed; the record of each is the
+HANDOFF step named below, which is the truth about what was built and is fuller than the
+prompt that asked for it. **Do not paste a section marked Done** — its prompt describes work
+that already exists, and a fresh session following it would build it again. The two left are
+both gated on Apple, not on a session: 1 waits for the submission to be approved, and 9 waits
+on 1. Read the Done prompts only as history, or where one says a later item should revisit it.
+
+| # | Task | Status | Model | Lane | Waits on | Files it owns |
+|---|------|--------|-------|------|----------|---------------|
+| 1 | Land the submission, then put the Mac back on Release | **Open** — in progress, see HANDOFF 19 | Opus | Gated | Zach's ASC access | `DEPLOYMENT.md` (archive), `README.md`, `HANDOFF.md` |
+| 2 | Scheduled and timed Anchor, plus Control Center and the widget button | Done — HANDOFF 24 | **Fable** | A (2nd) | 3 | `AnchorProfile`, `Policy`, `Monitoring`, `MonitorExtension`, `AnchorView`, `PhoneIntents`, `FurloughWidgets` |
+| 3 | Anchor everything except an allowlist | Done — HANDOFF 13 | **Fable** | A (1st) | nothing | `AnchorProfile`, `Policy.decide`, `Decision`, `ShieldReconciler`, `AnchorView` |
+| 4 | Sync the Anchor across devices | Done — HANDOFF 18 | **Fable** | A (3rd) | 2 and 3 | new `Shared/Core/AnchorSync.swift`, `AppModel`, `MacModel`, entitlements, privacy page |
+| 5 | Per-weekday budgets, then rules for categories | Done — HANDOFF 11; categories **settled as no**, HANDOFF 12 | Opus, Fable reviews | B | nothing | `Rule`, `Policy`, `Monitoring`, `ActivityLimit`, `RuleEditorView`, Mac editor, `ConfigExport` |
+| 6 | The record: streaks, minutes shielded, loosenings cancelled | Done — HANDOFF 25, with the fix in 29 | Opus | C | nothing | new `Shared/Core/Record.swift`, `RuntimeState`, `SettingsView`, Mac sidebar |
+| 7 | Live Activity at window start | Done — HANDOFF 10 | Opus | C | nothing | `LiveActivityManager`, `MonitorExtension` |
+| 8a | Help pages: blocking Safari, Settings and the App Store; what the Mac cannot reach | Done — HANDOFF 23 | Opus | D | nothing | `site/src/pages/help/` |
+| 8b | Mac content filter (network extension) | Done — HANDOFF 26 | **Fable** | E | Zach's go-ahead | new `FurloughMacFilter` target, `project.yml`, `MacModel` |
+| 9 | iPad | **Open** — gated on 1 | Opus | Gated | 1 approved; 4 or the no-NFC rule | `project.yml`, every iOS view that presents a sheet or popover |
+| 10 | Write down the no-QR, no-pause decisions | Done — HANDOFF 23, in the 8a session | Opus | D | nothing | `HANDOFF.md`, `site/src/pages/help/nfc-tags.astro` |
+| 11 | More companion pairs, every one confirmed | Done — HANDOFF 30 | **Sonnet** | F | nothing | `Companions.swift`, `CompanionsTests.swift`, new `design/companions-sources.md` |
+| 12 | Suggested rules by hazard tier, and an audit for quality-of-life defaults like it | Done — HANDOFF 28 | Opus | G | nothing | new `Shared/Core/RuleSuggestion.swift`, `RuleEditorView`, `Tests/Core` |
+
+**Two things landed that this board never planned**, so look for them in HANDOFF rather than
+here: the first week with capped delays and the 15-minute undo (HANDOFF 27, the lane-f
+session — it is why item 10's prompt carries a correction), and the Mac's Reset everything
+going all the way back to a first run (HANDOFF 31, with the detail in its "The Mac" section).
 
 **Lanes run in parallel with each other; tasks inside a lane run one after another.**
 A, B, C, D and E can all be open at once, each in its own worktree. Inside A the order is
@@ -89,7 +103,13 @@ Do these, in order, skipping any DEPLOYMENT.md already marks done:
    same day.
 4. When the build is approved: the Mac in `/Applications` is a Debug build (HANDOFF step 3
    explains why). Rebuild it with README's Release command and reinstall it. Update the
-   line in HANDOFF that says it is Debug.
+   line in HANDOFF that says it is Debug. **Ask Zach first whether he wants the testing
+   button to survive**: since 2026-09-09 a Release build carries it when built with
+   `SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) TESTING_TOOLS'`, hidden behind five
+   clicks on Version, so "back to Release" no longer has to mean giving up Reset everything
+   — and that reset now returns the Mac to its first run (HANDOFF 31), which is worth having
+   while the device pass is unfinished. A plain Release build is the right end state; which
+   one he wants *today* is his call.
 5. Item 9 (iPad) waits on this approval, because adding iPad to a submitted app changes
    the screenshot requirements. Leave a note in HANDOFF step 19 saying so.
 
@@ -99,6 +119,8 @@ paste, and the three replies.
 ---
 
 ## 2. Scheduled and timed Anchor, plus Control Center and the widget button
+
+**Done — HANDOFF step 24.** Kept as history; do not run this prompt again.
 
 **Model: Fable. Lane A, second. Waits on item 3 (the scope), because both edit
 `AnchorProfile` and the schedule should be able to drop an everything-except anchor.**
@@ -161,6 +183,8 @@ setting a drop two minutes out and watching the shield appear with the app close
 
 ## 3. Anchor everything except an allowlist
 
+**Done — HANDOFF step 13.** Kept as history; do not run this prompt again.
+
 **Model: Fable. Lane A, first. Waits on nothing.**
 
 You are picking up Furlough, Zach's iOS and Mac app blocker. Read `HANDOFF.md`, then
@@ -205,6 +229,8 @@ Hand back: the feature, the README limits paragraph, the HANDOFF step, and a tes
 ---
 
 ## 4. Sync the Anchor across devices
+
+**Done — HANDOFF step 18.** Kept as history; do not run this prompt again.
 
 **Model: Fable. Lane A, third. Waits on 2 and 3, so the synced shape is final.**
 
@@ -264,6 +290,8 @@ and a two-device test list for Zach.
 
 ## 5. Per-weekday budgets, then rules for categories
 
+**Done — HANDOFF step 11**, and the categories half was settled as no (step 12). Kept as history; do not run this prompt again.
+
 **Model: Opus to build, one Fable pass to review `Policy` and `Monitoring` before Zach
 installs it. Lane B. Waits on nothing. Budgets first, categories second.**
 
@@ -309,6 +337,8 @@ a five-minute budget on one weekday and a two-hour one on another.
 
 ## 6. The record: streaks, minutes shielded, loosenings cancelled
 
+**Done — HANDOFF step 25**, with the uncounted-queue fix in step 29. Kept as history; do not run this prompt again.
+
 **Model: Opus. Lane C. Waits on nothing. Parallel-safe with everything.**
 
 You are picking up Furlough, Zach's iOS and Mac app blocker. Read `HANDOFF.md`, then
@@ -351,6 +381,8 @@ Hand back: the model, the two screens, PNGs of the Mac one, and a phone test lis
 
 ## 7. Live Activity at window start
 
+**Done — HANDOFF step 10.** Kept as history; do not run this prompt again.
+
 **Model: Opus. Lane C. Waits on nothing.**
 
 You are picking up Furlough, Zach's iOS and Mac app blocker. Read `HANDOFF.md`, then
@@ -387,6 +419,8 @@ window starting with Furlough closed.
 
 ## 8a. Help pages: blocking Safari, Settings and the App Store; what the Mac cannot reach
 
+**Done — HANDOFF step 23**, in one session with item 10. Kept as history; do not run this prompt again.
+
 **Model: Opus (Sonnet is fine). Lane D. Waits on nothing. No Xcode build needed; site is
 `bun install`, `bun run build` in `site/`. Combine with item 10 in one session.**
 
@@ -420,6 +454,8 @@ Hand back: the pages, the build output, and the automation steps Zach confirmed.
 ---
 
 ## 8b. Mac content filter
+
+**Done — HANDOFF step 26.** Kept as history; do not run this prompt again.
 
 **Model: Fable. Lane E. Waits on Zach's go-ahead and a distribution decision. Big, and
 optional.**
@@ -498,6 +534,8 @@ list for the iPad.
 
 ## 10. Write down the no-QR, no-pause decisions
 
+**Done — HANDOFF step 23**, in the 8a session. Kept as history; do not run this prompt again.
+
 **Model: Opus (Sonnet is fine). Lane D; do it in the item 8a session. Waits on nothing.**
 
 You are picking up Furlough, Zach's iOS and Mac app blocker. Read `HANDOFF.md`, then
@@ -532,6 +570,10 @@ Hand back: the two edits and the site build output.
 ---
 
 ## 11. More companion pairs, every one confirmed
+
+**Done — HANDOFF step 30**, 33 pairs grown to 83. Do not run the prompt again, but **"How to
+confirm a pair" below is still the method**: any future pass uses it, and
+`design/companions-sources.md` records which lookups have already been spent.
 
 **Model: Sonnet. Lane: its own; parallel-safe with everything. Waits on nothing.**
 
@@ -638,6 +680,8 @@ that went in with no bundle identifier, and the test run's output.
 ---
 
 ## 12. Suggested rules by hazard tier, and an audit for quality-of-life defaults like it
+
+**Done — HANDOFF step 28.** Kept as history; do not run this prompt again.
 
 **Model: Opus. Lane: its own; parallel-safe with everything. Waits on nothing.**
 
