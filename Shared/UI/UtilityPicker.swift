@@ -50,18 +50,9 @@ struct UtilityPicker: View {
                 .padding(.top, 4)
 
             if let suggestion, suggestion != selection {
-                Button {
+                SuggestionOffer(text: "Furlough would call this \(suggestion.label.lowercased())") {
                     withAnimation(.snappy) { selection = suggestion }
-                } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 10, weight: .semibold))
-                        Text("Furlough would call this \(suggestion.label.lowercased())")
-                            .emberBody(11, .semibold)
-                    }
-                    .foregroundStyle(Ember.faint)
                 }
-                .buttonStyle(.plain)
                 .padding(.horizontal, 12)
                 .padding(.top, 8)
             }

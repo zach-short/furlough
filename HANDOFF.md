@@ -259,7 +259,10 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   `Record.swift` (the record of the contract: `accumulate` counts minutes into
   `RuntimeState.days`, `markSpent`/`markWarned`/`queue`/`noteCancelled`/`noteLanded`/
   `noteAnchorReleased` write the events, `card` and the copy functions are what the two screens
-  read. Pure, capped at 60 days, and never read by `Policy.decide` — see step 25).
+  read. Pure, capped at 60 days, and never read by `Policy.decide` — see step 25),
+  `RuleSuggestion.swift` (the rule a tier would start something on, and the two named exceptions
+  to it: `Draft`, `suggestion(for:chosen:)`, `offer`. Judgements rather than facts, which is why
+  they are not in `AppUtility`; offered by both editors and applied by neither — see step 28).
 - `Shared/Intents`: `FurloughIntents.swift` (What's Open, both platforms), `StatusSpeech.swift`
   (its sentence, tested), `DropAnchorIntent.swift` (iOS; compiled into the app and the widget
   extension, see step 8).
@@ -1836,6 +1839,54 @@ The plan for this stretch. Tick each phase off here as it lands.
 
     **Item 10 of `PASSOFF.md` changes.** Its no-pause paragraph now has to name these two and
     say why neither is an unblock, rather than claiming Furlough has nothing of the kind.
+
+28. **A starting rule, not just a tier (item 12, lane G).** Done 2026-09-09, in
+    `Shared/Core/RuleSuggestion.swift`. `AppUtility` already guessed what a target *is* and the
+    editor offered that tier while nobody had answered; nothing helped with the rule itself, and
+    "Use windows from another app" needs an app that is already set up — so the first hazard app
+    anyone adds had nothing to copy from. This is the same pattern one property over: a starting
+    budget, and a window where the tier calls for one.
+
+    **The numbers are Zach's, agreed 2026-09-09**, and that is why they live in their own file:
+    `AppUtility` is a table of checkable facts (this identifier is or is not Instagram's) and
+    this is a table of judgements, so one can be retuned without re-verifying the other.
+    Essential and useful suggest **nothing** — blocking an essential is the risk the caution
+    banner exists for, and the only figure generous enough for a work tool is looser than the 30
+    minutes the slider already sits at. Idle suggests **60 min, no windows**. Hazard suggests
+    **30 min plus 9:00 AM–10:00 PM every day**: the first and the last hours of the day are not
+    the feed, 10 PM is already what `UsageAnalysis.lateHours` calls late, and every hazard target
+    that takes it shares the one `window:540-1320` activity rather than spending one each.
+    Two named exceptions, each carrying the tier it was written against so retiering an app in
+    `AppUtility` fails a test here instead of silently switching the exception off:
+    **long-form video** (Netflix, Hulu, Disney+, Max, Prime Video, Peacock, Paramount+, Apple TV,
+    Crunchyroll) gets **120 min**, because an hour lands mid-film and Furlough's answer to
+    "I am halfway through" is to wait until tomorrow; **Snapchat** keeps the hazard budget and
+    **loses the window**, because closing it 10 PM–9 AM shuts a door people are knocked on.
+    Gambling and trading were considered and deliberately left on the generic hazard rule.
+
+    - `RuleSuggestion.suggestion(for:chosen:)` is nil whenever the target already has a rule, so
+      a suggestion can never be a second way to edit one somebody is living under, and nil for a
+      typed site whose suggestion is only a budget — nothing counts those minutes, so it offers
+      the hours or nothing. `chosen` is the tier showing in the editor and only once somebody
+      answered: an untouched picker reads `.useful` because that is what `Utility.unset` is, so
+      `tierTouched` in both editors is what tells an answer from a default.
+    - Both editors show it under the windows card as a `SuggestionOffer` — the one row every
+      guess now uses, `Shared/UI/SuggestionOffer.swift`, including the tier's own inside
+      `UtilityPicker`. Applying fills the fields and saves nothing; the window *joins* the rows
+      rather than replacing them, so a tap can never throw away hours somebody typed.
+      `Policy.decide` is untouched and nothing here reaches the shield.
+    - Three cold-start gaps closed with it, all offers and none of them applied:
+      `addWindow()`'s first row is the suggested window instead of a fixed 8–10 PM;
+      `AppUtility.offeredNickname(for:)` offers the name the tables know when a row is going by
+      an address or a bundle identifier (nil once a nickname exists, and nil when it would only
+      repeat the name already shown); and both copy pickers list Furlough's own starting rule as
+      their first row, which is what makes them worth opening on the *first* app rather than the
+      tenth.
+    - `AppUtility`'s three lookups are now generic matchers (`match(name:in:)`,
+      `match(bundleID:in:prefixes:)`, `match(host:in:)`) that `byName`/`byBundleID`/`byHost` and
+      `RuleSuggestion` both go through, so neither file has its own idea of what a match is.
+    - Tests: `Tests/Core/RuleSuggestionTests.swift`, 15 in 6 suites. 569 Core tests pass, iOS
+      and Mac both build warning-free. Not seen on the phone yet.
 
 ## Style rules
 

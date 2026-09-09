@@ -28,6 +28,10 @@ struct RuleEditorView: View {
     /// The tier in the draft. Saved through `AppModel.setUtility`, which decides on its own
     /// whether it lands now or queues.
     @State private var tier = Utility.unset
+    /// Whether anyone has actually touched the tier chips this visit. An untouched picker reads
+    /// `.useful` because that is what `Utility.unset` is, so a rule suggestion may not read it as
+    /// an answer — see `answeredTier`.
+    @State private var tierTouched = false
     @State private var confirmBlockEssential = false
     /// Set when the companion nudge is taken up: the flow below opens the guide or the picker.
     @State private var addRequest: AddRequest?
@@ -113,6 +117,30 @@ struct RuleEditorView: View {
         return AppUtility.suggestion(for: target)?.utility
     }
 
+    /// The rule Furlough would start this one on: the sibling of `suggestion` above, one
+    /// property over. That one answers what this thing is; this one answers what to do about it.
+    /// Offered only while the target has no rule of its own and none is queued — a suggestion is
+    /// for the cold start, never a second way to edit a rule someone is living under.
+    private var ruleSuggestion: RuleSuggestion.Draft? {
+        guard let target, pendingRule == nil else { return nil }
+        return RuleSuggestion.suggestion(for: target, chosen: answeredTier)
+    }
+
+    /// The tier the rule suggestion answers to, or nil while nobody has answered. "Useful" from
+    /// someone who has not touched the chips is the absence of an answer, not one, so the table's
+    /// own guess stands in until the picker is used or a tier is saved.
+    private var answeredTier: Utility? {
+        guard let target else { return nil }
+        return target.hasChosenUtility || tierTouched ? tier : nil
+    }
+
+    /// The name the tables already know for this row, while it is going by an address or a
+    /// stand-in and the field is still empty.
+    private var nicknameOffer: String? {
+        guard let target, trimmedNickname.isEmpty else { return nil }
+        return AppUtility.offeredNickname(for: target)
+    }
+
     /// What blocking this one costs, when it is worth saying. Nil for the tiers Furlough exists
     /// to block, and nil for a draft that restricts nothing.
     private var caution: String? {
@@ -130,6 +158,11 @@ struct RuleEditorView: View {
         A window that runs past midnight opens the early hours of the next day too, and the \
         budget resets at midnight, so those hours get a fresh one.
         """
+
+    /// Whether there is anything to copy a rule *from*: another configured target, or Furlough's
+    /// own starting rule for this one. The second is what makes the sheet worth opening on the
+    /// first app anyone adds, when there is nothing else in the list yet.
+    private var hasCopySources: Bool { !copyCandidates.isEmpty || ruleSuggestion != nil }
 
     /// Other apps and sites with windows worth copying.
     private var copyCandidates: [Target] {
@@ -194,6 +227,11 @@ struct RuleEditorView: View {
                     undoCard(target)
                     nudge(target)
                     nicknameCard
+                    if let name = nicknameOffer {
+                        SuggestionOffer(text: "Call it \(name)") { nickname = name }
+                            .padding(.top, 8)
+                            .padding(.horizontal, 8)
+                    }
                     if !target.kind.isCategory {
                         ruleSection(target)
                     } else {
@@ -265,8 +303,8 @@ struct RuleEditorView: View {
             }
         }
         .sheet(isPresented: $showCopy) {
-            CopyRuleSheet(candidates: copyCandidates) { source in
-                if let rule = source.rule { adopt(rule) }
+            CopyRuleSheet(candidates: copyCandidates, suggestion: ruleSuggestion?.rule) { rule in
+                adopt(rule)
             }
         }
         .sheet(isPresented: $showApply, onDismiss: {
@@ -312,6 +350,13 @@ struct RuleEditorView: View {
     private func ruleSection(_ target: Target) -> some View {
         SectionLabel(text: "Allowed windows")
         windowsCard
+        if let draft = ruleSuggestion {
+            SuggestionOffer(text: RuleSuggestion.offer(draft, counted: target.isCounted)) {
+                applySuggestion(draft)
+            }
+            .padding(.top, 8)
+            .padding(.horizontal, 8)
+        }
         if drafts.contains(where: { $0.window.isNight }) {
             Footnote(text: Self.nightNote)
                 .padding(.top, 8)
@@ -320,7 +365,7 @@ struct RuleEditorView: View {
         halves(target)
         SectionLabel(text: "How much it is worth")
         UtilityPicker(
-            selection: $tier,
+            selection: tierBinding,
             baseDelayHours: model.state.config.loosenDelayHours,
             suggestion: suggestion
         )
@@ -532,7 +577,7 @@ struct RuleEditorView: View {
             cardAction("Add window", symbol: "plus") { addWindow() }
             CardDivider()
             cardAction("Visualize windows", symbol: "calendar") { showWeek = true }
-            if !copyCandidates.isEmpty {
+            if hasCopySources {
                 CardDivider()
                 cardAction("Use windows from another app", symbol: "doc.on.doc") { showCopy = true }
             }
@@ -696,14 +741,33 @@ struct RuleEditorView: View {
 
     // MARK: Actions
 
+    /// The chips, with a note that they were touched. `UtilityPicker` writes the tier straight
+    /// through; what it cannot say is whether the value it wrote is an answer or the default the
+    /// picker opened on, and the rule suggestion needs to know which.
+    private var tierBinding: Binding<Utility> {
+        Binding(
+            get: { tier },
+            set: { chosen in
+                tier = chosen
+                tierTouched = true
+            }
+        )
+    }
+
+    /// The rule edit on this target that has not set yet, if there is one. Read by `load`, which
+    /// shows it rather than the rule it will replace, and by `ruleSuggestion`, which stays quiet
+    /// while one is waiting.
+    private var pendingRule: Rule? {
+        model.state.pending.compactMap { change -> Rule? in
+            if case .setRule(let id, let rule) = change.kind, id == targetID { return rule }
+            return nil
+        }.first
+    }
+
     private func load() {
         guard !loaded, let target else { return }
         loaded = true
         nickname = target.nickname
-        let pendingRule = model.state.pending.compactMap { change -> Rule? in
-            if case .setRule(let id, let rule) = change.kind, id == targetID { return rule }
-            return nil
-        }.first
         let rule = pendingRule ?? target.rule ?? Rule()
         tier = pendingTier ?? target.utility
         budget = rule.representativeBudget > 0 ? rule.representativeBudget : Furlough.defaultBudgetMinutes
@@ -720,6 +784,27 @@ struct RuleEditorView: View {
         dayBudgets = (1...7).map { rule.budget(on: $0) }
     }
 
+    /// Takes Furlough's own suggestion into the fields: the budget onto the slider, the window
+    /// into the list. A draft like any other — everything stays editable and nothing is written
+    /// until Save.
+    ///
+    /// The window is added to the rows rather than put in their place, so a tap can never throw
+    /// away hours somebody typed; `tidy` joins it into a row it overlaps, which on the usual
+    /// cold start is no row at all and lands as the one it suggests. The budget does replace
+    /// what the slider held, because a slider that has never been moved is holding a default
+    /// rather than an answer.
+    private func applySuggestion(_ draft: RuleSuggestion.Draft) {
+        withAnimation(.snappy) {
+            budget = draft.budgetMinutes
+            budgetByDay = false
+            dayBudgets = [Int](repeating: draft.budgetMinutes, count: 7)
+            if let window = draft.window {
+                drafts = DraftWindow.tidy(drafts + [DraftWindow(window: window)])
+                byDay = !drafts.allSatisfy { $0.window.days == .all }
+            }
+        }
+    }
+
     /// Replaces the draft with another target's rule. Nothing is saved until Save.
     private func adopt(_ rule: Rule) {
         withAnimation(.snappy) {
@@ -730,7 +815,8 @@ struct RuleEditorView: View {
         }
     }
 
-    /// The first window is an evening. Each one after that goes on the same days as the last
+    /// The first window is the one Furlough would have suggested for this target, or an evening
+    /// when it has nothing to say about it. Each one after that goes on the same days as the last
     /// row, where those days have room: after the latest window, or from the first free hour
     /// once the evening is taken, so "later on weekends" starts as the early-morning window
     /// it has to be. The list keeps its order; the new row is not joined until its times are
@@ -740,6 +826,10 @@ struct RuleEditorView: View {
         if let last = drafts.last {
             guard let free = TimeWindow.nextFree(after: windows, on: last.window.days) else { return }
             window = free
+        } else if let suggested = ruleSuggestion?.window {
+            // The first row on a target with no rule yet: the hours Furlough would have
+            // suggested are a better guess than a fixed evening, and it is the same one tap.
+            window = suggested
         }
         withAnimation(.snappy) { drafts = DraftWindow.sorted(drafts + [DraftWindow(window: window)]) }
     }
@@ -898,9 +988,15 @@ struct DayStrip: View {
 }
 
 /// Picks another app or site whose windows, days and budget replace the draft.
+///
+/// Since 2026-09-09 the first row can be Furlough's own starting rule for the target being
+/// edited, when it has one. That is the whole point of it: the second hazard app someone adds
+/// used to have exactly one thing to copy from, and the first had nothing at all.
 struct CopyRuleSheet: View {
     let candidates: [Target]
-    let onPick: (Target) -> Void
+    /// Furlough's suggestion for the target being edited, when there is one.
+    var suggestion: Rule?
+    let onPick: (Rule) -> Void
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -908,10 +1004,13 @@ struct CopyRuleSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     VStack(spacing: 0) {
+                        if let suggestion {
+                            suggestionRow(suggestion)
+                        }
                         ForEach(Array(candidates.enumerated()), id: \.element.id) { index, target in
-                            if index > 0 { CardDivider() }
+                            if index > 0 || suggestion != nil { CardDivider() }
                             Button {
-                                onPick(target)
+                                if let rule = target.rule { onPick(rule) }
                                 dismiss()
                             } label: {
                                 HStack(spacing: 10) {
@@ -968,6 +1067,41 @@ struct CopyRuleSheet: View {
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .presentationBackground(Ember.ground)
+    }
+
+    /// Furlough's own rule, wearing a sparkle where the other rows wear an app's icon. Same row,
+    /// same tap, and it says what it would set in the same words the list uses for a real rule.
+    private func suggestionRow(_ rule: Rule) -> some View {
+        Button {
+            onPick(rule)
+            dismiss()
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Ember.amber)
+                    .frame(width: 34, height: 34)
+                    .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: Ember.tileRadius, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: Ember.tileRadius, style: .continuous).strokeBorder(Ember.cardBorder, lineWidth: 1))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Furlough's starting rule")
+                        .emberBody(13, .semibold)
+                        .foregroundStyle(Ember.cream)
+                    Text(TimeFormat.rule(rule))
+                        .emberBody(11.5)
+                        .foregroundStyle(Ember.muted)
+                        .lineLimit(2)
+                }
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Ember.faint)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 

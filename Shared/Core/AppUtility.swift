@@ -49,22 +49,57 @@ enum AppUtility {
         }
     }
 
+    // MARK: Matching
+
+    /// The three ways a table here is keyed, written once and generic over what the table
+    /// answers. `RuleSuggestion` keys its own table of exceptions exactly the same way — a tier
+    /// and a starting rule are two answers to the one question, "which entry is this?" — so only
+    /// the answer differs, and neither file has its own idea of what counts as a match.
+
+    /// A name as a table key: trimmed and lowercased, nil when nothing is left of it.
+    static func key(forName name: String?) -> String? {
+        guard let key = name?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+              !key.isEmpty
+        else { return nil }
+        return key
+    }
+
+    static func match<Value>(name: String?, in table: [String: Value]) -> Value? {
+        key(forName: name).flatMap { table[$0] }
+    }
+
+    /// Exactly, then by prefix, so "com.apple.mobilesafari" and a vendor's whole suite land
+    /// together without listing each one. A prefix stops at a dot: "com.ubercabbage" is not Uber.
+    static func match<Value>(
+        bundleID raw: String,
+        in table: [String: Value],
+        prefixes: [(prefix: String, value: Value)] = []
+    ) -> Value? {
+        let key = raw.lowercased()
+        if let exact = table[key] { return exact }
+        return prefixes
+            .filter { key == $0.prefix || key.hasPrefix($0.prefix + ".") }
+            .max { $0.prefix.count < $1.prefix.count }?
+            .value
+    }
+
+    /// Subdomains count and the longest rule wins, so "shorts.youtube.com" beats "youtube.com".
+    static func match<Value>(host raw: String?, in table: [(host: String, value: Value)]) -> Value? {
+        guard let raw, let host = Hosts.normalize(raw) else { return nil }
+        return table
+            .filter { Hosts.matches(host, rule: $0.host) }
+            .max { $0.host.count < $1.host.count }?
+            .value
+    }
+
     // MARK: Lookups
 
-    static func byName(_ name: String?) -> Advice? {
-        guard let key = name?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !key.isEmpty else { return nil }
-        return names[key]
-    }
+    static func byName(_ name: String?) -> Advice? { match(name: name, in: names) }
 
     /// Bundle identifiers match exactly, then by prefix, so "com.apple.mobilesafari" and a
     /// vendor's whole suite land together without listing each one.
     static func byBundleID(_ raw: String) -> Advice? {
-        let key = raw.lowercased()
-        if let exact = bundleIDs[key] { return exact }
-        return bundleIDPrefixes
-            .filter { key == $0.prefix || key.hasPrefix($0.prefix + ".") }
-            .max { $0.prefix.count < $1.prefix.count }?
-            .advice
+        match(bundleID: raw, in: bundleIDs, prefixes: bundleIDPrefixes)
     }
 
     /// What to *call* the app with this bundle identifier, or nil when the table cannot tell.
@@ -93,6 +128,48 @@ enum AppUtility {
         let matches = names.filter { $0.value == advice }
         guard matches.count == 1, let matchKey = matches.keys.first else { return nil }
         return properName(matchKey)
+    }
+
+    /// The name to offer as a nickname for `target`, or nil when there is nothing better to call
+    /// it than what it is already called.
+    ///
+    /// The cold-start gap in naming. A typed site is its own address, so it reads
+    /// "m.youtube.com" on the shield, in the widget and in every notification until someone
+    /// types something better; a Mac app Furlough learned no name for reads as its bundle
+    /// identifier. Both are things these tables know the proper name of already.
+    ///
+    /// Offered, never applied, and offered as a *nickname* rather than written into
+    /// `systemName`: a nickname is config a person owns and an export carries, so filling it in
+    /// behind their back would put a name they never chose into their setup. `Companions` is
+    /// asked first because its names are the ones written to be shown — the same order
+    /// `AppModel.nameFromTables` asks in. Nil once a nickname exists, so it can never talk over
+    /// a name someone chose, and nil when the answer is what the target already shows.
+    static func offeredNickname(for target: Target) -> String? {
+        guard target.nickname.isEmpty, let known = knownName(of: target) else { return nil }
+        return known == target.defaultName ? nil : known
+    }
+
+    /// What the tables call the thing behind a target, whatever identity it has.
+    private static func knownName(of target: Target) -> String? {
+        switch target.kind {
+        #if os(iOS)
+        case .application, .category:
+            // A token carries no identity to look up. Either the shield has taught this one its
+            // real name already, in which case there is nothing here to add, or nothing has, in
+            // which case there is nothing here to ask with.
+            return nil
+        case .webDomain:
+            return Companions.pair(forHost: target.systemName ?? "")?.title
+        case .host(let host):
+            return Companions.pair(forHost: host)?.title
+        #else
+        case .macApp(let bundleID):
+            return Companions.pair(forBundleID: bundleID, name: target.systemName ?? "")?.title
+                ?? name(forBundleID: bundleID)
+        case .host(let host):
+            return Companions.pair(forHost: host)?.title
+        #endif
+        }
     }
 
     /// Bundle identifiers this table knows the exact name of, confirmed against the App Store
@@ -233,13 +310,7 @@ enum AppUtility {
     ]
 
     /// Subdomains count: "m.youtube.com" is YouTube.
-    static func byHost(_ raw: String?) -> Advice? {
-        guard let raw, let host = Hosts.normalize(raw) else { return nil }
-        return hosts
-            .filter { Hosts.matches(host, rule: $0.host) }
-            .max { $0.host.count < $1.host.count }?
-            .advice
-    }
+    static func byHost(_ raw: String?) -> Advice? { match(host: raw, in: hosts) }
 
     // MARK: The table
 
@@ -540,7 +611,7 @@ enum AppUtility {
     ]
 
     /// Whole vendor suites, matched on the longest prefix that fits.
-    static let bundleIDPrefixes: [(prefix: String, advice: Advice)] = [
+    static let bundleIDPrefixes: [(prefix: String, value: Advice)] = [
         ("com.agilebits", .init(.essential, "1Password holds the passwords you need to sign in anywhere.")),
         ("com.1password", .init(.essential, "1Password holds the passwords you need to sign in anywhere.")),
         ("com.bitwarden", .init(.essential, "Bitwarden holds the passwords you need to sign in anywhere.")),
@@ -557,7 +628,7 @@ enum AppUtility {
     ]
 
     /// Websites, matched on the longest host that fits so "shorts.youtube.com" beats "youtube.com".
-    static let hosts: [(host: String, advice: Advice)] = [
+    static let hosts: [(host: String, value: Advice)] = [
         ("web.whatsapp.com", .init(.essential, "WhatsApp Web is how some people reach you.")),
         ("messages.google.com", .init(.essential, "Messages is how people reach you, and how codes texted to you arrive.")),
         ("maps.google.com", .init(.essential, "Maps is how you find your way somewhere unfamiliar.")),

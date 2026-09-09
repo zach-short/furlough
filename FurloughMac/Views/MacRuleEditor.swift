@@ -27,6 +27,9 @@ struct MacRuleEditor: View {
     @State private var confirmRemove = false
     /// The tier in the draft, saved through `MacModel.setUtility`.
     @State private var tier = Utility.unset
+    /// Whether anyone has touched the tier chips this visit. An untouched picker reads `.useful`
+    /// because that is what `Utility.unset` is, so `answeredTier` may not take it for an answer.
+    @State private var tierTouched = false
     @State private var confirmBlockEssential = false
     /// The window's clock. It has to be the model's: the window rebuilds this editor on every
     /// tick of its own, which would restart a timer kept here before it could fire.
@@ -84,6 +87,46 @@ struct MacRuleEditor: View {
     private var suggestion: Utility? {
         guard let target, !target.hasChosenUtility else { return nil }
         return AppUtility.suggestion(for: target)?.utility
+    }
+
+    /// The rule Furlough would start this one on: the sibling of `suggestion` above, one
+    /// property over. Offered only while the target has no rule of its own and none is queued.
+    private var ruleSuggestion: RuleSuggestion.Draft? {
+        guard let target, pendingRule == nil else { return nil }
+        return RuleSuggestion.suggestion(for: target, chosen: answeredTier)
+    }
+
+    /// The tier the rule suggestion answers to, or nil while nobody has answered.
+    private var answeredTier: Utility? {
+        guard let target else { return nil }
+        return target.hasChosenUtility || tierTouched ? tier : nil
+    }
+
+    /// The name the tables already know for this row, while it is going by its bundle identifier
+    /// or its address and the field is still empty.
+    private var nicknameOffer: String? {
+        guard let target, trimmedNickname.isEmpty else { return nil }
+        return AppUtility.offeredNickname(for: target)
+    }
+
+    /// The chips, with a note that they were touched. `UtilityPicker` writes the tier straight
+    /// through; what it cannot say is whether the value is an answer or the default it opened on.
+    private var tierBinding: Binding<Utility> {
+        Binding(
+            get: { tier },
+            set: { chosen in
+                tier = chosen
+                tierTouched = true
+            }
+        )
+    }
+
+    /// The rule edit on this target that has not set yet, if there is one.
+    private var pendingRule: Rule? {
+        model.state.pending.compactMap { change -> Rule? in
+            if case .setRule(let id, let rule) = change.kind, id == targetID { return rule }
+            return nil
+        }.first
     }
 
     /// What blocking this one costs, when it is worth saying.
@@ -181,8 +224,20 @@ struct MacRuleEditor: View {
                             + (trimmedNickname.isEmpty ? "" : " Empty it to go back to \(target.defaultName).")
                     )
                     .padding(.top, 8)
+                    if let name = nicknameOffer {
+                        SuggestionOffer(text: "Call it \(name)") { nickname = name }
+                            .padding(.top, 6)
+                            .padding(.horizontal, 8)
+                    }
                     SectionLabel(text: "Allowed windows")
                     windowsCard
+                    if let draft = ruleSuggestion {
+                        SuggestionOffer(text: RuleSuggestion.offer(draft, counted: target.isCounted)) {
+                            applySuggestion(draft)
+                        }
+                        .padding(.top, 8)
+                        .padding(.horizontal, 8)
+                    }
                     if drafts.contains(where: { $0.window.isNight }) {
                         Footnote(text: Self.nightNote)
                             .padding(.top, 8)
@@ -191,7 +246,7 @@ struct MacRuleEditor: View {
                     budgetCard(target)
                     SectionLabel(text: "How much it is worth")
                     UtilityPicker(
-                        selection: $tier,
+                        selection: tierBinding,
                         baseDelayHours: model.state.config.loosenDelayHours,
                         suggestion: suggestion
                     )
@@ -321,9 +376,13 @@ struct MacRuleEditor: View {
             CardAction(title: "Add window", symbol: "plus") { addWindow() }
             CardDivider()
             CardAction(title: "Visualize windows", symbol: "calendar") { showWeek = true }
-            if !copyCandidates.isEmpty {
+            if hasCopySources {
                 CardDivider()
                 Menu {
+                    if let suggested = ruleSuggestion?.rule {
+                        Button("Furlough's starting rule · \(TimeFormat.rule(suggested))") { adopt(suggested) }
+                        Divider()
+                    }
                     ForEach(copyCandidates) { source in
                         Button("\(source.displayName) · \(TimeFormat.rule(source.rule))") {
                             if let rule = source.rule { adopt(rule) }
@@ -353,6 +412,11 @@ struct MacRuleEditor: View {
         }
         .emberCard()
     }
+
+    /// Whether there is anything to copy a rule *from*: another configured target, or Furlough's
+    /// own starting rule for this one, which is what makes the menu worth opening on the first
+    /// app anyone adds.
+    private var hasCopySources: Bool { !copyCandidates.isEmpty || ruleSuggestion != nil }
 
     private var copyCandidates: [Target] {
         model.state.config.targets.filter { $0.id != targetID && ($0.rule?.isEverAllowed ?? false) }
@@ -468,16 +532,31 @@ struct MacRuleEditor: View {
         guard !loaded, let target else { return }
         loaded = true
         nickname = target.nickname
-        let pendingRule = model.state.pending.compactMap { change -> Rule? in
-            if case .setRule(let id, let rule) = change.kind, id == targetID { return rule }
-            return nil
-        }.first
         let rule = pendingRule ?? target.rule ?? Rule()
         tier = pendingTier ?? target.utility
         budget = rule.representativeBudget > 0 ? rule.representativeBudget : Furlough.defaultBudgetMinutes
         seedBudgets(rule)
         drafts = TimeWindow.grouped(TimeWindow.folded(rule.windows)).map { DraftWindow(window: $0) }
         byDay = !rule.isSameEveryDay
+    }
+
+    /// Takes Furlough's own suggestion into the fields: the budget onto the slider, the window
+    /// into the list. A draft like any other, editable, and written by nothing until Save.
+    ///
+    /// The window joins the rows rather than replacing them, so a tap can never throw away hours
+    /// somebody typed; on the usual cold start there are none, and it lands as the one row it
+    /// suggests. The budget does replace what the slider held, because a slider nobody has moved
+    /// is holding a default rather than an answer.
+    private func applySuggestion(_ draft: RuleSuggestion.Draft) {
+        withAnimation(.snappy) {
+            budget = draft.budgetMinutes
+            budgetByDay = false
+            dayBudgets = [Int](repeating: draft.budgetMinutes, count: 7)
+            if let window = draft.window {
+                drafts = DraftWindow.tidy(drafts + [DraftWindow(window: window)])
+                byDay = !drafts.allSatisfy { $0.window.days == .all }
+            }
+        }
     }
 
     /// Replaces the draft with another target's rule. Nothing is saved until Save.
@@ -490,7 +569,8 @@ struct MacRuleEditor: View {
         }
     }
 
-    /// The first window is an evening. Each one after that goes on the same days as the last
+    /// The first window is the one Furlough would have suggested for this target, or an evening
+    /// when it has nothing to say about it. Each one after that goes on the same days as the last
     /// row, where those days have room: after the latest window, or from the first free hour
     /// once the evening is taken, so "later on weekends" starts as the early-morning window
     /// it has to be. Nothing is added when those days are full. Rows are only joined when
@@ -501,6 +581,8 @@ struct MacRuleEditor: View {
         if let last = drafts.last {
             guard let free = TimeWindow.nextFree(after: windows, on: last.window.days) else { return }
             window = free
+        } else if let suggested = ruleSuggestion?.window {
+            window = suggested
         }
         withAnimation(.snappy) { drafts = DraftWindow.sorted(drafts + [DraftWindow(window: window)]) }
     }
