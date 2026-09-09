@@ -28,7 +28,7 @@ It is served by Cloudflare Pages, project `furlough`, which owns `furloughapp.co
 `furlough-4e1.pages.dev`. Deploys are direct uploads with wrangler, not git-linked:
 
 ```bash
-bun run deploy   # astro build, then wrangler pages deploy dist --project-name furlough
+bun run deploy   # astro build, then wrangler pages deploy dist --project-name furlough --commit-dirty=true
 ```
 
 Pages serves `privacy/index.html` at `/privacy/` and redirects `/privacy` to it, which is why

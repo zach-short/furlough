@@ -7,7 +7,7 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "deploy": "astro build && wrangler pages deploy dist --project-name furlough"
+    "deploy": "astro build && wrangler pages deploy dist --project-name furlough --commit-dirty=true"
   },
   "dependencies": {
     "astro": "^7.3.2"
