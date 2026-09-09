@@ -404,7 +404,7 @@ Furlough sets application.denyAppRemoval while any shield is active, so the app 
 
 THE USAGE STEP AND THE REPORT EXTENSION
 
-The "Where your time went" step reviews the last fortnight of Screen Time history and suggests a rule per app. It has two paths, chosen at runtime. Where Apple grants the App & Website Usage data access capability, the app reads the fortnight itself. Everywhere else, only the DeviceActivityReport extension ever sees a number, so the cards are remote views stepped through one at a time, and "Apply" hands off to the picker rather than writing a rule, because nothing can be returned out of that sandbox.
+The "Where your time went" step reviews the last fortnight of Screen Time history and suggests a rule per app. Where Apple grants the App & Website Usage data access, the app reads the history itself. Everywhere else, only the DeviceActivityReport extension ever sees a number, so the cards are remote views shown one at a time, and "Apply" hands off to the picker, because nothing can come back out of that sandbox.
 
 On a review device outside the EU the second path is expected, and on a device with little Screen Time history the step may have nothing to show. Both are correct, not a failure. The step is skippable and nothing else depends on it.
 
@@ -412,7 +412,7 @@ Requesting that capability also makes the Screen Time authorization prompt all-o
 
 NFC IS OPTIONAL AND CANNOT BE TESTED WITHOUT HARDWARE
 
-One feature, the Anchor, blocks a chosen set of apps instantly and is released only by scanning a physical NFC tag the person paired beforehand. The person supplies the tag; any NTAG sticker works. Nothing else depends on it and it can be skipped entirely. Furlough reads only a tag's hardware identifier, in the foreground, on the person's own action. It never writes to a tag and never reads one in the background.
+The Anchor blocks a chosen set of apps instantly and is released only by scanning an NFC tag the person paired beforehand. The person supplies the tag; any NTAG sticker works. Nothing else depends on it and it can be skipped. Furlough reads only a tag's hardware identifier, in the foreground, on the person's own action. It never writes to a tag and never reads one in the background.
 
 WEBSITES
 
@@ -437,8 +437,11 @@ message often lands there.
 ### What Apple enforces here, confirmed against the API 2026-09-08
 
 - **Review Notes cannot exceed 4000 characters.** The draft above was 4290 and was rejected with
-  `ENTITY_ERROR.ATTRIBUTE.INVALID.TOO_LONG`. It is now **3986**, which is what the block above
-  holds. Fourteen characters of headroom, so anything added has to displace something.
+  `ENTITY_ERROR.ATTRIBUTE.INVALID.TOO_LONG`. It is now **3866**, which is what the block above
+  holds, after a second trim on 2026-09-09 for headroom. That day the web form refused a paste
+  at 4290: it was the old draft, pasted from a stale copy rather than from this file. Copy the
+  block from here (`build/review-notes.txt` is written from it, and `pbcopy < build/review-notes.txt`
+  puts it on the clipboard exactly), and clear the field before pasting.
 - **The block validates as a unit.** A write of `notes` alone is refused: `contactFirstName`,
   `contactLastName`, `contactEmail` and `contactPhone` are each required on every request to
   `appStoreReviewDetails`, whether or not you are changing them.
@@ -573,6 +576,23 @@ not match what the API returns now, so treat that as undone); and the marketing 
 is the App Privacy questionnaire; if it is unanswered the submission is refused with a message
 saying so, and it is one screen in the web form ("Data Not Collected", per the PRIVACY
 paragraph).
+
+**Read back again at 00:43 on 2026-09-09, after Zach set price, availability and the contact in
+the web form.** Price: free. Contact: Zachary Short, email and phone set. Both fine. Three things
+were not what they looked like from the form:
+
+- **Availability is 133 territories on, 42 off, and the 42 are Apple's "Europe" region, not the
+  EU.** That switches off the UK, Switzerland, Norway, Iceland, Turkey, Ukraine, Russia, Serbia
+  and the rest of the non-EU Balkans as well as the 27 members. The Territories section wants the
+  UK and everything else non-EU on; only the 27 (AUT BEL BGR HRV CYP CZE DNK EST FIN FRA DEU GRC
+  HUN IRL ITA LVA LTU LUX MLT NLD POL PRT ROU SVK SVN ESP SWE) trigger the trader declaration. So
+  turn these 15 back on: ALB BIH BLR CHE GBR ISL MDA MKD MNE NOR RUS SRB TUR UKR XKS.
+- **The review notes are a 112-character line about there being no sign-in.** The block above
+  is 3986 characters and is what Guideline 2.3.1 wants: how to see the shield work, that the
+  Simulator cannot run Family Controls, that a child account is refused, and that the missing
+  unblock button is the product. Paste the whole block over the line.
+- **The version has no build attached now** (it had `202609090224` at 00:23), and the marketing
+  URL is still the privacy page. Select `202609090423` and set `https://furloughapp.com`.
 
 The history of this section:
 
