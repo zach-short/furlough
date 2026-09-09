@@ -245,6 +245,55 @@ struct AppUtilityTests {
         app.nickname = "TikTok"
         #expect(AppUtility.suggestion(for: app)?.utility == .hazard)
     }
+
+    @Test("Every bundle identifier in the table is already lowercase")
+    func bundleIDsAreLowercase() {
+        // `byBundleID` lowercases what it is handed, then compares against the table as
+        // written — a capital letter in the table is an entry that can never match.
+        for key in AppUtility.bundleIDs.keys {
+            #expect(key == key.lowercased(), "\(key) is not lowercase")
+        }
+        for entry in AppUtility.bundleIDPrefixes {
+            #expect(entry.prefix == entry.prefix.lowercased(), "\(entry.prefix) is not lowercase")
+        }
+    }
+
+    @Test("No host string is claimed by two entries")
+    func noHostClaimedTwice() {
+        let allHosts = AppUtility.hosts.map(\.host)
+        #expect(allHosts.count == Set(allHosts).count, "a host appears more than once in AppUtility.hosts")
+    }
+
+    @Test("No name is empty after normalizing, and every key is already lowercase")
+    func namesAreWellFormed() {
+        for key in AppUtility.names.keys {
+            #expect(!key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            #expect(key == key.lowercased(), "\(key) is not lowercase")
+        }
+    }
+
+    @Test("Spot checks on the newly added tiers")
+    func newEntriesLandInTheRightTier() {
+        // Streaming video passes the time like Netflix already does; streaming music, like
+        // Spotify, is useful rather than idle.
+        #expect(AppUtility.byBundleID("com.hulu.plus")?.utility == .idle)
+        #expect(AppUtility.byBundleID("com.disney.disneyplus")?.utility == .idle)
+        #expect(AppUtility.byBundleID("com.google.ios.youtubemusic")?.utility == .useful)
+        // Swipe-based dating apps run on the same intermittent-reward loop as a social feed.
+        #expect(AppUtility.byBundleID("com.cardify.tinder")?.utility == .hazard)
+        // Sportsbooks and casinos are hazard regardless of brand.
+        #expect(AppUtility.byBundleID("com.draftkings.sportsbook")?.utility == .hazard)
+        #expect(AppUtility.byBundleID("com.playmgm.nj.sports2")?.utility == .hazard)
+        // A general-purpose AI assistant is a work tool; a companion chatbot is not.
+        #expect(AppUtility.byBundleID("com.openai.chat")?.utility == .useful)
+        #expect(AppUtility.byBundleID("ai.character.app")?.utility == .hazard)
+        // Temu and Shein are built around the same gamified, notification-driven loop as a
+        // feed; eBay and Etsy are ordinary marketplaces.
+        #expect(AppUtility.byHost("temu.com")?.utility == .hazard)
+        #expect(AppUtility.byHost("ebay.com")?.utility == .useful)
+        // Casual games pass the time without the feed's infinite scroll.
+        #expect(AppUtility.byBundleID("com.roblox.robloxmobile")?.utility == .idle)
+    }
 }
 
 @Suite("What Furlough says before blocking")
