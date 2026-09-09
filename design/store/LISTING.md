@@ -532,8 +532,18 @@ One thing, and it is not copy.
 
 ~~2. A deploy of `site/` to `furloughapp.com`.~~ **Done 2026-09-08**; see the URLs section.
 
-Worth doing once the listing is public, though it blocks nothing: `site/src/site.ts` still has
-`appStoreURL: null`, which is why both buttons on the site read "Coming soon to the App Store".
-Set it to `https://apps.apple.com/app/id6810006594` and redeploy.
+**Do not set `appStoreURL` until the app is actually released.** `site/src/site.ts` holds it at
+`null` deliberately, which is what makes both buttons render as a non-clickable "Coming soon to
+the App Store" rather than a live "Download on the App Store" link (`StoreButton.astro` switches
+on exactly this). Checked 2026-09-08: `https://apps.apple.com/app/id6810006594` returns **404**
+and Apple's own lookup returns `"resultCount": 0`, because the record is still
+PREPARE_FOR_SUBMISSION. Setting it now would publish two prominent download buttons pointing at a
+dead page. Zach's call, 2026-09-08: hold.
+
+Re-check with this, and set the URL and redeploy the moment it answers:
+
+```
+curl -s "https://itunes.apple.com/lookup?id=6810006594" | head -c 120
+```
 
 An App Preview video is optional and none is assumed.
