@@ -775,8 +775,8 @@ struct AnchorScheduleSheet: View {
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 11)
                         }
-                        ForEach($drafts) { $draft in
-                            ScheduleDraftRow(schedule: $draft) {
+                        ForEach(drafts) { draft in
+                            ScheduleDraftRow(schedule: binding(for: draft)) {
                                 withAnimation(.snappy) { drafts.removeAll { $0.id == draft.id } }
                             }
                             CardDivider()
@@ -835,6 +835,24 @@ struct AnchorScheduleSheet: View {
         } message: {
             Text(message ?? "")
         }
+    }
+
+    /// A row's binding, found by id rather than by position.
+    ///
+    /// `ForEach($drafts)` hands each row a binding that subscripts `drafts` at the index it had
+    /// when the row was made, and removing a row leaves the binding it handed that row pointing
+    /// past the end. The row is still in the tree while its own removal is dispatched, and its
+    /// `Toggle` reads `liftsBySelf` — and so `schedule` — on the way out, which trapped on the
+    /// out-of-range subscript: tapping the minus on the last drop time crashed the app. A lookup
+    /// by id cannot go out of range, and an edit arriving for a row that is gone is dropped.
+    private func binding(for draft: AnchorSchedule) -> Binding<AnchorSchedule> {
+        Binding(
+            get: { drafts.first { $0.id == draft.id } ?? draft },
+            set: { edited in
+                guard let index = drafts.firstIndex(where: { $0.id == draft.id }) else { return }
+                drafts[index] = edited
+            }
+        )
     }
 
     private func save() {
