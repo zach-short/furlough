@@ -3,7 +3,7 @@ import SwiftUI
 /// What the app will not stop to explain while you are using it: what a rule means, why a
 /// change waits, and the one way out. Reached from the question mark beside the gear on Home.
 ///
-/// Seven topics, one idea each, in the app's own voice. Two are pages in the app and five open
+/// Eight topics, one idea each, in the app's own voice. Two are pages in the app and six open
 /// furloughapp.com — the split is in `HelpTopics.swift`, and it is the difference between a
 /// topic that has to read this phone's own settings and one that is the same on every phone.
 /// Anything with a number in it reads the number out of the config rather than repeating the
@@ -84,6 +84,10 @@ struct HelpView: View {
             CardDivider()
             linkRow("Apps and websites", "What Furlough can hold, and how to add it", page: "apps-and-websites") {
                 HelpTile(symbol: "square.grid.2x2")
+            }
+            CardDivider()
+            linkRow("Apps the picker will not show", "Safari, Settings, the App Store, Phone", page: "beyond-the-picker") {
+                HelpTile(symbol: "eye.slash")
             }
         }
         .emberCard()

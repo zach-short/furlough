@@ -119,6 +119,15 @@ small codebase he fully understands over a fork. He is interactive: ask when a d
 - No emergency unblocks, no schedules beyond the windows. NFC exists only for the Anchor tag
   (in-app scan of the tag's hardware identifier; no background tag reading, no writes).
   Personal use, Xcode installs.
+- **No QR or barcode keys, and no breaks, pauses, temporary access or emergency unblock — decided
+  2026-09-09, do not re-ask.** A code is a photograph away from being a copy: the whole value of
+  the Anchor's tag is that it is somewhere else, and a picture of a code is not somewhere else,
+  it is in the camera roll. Breaks, pauses, temporary access and an emergency unblock are each an
+  unblock with a nicer name; Furlough has none of them on purpose, and the essential-tier
+  warnings (`UtilityText`, `confirmBlockEssential`, `Config.anchorWarning`) are where the safety
+  that a pause would otherwise provide actually lives. Written up for users on the site:
+  `site/src/pages/help/nfc-tags.astro` ("Why a tag and not a code") and
+  `site/src/pages/help/the-anchor.astro` ("There is no pause").
 - Extras that are in scope: "5 minutes left" notification, Live Activity during a window,
   home-screen widget. Websites are supported, and since 2026-09-08 in two kinds on the phone:
   one picked from Apple's picker, which is counted and wears Furlough's shield, and one typed
@@ -1200,6 +1209,44 @@ The plan for this stretch. Tick each phase off here as it lands.
     for Messages *and* Phone. `anchorWarning` also collapses duplicate names, so the exact sentence
     Zach saw cannot come back even where the tables cannot name anything. Tests in `UtilityTests`
     cover one, two and three names at every tier that speaks.
+
+23. **Apps the picker will not show, and the no-QR/no-pause decisions.** Done 2026-09-09, from
+    the pass-off's items 8a and 10 in one session, no Xcode.
+
+    A new page, `site/src/pages/help/beyond-the-picker.astro`, linked from
+    `site/src/pages/help/index.astro` and from `Furlough/Views/HelpView.swift`'s rules card
+    (`page: "beyond-the-picker"`, through `Furlough.helpURL(_:)`; the app itself still makes no
+    network request — the row hands the address to Safari, same as every other site link). It
+    covers the four apps Apple's picker never offers, on any Screen Time app, not only
+    Furlough's: **Safari** itself (Furlough already reaches it by blocking sites inside it, one
+    domain at a time — no single switch closes all of Safari's web today; the everything-except
+    Anchor scope, item 13, may add one, and this page should be revisited if it lands), **Settings**
+    and the **App Store** (a Shortcuts personal automation — "when opened" → Go to Home Screen,
+    optionally followed by Furlough's own `DropAnchorIntent`, "Drop Anchor" — with a plain note
+    that an automation is friction, not a lock, since it can be turned off in the same app it was
+    made in, and that the one real escape from Furlough itself stays Settings > Screen Time), and
+    **Phone**, which is also missing from the picker but gets no workaround on purpose: a phone
+    you cannot call out from is a hazard, not a commitment device, and that is the honest answer
+    rather than a trick that happens to work. A section "On the Mac" covers the same idea for
+    `Browsers.snapshots()`: Safari and the Chromium browsers by tab, not Firefox (not scriptable),
+    not a Safari web app in the Dock (its own bundle id), not a non-browser app's own network code
+    — item 8b's content filter would close the last one if it ever lands; written for today.
+
+    **Not yet run on a phone.** The Shortcuts automation steps are written from how personal
+    automations work, not from having built one. The task said plainly not to publish steps
+    nobody has run: build the two automations (Settings, App Store) on your phone, check `Go to
+    Home Screen` actually fires before the app draws and that `Drop Anchor` runs after it, then
+    tell me what to fix in the page. Left live in the meantime because the alternative — no page
+    at all — is worse than a page that might need a wording correction, and a site sentence is a
+    same-day fix.
+
+    The no-QR, no-pause paragraph is in "Settled: what Furlough is" above, dated 2026-09-09. The
+    site carries the same two decisions in the help pages' own voice: "Why a tag and not a code"
+    on `nfc-tags.astro`, and "There is no pause" on `the-anchor.astro`.
+
+    `bun run build` in `site/` is clean (see the message this step ends with for the output).
+    Nothing here touches `Shared/Core`, so no test target and no Xcode build were needed, matching
+    the pass-off's note that this item wants neither.
 
 ## Style rules
 

@@ -1,0 +1,68 @@
+---
+import Base from '../../layouts/Base.astro';
+import { site } from '../../site';
+
+// What Apple's own picker leaves out. Four apps never appear in it on any Screen Time app,
+// not just Furlough's, and three of them are worth a workaround; Phone is not, and this page
+// says why not rather than pretending there is one. The Mac's own gaps are a different
+// mechanism (Apple Events, not a picker) but the same idea — where Furlough cannot reach —
+// so they get a section here rather than a page of their own.
+---
+
+<Base
+  title="Apps the picker will not show"
+  description="Safari, Settings, the App Store and Phone never appear in Apple's picker. What Furlough does about each one, and what the Mac reads and does not."
+>
+  <section class="wrap page">
+    <header class="head" data-reveal>
+      <canvas class="mark" width="60" height="80" data-hourglass="alwaysBlocked" data-still aria-hidden="true"></canvas>
+      <div class="eyebrow amber">Help · The rules</div>
+      <h1 class="display">Four apps you cannot pick.</h1>
+      <p class="sub">Furlough for iPhone and Mac · what Apple's picker leaves out, and what to do instead</p>
+    </header>
+
+    <article class="card prose body" data-reveal style="--d: .1s">
+      <p>Apple's own picker leaves four apps out, on every Screen Time app, not only Furlough: Safari, Settings, the App Store, and Phone. Furlough cannot add what the picker will not offer. Here is what that means for each, and what actually helps.</p>
+
+      <h2>Safari</h2>
+      <p>Safari itself is not a target, but the sites you open in it are: block a domain and it is closed in Safari (and in Chrome and every other browser on the phone) at the times and budget you set. That is what to reach for — one site at a time, the same way as any other website in Furlough. There is no single switch yet that closes all of Safari's web at once; if that changes, this page will say so.</p>
+
+      <h2>Settings and the App Store</h2>
+      <p>Neither can be shielded, by Furlough or by anything built on the same API — Apple keeps its own Settings and the App Store out of the picker for every app that uses it. What helps is not a block but friction: a Shortcuts automation that sends you back to the Home Screen the moment either one opens.</p>
+      <ol>
+        <li>Open <strong>Shortcuts</strong> › <span class="path">Automation</span> › <span class="path">+</span> › <span class="path">Create Personal Automation</span>.</li>
+        <li>Choose <span class="path">App</span>, then <span class="path">Is Opened</span>, and pick <strong>Settings</strong>. Repeat for the App Store as a second automation.</li>
+        <li>Add the action <span class="path">Go to Home Screen</span>.</li>
+        <li>Optional: add Furlough's own <span class="path">Drop Anchor</span> action underneath it, so opening either app also locks whatever the Anchor holds.</li>
+        <li>Turn off <span class="path">Ask Before Running</span>, so it fires without a prompt.</li>
+      </ol>
+      <div class="note">
+        <p><strong>This is friction, not a lock.</strong> An automation lives in the Shortcuts app, and anything you can turn on you can turn off — including this one, in a few taps, any time you like. It buys you the same thing a tag in another room buys the Anchor: a pause before you get what you were about to get anyway. The one real escape from Furlough itself is still <span class="path">Settings › Screen Time › Apps with Screen Time Access › Furlough › off</span>, and no automation changes that.</p>
+      </div>
+      <p><strong>Not yet run on a phone.</strong> These steps are written from how Shortcuts automations work; nobody has built and used this one yet. If a step reads differently on your phone, that is the thing to fix here.</p>
+
+      <h2>Phone</h2>
+      <p>Phone is left out of the picker too, and Furlough leaves it alone on purpose rather than offering the same trick. A phone you cannot call out from is not a commitment device, it is a hazard — and Furlough already treats an app that carries something you might need in an emergency as worth a warning, never a block. If Phone itself is the distraction, the honest answer is that Furlough is not the tool for that part.</p>
+
+      <h2>On the Mac</h2>
+      <p>The Mac has no picker at all — no Screen Time API to draw one from — so it reads instead: every window of Safari and the Chromium browsers (Chrome, Arc, Brave, Edge, Vivaldi, Opera, Dia), tab by tab, redirected to Furlough's shield the moment a blocked host shows up there.</p>
+      <ul>
+        <li><strong>Firefox</strong> is not scriptable the way the others are, so a site with a rule stays open there.</li>
+        <li><strong>Safari web apps saved to the Dock</strong> run under their own identifier rather than Safari's, so the same host inside one of those is not caught either.</li>
+        <li><strong>Anything that reaches a blocked host without a browser tab</strong> — an app with its own network code — is invisible to a reader built on browser windows.</li>
+      </ul>
+      <p>Closing those gaps means reading network traffic rather than tabs, which is a different, heavier mechanism than what runs today. Written for how the Mac works right now; if that changes, this paragraph does too.</p>
+
+      <p class="contact">More: <a href="/help/apps-and-websites/">Apps and websites</a> · <a href="/help/">All help</a> · <a href={`mailto:${site.email}`}>{site.email}</a></p>
+    </article>
+  </section>
+</Base>
+
+<style>
+  .page { padding: clamp(24px, 6vh, 64px) 0 0; max-width: 760px; }
+  .mark { width: 60px; height: 80px; margin-bottom: 20px; }
+  .head h1 { margin-top: 12px; font-size: clamp(32px, 4.6vw, 52px); }
+  .sub { color: var(--faint); font-size: 14px; margin-top: 14px; }
+  .body { margin-top: 28px; padding: clamp(22px, 4vw, 36px); }
+  .contact { margin-top: 32px; padding-top: 18px; border-top: 1px solid var(--edge); font-size: 14px; }
+</style>
