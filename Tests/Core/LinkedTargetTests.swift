@@ -482,3 +482,172 @@ struct TableNameTests {
         #expect(AppUtility.name(forBundleID: "com.nobody.at.all") == nil)
     }
 }
+
+// MARK: - The usage page
+
+/// Screen Time counts an app and a website separately, and it is right to: on the phone they are
+/// two things. Once they are linked they are one row on one shared budget, so the page has to add
+/// their minutes rather than rank them apart — otherwise it shows YouTube twice and offers a
+/// budget for each half of one that is already shared.
+///
+/// `UsageSummary.folded(in:)` does the merging and lives in `Shared/Usage`, which imports
+/// DeviceActivity and so cannot be reached from a macOS test bundle. The decision it acts on —
+/// which entries belong together and which one carries the pair — is `UsageAnalysis.folding`, and
+/// that is pure and here.
+@Suite("Folding the halves of a pair into one card")
+struct UsageFoldingTests {
+    let app = TargetKind.macApp(bundleID: "com.google.ios.youtube")
+
+    /// YouTube the app, with youtube.com linked onto it.
+    func config() -> Config {
+        var pair = Target(kind: .macApp(bundleID: "com.google.ios.youtube"), nickname: "YouTube", rule: .unrestricted)
+        pair.also = [.host("youtube.com")]
+        return makeConfig([pair])
+    }
+
+    /// The site half has no token — nothing mints one for a name typed into Furlough — so it is
+    /// found by the domain in its usage key instead. This is the common shape on the phone.
+    @Test("A typed site folds into the app it is linked to")
+    func typedSiteFoldsIntoTheApp() {
+        let folding = UsageAnalysis.folding(
+            [
+                (key: "com.google.ios.youtube", kind: app, minutes: 300),
+                (key: "web:youtube.com", kind: nil, minutes: 120),
+            ],
+            in: config()
+        )
+        // Both halves point at the app, the app at itself, so a caller can tell a folded row from
+        // a lone one without a second lookup.
+        #expect(folding["web:youtube.com"] == "com.google.ios.youtube")
+        #expect(folding["com.google.ios.youtube"] == "com.google.ios.youtube")
+    }
+
+    /// The face is the app even when the browser half is the heavier of the two: the app is what a
+    /// rule is written on, and the only half with Apple's icon and name.
+    @Test("The app carries the pair even when the browser half is heavier")
+    func faceWinsOverWeight() {
+        let folding = UsageAnalysis.folding(
+            [
+                (key: "com.google.ios.youtube", kind: app, minutes: 5),
+                (key: "web:youtube.com", kind: nil, minutes: 900),
+            ],
+            in: config()
+        )
+        #expect(folding["web:youtube.com"] == "com.google.ios.youtube")
+    }
+
+    @Test("A subdomain's minutes land on the row that covers it")
+    func subdomainFolds() {
+        let folding = UsageAnalysis.folding(
+            [
+                (key: "com.google.ios.youtube", kind: app, minutes: 300),
+                (key: "web:m.youtube.com", kind: nil, minutes: 60),
+            ],
+            in: config()
+        )
+        #expect(folding["web:m.youtube.com"] == "com.google.ios.youtube")
+    }
+
+    /// The point of the whole exercise: nothing that is not a pair is touched, so the page keeps
+    /// ranking everything else exactly as it did.
+    @Test("Nothing that is not a pair is folded")
+    func unrelatedEntriesStandAlone() {
+        let folding = UsageAnalysis.folding(
+            [
+                (key: "com.zhiliaoapp.musically", kind: .macApp(bundleID: "com.zhiliaoapp.musically"), minutes: 300),
+                (key: "web:vimeo.com", kind: nil, minutes: 90),
+            ],
+            in: config()
+        )
+        #expect(folding.isEmpty)
+    }
+
+    /// A row Furlough manages but has not linked is still one thing, so its single entry is not a
+    /// group and nothing is rewritten.
+    @Test("An unlinked target is not a group")
+    func unlinkedTargetIsNotAGroup() {
+        let alone = makeConfig([Target(kind: .macApp(bundleID: "com.google.ios.youtube"), rule: .unrestricted)])
+        let folding = UsageAnalysis.folding(
+            [
+                (key: "com.google.ios.youtube", kind: app, minutes: 300),
+                (key: "web:youtube.com", kind: nil, minutes: 120),
+            ],
+            in: alone
+        )
+        // youtube.com is not managed here at all, so it keeps its own card.
+        #expect(folding.isEmpty)
+    }
+
+    /// The answer must not depend on the order Screen Time happened to hand the entries over.
+    @Test("The carrier is the same whichever order the halves arrive in")
+    func orderDoesNotMatter() {
+        let forwards = UsageAnalysis.folding(
+            [(key: "com.google.ios.youtube", kind: app, minutes: 300), (key: "web:youtube.com", kind: nil, minutes: 120)],
+            in: config()
+        )
+        let backwards = UsageAnalysis.folding(
+            [(key: "web:youtube.com", kind: nil, minutes: 120), (key: "com.google.ios.youtube", kind: app, minutes: 300)],
+            in: config()
+        )
+        #expect(forwards == backwards)
+    }
+
+    /// Two sites linked onto one row and no app half at all: the heaviest carries the pair, since
+    /// there is no face among them to prefer.
+    @Test("With no app half the heaviest site carries the row")
+    func heaviestWinsWithoutAFace() {
+        var pair = Target(kind: .host("youtube.com"), nickname: "YouTube", rule: .unrestricted)
+        pair.also = [.host("m.youtube.com")]
+        let folding = UsageAnalysis.folding(
+            [
+                (key: "web:youtube.com", kind: nil, minutes: 30),
+                (key: "web:m.youtube.com", kind: nil, minutes: 400),
+            ],
+            in: makeConfig([pair])
+        )
+        // Both keys resolve to the same row, and the heavier half carries it.
+        #expect(folding["web:youtube.com"] == "web:m.youtube.com")
+        #expect(folding["web:m.youtube.com"] == "web:m.youtube.com")
+    }
+
+    @Test("A website key is read and written in one place")
+    func webKeysRoundTrip() {
+        #expect(UsageAnalysis.webKey("youtube.com") == "web:youtube.com")
+        #expect(UsageAnalysis.domain(inKey: "web:youtube.com") == "youtube.com")
+        #expect(UsageAnalysis.domain(inKey: "com.google.ios.youtube") == nil)
+    }
+
+    /// The arithmetic the fold exists for, checked on the histogram itself: both halves were seen
+    /// over the same days, so the merged average is the sum over those days once — not twice, and
+    /// not two separate averages that each look small enough to ignore.
+    @Test("Merged minutes average over the days once")
+    func mergedAverageIsOverTheSameDays() {
+        var appHalf = UsageHistogram(daysObserved: [Int](repeating: 2, count: 7))
+        appHalf.add(weekday: 3, hour: 21, minutes: 140)
+        var siteHalf = UsageHistogram(daysObserved: [Int](repeating: 2, count: 7))
+        siteHalf.add(weekday: 3, hour: 22, minutes: 70)
+
+        #expect(appHalf.averageDailyMinutes == 10)
+        #expect(siteHalf.averageDailyMinutes == 5)
+        appHalf.merge(siteHalf)
+        #expect(appHalf.totalMinutes == 210)
+        #expect(appHalf.averageDailyMinutes == 15)
+        #expect(appHalf.daysObserved == [Int](repeating: 2, count: 7))
+    }
+
+    /// And the consequence worth having: apart, each half was under the bar and got no card at
+    /// all; together the habit is over it and earns one.
+    @Test("Two halves under the bar are one habit over it")
+    func togetherTheyPassTheBar() {
+        var appHalf = UsageHistogram(daysObserved: UsageHistogram.oneWeek)
+        appHalf.add(weekday: 3, hour: 21, minutes: 42)
+        var siteHalf = UsageHistogram(daysObserved: UsageHistogram.oneWeek)
+        siteHalf.add(weekday: 3, hour: 22, minutes: 35)
+        #expect(UsageAnalysis.recommendation(key: "app", name: "YouTube", histogram: appHalf) == nil)
+        #expect(UsageAnalysis.recommendation(key: "web:youtube.com", name: "youtube.com", histogram: siteHalf) == nil)
+
+        appHalf.merge(siteHalf)
+        let merged = try! #require(UsageAnalysis.recommendation(key: "app", name: "YouTube", histogram: appHalf))
+        #expect(merged.averageDailyMinutes == 11)
+    }
+}

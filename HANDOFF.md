@@ -1115,12 +1115,34 @@ The plan for this stretch. Tick each phase off here as it lands.
     the anchor reaching through a linked half, the picker rule, unlinking, the import and the
     export round trip, plus decoding state written before `also` existed. 353 tests in 52 suites.
 
-    **Two things left undone, both on purpose.** The usage page still keys on a bundle identifier
-    and `web:` a domain separately, so a linked pair whose site half is a *tokenised* web domain
-    would rank as two cards. What is fixed is the part that matters for enforcement — the
-    already-managed lookups see linked halves, so Apply lands on the one row instead of splitting
-    the pair — but summing two histograms into one card belongs to whoever owns `UsageAnalysis`,
-    which another session was editing at the time. And `AppUtility.name(forBundleID:)` answers only
+    **The usage page ranks a pair once**, added right after the rest on Zach's word.
+    `UsageAnalysis.folding(_:in:)` is the pure decision — which entries are halves of one linked
+    target, and which of them carries the pair — and `UsageSummary.folded(in:)` does the merging.
+    Screen Time counts an app and a website separately and is right to; they are one thing here
+    once linked, so ranking them apart put YouTube on the page twice and offered a budget for each
+    half of one that is already shared. Adding the minutes is also the only honest number, and it
+    changes what the page *says*: two halves that were each under `minimumDailyMinutes` and so got
+    no card at all are one habit over it and earn one.
+
+    The face carries the pair — the app is what a rule is written on and the only half with Apple's
+    icon and name — and failing a face, the heaviest half does. `UsageHistogram.merge` leaves
+    `daysObserved` alone, which is what makes the merged average right: both halves were observed
+    over the very same days, so the sum is divided by those days once. The carrier keeps its own
+    key and token, so `entry(for:)` still finds it and the card still draws Apple's name.
+    Folding happens in `nameApps()` rather than `load()`, and it has to: matching an app entry to a
+    target needs its **token**, and the naming loop is exactly what was waiting for one. The
+    ranking is redone afterwards, since a folded pair may place higher than either half did alone.
+    The `web:` key prefix is now `UsageAnalysis.webKey`/`domain(inKey:)` rather than three literals.
+
+    **What this does not reach is Path B, the report extension.** `FurloughReport` has only the
+    Family Controls entitlement and *no App Group*, so it cannot read `SharedStore` and cannot know
+    which targets are linked — the tour's five report slots still rank a pair as two. Fixing it
+    means adding the App Group to that target in `project.yml` and letting automatic signing add
+    the capability, then folding against `SharedStore.load().config`; `folded(in:)` is already
+    shared code and would need no change. Left for Zach to say yes to, because it is a
+    provisioning change and Path B only runs where there is no data access.
+
+    **One thing left undone on purpose.** `AppUtility.name(forBundleID:)` answers only
     where exactly one display name maps to an identifier's advice: every essential carries its own
     detail sentence and so is unique, while the quieter tiers share a bare `.init(.useful)` between
     many apps and the table genuinely cannot tell which one it is. It says nothing rather than

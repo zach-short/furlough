@@ -289,6 +289,67 @@ enum UsageAnalysis {
         )
     }
 
+    /// How a website's minutes are keyed, to tell "youtube.com" from an app called YouTube.
+    static let webKeyPrefix = "web:"
+
+    /// The key a domain's minutes are counted under.
+    static func webKey(_ domain: String) -> String { webKeyPrefix + domain }
+
+    /// The domain a website key names, or nil when the key is an app's.
+    static func domain(inKey key: String) -> String? {
+        key.hasPrefix(webKeyPrefix) ? String(key.dropFirst(webKeyPrefix.count)) : nil
+    }
+
+    /// Which usage entries are halves of one linked target, and which entry the rest fold into.
+    ///
+    /// Screen Time counts an app and a website separately, and it is right to — one keyed by
+    /// bundle identifier, one by `web:` and a domain, two things on the phone. They are *one*
+    /// thing in Furlough once they are linked, on one rule and one shared budget, so a page that
+    /// ranked them apart would show YouTube twice and offer a rule for each half of a budget that
+    /// is already shared. Adding their minutes is also the only honest number: an hour in the app
+    /// and an hour in the browser is two hours of the one habit.
+    ///
+    /// Answers a map from each key in a linked group to the key that carries the group's minutes —
+    /// the face included, mapping to itself, so a caller can tell a folded row from a lone one.
+    /// A key absent from the map stands alone, which is the common case.
+    ///
+    /// The face wins where it is present, because the face is the app: it is what a rule is
+    /// written on and the only half with Apple's own icon and name. Failing that the heaviest half
+    /// wins, then the lowest key, so the answer never depends on the order it was asked in.
+    static func folding(
+        _ entries: [(key: String, kind: TargetKind?, minutes: Double)],
+        in config: Config
+    ) -> [String: String] {
+        var groups: [UUID: [(key: String, isFace: Bool, minutes: Double)]] = [:]
+        for entry in entries {
+            guard let target = target(of: entry, in: config) else { continue }
+            groups[target.id, default: []].append((entry.key, entry.kind == target.kind, entry.minutes))
+        }
+        var folding: [String: String] = [:]
+        for group in groups.values where group.count > 1 {
+            let ordered = group.sorted { a, b in
+                if a.isFace != b.isFace { return a.isFace }
+                if a.minutes != b.minutes { return a.minutes > b.minutes }
+                return a.key < b.key
+            }
+            guard let face = ordered.first else { continue }
+            for half in group { folding[half.key] = face.key }
+        }
+        return folding
+    }
+
+    /// The target a usage entry is part of: by the token Screen Time handed over with the numbers,
+    /// else by the domain in its key, which is how a site typed into Furlough is found — and it
+    /// has to be, because a typed host has no token for Screen Time to hand over. Nil for the
+    /// common case of something Furlough does not manage at all.
+    private static func target(
+        of entry: (key: String, kind: TargetKind?, minutes: Double),
+        in config: Config
+    ) -> Target? {
+        if let kind = entry.kind, let found = config.target(kind: kind) { return found }
+        return domain(inKey: entry.key).flatMap { config.target(host: $0) }
+    }
+
     /// The heaviest first, at most `limit` of them, and only those worth a rule. Equal minutes
     /// fall back to the key, so the order never depends on how the input was gathered.
     static func rank(_ entries: [(key: String, name: String, histogram: UsageHistogram)], limit: Int = rankLimit) -> [Recommendation] {

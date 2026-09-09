@@ -404,6 +404,19 @@ struct UsageView: View {
             try? await Task.sleep(for: .seconds(1))
         }
         guard !Task.isCancelled else { return }
+        // Only now can the halves of a linked pair be added together, and only now is it worth
+        // ranking. Folding needs to know which entry is which target, and for an app that is the
+        // token — which is exactly what the loop above has just been waiting for. Ranked again
+        // afterwards because a folded pair carries both halves' minutes and so may place higher
+        // than either half did alone.
+        if let read = summary {
+            let folded = read.folded(in: model.state.config)
+            if folded.entries.count != read.entries.count {
+                SharedStore.log("usage: folded \(read.entries.count - folded.entries.count) linked half/halves into their rows")
+            }
+            summary = folded
+            advice = folded.recommendations
+        }
         let named = advice.filter { summary?.entry(for: $0)?.targetKind != nil }
         // Suggestions existed and not one of them could be named: Screen Time did not do its
         // half, and there is nothing to show. An honestly empty fortnight is not this.
