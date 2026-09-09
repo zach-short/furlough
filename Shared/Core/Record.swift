@@ -81,6 +81,13 @@ enum Record {
 
     /// Queues a loosening and counts it, in one call, so a new queueing site cannot forget the
     /// second half. Everything in `state.pending` is a loosening: a tightening lands at once.
+    ///
+    /// **Every append that will be saved goes through here.** A bare `state.pending.append` is
+    /// only ever right on a state that is thrown away — `ActivityLimit.projecting` and
+    /// `reason(schedules:in:)` build one to ask "would this fit?" and persist nothing. That is
+    /// the whole of the exception, and it is worth knowing which one you are writing:
+    /// `AppModel.setAnchorSchedules` was a real queueing site appending by hand from step 24
+    /// until 2026-09-09, so its loosenings were never counted (step 29).
     static func queue(
         _ change: PendingChange, in state: inout SharedState, now: Date, calendar: Calendar = .current
     ) {

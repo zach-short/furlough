@@ -1072,10 +1072,16 @@ final class AppModel {
         let now = current.now
         Policy.liftExpiredAnchor(&current.config, now: now)
         guard !current.config.anchor.isAnchored else { return .unchanged }
-        let hadQueued = current.pending.contains { if case .setAnchorSchedules = $0.kind { return true }; return false }
+        let before = current.pending.count
         current.pending.removeAll { if case .setAnchorSchedules = $0.kind { return true }; return false }
+        let dropped = before - current.pending.count
         guard schedules != current.config.anchor.schedules else {
-            guard hadQueued else { return .unchanged }
+            guard dropped > 0 else { return .unchanged }
+            // Emptying the queue and putting nothing in its place is a cancellation, and the only
+            // one here that is: the branch below drops a queued change to *replace* it, which is
+            // changing your mind about the figure rather than backing out of the wait. Counted by
+            // what actually left the queue, the way `cancelPending` counts it.
+            Record.noteCancelled(dropped, in: &current, now: now)
             SharedStore.save(current)
             SharedStore.log("anchor schedule: cancelled the queued change")
             enforce(reason: "anchor schedule")
@@ -1088,7 +1094,11 @@ final class AppModel {
             result = .appliedNow
         case .loosening:
             let effectiveAt = now.addingTimeInterval(TimeInterval(current.config.anchorDelayHours) * 3600)
-            current.pending.append(PendingChange(kind: .setAnchorSchedules(schedules), effectiveAt: effectiveAt))
+            Record.queue(
+                PendingChange(kind: .setAnchorSchedules(schedules), effectiveAt: effectiveAt),
+                in: &current,
+                now: now
+            )
             result = .scheduled(effectiveAt)
         }
         SharedStore.save(current)

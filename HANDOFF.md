@@ -1888,6 +1888,30 @@ The plan for this stretch. Tick each phase off here as it lands.
     - Tests: `Tests/Core/RuleSuggestionTests.swift`, 15 in 6 suites. 569 Core tests pass, iOS
       and Mac both build warning-free. Not seen on the phone yet.
 
+29. **The record's one uncounted queue.** Fixed 2026-09-09, found by checking step 25 against the
+    code rather than reading it. Step 25 says `Record.queue` replaces `state.pending.append`
+    everywhere "so a new queueing site cannot forget to count itself"; step 24's
+    `AppModel.setAnchorSchedules` then appended by hand, which is exactly the failure that
+    sentence was written to prevent. Two effects, and only the second was visible: a queued
+    anchor-schedule loosening was never counted as queued (nothing reads `DayRecord.queued`
+    today, so nothing said a wrong number — it would have started the moment anything did), and
+    the same function's *cancel* path emptied the queue without calling `noteCancelled` while
+    `Policy.applyDuePending` still counted it if it landed. So on the anchor schedule the
+    record's one line about the delay doing its job counted landings and not backing down.
+
+    Both routed properly now, and the cancel counts by what actually left the queue
+    (`before - current.pending.count`), the way `cancelPending` does. **The line held to:**
+    emptying the queue and putting nothing in its place is a cancellation; dropping a queued
+    change to *replace* it is not — that is changing your mind about the figure, not backing out
+    of the wait. Which is why the loosening branch beside it, and `setDelay`, and `propose`, all
+    drop a queued change without counting one.
+
+    **Still open, and Zach's call, not a defect.** `setUtility` choosing the saved tier back is a
+    replacement by that rule and an unqueueing by the comment above it ("is cancelled"), and it
+    is uncounted. Whether it should count is a judgement about what the number means. `Record`'s
+    `queue` doc comment now names the only legitimate bare append — a state that is thrown away,
+    which is `ActivityLimit`'s two projections — so the next one is easier to spot.
+
 ## Style rules
 
 Swift 6 language mode with approachable concurrency, SwiftUI, `@Observable`, async/await, no
