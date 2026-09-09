@@ -1028,9 +1028,18 @@ struct SettingsSheet: View {
                         }
                     }
                     .emberCard()
-                    Footnote(text: "Not in the shipping build. Reset everything forgets every app, website, rule, pending change and today's usage, and lifts every block.\n\nHide these buttons puts this section away; five clicks on Version, under Help > About, brings it back.")
+                    Footnote(text: "Not in the shipping build. Reset everything forgets every app, website, rule, pending change and today's usage, and lifts every block.\n\nHide these buttons puts this section away. Show testing buttons, or five clicks on Version under Help > About, brings it back.")
                         .padding(.top, 8)
                         .padding(.bottom, 20)
+                } else {
+                    // The same way back the phone has, for the same reason: the reset button is
+                    // used during a test pass, and a hidden gesture is a poor only route to it.
+                    CardAction(title: "Show testing buttons") {
+                        TestingTools.isShown = true
+                        showTesting = true
+                    }
+                    .emberCard()
+                    .padding(.bottom, 20)
                 }
                 #endif
             }

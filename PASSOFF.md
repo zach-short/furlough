@@ -20,6 +20,7 @@ already in progress, so item 1 is the tail of that, not the start.
 | 8b | Mac content filter (network extension) | **Fable** | E | Zach's go-ahead | new `FurloughMacFilter` target, `project.yml`, `MacModel` |
 | 9 | iPad | Opus | Gated | 1 approved; 4 or the no-NFC rule | `project.yml`, every iOS view that presents a sheet or popover |
 | 10 | Write down the no-QR, no-pause decisions | Opus | D | nothing | `HANDOFF.md`, `site/src/pages/help/nfc-tags.astro` |
+| 11 | More companion pairs, every one confirmed | **Sonnet** | F | nothing | `Companions.swift`, `CompanionsTests.swift`, new `design/companions-sources.md` |
 
 **Lanes run in parallel with each other; tasks inside a lane run one after another.**
 A, B, C, D and E can all be open at once, each in its own worktree. Inside A the order is
@@ -526,3 +527,109 @@ cravings.
    Screen Time escape named as the only one, as README already does.
 
 Hand back: the two edits and the site build output.
+
+---
+
+## 11. More companion pairs, every one confirmed
+
+**Model: Sonnet. Lane: its own; parallel-safe with everything. Waits on nothing.**
+
+You are picking up Furlough, Zach's iOS and Mac app blocker. Read `HANDOFF.md`, then
+`README.md`, then `Shared/Core/Companions.swift` and `Tests/Core/CompanionsTests.swift`.
+Session rules: never run `git commit` or `git push`; when the work is ready run
+`git status --short` and print two bash blocks for Zach — `git add <only the files this
+session touched>` and a short all-lowercase `git commit -m "..."` — with no
+`Co-Authored-By` line and no "Generated with" line. Every change to `Shared/Core` gets
+tests in `Tests/Core`. Run the test check from HANDOFF before handing back.
+
+`Companions.pairs` is the table that knows a thing is both an app and a website: YouTube
+and youtube.com are one habit, so Furlough offers to make them one row with one schedule
+and one budget. It carries **33 pairs**, which is too few — on the phone, 2026-09-09, most
+apps Zach added offered no website at all, because they are not in here. Your job is to
+grow it.
+
+**The whole difficulty is that you must not be wrong.** A wrong bundle identifier makes the
+offer never appear, which is invisible and will not be noticed for months. A wrong host is
+worse: Furlough would offer to block a domain that is not the thing, and someone would
+accept it and lose access to something they never meant to shut. So the bar is not "very
+likely" — it is confirmed by a lookup you actually ran, this session, and pasted the answer
+of. **Twenty pairs you confirmed beat fifty you remembered.** You have network access; use
+it. If a lookup does not confirm something, that pair does not go in, and you say so in the
+hand-back rather than quietly guessing.
+
+### How to confirm a pair
+
+For each candidate, run the App Store lookup and read the real answer:
+
+```bash
+curl -s "https://itunes.apple.com/search?term=duolingo&entity=software&country=us&limit=5" \
+  | python3 -c "import json,sys; [print(r['trackName'],'|',r['bundleId'],'|',r.get('sellerUrl'),'|',r['artistName']) for r in json.load(sys.stdin)['results']]"
+```
+
+That returns `bundleId` from Apple, not from anybody's memory. Verified working 2026-09-09;
+it reproduces entries already in the table, which is how you should sanity-check your
+method before trusting it on a new one — look up Slack and confirm you get
+`com.tinyspeck.slackmacgap`, which is exactly what the table already carries.
+
+1. **The app half.** Find the result whose `trackName` *and* `artistName` are unmistakably
+   the product — not a wrapper, not a clone, not a fan client. Take `bundleId` verbatim and
+   **lowercase it**. This matters: `Pair.matches` normalizes the identifier it is *handed*
+   but compares it against the table as written, so a capital letter in the table is an
+   entry that can never match anything. The lookup returns `net.whatsapp.WhatsApp`; the
+   table must say `net.whatsapp.whatsapp`.
+2. **The Mac half**, where there is one. Run the same search with `entity=macSoftware`. Add
+   the Mac identifier beside the iOS one when it differs — `Slack` and `Zoom` in the table
+   show the shape. A Catalyst app needs nothing extra: `normalize` sheds the
+   `maccatalyst.` prefix so the Mac build matches its iOS twin.
+3. **The website half.** The host must be where you actually *use* the product, not its
+   marketing page. The table already makes this distinction on purpose:
+   `open.spotify.com`, not spotify.com; `web.whatsapp.com`, not whatsapp.com;
+   `store.steampowered.com`, not valvesoftware.com. Blocking the brochure stops nobody.
+4. **The link between the two.** The lookup's `sellerUrl` having the same registrable
+   domain as your host is the strongest evidence there is, and where it matches you are
+   done. Where it does not — Steam again — you need a second confirmation and a sentence
+   in the sources file saying what it was.
+
+### What not to do
+
+- Never write a bundle identifier the search did not return. Not one.
+- Never claim a host a pair does not own outright. No `google.com` for the Google app, no
+  `apple.com`, no `amazon.com` for a seller that merely sells there. A host in this table
+  means "blocking this is blocking that thing, and nothing else anybody wanted".
+- Never let two pairs claim the same host. `Companions.pair(forHost:)` resolves the longest
+  match, so a subdomain deliberately beats a domain — `music.youtube.com` is YouTube Music
+  even though YouTube claims `youtube.com`. That is the one legal overlap, and it only
+  works because the subdomain is genuinely a different product. Two pairs claiming the same
+  string is a bug.
+- Do not add things nobody blocks. The table's own rule, at the top of it: "Mail is also at
+  gmail.com, but nobody adds Mail to keep themselves off it." Banking apps, maps, transit,
+  password managers and health apps do not belong here whatever their websites are.
+- An app with no App Store listing can still go in **with an empty `bundleIDs` list**, the
+  way `DraftKings` and `FanDuel` already do, but only when the name is unambiguous. Say
+  which pairs these are in the hand-back.
+
+### What to add
+
+Aim for another 30 to 50, kept in the table's existing groups (video, social, messaging and
+work, shopping and gaming) with new groups added only when one earns four or five entries.
+Blank lines separate groups; keep that. Territory worth walking: short-form video, news and
+sport, dating, mobile games with a web build, shopping and resale, sportsbooks and casinos,
+AI chat, forums and imageboards, streaming music, and the productivity tools that eat a day.
+Zach is in the US; prefer what he would plausibly install.
+
+### What to leave behind
+
+1. The new pairs in `Shared/Core/Companions.swift`, in the existing groups and style.
+2. **`design/companions-sources.md`** — new file, one row per pair you added: the name, the
+   identifiers, the hosts, and the `trackViewUrl` and `sellerUrl` you confirmed them from.
+   This is the audit trail, and the reason the next session can extend the table without
+   re-verifying yours.
+3. Tests in `Tests/Core/CompanionsTests.swift`. Two kinds. A handful of spot checks in the
+   style already there, and — more valuable — **structural tests that walk the whole table**
+   and would fail on the mistakes above: every identifier is already lowercase, no host
+   string is claimed by two pairs, every pair has at least one host and at least one name,
+   and no name is empty after normalizing. Those turn the invariants in this prompt into
+   something the build enforces rather than something the next person has to remember.
+
+Hand back: how many pairs you added, how many candidates you rejected and why, any pair
+that went in with no bundle identifier, and the test run's output.

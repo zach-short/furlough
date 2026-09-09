@@ -56,8 +56,17 @@ struct SettingsView: View {
                             }
                         }
                         .emberCard()
-                        Footnote(text: "Not in the App Store build. Reset everything forgets every app, rule, pending change and the Anchor, and lifts all shields.\n\nHide these buttons puts this section away; five taps on Version above brings it back.")
+                        Footnote(text: "Not in the App Store build. Reset everything forgets every app, rule, pending change and the Anchor, and lifts all shields.\n\nHide these buttons puts this section away. Show testing buttons, or five taps on Version above, brings it back.")
                             .padding(.top, 8)
+                    } else {
+                        // A way back that does not have to be known about. The five taps still
+                        // work and are the quieter route, but a hidden gesture is a poor only
+                        // route to the button that resets the phone during a test pass.
+                        GhostButton(title: "Show testing buttons", color: Ember.muted) {
+                            TestingTools.isShown = true
+                            showTesting = true
+                        }
+                        .padding(.top, 4)
                     }
                     #endif
                 }
