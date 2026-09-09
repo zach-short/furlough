@@ -1,0 +1,69 @@
+---
+import Base from '../../layouts/Base.astro';
+import { site } from '../../site';
+
+// The rule editor explained once, in full, so the app does not have to. Everything here is
+// static: the two limits, how to write them, and the two numbers Screen Time imposes. The
+// delay is deliberately not on this page — that one stays in the app, where it can quote the
+// hours your phone would actually serve.
+---
+
+<Base
+  title="Windows and budgets"
+  description="How Furlough's two limits work: the hours an app is allowed, the minutes a day it gets, and what Screen Time will and will not accept."
+>
+  <section class="wrap page">
+    <header class="head" data-reveal>
+      <canvas class="mark" width="60" height="80" data-hourglass="open" data-still aria-hidden="true"></canvas>
+      <div class="eyebrow amber">Help · The rules</div>
+      <h1 class="display">Hours and minutes.</h1>
+      <p class="sub">Furlough for iPhone · every app you add gets both, and either one can close it</p>
+    </header>
+
+    <article class="card prose body" data-reveal style="--d: .1s">
+      <p>Every app you add gets a daily budget and, if you want, the hours it is allowed. Whichever runs out first closes it until the next opening.</p>
+
+      <h2>The two limits</h2>
+      <ul>
+        <li><strong>A window</strong> is the hours an app is allowed, on the days you pick. With no windows at all it is open all day, up to its budget.</li>
+        <li><strong>A budget</strong> is minutes a day, counted across every window, spent whenever the app is in front. It resets at midnight.</li>
+        <li><strong>Together</strong> they are an <em>and</em>, not an <em>or</em>. A 30-minute budget inside an 8:00–10:00 PM window is 30 minutes, in that window. The rest of the evening is closed either way.</li>
+      </ul>
+      <p>A rule with neither is not a block. Adding an app enforces nothing on its own — saving its first rule is what starts it.</p>
+
+      <h2>Writing them</h2>
+      <ul>
+        <li><strong>Same every day</strong> is on to begin with. Turn it off and each window gets its own strip of weekdays: midnight on school nights, 2:00 AM on weekends.</li>
+        <li><strong>Past midnight.</strong> Set 5:00 PM → 4:00 AM and the row is marked <span class="path">+1</span>. Furlough keeps it as the evening and the early hours of the next day, and reads it back as the one night you wrote.</li>
+        <li><strong>Visualize windows</strong> shows the week as a grid. Tap a day to see and change just its hours, then apply those hours to any other days. Applying adds to what a day already has rather than replacing it, joining spans that overlap or touch.</li>
+        <li><strong>Copying a rule</strong> works both directions. <span class="path">Use windows from another app</span> pulls one in; <span class="path">Apply these windows to other apps</span> pushes this one out to as many as you like, each judged on its own — so the tightenings land now and the loosenings queue.</li>
+      </ul>
+      <p>Rows on the same days that overlap or touch are joined into one window when a time picker closes, so connected hours are always a single span rather than a pile of adjacent ones.</p>
+
+      <h2>What Screen Time allows</h2>
+      <p>Two limits come from iOS rather than from Furlough, and neither can be worked around.</p>
+      <ul>
+        <li><strong>Fifteen minutes</strong> is the shortest window iOS accepts. A night counts as two — one either side of midnight — so each half needs its own fifteen.</li>
+        <li><strong>Nineteen windows</strong> across every app together. iOS watches twenty things at once and Furlough spends one of them counting budgets.</li>
+      </ul>
+
+      <div class="note">
+        <p>A window shorter than fifteen minutes, or one that overlaps another on the same day, is refused in the editor before it can be saved. You will not find out at midnight.</p>
+      </div>
+
+      <h2>Changing one later</h2>
+      <p>Tightening a rule applies the moment you save it. Loosening one waits out a delay, and the app is the only place that can tell you how long yours is, because it reads your own settings. Open Furlough and tap the question mark on the home screen: <span class="path">Why changes wait</span>.</p>
+
+      <p class="contact">More: <a href="/help/apps-and-websites/">Apps and websites</a> · <a href="/help/">All help</a> · <a href={`mailto:${site.email}`}>{site.email}</a></p>
+    </article>
+  </section>
+</Base>
+
+<style>
+  .page { padding: clamp(24px, 6vh, 64px) 0 0; max-width: 760px; }
+  .mark { width: 60px; height: 80px; margin-bottom: 20px; }
+  .head h1 { margin-top: 12px; font-size: clamp(32px, 4.6vw, 52px); }
+  .sub { color: var(--faint); font-size: 14px; margin-top: 14px; }
+  .body { margin-top: 28px; padding: clamp(22px, 4vw, 36px); }
+  .contact { margin-top: 32px; padding-top: 18px; border-top: 1px solid var(--edge); font-size: 14px; }
+</style>

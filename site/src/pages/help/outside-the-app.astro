@@ -1,0 +1,59 @@
+---
+import Base from '../../layouts/Base.astro';
+import { site } from '../../site';
+
+// Everything Furlough does while you are looking at something else. Worth a page of its own
+// because most of it is never seen from inside the app, which is the point.
+---
+
+<Base
+  title="Outside the app"
+  description="Where Furlough shows up when you are not in it: notifications, the shield, the Live Activity, the widget and the What's Open shortcut."
+>
+  <section class="wrap page">
+    <header class="head" data-reveal>
+      <canvas class="mark" width="60" height="80" data-hourglass="comingSoon" data-still aria-hidden="true"></canvas>
+      <div class="eyebrow amber">Help · Beyond the rules</div>
+      <h1 class="display">Where Furlough shows up.</h1>
+      <p class="sub">Furlough for iPhone · almost everything it does happens elsewhere</p>
+    </header>
+
+    <article class="card prose body" data-reveal style="--d: .1s">
+      <p>Almost everything Furlough does happens while you are looking at something else. Opening the app is for writing rules; the rest of the time it is the shield, a notification and a countdown on the lock screen.</p>
+
+      <h2>Notifications</h2>
+      <ul>
+        <li><strong>Around a window:</strong> one when it opens, one five minutes before it closes, one five minutes before the budget runs out, and one when it is spent.</li>
+        <li><strong>Around a pending change:</strong> one an hour before a queued loosening lands, while you can still cancel it, and one when it lands.</li>
+      </ul>
+
+      <h2>On the screen</h2>
+      <ul>
+        <li><strong>The shield.</strong> iOS draws it over a blocked app: why it is blocked and when it opens next.</li>
+        <li><strong>The lock screen.</strong> A Live Activity while a window is open, counting down, with the same hourglass in the Dynamic Island.</li>
+        <li><strong>The home screen.</strong> A widget with the next opening, or the time left in the one running.</li>
+      </ul>
+
+      <h2>Asking</h2>
+      <ul>
+        <li><strong>What's Open</strong> is Furlough's one Shortcut. It says what is open now and when the next thing opens, without opening the app. It changes nothing, so it is always allowed.</li>
+        <li><strong>Where the time goes.</strong> Settings ranks the apps that took your last two weeks and suggests a rule for each. Screen Time draws those cards in a sandbox of its own; the numbers never reach the app.</li>
+      </ul>
+
+      <div class="note">
+        <p>The hourglass is the same drawing everywhere it appears — shield, widget, Dynamic Island, and the marks on these pages. The top bulb is the window draining with the countdown; the mound turns amber five minutes out and ember once the budget is spent.</p>
+      </div>
+
+      <p class="contact">More: <a href="/help/windows-and-budgets/">Windows and budgets</a> · <a href="/help/">All help</a> · <a href={`mailto:${site.email}`}>{site.email}</a></p>
+    </article>
+  </section>
+</Base>
+
+<style>
+  .page { padding: clamp(24px, 6vh, 64px) 0 0; max-width: 760px; }
+  .mark { width: 60px; height: 80px; margin-bottom: 20px; }
+  .head h1 { margin-top: 12px; font-size: clamp(32px, 4.6vw, 52px); }
+  .sub { color: var(--faint); font-size: 14px; margin-top: 14px; }
+  .body { margin-top: 28px; padding: clamp(22px, 4vw, 36px); }
+  .contact { margin-top: 32px; padding-top: 18px; border-top: 1px solid var(--edge); font-size: 14px; }
+</style>

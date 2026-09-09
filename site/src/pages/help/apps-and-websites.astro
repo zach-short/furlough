@@ -1,0 +1,63 @@
+---
+import Base from '../../layouts/Base.astro';
+import { site } from '../../site';
+
+// What the + button can hold. The two kinds of website are the whole reason this page exists:
+// a typed site and a picked site look identical in the list and behave differently, and
+// nobody discovers that on their own.
+---
+
+<Base
+  title="Apps and websites"
+  description="What Furlough can hold: apps, categories and websites, the two kinds of website and why only one of them gets a daily budget."
+>
+  <section class="wrap page">
+    <header class="head" data-reveal>
+      <canvas class="mark" width="60" height="80" data-hourglass="unconfigured" data-still aria-hidden="true"></canvas>
+      <div class="eyebrow amber">Help · The rules</div>
+      <h1 class="display">What Furlough can hold.</h1>
+      <p class="sub">Furlough for iPhone · apps, categories, and two kinds of website</p>
+    </header>
+
+    <article class="card prose body" data-reveal style="--d: .1s">
+      <p>The <span class="path">+</span> button asks Application or Website. Apps and categories come from Apple's own picker; a website can come from there too, or be typed.</p>
+
+      <h2>Three kinds</h2>
+      <ul>
+        <li><strong>An app</strong>, picked from Apple's list. Furlough is never told which app it is — iOS hands over a token that means nothing off this phone — but iOS still draws the real icon and name beside it.</li>
+        <li><strong>A category</strong>: Social, Entertainment, and the rest. Everything in a category is blocked all day. An app inside one that you give windows to is excepted from it.</li>
+        <li><strong>A website</strong>, blocked in every browser on the phone, subdomains included. There are two kinds, and they are not the same.</li>
+      </ul>
+
+      <h2>The two kinds of website</h2>
+      <p>This is the one thing worth reading twice, because the difference is invisible once a site is in the list.</p>
+      <ul>
+        <li><strong>Typed.</strong> <span class="path">Website</span> on the + button asks for an address. Its hours are enforced, but it gets no daily budget: iOS only counts a site it minted itself.</li>
+        <li><strong>From the picker.</strong> Three levels in — open a category, scroll past its apps, tap <span class="path">Add Website</span>. That one gets a budget and Furlough's own shield.</li>
+      </ul>
+      <p>The guide sheet in the app walks you into the picker, and the picker repeats the steps in its footer, because three levels down is easy to lose. If a site needs a budget rather than only hours, it has to come from there.</p>
+
+      <h2>Once it is added</h2>
+      <ul>
+        <li><strong>Nothing is enforced yet.</strong> Adding is instant and changes nothing at all. Saving the first rule is what starts it — and a first rule is always tighter than nothing, so it lands at once rather than waiting.</li>
+        <li><strong>Nicknames.</strong> A nickname takes the app's place on the shield, the widget and its notifications.</li>
+        <li><strong>The other half.</strong> Blocking the YouTube app and leaving youtube.com open is the gap most people find a week later. Furlough offers the other side when it recognises one.</li>
+      </ul>
+
+      <div class="note">
+        <p>While anything is shielded, iOS is told to refuse app deletion, so Furlough cannot be deleted as a shortcut past it. Turning off Screen Time access still lifts everything — see <a href="/support/">Support</a>.</p>
+      </div>
+
+      <p class="contact">More: <a href="/help/windows-and-budgets/">Windows and budgets</a> · <a href="/help/">All help</a> · <a href={`mailto:${site.email}`}>{site.email}</a></p>
+    </article>
+  </section>
+</Base>
+
+<style>
+  .page { padding: clamp(24px, 6vh, 64px) 0 0; max-width: 760px; }
+  .mark { width: 60px; height: 80px; margin-bottom: 20px; }
+  .head h1 { margin-top: 12px; font-size: clamp(32px, 4.6vw, 52px); }
+  .sub { color: var(--faint); font-size: 14px; margin-top: 14px; }
+  .body { margin-top: 28px; padding: clamp(22px, 4vw, 36px); }
+  .contact { margin-top: 32px; padding-top: 18px; border-top: 1px solid var(--edge); font-size: 14px; }
+</style>

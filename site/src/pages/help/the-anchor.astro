@@ -1,0 +1,57 @@
+---
+import Base from '../../layouts/Base.astro';
+import { site } from '../../site';
+
+// Using the Anchor. Buying and keeping a tag is the other page (/help/nfc-tags/) and the two
+// link to each other rather than repeating: this one is the lock, that one is the key.
+---
+
+<Base
+  title="The Anchor"
+  description="Furlough's one-tap lock: choosing what it holds, pairing tags, what freezes while it is on, and the one thing that lifts it."
+>
+  <section class="wrap page">
+    <header class="head" data-reveal>
+      <canvas class="mark" width="60" height="80" data-hourglass="anchored" data-still aria-hidden="true"></canvas>
+      <div class="eyebrow ember">Help · The Anchor</div>
+      <h1 class="display">One tap to lock. The tag to unlock.</h1>
+      <p class="sub">Furlough for iPhone · optional, and nothing else depends on it</p>
+    </header>
+
+    <article class="card prose body" data-reveal style="--d: .1s">
+      <p>The Anchor is a second list, locked in one tap from anywhere and released only by a physical NFC tag you paired. Leave the tag at home and the phone stays anchored until you are back.</p>
+      <p>It is separate from your rules and it does not use the delay. Anchoring only ever takes things away, so it needs no waiting; the walk back to the tag is the whole of the friction.</p>
+
+      <h2>Using it</h2>
+      <ol>
+        <li><strong>Choose apps.</strong> The first time, the anchor offers what you already block, every one checked. Keep what it should hold, or go on to the picker for anything else. After that, <span class="path">Change apps</span> opens the picker with the list filled in.</li>
+        <li><strong>Pair a tag.</strong> Hold the phone to any NTAG sticker, or the tag from a Brick if you already own one. Furlough reads its hardware identifier and writes nothing to it. Up to three can be paired, so a key can live at each place you do — name each one for its place.</li>
+        <li><strong>Anchor.</strong> Everything on the list is shielded immediately. No tag is needed to lock and no delay applies.</li>
+        <li><strong>Unanchor.</strong> Opens the reader. Only a tag you paired lifts the anchor, and any of them does, at once. This is the one unblock in Furlough, and it exists only here.</li>
+      </ol>
+      <p>Which tag to buy, what you may already own, and where to keep it: <a href="/help/nfc-tags/">NFC tags</a>.</p>
+
+      <h2>While anchored</h2>
+      <ul>
+        <li><strong>Nothing can loosen.</strong> The list and the tags cannot be changed until the anchor is off, so no key can be cut from under the lock. Pair every tag you want <em>before</em> you anchor.</li>
+        <li><strong>Rules still stand.</strong> An app can be anchored and have windows too. With the anchor off it falls back to its rule, or to nothing if it has none.</li>
+        <li><strong>Forget tag</strong> unpairs one after a confirmation, and only while the anchor is off. Anchoring is refused once the last one is gone, so there is always a way back.</li>
+      </ul>
+
+      <div class="note">
+        <p><strong>Before you tap it.</strong> Anchoring something Essential warns first and asks again before it drops. The anchor is instant and only a tag lifts it, so a tag in another room means Messages stays gone until you find it. Keep every tag somewhere that makes you think — a key in your bag is no lock at all.</p>
+      </div>
+
+      <p class="contact">More: <a href="/help/nfc-tags/">NFC tags</a> · <a href="/help/">All help</a> · <a href={`mailto:${site.email}`}>{site.email}</a></p>
+    </article>
+  </section>
+</Base>
+
+<style>
+  .page { padding: clamp(24px, 6vh, 64px) 0 0; max-width: 760px; }
+  .mark { width: 60px; height: 80px; margin-bottom: 20px; }
+  .head h1 { margin-top: 12px; font-size: clamp(32px, 4.6vw, 52px); }
+  .sub { color: var(--faint); font-size: 14px; margin-top: 14px; }
+  .body { margin-top: 28px; padding: clamp(22px, 4vw, 36px); }
+  .contact { margin-top: 32px; padding-top: 18px; border-top: 1px solid var(--edge); font-size: 14px; }
+</style>

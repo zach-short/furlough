@@ -1,0 +1,52 @@
+---
+import Base from '../../layouts/Base.astro';
+import { site } from '../../site';
+
+// What Furlough is and what it keeps. The privacy policy is the formal version of the middle
+// section and stays where the App Store listing points; this is the same answer in the app's
+// own voice, plus the setup file. The build's version number is not here — it is in the app,
+// under Settings, because only the running copy knows it.
+---
+
+<Base
+  title="About Furlough"
+  description="A personal app blocker with no unblock button. What it keeps, what never leaves the phone, and how the setup file works."
+>
+  <section class="wrap page">
+    <header class="head" data-reveal>
+      <div class="eyebrow amber">Help · About</div>
+      <h1 class="display">About Furlough.</h1>
+      <p class="sub">Furlough for iPhone and Mac</p>
+    </header>
+
+    <article class="card prose body" data-reveal style="--d: .1s">
+      <p>A personal app blocker with no unblock button, built on Apple's Screen Time API. It has no account, no server and no analytics, because it has no network code at all.</p>
+      <p>Swift and SwiftUI, no third-party code. Built on FamilyControls, ManagedSettings, DeviceActivity and Core NFC. The three typefaces — Bricolage Grotesque, Onest and Geist Mono — are used under the SIL Open Font License. The Mac app is <a href={site.githubURL} rel="noopener">open source</a>.</p>
+
+      <h2>What stays on the phone</h2>
+      <ul>
+        <li><strong>Which apps you picked.</strong> iOS never tells Furlough. An app is an opaque token that means nothing off this phone; the icon and the name beside it are drawn by iOS itself.</li>
+        <li><strong>Your rules,</strong> in a container shared by the app and its extensions, so all of them read the same state. Nothing syncs and nothing is uploaded.</li>
+        <li><strong>Your usage.</strong> Screen Time hands the hours to a report extension with no network of its own and nowhere to write. Only the picture reaches the app.</li>
+      </ul>
+      <p>The formal version of all of this is the <a href="/privacy/">privacy policy</a>.</p>
+
+      <h2>Your setup</h2>
+      <ul>
+        <li><strong>Download my setup</strong> writes your rules, budgets, tiers and delay to a JSON file you keep. Because a token means nothing elsewhere, the file records what each app is <em>called</em> rather than the app itself. The Anchor is not included.</li>
+        <li><strong>Restore from a file</strong> asks which app each rule was, since the file cannot say. It is a proposal, not a rewind: every rule goes through the same delay the editor does, so anything that loosens waits.</li>
+      </ul>
+      <p>Both are in the app under <span class="path">Settings › Your setup</span>, along with the version number of the copy you are running — useful if you write in about something.</p>
+
+      <p class="contact">More: <a href="/privacy/">Privacy policy</a> · <a href="/support/">Support</a> · <a href={`mailto:${site.email}`}>{site.email}</a></p>
+    </article>
+  </section>
+</Base>
+
+<style>
+  .page { padding: clamp(24px, 6vh, 64px) 0 0; max-width: 760px; }
+  .head h1 { margin-top: 12px; font-size: clamp(32px, 4.6vw, 52px); }
+  .sub { color: var(--faint); font-size: 14px; margin-top: 14px; }
+  .body { margin-top: 28px; padding: clamp(22px, 4vw, 36px); }
+  .contact { margin-top: 32px; padding-top: 18px; border-top: 1px solid var(--edge); font-size: 14px; }
+</style>
