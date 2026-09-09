@@ -495,10 +495,16 @@ Per the handoff, wording problems belong here rather than in a quiet edit.
    header comment of `scripts/store-shots.sh`, which said "five 1320x2868 frames" while its loop
    correctly rendered six; that is corrected too.
 
-5. **`design/store/board.html` frame 6's placeholder shield says "Netflix opens at 5:00 PM" and
-   "You get 1 hour per day."** The app's real shield says "Instagram is closed" and "Opens
-   tomorrow at 8:00 PM". Only matters if a placeholder ever ships, which it must not, but the mock
-   is the wrong voice to be checking the layout against.
+5. ~~**`design/store/board.html` frame 6's placeholder shield is the wrong voice.**~~
+   **Withdrawn 2026-09-08: the finding was wrong and the mock is right.** It had been checked
+   against the site, which says "Instagram is closed / Opens tomorrow at 8:00 PM". That is the
+   site's own stylization, not the app's copy. `ShieldText.text` (`Shared/Core/TimeFormat.swift:218`)
+   returns, for a closed target, the title `"\(name) opens \(TimeFormat.nextOpen(next))"` and the
+   subtitle `"You get \(budget) per day."`; `nextOpen` renders a same-day time as `"at 5:00 PM"`
+   and `budget(60)` as `"1 hour"`. So "Netflix opens at 5:00 PM" and "You get 1 hour per day." is
+   the real shield, character for character, and the `Close` button matches too. Frame 6 was left
+   alone. The site and the app do differ here; if they are ever to match, the site is the side to
+   move.
 
 6. ~~**`site/src/pages/privacy.astro` understates what the app now reads.**~~ **Fixed
    2026-09-08.** It had said Screen Time "usage is reported only as anonymous 'a limit was
