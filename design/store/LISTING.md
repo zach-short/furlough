@@ -452,11 +452,14 @@ the captures have to come off the phone: take them on the iPhone, convert, and d
 | 1 | The rule | No unblock button. | Pick the apps that eat your time. Furlough shields them when the time is gone. | none |
 | 2 | Budgets | Thirty minutes. Then it's gone. | Give every app a daily budget. Spend it whenever you like. | none |
 | 3 | Windows | Open only when you said so. | Eight to ten on school nights. Later on weekends. Your call, once. | none |
-| 4 | The delay | Loosening waits a day. | Tightening is instant. Loosening waits out the delay you set. You can cancel it while it waits. | **rewrite, see below** |
-| 5 | The Anchor | Locked till you tap the tag. | One tap locks. Only the NFC tag you paired releases it. Leave the tag at home. | **rewrite, see below** |
+| 4 | The delay | Loosening waits a day. | Tightening is instant. Loosening waits out the delay you set. You can cancel it while it waits. | applied 2026-09-08 |
+| 5 | The Anchor | Locked till you tap the tag. | One tap locks. Only the NFC tag you paired releases it. Leave the tag at home. | applied 2026-09-08 |
 | 6 | The shield | Nothing to tap but Close. | The block screen says which app, and when it opens next. That is the whole conversation. | none |
 
-Frames 1, 2, 3 and 6 are already right and match the site.
+Frames 1, 2, 3 and 6 were already right and match the site. Frames 4 and 5 were rewritten in
+`design/store/board.html` on 2026-09-08 and the result was measured in a render: frame 4's caption
+runs to four lines, which frame 6 already did, and every frame keeps the same 96 px gap between the
+caption and the device with nothing overflowing the 2868 px frame.
 
 ---
 
@@ -464,19 +467,18 @@ Frames 1, 2, 3 and 6 are already right and match the site.
 
 Per the handoff, wording problems belong here rather than in a quiet edit.
 
-1. **`design/store/board.html:191` contains an em dash, in shipped pixels.**
-   `Tightening is instant. Every loosening lands 24 hours later &#8212; and you can cancel it.`
-   The other two em dashes in the file are in a `<title>` and a CSS comment and never render into
-   a frame; this one does.
+1. ~~**`design/store/board.html:191` contains an em dash, in shipped pixels.**~~ **Fixed
+   2026-09-08** by the frame 4 rewrite. The two em dashes left in the file are in a `<title>` and
+   a CSS comment, neither of which renders into an exported frame.
 
-2. **The same line overclaims, which is a 2.3 problem as well as a voice one.** "Every loosening
-   lands 24 hours later" is only true at the default base and only for the Useful tier. A Hazard
-   app waits four days. The replacement in the table above drops the number rather than trying to
-   explain the tiers in a screenshot.
+2. ~~**The same line overclaims, which is a 2.3 problem as well as a voice one.**~~ **Fixed
+   2026-09-08.** "Every loosening lands 24 hours later" was only true at the default base and only
+   for the Useful tier; a Hazard app waits four days. The replacement drops the number rather than
+   trying to explain the tiers in a screenshot.
 
-3. **`design/store/board.html` frame 5 does not say the tag is user-supplied.** "Only a physical
-   NFC tag unlocks" reads as though one is included. The replacement says "the NFC tag you
-   paired", and swaps "unlocks" for "releases", which is the verb the app itself uses.
+3. ~~**`design/store/board.html` frame 5 does not say the tag is user-supplied.**~~ **Fixed
+   2026-09-08.** "Only a physical NFC tag unlocks" read as though one were included. It now says
+   "the NFC tag you paired", and "releases" rather than "unlocks", which is the verb the app uses.
 
 4. **`design/store/raw/README.md` is out of date and will cause a missing frame.** It says
    "`01.png` … `05.png`, matching the five frames" and "the five frames in `../board.html`".
