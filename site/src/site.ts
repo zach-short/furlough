@@ -7,7 +7,9 @@ export const site = {
   // Set this once the App Store record exists. Until then the download button says so.
   appStoreURL: null as string | null,
   githubURL: 'https://github.com/zach-short/furlough',
-  email: 'zmshort@wm.edu',
+  // Cloudflare Email Routing forwards this to the real inbox, so the address on a public page
+  // and in the App Store listing is the domain's own rather than a personal one.
+  email: 'support@furloughapp.com',
   author: 'Zach Short',
   policyUpdated: '8 September 2026',
 };

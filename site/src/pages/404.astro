@@ -1,0 +1,52 @@
+---
+import Base from '../layouts/Base.astro';
+
+// Astro emits this as dist/404.html, which Cloudflare Pages serves with a real 404 status.
+// Without it Pages falls back to index.html and every wrong URL answers 200 with the homepage —
+// which hides a mistyped Support or Privacy URL in the App Store listing behind a page that
+// looks fine, and lets search engines index every typo as a duplicate of the front page.
+---
+
+<Base title="Page not found" description="There is nothing at this address.">
+  <section class="wrap page">
+    <header class="head" data-reveal>
+      <!-- The glass Furlough draws for a target with no schedule: pending outline, no sand.
+           The site already means "nothing here yet" by it, so the 404 says it the same way. -->
+      <canvas class="mark" width="74" height="98" data-hourglass="unconfigured" aria-hidden="true"></canvas>
+      <div class="eyebrow pending">404</div>
+      <h1 class="display">There is nothing at this address.</h1>
+      <p class="sub">The link may be old, or a character short. Everything on this site is below.</p>
+    </header>
+
+    <nav class="links" aria-label="Pages on this site" data-reveal style="--d: .1s">
+      <a class="glass large" href="/">Home</a>
+      <a class="glass large" href="/privacy/">Privacy policy</a>
+      <a class="glass large" href="/support/">Support</a>
+    </nav>
+  </section>
+</Base>
+
+<style>
+  .page {
+    padding: clamp(40px, 12vh, 120px) 0 clamp(48px, 12vh, 112px);
+    max-width: 620px;
+    margin-inline: auto;
+    text-align: center;
+  }
+  .mark { display: block; width: 74px; height: 98px; margin: 0 auto 26px; }
+  .head h1 { margin-top: 12px; font-size: clamp(28px, 4.4vw, 44px); }
+  .sub {
+    color: var(--muted);
+    font-size: 15px;
+    margin-top: 16px;
+    margin-inline: auto;
+    max-width: 44ch;
+  }
+  .links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 34px;
+  }
+</style>
