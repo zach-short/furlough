@@ -295,6 +295,17 @@ table. Not yet seen on the phone: install, then check the test steps in the last
 - `Shared/UI/Theme.swift` (app + widgets), `Shared/UI/Hourglass.swift` (`HourglassState`
   with its presets and `of(target:status:runtime:now:)`, `HourglassView(state:phase:)` pure,
   `LivingHourglass` animated, `TopSandShape`/`MoundShape` animatable).
+- `Shared/Usage/` — what the app and the report extension both need, because the same cards are
+  drawn on both sides of the data-access line (step 9 for why there are two sides).
+  `UsageCards.swift` is the drawing and reaches for nothing: hand it a histogram and a
+  `Recommendation` and it draws, which is what lets the extension render it inside its sandbox.
+  It also fixes `UsageReportFrame.height` (380), because a report cannot tell its host how tall
+  it wants to be, so the height is agreed once rather than guessed twice. `UsageCollector.swift`
+  holds `UsageEntry` — one app or site as Screen Time reported it, with the token riding along
+  so the app can write a rule without a picker — and the `DeviceActivityReport.Context` names
+  (`rank(_:)`, one card per report) that pair a scene in `FurloughReport` with the app's request
+  for it. The arithmetic under both is `Shared/Core/UsageAnalysis.swift`, pure and tested, and
+  `Furlough/Model/UsageReader.swift` is the app-side source of the numbers.
 - `Furlough/` app: `Model/AppModel.swift` (`@MainActor @Observable`; `enforce()` folds in due
   pending changes, calls `Monitoring.register`, `ShieldReconciler.reconcile`, reloads widgets,
   syncs the Live Activity), `Model/Monitoring.swift` (DeviceActivity registration),
@@ -510,13 +521,20 @@ Done:
   lifts every block; it just stops buying the
   rest of the day.
 
-Open, and where each one lives:
+Where each one stands. This was written as an open list on 2026-09-08 and swept on 2026-09-09,
+by which time most of it had landed; it is kept in the review's own order so the list can be
+checked against Zach's, and the arrow points at the step that holds the record. **Four are
+still open**: two of them want Zach's phone rather than a session (the test pass, and the
+third-party-browser question inside it), and two are a session's to pick up whenever — the
+window-start lag and `widgetURL`. The iPad half of that last row waits on Apple.
 
-- Nothing tested on the device beyond the basics → step 3, the two checklists. Zach's report
-  is still outstanding, and it is the gate on a lot of this file.
-- Third-party iOS browsers (does a web-domain shield reach Chrome on the phone?) → step 3; the
-  answer goes in README's limits either way.
-- The Live Activity only starting if the app is opened during a window → step 10. Done
+- Nothing tested on the device beyond the basics → step 3, the two checklists. **Still open,
+  and still the gate on a lot of this file.** Part of the Mac's report is in — the pending
+  card, the browser redirect in both Safari and Chrome, the watchdog, the menu bar — and the
+  phone's is not.
+- Third-party iOS browsers (does a web-domain shield reach Chrome on the phone?) → step 3.
+  **Still open**; the answer goes in README's limits either way.
+- The Live Activity only starting if the app is opened during a window → **done**, step 10,
   2026-09-09: `Activity.request(…, start:)` schedules the next window's activity ahead of time.
 - The shield icon still being the SF hourglass → **done**, 2026-09-08 evening, and not the way
   e9bfff2 tried: iOS calls `ShieldConfigurationDataSource` off the main thread, so a SwiftUI
@@ -525,22 +543,33 @@ Open, and where each one lives:
   no thread to wait for. Nothing SwiftUI-rendered can go on a shield; step 17's imagery is
   for the app and the store, not here.
 - The duplicated Mac UI (`MacComponents.swift`, `MacWeekView.swift`, two `Notifier`s) → step 16.
-- Safari web apps in the Dock bypassing host rules → step 7. No web app on this Mac to test.
+  **Half of it dissolved without anyone doing it**: there is one `Notifier` now, in
+  `Shared/Core/PendingNotifications.swift`, and a good deal of the rest went to `Shared/UI` as
+  each later feature had to draw on both platforms. The two view files are what is left.
+- Safari web apps in the Dock bypassing host rules → **answered by step 26**, not step 7: the
+  Mac web filter refuses the connection from any app, a site saved to the Dock included, which
+  is precisely what the tab reader cannot see. Built, and not yet run on a Mac, so the answer
+  is real in code and unwitnessed on the machine.
 - **The 19-window limit only being checked after Save** — **done**, step 6, as `ActivityLimit`.
-- Window start lagging by minutes with no way to hurry it → step 6/step 3; the shield extension
-  has the App Group and the entitlement, so it may be able to reconcile itself on `.open`.
-- Categories only being blockable all day → step 12. Ask Zach first.
+- Window start lagging by minutes with no way to hurry it → step 6/step 3. **Still open**, and
+  needs no device to start on: the shield extension has the App Group and the entitlement, so
+  it may be able to reconcile itself on `.open`.
+- Categories only being blockable all day → **settled as no**, step 12, asked and answered
+  2026-09-09. Not a gap any more; a decision.
 - Pending cards showing the new rule rather than old → new → **done**, step 6.
-- `widgetURL` and the `furlough://target/<id>` scheme, and iPad → step 6.
-- Anchor from anywhere (App Intents, Siri, Control Center, the Action button) → step 8.
-- Real usage on the phone (`DeviceActivityReport`) → step 9.
+- `widgetURL` and the `furlough://target/<id>` scheme, and iPad → step 6 for the scheme,
+  pass-off item 9 for iPad. **Still open**: `widgetURL` needs a target id on `Policy.Summary`,
+  which today carries only names, and iPad is gated on the submission being approved.
+- Anchor from anywhere (App Intents, Siri, Control Center, the Action button) → **done**, step 8.
+- Real usage on the phone (`DeviceActivityReport`) → **landed in a different shape**, and its
+  record is step 22, not step 9. See step 9, which says what changed and why.
 - Pending-change notifications → **done**, step 5.
-- Per-weekday budgets → step 11.
-- Anchor everything except an allowlist → step 13.
-- A second tag → step 14.
+- Per-weekday budgets → **done**, step 11.
+- Anchor everything except an allowlist → **done**, step 13.
+- A second tag → **done**, step 14.
 - A longer delay for the worst apps → **done**, step 15, as four utility tiers rather than a
   raw hours field, because one tier drives both the delay and the warnings.
-- iCloud sync of the Anchor → step 18. Rules cannot sync: tokens versus bundle ids.
+- iCloud sync of the Anchor → **done**, step 18. Rules cannot sync: tokens versus bundle ids.
 
 ## The utility tiers, reviewed 2026-09-08
 
@@ -839,9 +868,25 @@ The plan for this stretch. Tick each phase off here as it lands.
    once, in `activate`) reloads on it and enforces if anything changed
    (`changedElsewhere`). The app's own writes come back through it and find nothing new.
    Nobody has pressed the control on a phone.
-9. **Real usage on the phone**: a `FurloughReport` DeviceActivity report extension with a
-   `budget` scene on the hero and in the rule editor, a `week` scene behind a History link, and
-   quarter-mark threshold events if DeviceActivity accepts four events per target.
+9. **Real usage on the phone.** Landed 2026-09-08, and **not in the shape this step asked for**,
+   so read step 22 for what exists — this entry is kept only so the plan and the outcome can be
+   told apart. The plan was a `FurloughReport` DeviceActivity report extension with a `budget`
+   scene on the hero and in the rule editor, a `week` scene behind a History link, and
+   quarter-mark threshold events if DeviceActivity accepted four events per target.
+
+   What was built instead, once iOS 26.4's in-app usage API turned out to be reachable: the app
+   reads the numbers itself where it can (`Furlough/Model/UsageReader.swift`, gated on
+   `UsageReader.hasDataAccess`, which has to be consulted at runtime rather than once), draws its
+   own cards with an Apply button (`Furlough/Views/UsageView.swift`, `UsageCard.swift`,
+   `Shared/Usage/`), and the report extension stays as the path for a phone where that access is
+   refused — five `RankReport` scenes rather than a budget and a week, because the extension
+   cannot read the App Group and so cannot know what a target is. The arithmetic both paths use
+   is `Shared/Core/UsageAnalysis.swift`, and it is the same on both.
+
+   **Two things from the plan are genuinely not built**, and neither has been asked for since:
+   the quarter-mark threshold events, and a budget scene inside the rule editor. What is left
+   open on the extension side is Path B in step 22 — `FurloughReport` has no App Group, so a
+   linked pair still ranks as two there — which is a provisioning change waiting on Zach.
 10. **Live Activity at window start.** Done 2026-09-09; the scheduled-start `Activity.request`
     exists (the signature is quoted under "Known API facts and quirks"). `LiveActivityManager`
     moved from `Furlough/Model` to `Shared/LiveActivity` so the monitor extension compiles it
@@ -1023,6 +1068,16 @@ The plan for this stretch. Tick each phase off here as it lands.
     **Not done**: the tier has no home on the home screen or in the widget, and nothing sorts by
     it. Zach has not seen any of this on a device.
 16. **Unify the Mac duplicates** into `Shared/UI`, only while `Furlough/Views` is quiet.
+    Still open, but **smaller than when it was written**, because most of it was paid off a
+    piece at a time: every feature since that had to draw on both platforms put its view in
+    `Shared/UI` rather than twice (the theme, the hourglass, the pending delta, the import
+    review, the companion nudge, the utility picker, the anchor mark), and the two `Notifier`s
+    are one, in `Shared/Core/PendingNotifications.swift`. What is genuinely left is
+    `FurloughMac/Views/MacComponents.swift` and `MacWeekView.swift`, about 680 lines between
+    them. Two things to know before starting: `WeekDraft` lives in `Furlough/Views/WeekView.swift`
+    and moving it into `Shared/Core` is what would make it testable (step 1 says so), and the
+    Mac's `DraftWindow` deliberately joins rows at Save rather than as fields change, because
+    the fields commit as you type — so the two are not as identical as they look.
 17. **Imagery** with the Higgsfield MCP, only with Zach's go-ahead per item, preflighting every
     cost (balance was about 413). Reference the icon jobs by id: original
     `27b1c254-594f-46fe-9b3e-232c38a9e9d2`, toned-down (in use)
@@ -1126,9 +1181,9 @@ The plan for this stretch. Tick each phase off here as it lands.
     the Simulator, so the real screens have to be composed into full-size frames rather than
     captured at size.
 
-    **Where it actually stands**, from `scripts/status.sh` run 2026-09-09 (export `ASC_KEY_ID`
-    and `ASC_ISSUER_ID` — both are in the archive's DEPLOYMENT.md — and re-run it rather than
-    trusting this line):
+    **Where it actually stands**, from `scripts/status.sh` run 2026-09-09 and re-run at 18:30
+    the same day with the same answer (export `ASC_KEY_ID` and `ASC_ISSUER_ID` — both are in
+    the archive's DEPLOYMENT.md — and re-run it rather than trusting this line):
 
     ```
     1.0.1  (202609091529)  VALID  internal=IN_BETA_TESTING  external=READY_FOR_BETA_SUBMISSION
@@ -1678,8 +1733,13 @@ The plan for this stretch. Tick each phase off here as it lands.
     rather than sampled once. A gap longer than a day counts at most a day: a phone that was off
     for a week was not holding anything shut. What it cannot do is see **use**: without the iOS
     26.4 data-access entitlement the phone knows only whether a budget ran out, so `spent` is the
-    honest limit and the copy does not pretend otherwise (`UsageReader` could add real minutes if
-    that entitlement ever lands — see step 9).
+    honest limit and the copy does not pretend otherwise. (Written before the entitlement was
+    granted, which it since has been — step 19 verified
+    `…family-controls.app-and-website-usage` in the signed binary. What is *not* settled is
+    whether any given phone answers `UsageReader.hasDataAccess` with true: the prompt is
+    all-or-nothing and refusable, and Apple honours it only for EU customers. So `spent` stays
+    the honest limit, and `UsageReader` is the path to real minutes where the answer is yes —
+    see steps 9 and 22.)
 
     **The screens.** A card at the top of Settings on the phone and a section at the foot of the
     Mac sidebar, both drawing the same five rows from the same `Record` copy functions so neither
@@ -1697,7 +1757,7 @@ The plan for this stretch. Tick each phase off here as it lands.
     the footnote under the card says which numbers are this week and which are the whole record.
     `SharedStore.reset` already clears it with the rest of the runtime, so Testing > Reset
     everything forgets it.
-26. **The Mac web filter (item 8b, lane E).** Built 2026-09-09 on branch `lane-e-mac-filter`:
+26. **The Mac web filter (item 8b, lane E).** Built 2026-09-09, on `main` since `dfe1049`:
     compiled in Debug and Release, 21 new tests, the built bundle read back — and **not yet run
     on a Mac**, because installing a system extension takes two approvals in front of the
     screen. The test list is at the end of this step.
@@ -1710,8 +1770,9 @@ The plan for this stretch. Tick each phase off here as it lands.
     is exactly the `ditto` install this Mac already uses. And the archive's DEPLOYMENT.md
     section 3 had already settled the Mac's road as Developer ID plus notarization, with only
     *when* open. So nothing about distribution blocks the build; what it blocks is strangers
-    installing it, which was true before this step. Everything is on the branch and touches
-    nothing on `main` until Zach merges it.
+    installing it, which was true before this step. (That paragraph was written while this
+    lived on `lane-e-mac-filter` and said it touched nothing on `main`; Zach merged it in
+    `dfe1049` the same day, so the branch is gone and this is `main`.)
 
     **What it is.** A `NEFilterDataProvider` system extension, `FurloughMacFilter` (bundle
     `com.zachshort.furlough.mac.filter`, `type: system-extension` in `project.yml`, embedded by
@@ -1834,9 +1895,9 @@ The plan for this stretch. Tick each phase off here as it lands.
        Not installed and Firefox is open.
     Anything QUIC-shaped worth a look while there: with a site blocked, YouTube should still
     play in Safari and in Chrome (Chrome over TCP after a refused QUIC attempt, invisibly).
-27. **Forgiveness for a mistake, never for a craving.** Done 2026-09-09, on branch
-    `lane-f-forgiveness`. See the "Settled" bullet above for what it is and why a pass count
-    was refused. What is where:
+27. **Forgiveness for a mistake, never for a craving.** Done 2026-09-09 in the
+    `lane-f-forgiveness` session, merged to `main` in `dfe1049`. See the "Settled" bullet above
+    for what it is and why a pass count was refused. What is where:
 
     - `Shared/Core/Forgiveness.swift` — `startTrial` (once per install, guarded on
       `trialStartedAt`), `expire` (ends the week, forgets unreachable undos), `trialDaysLeft`
