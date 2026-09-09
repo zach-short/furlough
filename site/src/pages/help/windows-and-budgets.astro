@@ -4,8 +4,10 @@ import { site } from '../../site';
 
 // The rule editor explained once, in full, so the app does not have to. Everything here is
 // static: the two limits, how to write them, and the two numbers Screen Time imposes. The
-// delay is deliberately not on this page — that one stays in the app, where it can quote the
-// hours your phone would actually serve.
+// delay's own length is deliberately not on this page — that one stays in the app, where it
+// can quote the hours your phone would actually serve. The first week and the undo window are
+// here anyway, and do not break that rule: both are the same for everyone (one hour, fifteen
+// minutes), so neither needs a number read off your settings.
 ---
 
 <Base
@@ -53,6 +55,12 @@ import { site } from '../../site';
 
       <h2>Changing one later</h2>
       <p>Tightening a rule applies the moment you save it. Loosening one waits out a delay, and the app is the only place that can tell you how long yours is, because it reads your own settings. Open Furlough and tap the question mark on the home screen: <span class="path">Why changes wait</span>.</p>
+      <p>Two things soften that while you are still learning what a rule does, and neither is a way out of one.</p>
+      <ul>
+        <li><strong>Your first week is gentler.</strong> For seven days after you first allow Screen Time access, a loosening waits one hour instead of your full delay. Everything else is real from the first minute — the windows, the budgets, the shields — and only the price of a mistake is held down. The week is granted once per install and ends on a date fixed the moment it starts; it cannot be extended, and turning Screen Time access off and on again does not buy another. Settings counts it down, so the first delay that is real is never a surprise.</li>
+        <li><strong>Fifteen minutes to take a tightening back.</strong> A change that takes effect at once — anything giving you less time — can be put back exactly as it was for a quarter of an hour after you save it. That undo is instant because the only thing it can restore is the rule that was already in force: it never reaches further back than the last thing you saved, so it cannot walk you out to something looser than where you started. Someone who wants an app open cannot reach for it, because before the edit that app was shut too. A loosening needs no undo — it is already waiting out its delay, and you can cancel it the whole time it waits.</li>
+      </ul>
+      <p>Neither is a break, a pause or an emergency unblock. They forgive a mistake rather than a craving: the only thing either one can hand back is the state you were already in.</p>
 
       <p class="contact">More: <a href="/help/apps-and-websites/">Apps and websites</a> · <a href="/help/">All help</a> · <a href={`mailto:${site.email}`}>{site.email}</a></p>
     </article>

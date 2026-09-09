@@ -1873,6 +1873,18 @@ The plan for this stretch. Tick each phase off here as it lands.
     have one, it is a call to `Forgiveness.startTrial` at its onboarding finish — deliberately
     not made, because nobody has asked for it.
 
+    **The site pass, added 2026-09-09** (this step shipped without one, and for a day the public
+    pages said the absolutes — "there is no unblock button", "no break, no temporary access" —
+    beside an app that had just grown both of these). `site/src/pages/help/windows-and-budgets.astro`
+    carries them under "Changing one later", and `support.astro`'s no-unblock note now names them
+    and links there. Two things to keep right if the mechanism moves: the undo is offered **only on
+    a tightening** (`AppModel.assign` records it just where a rule lands now — a loosening is
+    already waiting and is cancelled instead, not undone), and the page's own rule that the delay's
+    length stays in the app still holds — the week's cap and the undo window are quotable there only
+    because they are the same hour and the same fifteen minutes for everyone. `the-anchor.astro`'s
+    "There is no pause" was deliberately left alone: the Anchor takes neither the delay nor the undo,
+    so the line is still true of it.
+
     **Not seen on the phone yet.** iOS and Mac both build warning-free and all 400 Core tests
     pass. What to check is in the last message.
 
