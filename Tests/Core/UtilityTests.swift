@@ -272,6 +272,33 @@ struct AppUtilityTests {
         }
     }
 
+    @Test("name(forBundleID:) answers instantly for anything with a confirmed proper name")
+    func nameResolvesWithoutWaitingOnTheShield() {
+        // BeReal has no website, so `Companions` cannot name it, and its tier (`.hazard`) is
+        // shared by a dozen other apps with no detail — the old reverse lookup was ambiguous
+        // and returned nil. `properNameByBundleID` closes exactly that gap.
+        #expect(AppUtility.name(forBundleID: "com.bereal.bereal") == "BeReal")
+        #expect(AppUtility.name(forBundleID: "COM.BEREAL.BEREAL") == "BeReal")
+        #expect(AppUtility.name(forBundleID: "com.robinhood.release.Robinhood") == "Robinhood")
+        #expect(AppUtility.name(forBundleID: "com.amazon.Lassen") == "Kindle")
+        // An essential still resolves the old way, through its unique detail sentence, with
+        // no entry needed in `properNameByBundleID`.
+        #expect(AppUtility.name(forBundleID: "com.apple.MobileSMS") == "Messages")
+        // A tier genuinely shared by several apps with no confirmed name for any of them is
+        // still nil, not a guess — Apple's own Mail and Xcode are both bare `.useful`.
+        #expect(AppUtility.name(forBundleID: "com.apple.mail") == nil)
+        #expect(AppUtility.name(forBundleID: "com.nobody.at.all") == nil)
+    }
+
+    @Test("Every key in properNameByBundleID is lowercase and a real entry in bundleIDs")
+    func properNameTableIsWellFormed() {
+        for (key, name) in AppUtility.properNameByBundleID {
+            #expect(key == key.lowercased(), "\(key) is not lowercase")
+            #expect(!name.isEmpty)
+            #expect(AppUtility.bundleIDs[key] != nil, "\(key) has a proper name but no tier")
+        }
+    }
+
     @Test("Spot checks on the newly added tiers")
     func newEntriesLandInTheRightTier() {
         // Streaming video passes the time like Netflix already does; streaming music, like

@@ -69,22 +69,121 @@ enum AppUtility {
 
     /// What to *call* the app with this bundle identifier, or nil when the table cannot tell.
     ///
-    /// A Screen Time token says nothing, so a target has no name until the shield covers it. The
-    /// two tables here are keyed differently — `bundleIDs` by identifier, `names` by the name the
-    /// shield reports — and this is the bridge between them: take the advice the identifier maps
-    /// to, and answer the display name that maps to the very same advice.
+    /// A Screen Time token says nothing on its own, so without data access a target has no name
+    /// until the shield covers it once. `AppModel.nameUnnamedTargets` exists to skip that wait: on
+    /// a device with data access it resolves a fresh target's token to a bundle identifier through
+    /// `UsageReader.identities()` right after it is added, and asks here (after `Companions`, which
+    /// knows the rest by name outright) whether the identifier is already known. Answering exactly
+    /// is what lets that shortcut work for anything in the table, not only Companions' own 33 pairs
+    /// — so this checks `properNameByBundleID` first, a name confirmed against the App Store the
+    /// same session the identifier was added (see `design/companions-sources.md` for the ones that
+    /// are also companions, and this file's own history otherwise).
     ///
-    /// Only when exactly one name does. Every essential carries its own detail sentence, so those
-    /// are unique and answer here; the quieter tiers share a bare `.init(.useful)` between many
-    /// apps, and for those the table genuinely does not know which one this is. Guessing between
-    /// them would put the wrong name on a target and on the shield, which is worse than "This
-    /// app". `Companions` is asked first by the caller and knows the rest by name outright.
+    /// Failing that, the older and lossier route: take the advice the identifier maps to in
+    /// `bundleIDs`, and answer the one name in `names` that maps to the very same advice — but only
+    /// when exactly one does. Every essential carries its own detail sentence, so those are unique
+    /// and answer here without needing an entry in `properNameByBundleID` at all; the quieter tiers
+    /// mostly share a bare `.init(.useful)` between many apps, and for anything not also listed in
+    /// `properNameByBundleID` the table genuinely does not know which one this is. Guessing between
+    /// them would put the wrong name on a target and on the shield, which is worse than "This app".
     static func name(forBundleID raw: String) -> String? {
+        let key = raw.lowercased()
+        if let exact = properNameByBundleID[key] { return exact }
         guard let advice = byBundleID(raw) else { return nil }
         let matches = names.filter { $0.value == advice }
-        guard matches.count == 1, let key = matches.keys.first else { return nil }
-        return properName(key)
+        guard matches.count == 1, let matchKey = matches.keys.first else { return nil }
+        return properName(matchKey)
     }
+
+    /// Bundle identifiers this table knows the exact name of, confirmed against the App Store
+    /// rather than reconstructed from a shared tier. Only entries `Companions` does not already
+    /// carry: anything with a website goes through it first, in the caller
+    /// (`AppModel.nameFromTables`), and its names are the ones written to be shown.
+    static let properNameByBundleID: [String: String] = [
+        "net.kortina.labs.venmo": "Venmo",
+        "com.squareup.cash": "Cash App",
+        "com.yourcompany.ppclient": "PayPal",
+        "doordash.doordashconsumer": "DoorDash",
+        "com.ubercab.ubereats": "Uber Eats",
+        "com.airbnb.app": "Airbnb",
+        "com.ebay.iphone": "eBay",
+        "com.etsy.etsyforios": "Etsy",
+        "com.microsoft.skype.teams": "Microsoft Teams",
+        "com.fogcreek.trello": "Trello",
+        "com.asana.asana": "Asana",
+        "com.duolingo.duolingomobile": "Duolingo",
+        "com.soundcloud.touchapp": "SoundCloud",
+        "com.pandora": "Pandora",
+        "com.anthropic.claude": "Claude",
+        "com.google.gemini": "Gemini",
+        "ai.perplexity.app": "Perplexity",
+        "com.evernote.iphone.evernote": "Evernote",
+        "com.todoist.ios": "Todoist",
+        "com.monday.monday": "monday.com",
+        "com.canva.canvaeditor": "Canva",
+        "org.khanacademy.khan-academy": "Khan Academy",
+        "org.coursera.coursera": "Coursera",
+        "com.audible.iphone": "Audible",
+        "com.amazon.lassen": "Kindle",
+        "com.quora.app.experts": "Poe",
+        "com.microsoft.officemobile": "Microsoft Copilot",
+        "com.instacart": "Instacart",
+        "com.walmart.electronics": "Walmart",
+        "com.target.target": "Target",
+
+        "com.peacocktv.peacock": "Peacock",
+        "com.cbsvideo.app": "Paramount+",
+        "com.apple.tv": "Apple TV",
+        "com.espn.scorecenter": "ESPN",
+        "iphone.thescore.com": "theScore",
+        "com.flipboard.flipboard-ipad": "Flipboard",
+        "com.quora.app.mobile": "Quora",
+        "com.nextdoor.nextdoor": "Nextdoor",
+        "imgurmobile": "Imgur",
+        "com.roblox.robloxmobile": "Roblox",
+        "com.epicgames.fortnitegame": "Fortnite",
+        "com.midasplayer.apps.candycrushsaga": "Candy Crush Saga",
+        "com.zynga.wordswithfriends3": "Words With Friends",
+        "com.nianticlabs.pokemongo": "Pokémon GO",
+        "com.chess.iphone": "Chess.com",
+        "com.poshmark.poshmark": "Poshmark",
+        "com.garageitaly.garage": "Depop",
+        "com.vimeo": "Vimeo",
+        "com.crunchyroll.iphone": "Crunchyroll",
+        "com.nfl.gamecenter": "NFL",
+        "com.bleacherreport.teamstream": "Bleacher Report",
+        "com.mojang.minecraftpe": "Minecraft",
+        "com.mercariapp.ios.mercari": "Mercari",
+        "com.offerup.iphone.consumer": "OfferUp",
+        "com.alibaba.ialiexpress": "AliExpress",
+        "com.innersloth.amongus": "Among Us!",
+        "com.activision.callofduty.shooter": "Call of Duty: Mobile",
+        "com.vilcsak.bitcoin2": "Coinbase",
+
+        "com.bereal.bereal": "BeReal",
+        "com.9gag.ios.mobile": "9GAG",
+        "com.einnovation.temu": "Temu",
+        "zzkko.com.zzkko": "Shein",
+        "com.cardify.tinder": "Tinder",
+        "com.moxco.bumble": "Bumble",
+        "co.hinge.mobile.ios": "Hinge",
+        "com.grindrguy.grindrx": "Grindr",
+        "com.okcupid.app": "OkCupid",
+        "ai.character.app": "Character.AI",
+        "com.draftkings.sportsbook": "DraftKings",
+        "com.fanduel.sportsbook": "FanDuel",
+        "com.playmgm.nj.sports2": "BetMGM",
+        "us.williamhill.nj.sports": "Caesars Sportsbook",
+        "com.espn.bet": "ESPN Bet",
+        "com.myprizepicks.prizepicks": "PrizePicks",
+        "com.kick.mobile": "Kick",
+        "com.kick.streaming": "Kick",
+        "com.supercell.magic": "Clash of Clans",
+        "com.supercell.scroll": "Clash Royale",
+        "com.supercell.laser": "Brawl Stars",
+        "com.match.match.com": "Match",
+        "com.robinhood.release.robinhood": "Robinhood",
+    ]
 
     /// A key from `names` as a person writes it. The keys are lowercased because that is how the
     /// shield reports a name and so how the lookup has to match, which loses the casing — and
@@ -124,6 +223,13 @@ enum AppUtility {
         "pokémon go": "Pokémon GO",
         "pokemon go": "Pokémon GO",
         "youtube music": "YouTube Music",
+        "monday.com": "monday.com",
+        "khan academy": "Khan Academy",
+        "poe": "Poe",
+        "nfl": "NFL",
+        "aliexpress": "AliExpress",
+        "offerup": "OfferUp",
+        "among us!": "Among Us!",
     ]
 
     /// Subdomains count: "m.youtube.com" is YouTube.
@@ -197,6 +303,24 @@ enum AppUtility {
         "claude": .init(.useful),
         "gemini": .init(.useful),
         "perplexity": .init(.useful),
+        "telegram": .init(.useful),
+        "messenger": .init(.useful),
+        "notion": .init(.useful),
+        "evernote": .init(.useful),
+        "todoist": .init(.useful),
+        "monday.com": .init(.useful),
+        "canva": .init(.useful),
+        "khan academy": .init(.useful),
+        "coursera": .init(.useful),
+        "audible": .init(.useful),
+        "kindle": .init(.useful),
+        "poe": .init(.useful),
+        "copilot": .init(.useful),
+        "microsoft copilot": .init(.useful),
+        "instacart": .init(.useful),
+        "walmart": .init(.useful),
+        "target": .init(.useful),
+        "amazon": .init(.useful),
 
         "youtube": .init(.idle),
         "netflix": .init(.idle),
@@ -228,6 +352,19 @@ enum AppUtility {
         "chess.com": .init(.idle),
         "poshmark": .init(.idle),
         "depop": .init(.idle),
+        "vimeo": .init(.idle),
+        "crunchyroll": .init(.idle),
+        "nfl": .init(.idle),
+        "bleacher report": .init(.idle),
+        "minecraft": .init(.idle),
+        "mercari": .init(.idle),
+        "offerup": .init(.idle),
+        "aliexpress": .init(.idle),
+        "among us": .init(.idle),
+        "among us!": .init(.idle),
+        "call of duty": .init(.idle),
+        "call of duty: mobile": .init(.idle),
+        "coinbase": .init(.idle),
 
         "tiktok": .init(.hazard),
         "instagram": .init(.hazard),
@@ -256,6 +393,13 @@ enum AppUtility {
         "caesars sportsbook": .init(.hazard),
         "espn bet": .init(.hazard),
         "prizepicks": .init(.hazard),
+        "kick": .init(.hazard),
+        "clash of clans": .init(.hazard),
+        "clash royale": .init(.hazard),
+        "brawl stars": .init(.hazard),
+        "match": .init(.hazard),
+        "robinhood": .init(.hazard),
+        "bluesky": .init(.hazard),
     ]
 
     /// Mac and iOS bundle identifiers. Messages, FaceTime and Maps share ids across platforms.
@@ -305,6 +449,23 @@ enum AppUtility {
         "com.anthropic.claude": .init(.useful),
         "com.google.gemini": .init(.useful),
         "ai.perplexity.app": .init(.useful),
+        "ph.telegra.telegraph": .init(.useful),
+        "com.facebook.messenger": .init(.useful),
+        "notion.id": .init(.useful),
+        "com.evernote.iphone.evernote": .init(.useful),
+        "com.todoist.ios": .init(.useful),
+        "com.monday.monday": .init(.useful),
+        "com.canva.canvaeditor": .init(.useful),
+        "org.khanacademy.khan-academy": .init(.useful),
+        "org.coursera.coursera": .init(.useful),
+        "com.audible.iphone": .init(.useful),
+        "com.amazon.lassen": .init(.useful),
+        "com.quora.app.experts": .init(.useful),
+        "com.microsoft.officemobile": .init(.useful),
+        "com.instacart": .init(.useful),
+        "com.walmart.electronics": .init(.useful),
+        "com.target.target": .init(.useful),
+        "com.amazon.amazon": .init(.useful),
 
         "com.google.ios.youtube": .init(.idle),
         "com.netflix.netflix": .init(.idle),
@@ -332,6 +493,17 @@ enum AppUtility {
         "com.chess.iphone": .init(.idle),
         "com.poshmark.poshmark": .init(.idle),
         "com.garageitaly.garage": .init(.idle),
+        "com.vimeo": .init(.idle),
+        "com.crunchyroll.iphone": .init(.idle),
+        "com.nfl.gamecenter": .init(.idle),
+        "com.bleacherreport.teamstream": .init(.idle),
+        "com.mojang.minecraftpe": .init(.idle),
+        "com.mercariapp.ios.mercari": .init(.idle),
+        "com.offerup.iphone.consumer": .init(.idle),
+        "com.alibaba.ialiexpress": .init(.idle),
+        "com.innersloth.amongus": .init(.idle),
+        "com.activision.callofduty.shooter": .init(.idle),
+        "com.vilcsak.bitcoin2": .init(.idle),
 
         "com.zhiliaoapp.musically": .init(.hazard),
         "com.ss.iphone.ugc.ame": .init(.hazard),
@@ -357,6 +529,14 @@ enum AppUtility {
         "us.williamhill.nj.sports": .init(.hazard),
         "com.espn.bet": .init(.hazard),
         "com.myprizepicks.prizepicks": .init(.hazard),
+        "com.kick.mobile": .init(.hazard),
+        "com.kick.streaming": .init(.hazard),
+        "com.supercell.magic": .init(.hazard),
+        "com.supercell.scroll": .init(.hazard),
+        "com.supercell.laser": .init(.hazard),
+        "com.match.match.com": .init(.hazard),
+        "com.robinhood.release.robinhood": .init(.hazard),
+        "xyz.blueskyweb.app": .init(.hazard),
     ]
 
     /// Whole vendor suites, matched on the longest prefix that fits.
@@ -410,6 +590,18 @@ enum AppUtility {
         ("claude.ai", .init(.useful)),
         ("gemini.google.com", .init(.useful)),
         ("perplexity.ai", .init(.useful)),
+        ("web.telegram.org", .init(.useful)),
+        ("notion.so", .init(.useful)),
+        ("evernote.com", .init(.useful)),
+        ("todoist.com", .init(.useful)),
+        ("monday.com", .init(.useful)),
+        ("canva.com", .init(.useful)),
+        ("khanacademy.org", .init(.useful)),
+        ("coursera.org", .init(.useful)),
+        ("audible.com", .init(.useful)),
+        ("instacart.com", .init(.useful)),
+        ("walmart.com", .init(.useful)),
+        ("target.com", .init(.useful)),
 
         ("youtube.com", .init(.idle)),
         ("netflix.com", .init(.idle)),
@@ -431,6 +623,14 @@ enum AppUtility {
         ("chess.com", .init(.idle)),
         ("poshmark.com", .init(.idle)),
         ("depop.com", .init(.idle)),
+        ("vimeo.com", .init(.idle)),
+        ("crunchyroll.com", .init(.idle)),
+        ("nfl.com", .init(.idle)),
+        ("bleacherreport.com", .init(.idle)),
+        ("mercari.com", .init(.idle)),
+        ("offerup.com", .init(.idle)),
+        ("aliexpress.com", .init(.idle)),
+        ("coinbase.com", .init(.idle)),
 
         ("tiktok.com", .init(.hazard)),
         ("instagram.com", .init(.hazard)),
@@ -455,5 +655,9 @@ enum AppUtility {
         ("character.ai", .init(.hazard)),
         ("betmgm.com", .init(.hazard)),
         ("prizepicks.com", .init(.hazard)),
+        ("kick.com", .init(.hazard)),
+        ("match.com", .init(.hazard)),
+        ("robinhood.com", .init(.hazard)),
+        ("bsky.app", .init(.hazard)),
     ]
 }
