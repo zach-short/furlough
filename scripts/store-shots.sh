@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Renders design/store/board.html into App Store screenshots.
 #
-#   ./scripts/store-shots.sh            # six 1320x2868 frames + the panorama
+#   ./scripts/store-shots.sh            # ten 1320x2868 frames + the panorama
 #   ./scripts/store-shots.sh 3          # just frame 3, while iterating
 #
 # Output lands in build/store-shots/ (gitignored). Upload the .jpg files:
@@ -30,12 +30,12 @@ if [ $# -gt 0 ]; then
   echo "Rendering frame $1"
   shoot "$(printf '%02d' "$1")" $W $H "$1"
 else
-  echo "Rendering six frames"
-  for f in 1 2 3 4 5 6; do shoot "$(printf '%02d' $f)" $W $H "$f"; done
+  echo "Rendering ten frames"
+  for f in $(seq 1 10); do shoot "$(printf '%02d' $f)" $W $H "$f"; done
   echo "Rendering the panorama (review only, not for upload)"
-  shoot panorama $((W * 6)) $H all
+  shoot panorama $((W * 10)) $H all
   echo "Flattening to JPEG for upload"
-  for f in 01 02 03 04 05 06; do
+  for f in $(seq -w 1 10); do
     sips -s format jpeg -s formatOptions 100 "$OUT/$f.png" --out "$OUT/$f.jpg" >/dev/null
   done
 fi
