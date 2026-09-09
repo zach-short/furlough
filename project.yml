@@ -160,12 +160,21 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.zachshort.furlough.shield
         TARGETED_DEVICE_FAMILY: "1"
 
+  # The widget reads the app's store and draws it; it calls no Screen Time API and must not
+  # link one. App Review's automated scan rejected build 202609090423 (2026-09-09, guideline
+  # 2.5.1) because this target linked ManagedSettings — Shared/Core imports it for the token
+  # types inside the state — while carrying no Family Controls entitlement, which every bundle
+  # that links FamilyControls, ManagedSettings or DeviceActivity must. NO_SCREEN_TIME drops
+  # those imports and swaps in Shared/Core/ScreenTimeStandIns.swift; the reconciler goes the
+  # way it does on the Mac. scripts/archive.sh refuses to ship a bundle that gets this wrong.
   FurloughWidgets:
     type: app-extension
     platform: iOS
     sources:
       - path: FurloughWidgets
       - path: Shared/Core
+        excludes:
+          - ShieldReconciler.swift
       - path: Shared/LiveActivity
       - path: Shared/UI
       - path: Furlough/Fonts
@@ -202,6 +211,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.zachshort.furlough.widgets
         TARGETED_DEVICE_FAMILY: "1"
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) NO_SCREEN_TIME"
 
   # The rules engine on its own. Shared/Core is pure Foundation and already builds for macOS,
   # so the engine can be tested on this Mac with no phone and no host app. ShieldReconciler is

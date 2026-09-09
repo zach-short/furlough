@@ -1,5 +1,5 @@
 import Foundation
-#if os(iOS)
+#if os(iOS) && !NO_SCREEN_TIME
 import ManagedSettings
 #endif
 
