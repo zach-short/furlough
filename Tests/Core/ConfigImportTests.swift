@@ -296,7 +296,7 @@ struct ConfigImportTests {
           "platform": "mac",
           "exportedAt": "2026-09-08T00:00:00Z",
           "loosenDelayHours": 24,
-          "anchor": { "kinds": [], "isAnchored": false, "tagID": "AQID" },
+          "anchor": { "kinds": [], "isAnchored": false, "tags": [{ "id": "AQID", "name": "Home" }] },
           "pending": [
             { "id": "9E3C1E9E-0000-0000-0000-000000000001",
               "kind": { "setDelay": { "hours": 1 } },
@@ -320,7 +320,7 @@ struct ConfigImportTests {
             kinds: [.host("youtube.com")],
             isAnchored: true,
             anchoredAt: at(7),
-            tagID: Data([9, 9, 9])
+            tags: [PairedTag(id: Data([9, 9, 9]), name: "Home")]
         )
         before.runtime.exhausted = [target.id.uuidString: Policy.dayKey(now, calendar: cal)]
         before.runtime.warned = [target.id.uuidString: Policy.dayKey(now, calendar: cal)]

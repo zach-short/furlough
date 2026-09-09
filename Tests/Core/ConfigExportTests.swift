@@ -73,11 +73,16 @@ struct ConfigExportTests {
     @Test("nothing that belongs to the device goes in the file")
     func runtimeAndAnchorStayHome() throws {
         var state = sample()
-        state.config.anchor = AnchorProfile(kinds: [.host("youtube.com")], isAnchored: true, anchoredAt: .now, tagID: Data([1, 2, 3]))
+        state.config.anchor = AnchorProfile(
+            kinds: [.host("youtube.com")],
+            isAnchored: true,
+            anchoredAt: .now,
+            tags: [PairedTag(id: Data([1, 2, 3]), name: "Home")]
+        )
         state.pending = [PendingChange(kind: .setDelay(hours: 1), effectiveAt: .now)]
         state.runtime.exhausted = ["\(state.config.targets[0].id.uuidString)": Policy.dayKey(.now)]
         let json = try String(decoding: ConfigExport.current(state).json(), as: UTF8.self)
-        for leak in ["anchor", "tagID", "isAnchored", "pending", "exhausted", "clock"] {
+        for leak in ["anchor", "tags", "Home", "isAnchored", "pending", "exhausted", "clock"] {
             #expect(!json.contains(leak), "the file mentions \(leak)")
         }
     }

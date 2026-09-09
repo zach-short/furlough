@@ -371,7 +371,24 @@ enum TargetKind: Codable, Hashable {
 /// One app, website, or category that Furlough manages.
 struct Target: Codable, Hashable, Identifiable {
     var id = UUID()
+    /// The face of this thing: the app, wherever there is one. Blocking the YouTube app and
+    /// leaving youtube.com open is the gap everyone finds a week later, so the two halves are
+    /// one target — and the app is the half with real artwork and Apple's own name, so it is
+    /// the half the row shows.
     var kind: TargetKind
+    /// The other doors into the same thing, blocked on the same rule.
+    ///
+    /// Two doors into one habit should not cost two rules to close. Everything downstream reads
+    /// `kinds` rather than `kind`, so one status, one schedule, one budget, one removal delay and
+    /// one row cover every half: `Policy.decide` shields them together, and `Monitoring.include`
+    /// puts their tokens in *one* DeviceActivity event, so 45 minutes is 45 across the app and
+    /// the site together rather than 45 each. Where a half has no token — a site typed by name —
+    /// it shares the windows and nothing counts it; the editor says so.
+    ///
+    /// Optional for the same reason `systemName` and `utilityLevel` are: a synthesised
+    /// `init(from:)` demands every non-optional key, and the state already on the phone has none.
+    /// Read it through `kinds`.
+    var also: [TargetKind]?
     var nickname = ""
     /// nil means "not configured yet": nothing is enforced until the first rule is saved.
     var rule: Rule?
@@ -391,6 +408,17 @@ struct Target: Codable, Hashable, Identifiable {
     /// reason `systemName` is: a synthesised `init(from:)` demands every non-optional key, and
     /// state written before tiers existed has none. Read it through `utility`.
     var utilityLevel: Utility?
+
+    /// Every door into this thing, the face first. Read this rather than `kind` anywhere the
+    /// question is "what does this target cover": one target may be an app *and* the website it
+    /// is also at, and both are blocked on the one rule.
+    var kinds: [TargetKind] { [kind] + (also ?? []) }
+
+    /// True when this target covers more than one door.
+    var isLinked: Bool { !(also ?? []).isEmpty }
+
+    /// Whether `kind` is one of this target's doors.
+    func covers(_ kind: TargetKind) -> Bool { kinds.contains(kind) }
 
     /// How much this one is worth, which sets both how long a loosening waits and how loudly
     /// blocking it is questioned. Unset means the middle: the base delay, a mild warning.
@@ -418,29 +446,58 @@ struct Target: Codable, Hashable, Identifiable {
     var displayName: String { nickname.isEmpty ? defaultName : nickname }
 }
 
+/// One tag paired with the anchor: the hardware identifier read over NFC, and a name. The name
+/// is what makes more than one usable — two identifiers are four hex digits apiece, and nobody
+/// tells those apart. A tag lives in a place; the name is which place.
+struct PairedTag: Codable, Equatable, Identifiable {
+    /// Hardware identifier read over NFC. Unique per tag, so it is the identity.
+    var id: Data
+    var name: String
+
+    /// The longest name a row can show without wrapping into the identifier under it.
+    static let maxNameLength = 24
+}
+
 /// A set of apps, sites, or categories locked behind a physical NFC tag. Anchoring is instant
-/// from the app; weighing anchor needs the paired tag. This is the only unblock path in Furlough,
-/// and it exists only here: rule-based targets never get one. While anchored, the list and the
-/// tag cannot be changed.
+/// from the app; weighing anchor needs one of the paired tags. This is the only unblock path in
+/// Furlough, and it exists only here: rule-based targets never get one. While anchored, the list
+/// and the tags cannot be changed.
 struct AnchorProfile: Codable, Equatable {
     var kinds: [TargetKind] = []
     var isAnchored = false
     var anchoredAt: Date?
-    /// Hardware identifier of the paired tag, read over NFC.
-    var tagID: Data?
+    /// Every tag that releases this anchor. They are keys to one lock, not a sequence: any of
+    /// them lifts it, so a tag at each place you live keeps the friction at "walk to the drawer"
+    /// in both. Capped at `Furlough.maxAnchorTags`, since the failure here is not two keys but
+    /// enough of them that one is always within reach.
+    var tags: [PairedTag] = []
 
-    var isPaired: Bool { tagID != nil }
+    var isPaired: Bool { !tags.isEmpty }
+    /// Room for another key. Pairing is refused past the cap rather than evicting the oldest:
+    /// silently dropping a key is how someone finds out at the drawer that it no longer opens.
+    var canPairMore: Bool { tags.count < Furlough.maxAnchorTags }
     var count: Int { kinds.count }
     /// Ready to anchor: something to lock and a tag to unlock it with.
     var canAnchor: Bool { !kinds.isEmpty && isPaired && !isAnchored }
     func contains(_ kind: TargetKind) -> Bool { kinds.contains(kind) }
     /// True when `kind` is blocked by the anchor right now.
     func blocks(_ kind: TargetKind) -> Bool { isAnchored && contains(kind) }
+    /// The paired tag a scan matches, if any.
+    func tag(matching scanned: Data) -> PairedTag? { tags.first { $0.id == scanned } }
+    /// A placeholder for a tag just paired, never a duplicate of one already here, because a
+    /// name only earns its place by telling one drawer from another.
+    var nextTagName: String {
+        var n = tags.count + 1
+        while tags.contains(where: { $0.name == "Tag \(n)" }) { n += 1 }
+        return "Tag \(n)"
+    }
 }
 
 extension AnchorProfile {
-    /// The anchor was called the Brick until 2026-09-08, and the state on the phone still says
-    /// so. Read the old names when the new ones are missing; encoding always writes the new.
+    /// The anchor was called the Brick until 2026-09-08, and held a single `tagID` until
+    /// 2026-09-08. Read the old names when the new ones are missing; encoding always writes the
+    /// new. A lone stored identifier becomes the first of the list, named rather than blank, so
+    /// the phone comes back with the key it already had.
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let legacy = try decoder.container(keyedBy: LegacyKeys.self)
@@ -449,10 +506,16 @@ extension AnchorProfile {
             ?? legacy.decodeIfPresent(Bool.self, forKey: .isBricked) ?? false
         anchoredAt = try container.decodeIfPresent(Date.self, forKey: .anchoredAt)
             ?? legacy.decodeIfPresent(Date.self, forKey: .brickedAt)
-        tagID = try container.decodeIfPresent(Data.self, forKey: .tagID)
+        if let stored = try container.decodeIfPresent([PairedTag].self, forKey: .tags) {
+            // Trimmed on the way in as well as on the way out: a file written when the cap was
+            // higher, or by hand, does not get to hand the anchor more keys than it allows.
+            tags = Array(stored.prefix(Furlough.maxAnchorTags))
+        } else if let single = try legacy.decodeIfPresent(Data.self, forKey: .tagID) {
+            tags = [PairedTag(id: single, name: "Tag 1")]
+        }
     }
 
-    private enum LegacyKeys: String, CodingKey { case isBricked, brickedAt }
+    private enum LegacyKeys: String, CodingKey { case isBricked, brickedAt, tagID }
 }
 
 struct Config: Codable, Equatable {
@@ -480,11 +543,15 @@ struct Config: Codable, Equatable {
 
     var loosenDelay: TimeInterval { TimeInterval(loosenDelayHours) * 3600 }
 
-    /// Whether `target` is locked by the anchor right now.
-    func isAnchored(_ target: Target) -> Bool { anchor.blocks(target.kind) }
+    /// Whether `target` is locked by the anchor right now. Any door being anchored anchors the
+    /// target: the halves are one thing, and one of them held is the whole of it held.
+    func isAnchored(_ target: Target) -> Bool { target.kinds.contains { anchor.blocks($0) } }
 
     func target(id: UUID) -> Target? { targets.first { $0.id == id } }
-    func target(kind: TargetKind) -> Target? { targets.first { $0.kind == kind } }
+    /// The target `kind` is a door into, whether it is the face or a linked half. Reading only
+    /// `kind` here would let the picker and an import add a second target for a half that is
+    /// already covered.
+    func target(kind: TargetKind) -> Target? { targets.first { $0.covers(kind) } }
 }
 
 enum PendingKind: Codable, Hashable {
@@ -493,6 +560,11 @@ enum PendingKind: Codable, Hashable {
     case setDelay(hours: Int)
     /// Moving a target toward essential shortens its delay, so that is a loosening and queues.
     case setUtility(targetID: UUID, level: Utility)
+    /// Taking one half off a linked target: the website an app is also at stops being blocked
+    /// while the app stays. Something shielded a moment ago is not any more, so it is a
+    /// loosening and queues, exactly as removing the whole row does. Linking is the tightening
+    /// and lands at once.
+    case unlink(targetID: UUID, kind: TargetKind)
 }
 
 /// A loosening edit waiting out the delay.
@@ -504,7 +576,7 @@ struct PendingChange: Codable, Hashable, Identifiable {
 
     var targetID: UUID? {
         switch kind {
-        case .setRule(let id, _), .removeTarget(let id), .setUtility(let id, _): id
+        case .setRule(let id, _), .removeTarget(let id), .setUtility(let id, _), .unlink(let id, _): id
         case .setDelay: nil
         }
     }
@@ -536,12 +608,19 @@ struct SharedState: Codable, Equatable {
 /// only ever had it, and the phone gained typed sites alongside the picker's — so this is not
 /// Mac-only the way the bundle-identifier lookups below are.
 extension Config {
-    /// The target whose host is `host` or a parent domain of it: "m.youtube.com" matches "youtube.com".
+    /// The target whose host is `host` or a parent domain of it: "m.youtube.com" matches
+    /// "youtube.com". Searches every door, so a site linked to an app is found through the app's
+    /// target — which is the point of linking: one row answers for both halves.
     func target(host: String) -> Target? {
         let host = host.lowercased()
         return targets
-            .filter { if case .host(let h) = $0.kind { return Hosts.matches(host, rule: h) }; return false }
-            .max { a, b in a.host.count < b.host.count }
+            .compactMap { target -> (Target, Int)? in
+                guard let matched = target.hosts.filter({ Hosts.matches(host, rule: $0) }).max(by: { $0.count < $1.count })
+                else { return nil }
+                return (target, matched.count)
+            }
+            .max { a, b in a.1 < b.1 }?
+            .0
     }
 }
 
@@ -550,12 +629,58 @@ extension TargetKind {
         if case .host = self { return true }
         return false
     }
+
+    /// The host this door is, or nil when it is not a typed site.
+    var hostName: String? {
+        if case .host(let h) = self { return h }
+        return nil
+    }
 }
 
 extension Target {
-    var host: String {
-        if case .host(let h) = kind { return h }
-        return ""
+    /// The face's host, or "" when the face is not a typed site. `hosts` is what to read when
+    /// the question is which sites this target covers.
+    var host: String { kind.hostName ?? "" }
+
+    /// Every typed site this target covers, the face first.
+    var hosts: [String] { kinds.compactMap(\.hostName) }
+
+    /// True when any door is a typed site, so the web content filter has work to do for it.
+    var hasHost: Bool { kinds.contains(where: \.isHost) }
+
+    /// Whether this target covers the app half of a thing.
+    var coversApp: Bool {
+        kinds.contains { kind in
+            #if os(iOS)
+            if case .application = kind { return true }
+            #else
+            if case .macApp = kind { return true }
+            #endif
+            return false
+        }
+    }
+
+    /// Whether anything this target covers is counted against its budget.
+    ///
+    /// DeviceActivity counts tokens and nothing else, so a site typed by name is never counted —
+    /// on its own that leaves a target with hours and no budget at all. Linked to an app it is
+    /// different: the pair shares one budget event and the app's minutes draw it down, so the
+    /// budget is real and only the browser half is invisible. The editor says which it is.
+    var isCounted: Bool { kinds.contains { !$0.isHost } }
+
+    /// Typed sites that share this target's budget without being counted towards it: the honest
+    /// gap in a linked pair, and empty when there is none.
+    var uncountedHosts: [String] { isCounted ? hosts : [] }
+
+    /// Whether this target covers the website half, however it got there: Apple's picker mints a
+    /// token, and a name typed into Furlough is a `.host`. Both are the site.
+    var coversSite: Bool {
+        kinds.contains { kind in
+            #if os(iOS)
+            if case .webDomain = kind { return true }
+            #endif
+            return kind.isHost
+        }
     }
 }
 

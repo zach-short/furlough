@@ -688,7 +688,28 @@ The plan for this stretch. Tick each phase off here as it lands.
     day" toggle, one `budget:` event per distinct value, the monitor filtering by today's.
 12. **Rules for categories** instead of always-blocked. Ask Zach first.
 13. **Anchor the whole phone**: a scope on `AnchorProfile`, `.all(except:)` with an allowlist.
-14. **A second tag**: `AnchorProfile.tagIDs`, pairing another queues as loosening.
+14. **More than one tag.** Done 2026-09-08. Zach lives in two places and wanted a key at each,
+    which is the case the anchor is for rather than a hole in it: a key three hours away is not
+    a stronger lock, it is one nobody dares close. `AnchorProfile.tagID: Data?` became
+    `tags: [PairedTag]` (`id`, the hardware identifier, plus a `name`, because two identifiers
+    are four hex digits apiece and nobody tells those apart), capped at
+    `Furlough.maxAnchorTags` = 3 — the failure here is not two keys but enough that one is
+    always in a pocket. Any paired tag releases the anchor (`AnchorProfile.tag(matching:)`);
+    `isPaired` is `!tags.isEmpty`, so `canAnchor` and every call site read as before.
+    **What was decided against**: this plan said pairing another would queue as a loosening.
+    It does not, and must not be allowed while anchored either — a queued pair under a lock
+    turns the anchor's guarantee from "held until the tag" into "held for the delay, then any
+    ISO 14443 card in your wallet", which is a timer with extra steps. `pairTag()` keeps the
+    old refusal (`AppModel.pairingRefusal`, checked before and after the scan since the state
+    can move under a long await), so the discipline is: pair every key before you anchor.
+    With the anchor off there is nothing being held to wait for, so pairing lands at once.
+    Also `renameTag(id:to:)` (trimmed, empty ignored, capped at `PairedTag.maxNameLength`)
+    and `unpairTag(id:)`, both locked while anchored; `AnchorOutcome.paired` carries the new
+    tag so `AnchorView` opens the name field straight after the scan. The old lone `tagID`
+    reads back as one tag named "Tag 1" (`LegacyKeys`, beside the `brick` rename), and a
+    stored list is `prefix`-ed to the cap on decode so a hand-written file cannot exceed it.
+    Tests: `Tests/Core/ModelsTests.swift` (`Anchor tags` suite) and the migration cases in
+    `Tests/Core/DecodingTests.swift`.
 15. **Tiers, and the warnings that come with them.** Done 2026-09-08. Zach asked for a delay
     scaled to how useful an app is, and for a warning before blocking one the phone needs — and
     the two are the same axis read in opposite directions, so they are one field, not two.

@@ -6,13 +6,15 @@ enum AnchorRoute: Hashable {
 }
 
 /// The Anchor profile: apps locked behind a physical tag. Anchor from here or from the home
-/// card; weigh anchor only by scanning the paired tag.
+/// card; weigh anchor only by scanning one of the paired tags.
 struct AnchorView: View {
     @Environment(AppModel.self) private var model
     @State private var showPicker = false
     @State private var selection = FamilyActivitySelection(includeEntireCategory: true)
     @State private var message: String?
-    @State private var confirmForget = false
+    @State private var forgetting: PairedTag?
+    @State private var renaming: PairedTag?
+    @State private var draftName = ""
 
     private var anchor: AnchorProfile { model.state.config.anchor }
     private var anchorCaution: (text: String, isSevere: Bool)? { model.anchorCaution }
@@ -32,9 +34,9 @@ struct AnchorView: View {
                     ? "Unanchor with your tag to change the list."
                     : "Anything here is blocked while anchored. Windows and budgets still apply the rest of the time.")
                     .padding(.top, 8)
-                SectionLabel(text: "Tag")
+                SectionLabel(text: "Tags")
                 tagCard
-                Footnote(text: "Anchoring works without the tag. Weighing anchor needs it, so keep the tag somewhere that makes you think.")
+                Footnote(text: tagFootnote)
                     .padding(.top, 8)
             }
             .padding(.horizontal, 16)
@@ -65,9 +67,39 @@ struct AnchorView: View {
         } message: {
             Text(message ?? "")
         }
-        .confirmationDialog("Forget this tag?", isPresented: $confirmForget, titleVisibility: .visible) {
-            Button("Forget tag", role: .destructive) { model.unpairTag() }
+        .confirmationDialog(
+            "Forget this tag?",
+            isPresented: Binding(get: { forgetting != nil }, set: { if !$0 { forgetting = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button("Forget \(forgetting?.name ?? "tag")", role: .destructive) {
+                if let tag = forgetting { model.unpairTag(id: tag.id) }
+                forgetting = nil
+            }
+            Button("Keep it", role: .cancel) { forgetting = nil }
+        } message: {
+            Text(anchor.tags.count == 1
+                ? "This is the last key. Anchoring is refused until you pair another."
+                : "The other tags still release the anchor.")
         }
+        .alert(
+            "Name this tag",
+            isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })
+        ) {
+            TextField("Home", text: $draftName)
+            Button("Save") {
+                if let tag = renaming { model.renameTag(id: tag.id, to: draftName) }
+                renaming = nil
+            }
+            Button("Cancel", role: .cancel) { renaming = nil }
+        } message: {
+            Text("Name it for the place it lives in, so you know which key you are looking for.")
+        }
+    }
+
+    private var tagFootnote: String {
+        let cap = "Up to \(Furlough.maxAnchorTags), so a key can live at each place you do."
+        return "Anchoring works without a tag. Weighing anchor needs one, so keep every tag somewhere that makes you think. \(cap)"
     }
 
     private var header: some View {
@@ -154,48 +186,110 @@ struct AnchorView: View {
 
     private var tagCard: some View {
         VStack(spacing: 0) {
-            HStack {
-                Text("Paired tag")
-                    .emberBody(13)
-                    .foregroundStyle(Ember.cream)
-                Spacer()
-                Text(anchor.tagID.map(tagLabel) ?? "None")
-                    .emberBody(13)
-                    .monospacedDigit()
-                    .foregroundStyle(anchor.isPaired ? Ember.moss : Ember.muted)
+            if anchor.tags.isEmpty {
+                HStack {
+                    Text("None paired")
+                        .emberBody(13)
+                        .foregroundStyle(Ember.muted)
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 11)
+            } else {
+                ForEach(Array(anchor.tags.enumerated()), id: \.element.id) { index, tag in
+                    if index > 0 { CardDivider() }
+                    tagRow(tag)
+                }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 11)
             if !anchor.isAnchored {
                 CardDivider()
-                Button {
-                    Task { await pair() }
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "wave.3.right")
-                            .font(.system(size: 12, weight: .bold))
-                        Text(anchor.isPaired ? "Replace tag" : "Pair a tag")
-                            .emberBody(13, .semibold)
+                if anchor.canPairMore {
+                    Button {
+                        Task { await pair() }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "wave.3.right")
+                                .font(.system(size: 12, weight: .bold))
+                            Text(anchor.isPaired ? "Pair another tag" : "Pair a tag")
+                                .emberBody(13, .semibold)
+                            Spacer(minLength: 8)
+                            Text(tagCount)
+                                .emberBody(11.5)
+                                .monospacedDigit()
+                                .foregroundStyle(Ember.muted)
+                        }
+                        .foregroundStyle(Ember.ember)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 11)
+                        .contentShape(Rectangle())
                     }
-                    .foregroundStyle(Ember.ember)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .buttonStyle(.plain)
+                } else {
+                    HStack {
+                        Text("\(tagCount) · forget one to pair another")
+                            .emberBody(11.5)
+                            .foregroundStyle(Ember.muted)
+                        Spacer(minLength: 0)
+                    }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 11)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                if anchor.isPaired {
-                    CardDivider()
-                    GhostButton(title: "Forget tag") { confirmForget = true }
                 }
             }
         }
         .emberCard()
     }
 
+    /// One key: what it is called, what it is, and the way to change either. Both controls are
+    /// gone while anchored, like the app list above them.
+    private func tagRow(_ tag: PairedTag) -> some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(tag.name)
+                    .emberBody(13)
+                    .foregroundStyle(Ember.cream)
+                    .lineLimit(1)
+                Text(tagLabel(tag.id))
+                    .emberBody(11)
+                    .monospacedDigit()
+                    .foregroundStyle(Ember.muted)
+            }
+            Spacer(minLength: 8)
+            if !anchor.isAnchored {
+                Button {
+                    draftName = tag.name
+                    renaming = tag
+                } label: {
+                    Text("Rename")
+                        .emberBody(12, .semibold)
+                        .foregroundStyle(Ember.ember)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                Button {
+                    forgetting = tag
+                } label: {
+                    Text("Forget")
+                        .emberBody(12, .semibold)
+                        .foregroundStyle(Ember.muted)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 11)
+    }
+
+    private var tagCount: String { "\(anchor.tags.count) of \(Furlough.maxAnchorTags)" }
+
     private func pair() async {
         switch await model.pairTag() {
-        case .paired: message = "Tag paired. Anchoring is ready."
+        // Straight into the name: an identifier's last four digits are not a place, and the
+        // scan is done, so nothing is waiting on the typing.
+        case .paired(let tag):
+            draftName = ""
+            renaming = tag
         case .failed(let reason): message = reason
         default: break
         }
@@ -203,7 +297,7 @@ struct AnchorView: View {
 
     private func tagLabel(_ id: Data) -> String {
         let hex = id.map { String(format: "%02X", $0) }.joined()
-        return "Paired · …\(hex.suffix(4))"
+        return "…\(hex.suffix(4))"
     }
 
     private func count(_ n: Int) -> String {
@@ -275,7 +369,7 @@ struct AnchorToggleButton: View {
         busy = true
         defer { busy = false }
         switch await model.unanchorWithTag() {
-        case .wrongTag: message = "That is not the paired tag."
+        case .wrongTag: message = "That is not a paired tag."
         case .failed(let reason): message = reason
         default: break
         }

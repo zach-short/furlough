@@ -43,7 +43,7 @@ struct DecodingTests {
         let config = try decode(Config.self, #"{"targets":[],"loosenDelayHours":24}"#)
         #expect(config.anchor == AnchorProfile())
         #expect(!config.anchor.isAnchored)
-        #expect(config.anchor.tagID == nil)
+        #expect(config.anchor.tags.isEmpty)
         #expect(config.schemaVersion == 1)
         #expect(config.loosenDelayHours == 24)
     }
@@ -65,8 +65,43 @@ struct DecodingTests {
         let config = try decode(Config.self, json)
         #expect(config.anchor.isAnchored)
         #expect(config.anchor.anchoredAt == at(8, 18, 12))
-        #expect(config.anchor.tagID == Data([1, 2, 3, 4]))
+        #expect(config.anchor.tags == [PairedTag(id: Data([1, 2, 3, 4]), name: "Tag 1")])
         #expect(config.anchor.isPaired)
+    }
+
+    @Test("a lone paired tag becomes the first of the list")
+    func legacySingleTag() throws {
+        let json = #"""
+        {"targets":[],"loosenDelayHours":24,"schemaVersion":1,
+         "anchor":{"kinds":[],"isAnchored":false,"tagID":"AQIDBA=="}}
+        """#
+        let config = try decode(Config.self, json)
+        #expect(config.anchor.tags == [PairedTag(id: Data([1, 2, 3, 4]), name: "Tag 1")])
+        #expect(config.anchor.isPaired)
+        #expect(config.anchor.canPairMore)
+    }
+
+    @Test("a stored list of tags wins over a lone identifier, and is capped on the way in")
+    func storedTagsWinAndAreCapped() throws {
+        let json = #"""
+        {"targets":[],"loosenDelayHours":24,"schemaVersion":1,
+         "anchor":{"kinds":[],"isAnchored":false,"tagID":"AQIDBA==","tags":[
+           {"id":"AQ==","name":"Home"},{"id":"Ag==","name":"Apartment"},
+           {"id":"Aw==","name":"Desk"},{"id":"BA==","name":"Backpack"}]}}
+        """#
+        let tags = try decode(Config.self, json).anchor.tags
+        #expect(tags.count == Furlough.maxAnchorTags)
+        #expect(tags.map(\.name) == ["Home", "Apartment", "Desk"])
+    }
+
+    @Test("tags are written back under the new key and read again")
+    func tagsRoundTrip() throws {
+        var config = Config()
+        config.anchor.tags = [PairedTag(id: Data([0xAB, 0xCD]), name: "Apartment")]
+        let json = String(data: try encoder.encode(config), encoding: .utf8) ?? ""
+        #expect(json.contains("\"tags\""))
+        #expect(!json.contains("tagID"))
+        #expect(try decode(Config.self, json).anchor.tags == config.anchor.tags)
     }
 
     @Test("the new keys win when both are somehow present")
@@ -100,7 +135,7 @@ struct DecodingTests {
         original.config.anchor.kinds = [.macApp(bundleID: "com.apple.Safari")]
         original.config.anchor.isAnchored = true
         original.config.anchor.anchoredAt = at(8)
-        original.config.anchor.tagID = Data([1, 2, 3, 4])
+        original.config.anchor.tags = [PairedTag(id: Data([1, 2, 3, 4]), name: "Home")]
         original.runtime.exhausted["x"] = "2026-09-08"
 
         let restored = try decoder.decode(SharedState.self, from: encoder.encode(original))

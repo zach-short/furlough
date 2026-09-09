@@ -131,20 +131,20 @@ struct AnchorHelp: View {
         ) {
             SectionLabel(text: "Using it")
             HelpPoints([
-                .init("Pair a tag", "Hold the phone to any NTAG sticker, or the tag from a Brick if you already own one. Furlough reads its hardware identifier and writes nothing to it."),
+                .init("Pair a tag", "Hold the phone to any NTAG sticker, or the tag from a Brick if you already own one. Furlough reads its hardware identifier and writes nothing to it. Up to three can be paired, so a key can live at each place you do — name each one for its place."),
                 .init("Anchor", "Everything on the list is shielded immediately. No tag is needed to lock and no delay applies, because anchoring only ever takes things away."),
-                .init("Unanchor", "Opens the reader. Only the tag you paired lifts the anchor, and it lifts at once. This is the one unblock in Furlough, and it exists only here."),
+                .init("Unanchor", "Opens the reader. Only a tag you paired lifts the anchor, and any of them does, at once. This is the one unblock in Furlough, and it exists only here."),
             ])
 
             SectionLabel(text: "While anchored")
             HelpPoints([
-                .init("Nothing can loosen", "The list and the paired tag cannot be changed until the anchor is off, so nothing can be edited out from under the lock."),
+                .init("Nothing can loosen", "The list and the tags cannot be changed until the anchor is off, so no key can be cut from under the lock. Pair every tag you want before you anchor."),
                 .init("Rules still stand", "An app can be anchored and have windows too. With the anchor off it falls back to its rule, or to nothing if it has none."),
-                .init("Forget tag", "Unpairs after a confirmation, and only while the anchor is off. Anchoring is refused until a new tag is paired, so there is always a way back."),
+                .init("Forget tag", "Unpairs one after a confirmation, and only while the anchor is off. Anchoring is refused once the last one is gone, so there is always a way back."),
             ])
 
             SectionLabel(text: "Before you tap it")
-            HelpProse("Anchoring something Essential warns first and asks again before it drops. The anchor is instant and only the tag lifts it, so a tag in another room means Messages stays gone until you find it. Keep the tag somewhere that makes you think.")
+            HelpProse("Anchoring something Essential warns first and asks again before it drops. The anchor is instant and only a tag lifts it, so a tag in another room means Messages stays gone until you find it. Keep every tag somewhere that makes you think — a key in your bag is no lock at all.")
                 .padding(.top, 2)
         }
     }

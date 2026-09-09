@@ -313,3 +313,54 @@ struct NightTests {
         #expect(TimeFormat.schedule(rule, calendar: cal) == "Weekends \(evening)–\(morning)")
     }
 }
+
+@Suite("Anchor tags")
+struct AnchorTagTests {
+    private func tag(_ byte: UInt8, _ name: String) -> PairedTag {
+        PairedTag(id: Data([byte]), name: name)
+    }
+
+    @Test("any paired tag matches, and nothing else does")
+    func matching() {
+        let anchor = AnchorProfile(tags: [tag(1, "Home"), tag(2, "Apartment")])
+        #expect(anchor.tag(matching: Data([1]))?.name == "Home")
+        #expect(anchor.tag(matching: Data([2]))?.name == "Apartment")
+        #expect(anchor.tag(matching: Data([3])) == nil)
+        // A prefix of a paired identifier is a different tag, not a partial match.
+        #expect(anchor.tag(matching: Data()) == nil)
+    }
+
+    @Test("one key is enough to anchor, and none is not")
+    func pairing() {
+        var anchor = AnchorProfile(kinds: [.host("youtube.com")])
+        #expect(!anchor.isPaired)
+        #expect(!anchor.canAnchor)
+        anchor.tags = [tag(1, "Home")]
+        #expect(anchor.isPaired)
+        #expect(anchor.canAnchor)
+    }
+
+    @Test("the cap is reached, not exceeded")
+    func cap() {
+        var anchor = AnchorProfile()
+        #expect(anchor.canPairMore)
+        anchor.tags = (1...UInt8(Furlough.maxAnchorTags)).map { tag($0, "Tag \($0)") }
+        #expect(!anchor.canPairMore)
+        anchor.tags.removeLast()
+        #expect(anchor.canPairMore)
+    }
+
+    @Test("a suggested name never collides with one already there")
+    func nextName() {
+        var anchor = AnchorProfile()
+        #expect(anchor.nextTagName == "Tag 1")
+        anchor.tags = [tag(1, "Home")]
+        #expect(anchor.nextTagName == "Tag 2")
+        // The count is only a starting guess: renaming leaves gaps, and a name in the way is
+        // stepped over rather than duplicated.
+        anchor.tags = [tag(1, "Tag 2")]
+        #expect(anchor.nextTagName == "Tag 3")
+        anchor.tags = [tag(1, "Tag 2"), tag(2, "Tag 3")]
+        #expect(anchor.nextTagName == "Tag 4")
+    }
+}

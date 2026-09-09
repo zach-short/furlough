@@ -20,4 +20,8 @@ enum Furlough {
     /// waits this long. Without it a low base times the essential tier rounds to nothing.
     static let minimumLoosenDelayHours = 1
     static let defaultBudgetMinutes = 30
+    /// How many tags may release one anchor. More than one because a person can live in more
+    /// than one place, and a key three hours away is not a stronger lock — it is a lock nobody
+    /// dares close. Capped so the count cannot drift upward until one is always in a pocket.
+    static let maxAnchorTags = 3
 }
