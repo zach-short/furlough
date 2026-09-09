@@ -427,7 +427,14 @@ There are no demo credentials because there is nothing to sign in to.
 
 **Sign-in required: No.** There is no account, so leave the demo account fields empty.
 
-**Contact:** Zach Short, `zmshort@wm.edu`.
+**Contact:** Zach Short, `support@furloughapp.com`.
+
+This one is not published — App Review Information is how Apple reaches the developer during
+review, and only the Support URL is public. It forwards to the real inbox through Cloudflare
+Email Routing (`furloughapp.com` → MX `route1/2/3.mx.cloudflare.net`), which is the one place a
+forwarding failure would cost something: a reviewer's question that never arrives stalls the
+release. Send a test to it before submitting, and check the spam folder — a first forwarded
+message often lands there.
 
 ---
 
@@ -480,9 +487,13 @@ Per the handoff, wording problems belong here rather than in a quiet edit.
    2026-09-08.** "Only a physical NFC tag unlocks" read as though one were included. It now says
    "the NFC tag you paired", and "releases" rather than "unlocks", which is the verb the app uses.
 
-4. **`design/store/raw/README.md` is out of date and will cause a missing frame.** It says
-   "`01.png` … `05.png`, matching the five frames" and "the five frames in `../board.html`".
-   There are **six**. Anyone following it drops five files and ships frame 6 as a placeholder.
+4. ~~**`design/store/raw/README.md` is out of date and will cause a missing frame.**~~ **Fixed
+   2026-09-08.** It had said "`01.png` … `05.png`, matching the five frames" when there are six,
+   so anyone following it would have dropped five files and shipped frame 6 as a placeholder. The
+   README now names all six and says which screen each frame wants, including that frame 6 is
+   captured from inside the blocked app rather than from Furlough. The same stale count was in the
+   header comment of `scripts/store-shots.sh`, which said "five 1320x2868 frames" while its loop
+   correctly rendered six; that is corrected too.
 
 5. **`design/store/board.html` frame 6's placeholder shield says "Netflix opens at 5:00 PM" and
    "You get 1 hour per day."** The app's real shield says "Instagram is closed" and "Opens

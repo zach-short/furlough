@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Renders design/store/board.html into App Store screenshots.
 #
-#   ./scripts/store-shots.sh            # five 1320x2868 frames + the panorama
+#   ./scripts/store-shots.sh            # six 1320x2868 frames + the panorama
 #   ./scripts/store-shots.sh 3          # just frame 3, while iterating
 #
 # Output lands in build/store-shots/ (gitignored). Upload the .jpg files:
