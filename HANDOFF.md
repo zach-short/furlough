@@ -266,15 +266,34 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   `CardDivider`), `RuleEditor` (`WindowRow` with `DayStrip`, `CopyRuleSheet`, `TimeChip`,
   `TimePickerSheet`, `EffectBanner`), `WeekView` (`WeekDraft`, `WeekSheet`, `WeekGrid`,
   `DayColumn`, `WindowBlock`, `DayEditor`, `DayBar`), `BudgetSlider` (piecewise
-  linear over the 5/30/60/120/240 ticks), `PendingChanges`, `Settings` + `LogView`. Screens are
+  linear over the 5/30/60/120/240 ticks), `PendingChanges`,
+  `Help` (`HelpView` is the hub behind the question mark on Home; since 2026-09-09
+  `HelpTopics.swift` holds only the two pages still in the binary — `DelayHelp`, which quotes
+  this phone's own base delay and per-tier delays rather than a default, and `StuckHelp`, which
+  is wanted at the moment a shield will not lift and so must not send anyone to a browser. The
+  other five topics are pages on the site: their rows are buttons that hand
+  `Furlough.helpURL(_:)` to `openURL`, and wear `arrow.up.right` instead of a chevron so a tap
+  that leaves the app looks like one. The app itself still issues no network request, which is
+  what keeps "no networking code at all" true on the privacy page and in the App Store label),
+  `Settings` + `LogView` (Settings gained the build version on 2026-09-09, because it moved out
+  of the old in-app About and the site cannot know which build is running). Screens are
   `ScrollView`s over `EmberWall`, not `List`/`Form`; the iOS 26 toolbar supplies the glass.
 - `FurloughMonitor/MonitorExtension.swift`: every callback reconciles from shared state.
 - `FurloughShield/ShieldExtension.swift`: reads shared state, writes the copy via `ShieldText`,
   and records the name iOS gives the app it is covering (see the naming note below).
 - `FurloughWidgets/`: `StatusWidget.swift`, `WindowLiveActivity.swift`, bundle.
-- `design/`: `DESIGN.md`, `HOURGLASS.md` (the next brief), `icons/` (candidates);
+- `design/`: `DESIGN.md`, `HOURGLASS.md` (the next brief);
   `scripts/make-icon.swift` (the app icon, drawn from the hourglass),
   `scripts/make-noise.swift` (the wall grain).
+- `site/`: the Astro site at furloughapp.com (`bun install`, `bun run build`; static output,
+  no npm — there is no `package-lock.json` and there should not be). `src/pages/help/` is
+  where help copy belongs now. Five topics moved there from the app on 2026-09-09 for one
+  reason worth keeping in mind before writing any user-facing prose: **a sentence on the site
+  can be fixed the same day, and a sentence in the binary waits on an App Store review.** So
+  anything that reads the same on every phone goes on the site and the app links to it;
+  only copy that has to read this phone's own state stays in Swift. The two are wired
+  together by `Furlough.helpURL(_:)` and the paths are literals on both sides, so renaming a
+  page means editing the Swift too — `bun run build` will not catch it.
 
 ## How enforcement works (do not break these invariants)
 

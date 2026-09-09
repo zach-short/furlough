@@ -1,69 +1,113 @@
 ---
 // The app's Home screen, as a working demo: the hero page with the living hourglass, the
 // strip of status hourglasses that turns the pages, and a couple of rows under it. The
-// script plays one evening on a loop, twelve seconds to the second.
+// script plays one evening on a loop, twelve seconds to the second, and the two buttons
+// under the phone skip ahead to the next change or run the Anchor through its own walkthrough.
+const anchorGlyph =
+  '<circle cx="40" cy="15" r="10.5"/><path d="M40 26v56M17 38h46M12 58c0 16 12 26 28 26s28-10 28-26"/><path d="M7 41L2 59l16 9zM73 41l5 18-16 9z" fill="currentColor" stroke-width="2"/>';
 ---
 
-<div class="phone" data-hero aria-label="Furlough's home screen: the living hourglass and today's countdown" role="img">
-  <div class="statusbar"><span class="mono">9:41</span><span class="signal" aria-hidden="true"><i></i><i></i><i></i><i></i></span></div>
-  <div class="toolbar" aria-hidden="true">
-    <span class="glass icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></span>
-    <span class="right">
-      <span class="glass pill">1 pending</span>
-      <span class="glass icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
-    </span>
+<div class="stack">
+  <div class="phone" data-hero aria-label="Furlough's home screen: the living hourglass and today's countdown" role="img">
+    <div class="statusbar"><span class="mono">9:41</span><span class="signal" aria-hidden="true"><i></i><i></i><i></i><i></i></span></div>
+    <div class="toolbar" aria-hidden="true">
+      <span class="glass icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></span>
+      <span class="right">
+        <span class="glass pill" data-hero-pill>1 pending</span>
+        <span class="glass icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
+      </span>
+    </div>
+
+    <div class="hero-page">
+      <canvas class="glass-canvas" width="96" height="128" data-hero-glass aria-hidden="true"></canvas>
+      <div class="text">
+        <div class="eyebrow moss" data-hero-eyebrow>Open now · until 8:30 PM</div>
+        <div class="name" data-hero-name>Instagram</div>
+        <div class="count mono" data-hero-count>30:00</div>
+        <div class="sub" data-hero-sub>30 min budget today</div>
+      </div>
+    </div>
+
+    <div class="indicator" aria-hidden="true">
+      <canvas class="on" width="11" height="15" data-hero-mini></canvas>
+      <canvas width="11" height="15" data-hourglass="comingSoon:60" data-still></canvas>
+      <canvas width="11" height="15" data-hourglass="comingSoon:200" data-still></canvas>
+      <canvas width="11" height="15" data-hourglass="alwaysBlocked" data-still></canvas>
+      <canvas width="11" height="15" data-hourglass="anchored" data-still data-hero-anchor-dot></canvas>
+    </div>
+
+    <div class="list" data-today-list aria-hidden="true">
+      <div class="eyebrow seclabel">Later today</div>
+      <div class="card rows">
+        <div class="row">
+          <span class="tile yt" style="--c: #fff"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#f00" d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8Z"/><path fill="#fff" d="M9.55 15.57V8.43L15.82 12z"/></svg></span>
+          <span class="who"><span class="n">YouTube</span><span class="r">8:00–10:00 PM · 30 min</span></span>
+          <span class="chip amber"><canvas width="12" height="16" data-hourglass="comingSoon:60" data-still></canvas>8:00 PM</span>
+        </div>
+        <div class="row">
+          <span class="tile rd" style="--c: #ff4500"><svg viewBox="0 0 24 24" aria-hidden="true"><g fill="#fff"><circle cx="16.4" cy="3.2" r="2"/><path d="M12.05 10.1 13.6 4a.75.75 0 0 1 .9-.55l1.6.35-.3 1.42-1-.22-1.35 5.32z"/><ellipse cx="12" cy="15.4" rx="7.5" ry="6.2"/><circle cx="3.1" cy="12.6" r="2.8"/><circle cx="20.9" cy="12.6" r="2.8"/></g><g fill="#ff4500"><circle cx="9" cy="14.6" r="1.6"/><circle cx="15" cy="14.6" r="1.6"/></g><path d="M8.8 17.9a4.5 4.5 0 0 0 6.4 0" fill="none" stroke="#ff4500" stroke-width="1.4" stroke-linecap="round"/></svg></span>
+          <span class="who"><span class="n">Reddit</span><span class="r">9:00–10:00 PM · 20 min</span></span>
+          <span class="chip amber"><canvas width="12" height="16" data-hourglass="comingSoon:200" data-still></canvas>9:00 PM</span>
+        </div>
+      </div>
+      <div class="eyebrow seclabel">Tomorrow</div>
+      <div class="card rows">
+        <div class="row">
+          <span class="tile nf" style="--c: #000"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#e50914" d="M4.5 2h4.5l6 11.4V2h4.5v20H15L9 10.6V22H4.5z"/></svg></span>
+          <span class="who"><span class="n">Netflix</span><span class="r">Fri–Sun 9:00–11:00 PM · 60 min</span></span>
+          <span class="chip muted"><canvas width="12" height="16" data-hourglass="doneForToday" data-still></canvas>Fri</span>
+        </div>
+      </div>
+      <div class="eyebrow seclabel">Always blocked</div>
+      <div class="card rows">
+        <div class="row">
+          <span class="tile tt" style="--c: #000"><svg viewBox="-2 -2 28 28" aria-hidden="true"><g><path fill="#25f4ee" transform="translate(-1.3 -1)" d="M16.6 5.82A4.28 4.28 0 0 1 15.54 3h-3.09v12.4a2.59 2.59 0 1 1-1.84-2.48V9.66a5.66 5.66 0 1 0 4.93 5.61V8.99a7.3 7.3 0 0 0 4.27 1.37V7.27a4.29 4.29 0 0 1-3.21-1.45"/><path fill="#fe2c55" transform="translate(1.3 1)" d="M16.6 5.82A4.28 4.28 0 0 1 15.54 3h-3.09v12.4a2.59 2.59 0 1 1-1.84-2.48V9.66a5.66 5.66 0 1 0 4.93 5.61V8.99a7.3 7.3 0 0 0 4.27 1.37V7.27a4.29 4.29 0 0 1-3.21-1.45"/><path fill="#fff" d="M16.6 5.82A4.28 4.28 0 0 1 15.54 3h-3.09v12.4a2.59 2.59 0 1 1-1.84-2.48V9.66a5.66 5.66 0 1 0 4.93 5.61V8.99a7.3 7.3 0 0 0 4.27 1.37V7.27a4.29 4.29 0 0 1-3.21-1.45"/></g></svg></span>
+          <span class="who"><span class="n">TikTok</span><span class="r">Social · no windows</span></span>
+          <span class="chip grey"><canvas width="12" height="16" data-hourglass="alwaysBlocked" data-still></canvas>all day</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- The Anchor's own page: the same rows, held together rather than each on its own rule. -->
+    <div class="list anchor-list" data-anchor-list aria-hidden="true" hidden>
+      <div class="eyebrow seclabel">In the Anchor · 6 apps</div>
+      <div class="card rows">
+        <div class="row">
+          <span class="tile ig"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" aria-hidden="true"><rect x="2.6" y="2.6" width="18.8" height="18.8" rx="5.6"/><circle cx="12" cy="12" r="4.6"/><circle cx="17.5" cy="6.5" r="1.35" fill="#fff" stroke="none"/></svg></span>
+          <span class="who"><span class="n">Instagram</span><span class="r">Held with the list</span></span>
+          <span class="chip achip"><span class="a-ready">ready</span><span class="a-held">held</span></span>
+        </div>
+        <div class="row">
+          <span class="tile yt" style="--c: #fff"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#f00" d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8Z"/><path fill="#fff" d="M9.55 15.57V8.43L15.82 12z"/></svg></span>
+          <span class="who"><span class="n">YouTube</span><span class="r">Held with the list</span></span>
+          <span class="chip achip"><span class="a-ready">ready</span><span class="a-held">held</span></span>
+        </div>
+        <div class="row">
+          <span class="tile rd" style="--c: #ff4500"><svg viewBox="0 0 24 24" aria-hidden="true"><g fill="#fff"><circle cx="16.4" cy="3.2" r="2"/><path d="M12.05 10.1 13.6 4a.75.75 0 0 1 .9-.55l1.6.35-.3 1.42-1-.22-1.35 5.32z"/><ellipse cx="12" cy="15.4" rx="7.5" ry="6.2"/><circle cx="3.1" cy="12.6" r="2.8"/><circle cx="20.9" cy="12.6" r="2.8"/></g><g fill="#ff4500"><circle cx="9" cy="14.6" r="1.6"/><circle cx="15" cy="14.6" r="1.6"/></g><path d="M8.8 17.9a4.5 4.5 0 0 0 6.4 0" fill="none" stroke="#ff4500" stroke-width="1.4" stroke-linecap="round"/></svg></span>
+          <span class="who"><span class="n">Reddit</span><span class="r">Held with the list</span></span>
+          <span class="chip achip"><span class="a-ready">ready</span><span class="a-held">held</span></span>
+        </div>
+        </div>
+      <div class="aact">
+        <span class="glass prominent abtn"><svg viewBox="0 0 80 100" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={anchorGlyph} />Anchor</span>
+        <span class="glass atag"><span class="wave" aria-hidden="true"></span>Hold the tag to unanchor</span>
+      </div>
+    </div>
+    <div class="fade"></div>
   </div>
 
-  <div class="hero-page">
-    <canvas class="glass-canvas" width="96" height="128" data-hero-glass aria-hidden="true"></canvas>
-    <div class="text">
-      <div class="eyebrow moss" data-hero-eyebrow>Open now · until 8:30 PM</div>
-      <div class="name">Instagram</div>
-      <div class="count mono" data-hero-count>30:00</div>
-      <div class="sub" data-hero-sub>30 min budget today</div>
-    </div>
+  <div class="controls">
+    <button type="button" class="glass" data-hero-ff>
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.6v12.8L12.2 12zM12.6 5.6v12.8L21.8 12z"/></svg>
+      Fast-forward
+    </button>
+    <button type="button" class="glass" data-hero-mode aria-pressed="false">
+      <svg viewBox="0 0 80 100" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={anchorGlyph} />
+      <span data-hero-mode-label>View Anchor Mode</span>
+    </button>
   </div>
 
-  <div class="indicator" aria-hidden="true">
-    <canvas class="on" width="11" height="15" data-hero-mini></canvas>
-    <canvas width="11" height="15" data-hourglass="comingSoon:60" data-still></canvas>
-    <canvas width="11" height="15" data-hourglass="comingSoon:200" data-still></canvas>
-    <canvas width="11" height="15" data-hourglass="alwaysBlocked" data-still></canvas>
-    <canvas width="11" height="15" data-hourglass="anchored" data-still></canvas>
-  </div>
-
-  <div class="list" aria-hidden="true">
-    <div class="eyebrow seclabel">Later today</div>
-    <div class="card rows">
-      <div class="row">
-        <span class="tile yt" style="--c: #fff"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#f00" d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8Z"/><path fill="#fff" d="M9.55 15.57V8.43L15.82 12z"/></svg></span>
-        <span class="who"><span class="n">YouTube</span><span class="r">8:00–10:00 PM · 30 min</span></span>
-        <span class="chip amber"><canvas width="12" height="16" data-hourglass="comingSoon:60" data-still></canvas>8:00 PM</span>
-      </div>
-      <div class="row">
-        <span class="tile rd" style="--c: #ff4500"><svg viewBox="0 0 24 24" aria-hidden="true"><g fill="#fff"><circle cx="16.4" cy="3.2" r="2"/><path d="M12.05 10.1 13.6 4a.75.75 0 0 1 .9-.55l1.6.35-.3 1.42-1-.22-1.35 5.32z"/><ellipse cx="12" cy="15.4" rx="7.5" ry="6.2"/><circle cx="3.1" cy="12.6" r="2.8"/><circle cx="20.9" cy="12.6" r="2.8"/></g><g fill="#ff4500"><circle cx="9" cy="14.6" r="1.6"/><circle cx="15" cy="14.6" r="1.6"/></g><path d="M8.8 17.9a4.5 4.5 0 0 0 6.4 0" fill="none" stroke="#ff4500" stroke-width="1.4" stroke-linecap="round"/></svg></span>
-        <span class="who"><span class="n">Reddit</span><span class="r">9:00–10:00 PM · 20 min</span></span>
-        <span class="chip amber"><canvas width="12" height="16" data-hourglass="comingSoon:200" data-still></canvas>9:00 PM</span>
-      </div>
-    </div>
-    <div class="eyebrow seclabel">Tomorrow</div>
-    <div class="card rows">
-      <div class="row">
-        <span class="tile nf" style="--c: #000"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#e50914" d="M4.5 2h4.5l6 11.4V2h4.5v20H15L9 10.6V22H4.5z"/></svg></span>
-        <span class="who"><span class="n">Netflix</span><span class="r">Fri–Sun 9:00–11:00 PM · 60 min</span></span>
-        <span class="chip muted"><canvas width="12" height="16" data-hourglass="doneForToday" data-still></canvas>Fri</span>
-      </div>
-    </div>
-    <div class="eyebrow seclabel">Always blocked</div>
-    <div class="card rows">
-      <div class="row">
-        <span class="tile tt" style="--c: #000"><svg viewBox="-2 -2 28 28" aria-hidden="true"><g><path fill="#25f4ee" transform="translate(-1.3 -1)" d="M16.6 5.82A4.28 4.28 0 0 1 15.54 3h-3.09v12.4a2.59 2.59 0 1 1-1.84-2.48V9.66a5.66 5.66 0 1 0 4.93 5.61V8.99a7.3 7.3 0 0 0 4.27 1.37V7.27a4.29 4.29 0 0 1-3.21-1.45"/><path fill="#fe2c55" transform="translate(1.3 1)" d="M16.6 5.82A4.28 4.28 0 0 1 15.54 3h-3.09v12.4a2.59 2.59 0 1 1-1.84-2.48V9.66a5.66 5.66 0 1 0 4.93 5.61V8.99a7.3 7.3 0 0 0 4.27 1.37V7.27a4.29 4.29 0 0 1-3.21-1.45"/><path fill="#fff" d="M16.6 5.82A4.28 4.28 0 0 1 15.54 3h-3.09v12.4a2.59 2.59 0 1 1-1.84-2.48V9.66a5.66 5.66 0 1 0 4.93 5.61V8.99a7.3 7.3 0 0 0 4.27 1.37V7.27a4.29 4.29 0 0 1-3.21-1.45"/></g></svg></span>
-        <span class="who"><span class="n">TikTok</span><span class="r">Social · no windows</span></span>
-        <span class="chip grey"><canvas width="12" height="16" data-hourglass="alwaysBlocked" data-still></canvas>all day</span>
-      </div>
-    </div>
-  </div>
-  <div class="fade"></div>
+  <p class="caption" data-hero-caption hidden></p>
 </div>
 
 <style>
@@ -84,7 +128,8 @@
   .toolbar .right { display: flex; gap: 8px; }
   .toolbar .glass { min-height: 36px; font-size: 13px; cursor: default; }
   .toolbar .glass:hover { transform: none; }
-  .toolbar .pill { color: var(--pending); padding: 0 12px; }
+  .toolbar .pill { color: var(--pending); padding: 0 12px; transition: color 0.3s var(--ease); }
+  .toolbar .pill.on { color: var(--ember); }
 
   .hero-page { display: flex; align-items: center; gap: 16px; padding: 26px 6px 8px; }
   .glass-canvas { width: 96px; height: 128px; flex: 0 0 auto; }
@@ -97,6 +142,7 @@
   .indicator canvas { width: 11px; height: 15px; opacity: 0.5; transition: transform 0.25s, opacity 0.25s; }
   .indicator canvas.on { opacity: 1; transform: scale(1.35); }
 
+  .list[hidden] { display: none; }
   .seclabel { padding: 12px 8px 6px; }
   .rows { display: flex; flex-direction: column; }
   .row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
@@ -107,6 +153,7 @@
   .tile.nf svg { width: 19px; height: 19px; }
   .tile.tt svg { width: 22px; height: 22px; }
   .tile.nf, .tile.tt { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16); }
+  .tile.ig { background: radial-gradient(circle at 28% 108%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285aeb 90%); }
   .who { display: flex; flex-direction: column; min-width: 0; }
   .n { font-family: var(--display-small); font-weight: 600; font-size: 13.5px; line-height: 1.15; color: var(--cream); }
   .r { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
@@ -114,18 +161,61 @@
   .chip.amber { color: var(--amber); } .chip.grey { color: var(--faint); } .chip.muted { color: var(--muted); }
   .chip canvas { width: 12px; height: 16px; }
   .fade { position: absolute; left: 0; right: 0; bottom: 0; height: 72px; background: linear-gradient(180deg, transparent, rgba(15, 13, 11, 0.96)); pointer-events: none; }
+
+  /* The Anchor page. One class on the list says whether it is held; the rows follow. */
+  .achip { color: var(--faint); transition: color 0.3s var(--ease); }
+  .achip .a-held, .anchor-list.held .achip .a-ready { display: none; }
+  .anchor-list.held .achip .a-held { display: inline; }
+  .anchor-list.held .achip { color: var(--ember); }
+  .aact { display: flex; gap: 8px; padding: 14px 4px 0; }
+  .phone.anchoring .fade { height: 34px; }
+  .aact .glass { min-height: 38px; font-size: 13px; cursor: default; transition: transform 0.25s var(--ease), box-shadow 0.35s var(--ease), background 0.25s var(--ease); }
+  .aact .glass:hover { transform: none; }
+  .atag, .anchor-list.held .abtn { display: none; }
+  .anchor-list.held .atag { display: inline-flex; }
+  .anchor-list.tapping .abtn { transform: scale(0.955); box-shadow: 0 0 0 7px rgba(229, 86, 61, 0.2), 0 10px 34px rgba(229, 86, 61, 0.32); }
+  .wave { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--ember); border-left-color: transparent; border-bottom-color: transparent; transform: rotate(-45deg); }
+  @media (prefers-reduced-motion: no-preference) {
+    .anchor-list.tagging .atag { animation: tag 1.15s var(--ease) infinite; }
+    @keyframes tag { 0%, 100% { box-shadow: 0 0 0 0 rgba(229, 86, 61, 0.5); } 55% { box-shadow: 0 0 0 9px rgba(229, 86, 61, 0); } }
+  }
+
+  /* The two controls under the phone, outside its tilt. The hero's perspective only reaches
+     its own children, so it is repeated here for the phone now that .stack sits between. */
+  .stack { perspective: 1800px; }
+  .caption {
+    max-width: 350px; margin: 18px auto 0; text-align: center;
+    font-size: 13px; line-height: 1.45; color: var(--muted); min-height: 38px;
+  }
+  .caption[hidden] { display: none; }
+  .controls { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+  .controls .glass { min-height: 38px; font-size: 13px; }
+  .controls .glass[aria-pressed='true'] {
+    background: linear-gradient(160deg, rgba(229, 86, 61, 0.28), rgba(229, 86, 61, 0.12));
+    color: var(--cream);
+  }
 </style>
 
 <script>
   import { LivingHourglass, States, blendStates, type HourglassState } from '../lib/hourglass';
 
   const root = document.querySelector<HTMLElement>('[data-hero]');
-  if (root) {
+  const stack = root?.closest('.stack') ?? null;
+  if (root && stack) {
     const canvas = root.querySelector<HTMLCanvasElement>('[data-hero-glass]')!;
     const miniCanvas = root.querySelector<HTMLCanvasElement>('[data-hero-mini]')!;
+    const anchorDot = root.querySelector<HTMLCanvasElement>('[data-hero-anchor-dot]')!;
     const eyebrowEl = root.querySelector<HTMLElement>('[data-hero-eyebrow]')!;
+    const nameEl = root.querySelector<HTMLElement>('[data-hero-name]')!;
     const countEl = root.querySelector<HTMLElement>('[data-hero-count]')!;
     const subEl = root.querySelector<HTMLElement>('[data-hero-sub]')!;
+    const pillEl = root.querySelector<HTMLElement>('[data-hero-pill]')!;
+    const todayList = root.querySelector<HTMLElement>('[data-today-list]')!;
+    const anchorList = root.querySelector<HTMLElement>('[data-anchor-list]')!;
+    const captionEl = stack.querySelector<HTMLElement>('[data-hero-caption]')!;
+    const ffBtn = stack.querySelector<HTMLButtonElement>('[data-hero-ff]')!;
+    const modeBtn = stack.querySelector<HTMLButtonElement>('[data-hero-mode]')!;
+    const modeLabel = stack.querySelector<HTMLElement>('[data-hero-mode-label]')!;
 
     // One evening, played twelve times faster than life. The window is 8:00–8:30 PM with a
     // 30-minute budget spent all the way through it, so the last five minutes carry the
@@ -133,8 +223,12 @@
     const SPEED = 12;
     const PRE = 5, WINDOW = 1800 / SPEED, DONE = 8;
     const CYCLE = PRE + WINDOW + DONE;
+    const WARN_AT = PRE + 1500 / SPEED;
     const TOMORROW = 23.5 * 3600;
     const BUDGET = '30 min';
+    // Fast-forward lands here rather than on the change itself, so the switch is watched
+    // rather than jumped over: three quarters of a minute on the clock the phone is showing.
+    const LEAD = 45 / SPEED;
 
     const glass = new LivingHourglass(canvas, States.comingSoon(1));
     const mini = new LivingHourglass(miniCanvas, States.comingSoon(1), { still: true });
@@ -146,32 +240,96 @@
       return h > 0 ? `${h}:${two(m)}:${two(s)}` : `${m}:${two(s)}`;
     };
     const setText = (el: HTMLElement, text: string) => { if (el.textContent !== text) el.textContent = text; };
-    const setEyebrow = (text: string, color: string) => {
-      setText(eyebrowEl, text);
-      const cls = `eyebrow ${color}`;
-      if (eyebrowEl.className !== cls) eyebrowEl.className = cls;
+    const setClass = (el: HTMLElement, cls: string) => { if (el.className !== cls) el.className = cls; };
+
+    type Beat = {
+      key: string; state: HourglassState; eyebrow: string; color: string;
+      name: string; count: string; sub: string; pill: string; pillOn: boolean;
+      caption: string; anchorClass: string;
     };
 
-    type Beat = { key: string; state: HourglassState; eyebrow: string; color: string; count: string; sub: string };
-    const beat = (t: number): Beat => {
+    // MARK: One evening
+
+    const todayBeat = (t: number): Beat => {
+      const base = { name: 'Instagram', pill: '1 pending', pillOn: false, caption: '', anchorClass: '' };
       if (t < PRE) {
         const toOpen = (PRE - t) * SPEED;
-        return { key: 'pre', state: States.comingSoon(toOpen / 60), eyebrow: 'Next window', color: 'amber', count: countdown(toOpen), sub: `opens at 8:00 PM · ${BUDGET} a day` };
+        return { ...base, key: 'pre', state: States.comingSoon(toOpen / 60), eyebrow: 'Next window', color: 'amber', count: countdown(toOpen), sub: `opens at 8:00 PM · ${BUDGET} a day` };
       }
       if (t < PRE + WINDOW) {
         const left = 1800 - (t - PRE) * SPEED;
         const warned = left <= 300;
         return {
-          key: warned ? 'warn' : 'open', state: States.open(left / 1800, warned),
+          ...base, key: warned ? 'warn' : 'open', state: States.open(left / 1800, warned),
           eyebrow: warned ? 'Open now · 5 min left' : 'Open now · until 8:30 PM', color: warned ? 'amber' : 'moss',
           count: countdown(left), sub: warned ? `${BUDGET} budget · under 5 min left` : `${BUDGET} budget today`,
         };
       }
       const toTomorrow = TOMORROW - (t - PRE - WINDOW) * SPEED;
-      return { key: 'done', state: States.doneForToday, eyebrow: 'Next window', color: 'amber', count: countdown(toTomorrow), sub: `opens tomorrow 8:00 PM · ${BUDGET} a day` };
+      return { ...base, key: 'done', state: States.doneForToday, eyebrow: 'Next window', color: 'amber', count: countdown(toTomorrow), sub: `opens tomorrow 8:00 PM · ${BUDGET} a day` };
     };
 
-    const start = performance.now();
+    // MARK: The Anchor, walked through
+
+    const STEPS = [
+      { key: 'ready', secs: 3.4 }, { key: 'tap', secs: 1.2 }, { key: 'held', secs: 5.4 },
+      { key: 'tag', secs: 2.8 }, { key: 'freed', secs: 2.2 },
+    ];
+    const ENDS: number[] = [];
+    STEPS.reduce((n, s) => { ENDS.push(n + s.secs); return n + s.secs; }, 0);
+    const ANCHOR_CYCLE = ENDS[ENDS.length - 1];
+    /** How long the phone has been held: the tap landed when that step ended. */
+    const heldSince = (t: number) => (t - ENDS[0]) * SPEED;
+
+    const anchorBeat = (t: number): Beat => {
+      let i = 0;
+      while (i < ENDS.length - 1 && t >= ENDS[i]) i++;
+      const into = t - (i ? ENDS[i - 1] : 0);
+      const base = { name: 'Anchor', pill: 'Anchored', pillOn: true, count: '6 apps' };
+      switch (STEPS[i].key) {
+        case 'ready':
+          return {
+            ...base, key: 'a-ready', state: States.open(0.62), eyebrow: 'Not anchored', color: 'moss',
+            pill: '1 pending', pillOn: false, sub: 'Six apps, one switch', anchorClass: '',
+            caption: 'A second list, separate from the rules: the apps you want gone all at once.',
+          };
+        case 'tap':
+          return {
+            ...base, key: 'a-tap', state: States.anchored, eyebrow: 'Anchoring…', color: 'ember',
+            sub: 'Holding every app in the list', anchorClass: 'tapping',
+            caption: 'One tap, from anywhere. No confirmation and no countdown.',
+          };
+        case 'held':
+          return {
+            ...base, key: 'a-held', state: States.anchored, eyebrow: 'Anchored · since 8:12 PM', color: 'ember',
+            count: countdown(heldSince(t)), sub: 'Instagram, YouTube, Reddit +3', anchorClass: 'held',
+            caption: 'Every app in the list is held, and the glass stops mid-pour.',
+          };
+        case 'tag':
+          return {
+            ...base, key: 'a-tag', state: States.anchored, eyebrow: 'Hold your phone to the tag', color: 'ember',
+            count: countdown(heldSince(t)), sub: 'The only thing that ends it', anchorClass: 'held tagging',
+            caption: 'Only the NFC tag you paired unlocks it. Leave the tag at home and the phone stays anchored until you are back.',
+          };
+        default:
+          return {
+            ...base, key: 'a-freed', state: States.open(0.62), eyebrow: 'Unanchored', color: 'moss',
+            pill: '1 pending', pillOn: false, sub: 'Back to today’s rules', anchorClass: '',
+            caption: 'Tag tapped. Today’s windows and budgets take over again.',
+          };
+      }
+    };
+
+    // MARK: The two clocks
+
+    type Mode = 'today' | 'anchor';
+    let mode: Mode = 'today';
+    /** Where each mode's loop began, so leaving the evening does not restart it. */
+    const origin: Record<Mode, number> = { today: performance.now(), anchor: 0 };
+    const cycleOf = (m: Mode) => (m === 'today' ? CYCLE : ANCHOR_CYCLE);
+    const beatOf = (m: Mode, t: number) => (m === 'today' ? todayBeat(t) : anchorBeat(t));
+    const clock = (now: number, m: Mode = mode) => ((now - origin[m]) / 1000) % cycleOf(m);
+
     let lastKey = '';
     let from: HourglassState | null = null;
     let changedAt = 0;
@@ -179,8 +337,7 @@
 
     const frame = (now: number) => {
       requestAnimationFrame(frame);
-      const t = ((now - start) / 1000) % CYCLE;
-      const b = beat(t);
+      const b = beatOf(mode, clock(now));
       if (b.key !== lastKey) {
         from = lastKey ? glass.state : null;
         changedAt = now;
@@ -189,12 +346,55 @@
       const k = from ? (now - changedAt) / 800 : 1;
       const shown = from && k < 1 ? blendStates(from, b.state, k) : b.state;
       glass.set(shown);
-      setEyebrow(b.eyebrow, b.color);
+      setText(eyebrowEl, b.eyebrow);
+      setClass(eyebrowEl, `eyebrow ${b.color}`);
+      setText(nameEl, b.name);
       setText(countEl, b.count);
       setText(subEl, b.sub);
+      setText(pillEl, b.pill);
+      setClass(pillEl, b.pillOn ? 'glass pill on' : 'glass pill');
+      setClass(anchorList, `list anchor-list ${b.anchorClass}`.trimEnd());
+      // The first dot is today's rule and the last is the Anchor; the live one is whichever
+      // page the phone is on, so the other keeps showing its own glass.
       const second = Math.floor(now / 1000);
-      if (second !== lastMini) { lastMini = second; mini.set(shown); }
+      if (second !== lastMini) {
+        lastMini = second;
+        mini.set(mode === 'today' ? shown : todayBeat(clock(now, 'today')).state);
+      }
+      if (mode === 'anchor') setText(captionEl, b.caption);
     };
+
+    const show = (m: Mode) => {
+      mode = m;
+      const anchoring = m === 'anchor';
+      if (anchoring) origin.anchor = performance.now();
+      todayList.hidden = anchoring;
+      anchorList.hidden = !anchoring;
+      captionEl.hidden = !anchoring;
+      if (!anchoring) captionEl.textContent = '';
+      root.classList.toggle('anchoring', anchoring);
+      miniCanvas.classList.toggle('on', !anchoring);
+      anchorDot.classList.toggle('on', anchoring);
+      modeBtn.setAttribute('aria-pressed', String(anchoring));
+      setText(modeLabel, anchoring ? 'Back to today' : 'View Anchor Mode');
+      root.setAttribute('aria-label', anchoring
+        ? 'Furlough in Anchor mode: the list held, the hourglass stopped until the tag'
+        : "Furlough's home screen: the living hourglass and today's countdown");
+    };
+
+    /** Skip the wait: land `LEAD` short of the next change, so the switch itself is on screen. */
+    ffBtn.addEventListener('click', () => {
+      const now = performance.now();
+      const t = clock(now);
+      const lead = mode === 'today' ? LEAD : 0.55;
+      const bounds = mode === 'today' ? [PRE, WARN_AT, PRE + WINDOW, CYCLE] : ENDS;
+      const next = bounds.find((b) => b - lead > t + 0.05) ?? bounds[0] + cycleOf(mode);
+      origin[mode] = now - (next - lead) * 1000;
+    });
+
+    modeBtn.addEventListener('click', () => show(mode === 'today' ? 'anchor' : 'today'));
+
+    show('today');
     requestAnimationFrame(frame);
   }
 </script>

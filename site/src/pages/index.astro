@@ -123,7 +123,7 @@ const legend = [
       <div class="card pending-card">
         <div class="eyebrow pending">Pending · lands in <span class="mono" data-lands>22:41:06</span></div>
         <div class="prow">
-          <span class="tile" style="--c: #d63a6e">I</span>
+          <span class="tile ig"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" aria-hidden="true"><rect x="2.6" y="2.6" width="18.8" height="18.8" rx="5.6"/><circle cx="12" cy="12" r="4.6"/><circle cx="17.5" cy="6.5" r="1.35" fill="#fff" stroke="none"/></svg></span>
           <span class="who"><span class="n">Instagram</span><span class="r">More time, so it waits 1 day</span></span>
         </div>
         <div class="delta">
@@ -300,6 +300,9 @@ const legend = [
   }
 
   .tile { width: 34px; height: 34px; border-radius: 9px; background: var(--c); display: grid; place-items: center; font-family: var(--display); font-weight: 700; font-size: 15px; color: #fff; flex: 0 0 auto; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1); }
+  .tile svg { display: block; width: 21px; height: 21px; }
+  /* Instagram's own mark, so the pending card names a real app the way the phone's rows do. */
+  .tile.ig { background: radial-gradient(circle at 28% 108%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285aeb 90%); }
   .who { display: flex; flex-direction: column; }
   .n { font-family: var(--display-small); font-weight: 600; font-size: 14px; color: var(--cream); }
   .r { font-size: 12px; color: var(--muted); margin-top: 2px; }

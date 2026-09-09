@@ -162,7 +162,7 @@ that pauses when the state is still. Respect Reduce Motion.
   shows the thing itself rather than a picture of one. The Mac set and the site's
   `icon-1024`, `icon-512` and `apple-touch-icon` come off the same script; under 40 px the
   drawing switches to its own bolder chip form, which is what the 16 and 32 Mac icons get.
-  The generated hourglasses it replaced are in `design/icons`.
+  The generated hourglasses it replaced are gone; re-run the script to rebuild any size.
 - Still to generate, only after Zach approves each: a transparent-background hourglass for
   the shield icon and the home hero, an onboarding hero and empty-state illustration in the
   same style, and short clips for the README.

@@ -243,6 +243,8 @@ const SPLASH_LIFE = 0.42;
 const SPLASH_CHANCE = 0.4;
 /** The frame the Anchor stops the stream on. */
 const FROZEN_PHASE = 2.75;
+/** The bar the anchor's skeleton is stroked with, from AnchorMark.weight. */
+const ANCHOR_WEIGHT = 7;
 
 /** A steady value in 0..<1 for a grain and a salt. */
 function noise(i: number, salt: number): number {
@@ -374,12 +376,16 @@ function grainPath(ctx: CanvasRenderingContext2D, g: Grain) {
   ctx.ellipse(g.x, g.y, g.r, g.r + g.stretch / 2, 0, 0, 2 * Math.PI);
 }
 
-/** The Anchor's mark, standing on the base half in the pile. Ported from Shared/UI/AnchorMark.swift. */
+/**
+ * The Anchor's mark, across the neck where the sand would have to pass. Ported from
+ * Shared/UI/AnchorMark.swift and the `.anchor` part of Shared/UI/Hourglass.swift: it stood on
+ * the base until 2026-09-08, ember on ember-lit sand, and was lost there.
+ */
 function drawAnchor(ctx: CanvasRenderingContext2D) {
-  // Drawn in an 80 × 100 space whose ink spans x 2…78 and y 1…87.5, fitted into (50, 130, 20, 25).
-  const s = Math.min(20 / 76, 25 / 86.5);
+  // Drawn in an 80 × 100 space whose ink spans x 2…78 and y 1…87.5, fitted into (48, 66, 24, 28).
+  const s = Math.min(24 / 76, 28 / 86.5);
   ctx.save();
-  ctx.translate(60 - 40 * s, 142.5 - 44.25 * s);
+  ctx.translate(60 - 40 * s, 80 - 44.25 * s);
   ctx.scale(s, s);
   const skeleton = () => {
     ctx.beginPath();
@@ -395,13 +401,15 @@ function drawAnchor(ctx: CanvasRenderingContext2D) {
   };
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  const edge = 1 / s;
-  ctx.strokeStyle = rgba(C.cream, 0.7);
-  skeleton(); ctx.lineWidth = 7 + edge; ctx.stroke();
-  flukes(); ctx.lineWidth = edge; ctx.stroke();
+  // Swift strokes the one unioned outline at 3, half of it outside the ink; canvas has no
+  // union, so the same rim comes of drawing each part 1.5 wider under the ember on top.
+  ctx.strokeStyle = rgba(C.ground, 0.9);
+  ctx.fillStyle = rgba(C.ground, 0.9);
+  skeleton(); ctx.lineWidth = ANCHOR_WEIGHT + 3; ctx.stroke();
+  flukes(); ctx.lineWidth = 3; ctx.stroke(); ctx.fill();
   ctx.strokeStyle = C.ember;
   ctx.fillStyle = C.ember;
-  skeleton(); ctx.lineWidth = 7; ctx.stroke();
+  skeleton(); ctx.lineWidth = ANCHOR_WEIGHT; ctx.stroke();
   flukes(); ctx.fill();
   ctx.restore();
 }
