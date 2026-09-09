@@ -264,7 +264,7 @@ Two of these are worth knowing the reasoning for, because both look arguable and
   block something you need. Both are advice about a rule, not about a person, and neither is
   health guidance.
 
-Guideline 2.3.8 also requires the screenshots themselves to suit a 4+ rating. The six frames are
+Guideline 2.3.8 also requires the screenshots themselves to suit a 4+ rating. The ten frames are
 app UI and typography; nothing in them raises it.
 
 ---
@@ -404,15 +404,15 @@ Furlough sets application.denyAppRemoval while any shield is active, so the app 
 
 THE USAGE STEP AND THE REPORT EXTENSION
 
-The "Where your time went" step reviews the last fortnight of Screen Time history and suggests a rule per app. It has two paths, chosen at runtime. Where Apple grants the App & Website Usage data access capability, the app reads the fortnight itself and draws a scrolling list. Everywhere else, only the DeviceActivityReport extension ever sees a number, so the cards are remote views stepped through one at a time and "Apply" hands off to the picker rather than writing a rule directly, because nothing can be returned out of that sandbox.
+The "Where your time went" step reviews the last fortnight of Screen Time history and suggests a rule per app. It has two paths, chosen at runtime. Where Apple grants the App & Website Usage data access capability, the app reads the fortnight itself. Everywhere else, only the DeviceActivityReport extension ever sees a number, so the cards are remote views stepped through one at a time, and "Apply" hands off to the picker rather than writing a rule, because nothing can be returned out of that sandbox.
 
-On a review device outside the EU the second path is the expected one, and on a device with little Screen Time history the step may have nothing to show. Both are correct behaviour, not a failure. The step is skippable and nothing else in the app depends on it.
+On a review device outside the EU the second path is expected, and on a device with little Screen Time history the step may have nothing to show. Both are correct, not a failure. The step is skippable and nothing else depends on it.
 
-Note that requesting the App & Website Usage capability makes the Screen Time authorization prompt all-or-nothing. That wording comes from iOS, not from us.
+Requesting that capability also makes the Screen Time authorization prompt all-or-nothing. That wording is iOS's, not ours.
 
 NFC IS OPTIONAL AND CANNOT BE TESTED WITHOUT HARDWARE
 
-One feature, the Anchor, blocks a chosen set of apps instantly and is released only by scanning a physical NFC tag the person paired beforehand. The person supplies the tag; any NTAG sticker works. Nothing else in the app depends on it and it can be skipped entirely. Furlough reads only a tag's hardware identifier, in the foreground, on the person's own action. It never writes to a tag and never reads one in the background.
+One feature, the Anchor, blocks a chosen set of apps instantly and is released only by scanning a physical NFC tag the person paired beforehand. The person supplies the tag; any NTAG sticker works. Nothing else depends on it and it can be skipped entirely. Furlough reads only a tag's hardware identifier, in the foreground, on the person's own action. It never writes to a tag and never reads one in the background.
 
 WEBSITES
 
@@ -420,9 +420,7 @@ A website chosen from Apple's picker is shielded like an app. A website typed in
 
 NO ACCOUNT, NO NETWORK, NO DATA COLLECTION
 
-Furlough has no server, no accounts and no network code at all: no URLSession, no analytics, no third-party SDKs. Rules and the opaque activity tokens never leave the device. The privacy answer is Data Not Collected, and the bundle carries a privacy manifest declaring the two required-reason APIs the app touches (UserDefaults for its App Group, and system boot time for measuring elapsed time between events).
-
-There are no demo credentials because there is nothing to sign in to.
+Furlough has no server, no accounts and no network code at all: no URLSession, no analytics, no third-party SDKs. Rules and the opaque activity tokens never leave the device. The privacy answer is Data Not Collected. There are no demo credentials because there is nothing to sign in to.
 ```
 
 **Sign-in required: No.** There is no account, so leave the demo account fields empty.
@@ -436,37 +434,67 @@ forwarding failure would cost something: a reviewer's question that never arrive
 release. Send a test to it before submitting, and check the spam folder — a first forwarded
 message often lands there.
 
+### What Apple enforces here, confirmed against the API 2026-09-08
+
+- **Review Notes cannot exceed 4000 characters.** The draft above was 4290 and was rejected with
+  `ENTITY_ERROR.ATTRIBUTE.INVALID.TOO_LONG`. It is now **3986**, which is what the block above
+  holds. Fourteen characters of headroom, so anything added has to displace something.
+- **The block validates as a unit.** A write of `notes` alone is refused: `contactFirstName`,
+  `contactLastName`, `contactEmail` and `contactPhone` are each required on every request to
+  `appStoreReviewDetails`, whether or not you are changing them.
+- **`contactPhone` must lead with `+` and a country code.** Apple's own example is
+  `+44 844 209 0611`.
+
+**Where this gets written, and by what.** App `6810006594`, version `1.0`
+(`b60441f6-a8f1-4619-8e04-5584a68d46db`, PREPARE_FOR_SUBMISSION), review-details record
+`dd22a325-f43a-4695-b50b-e0ffda9710ce`. The API key `L6A2R4SBXQ` on this machine can write it, so
+none of this has to be retyped into the web form.
+
 ---
 
 ## Screenshots
 
 **There is no caption field.** App Store Connect takes images only; the headline and the line
-under it are drawn into the PNG by `design/store/board.html`, which composes six 1320 × 2868
-frames. So "captions" below means the text baked into each frame.
+under it are drawn into the PNG by `design/store/board.html`, which composes ten 1320 × 2868
+frames, Apple's maximum. So "captions" below means the text baked into each frame.
 
 Apple wants 1 to 10 images with no alpha channel. A 6.9-inch set removes the 6.5-inch
 requirement, which is what the 1320 × 2868 canvas is for. Guideline 2.3.3: screenshots must show
 the app **in use**, not title art or a splash screen; text and image overlays around a real
 capture are explicitly allowed, which is exactly what the board does.
 
-**This is the other blocker.** `design/store/raw/` holds only a README, so all six frames are
+**This is the other blocker.** `design/store/raw/` holds only a README, so all ten frames are
 currently falling back to drawn placeholders. Family Controls does not run in the Simulator, so
 the captures have to come off the phone: take them on the iPhone, convert, and drop them in as
-`01.png` through `06.png`. Then `scripts/store-shots.sh` re-renders and flattens to JPEG.
+`01.png` through `10.png`. Then `scripts/store-shots.sh` re-renders and flattens to JPEG.
 
-| # | Eyebrow | Headline | Line under it | Change needed |
+| # | Eyebrow | Headline | Line under it | Status |
 |---|---|---|---|---|
-| 1 | The rule | No unblock button. | Pick the apps that eat your time. Furlough shields them when the time is gone. | none |
-| 2 | Budgets | Thirty minutes. Then it's gone. | Give every app a daily budget. Spend it whenever you like. | none |
-| 3 | Windows | Open only when you said so. | Eight to ten on school nights. Later on weekends. Your call, once. | none |
-| 4 | The delay | Loosening waits a day. | Tightening is instant. Loosening waits out the delay you set. You can cancel it while it waits. | applied 2026-09-08 |
-| 5 | The Anchor | Locked till you tap the tag. | One tap locks. Only the NFC tag you paired releases it. Leave the tag at home. | applied 2026-09-08 |
-| 6 | The shield | Nothing to tap but Close. | The block screen says which app, and when it opens next. That is the whole conversation. | none |
+| 1 | The rule | No unblock button. | Pick the apps that eat your time. Furlough shields them when the time is gone. | unchanged |
+| 2 | Budgets | Thirty minutes. Then it's gone. | Give every app a daily budget. Spend it whenever you like. | unchanged |
+| 3 | Windows | Open only when you said so. | Eight to ten on school nights. Later on weekends. Your call, once. | unchanged |
+| 4 | The week | Draw the whole week. | Seven days across, 24 hours down. Tap a day to change its hours, then give them to any other day. | added 2026-09-08 |
+| 5 | The delay | Loosening waits a day. | Tightening is instant. Loosening waits out the delay you set. You can cancel it while it waits. | rewritten 2026-09-08 |
+| 6 | Tiers | The worst apps wait longest. | Each app has a tier that scales its delay. Hazard waits four times as long, Essential a quarter. | added 2026-09-08 |
+| 7 | Websites | Websites, too. | Picked from Apple's picker, a site gets hours and a budget like an app. Typed in, it gets hours. | added 2026-09-08 |
+| 8 | The widget | Watch the window drain. | The widget and the Live Activity count down the open window in the same glass as every row. | added 2026-09-08 |
+| 9 | The Anchor | Locked till you tap the tag. | One tap locks. Only the NFC tag you paired releases it. Leave the tag at home. | rewritten 2026-09-08 |
+| 10 | The shield | Nothing to tap but Close. | The block screen says which app, and when it opens next. That is the whole conversation. | unchanged |
 
-Frames 1, 2, 3 and 6 were already right and match the site. Frames 4 and 5 were rewritten in
-`design/store/board.html` on 2026-09-08 and the result was measured in a render: frame 4's caption
-runs to four lines, which frame 6 already did, and every frame keeps the same 96 px gap between the
-caption and the device with nothing overflowing the 2868 px frame.
+**The set grew from six frames to ten on 2026-09-08**, which supersedes the six-frame count
+recorded under "Found while writing this" below. The six original frames kept their copy; four
+were added so the screenshots show everything the description promises: the week grid and the
+widget with its Live Activity from ALSO IN THE APP, the tiers from THE DELAY, and the WEBSITES
+paragraph. Usage stays out of the frames for the same reason it stays out of the description:
+it is EU-only for customers. The order keeps each addition next to the frame it extends, the
+week after windows and the tiers after the delay, and keeps the shield as the last word. Apple
+shows the first three in search results, so the rule, the budgets and the windows still lead.
+
+Measured in a render on 2026-09-08: the week's caption runs to four lines and every other
+caption to three or fewer, the lowest device bottom sits at 2625 px of the 2868 px frame, and
+nothing overflows. The device tilt is now set per frame in `board.html` (`--ry`, `--rx`,
+`--rz`, `--ty` on each section) so the ten read as one arc in the review panorama, turned
+furthest at the two ends and flat in the middle.
 
 ---
 
@@ -525,8 +553,8 @@ Per the handoff, wording problems belong here rather than in a quiet edit.
 
 One thing, and it is not copy.
 
-1. **Real screenshots.** Six captures off the iPhone into `design/store/raw/` as `01.png` to
-   `06.png`, then `scripts/store-shots.sh`. Apple requires the app in use, and Family Controls
+1. **Real screenshots.** Ten captures off the iPhone into `design/store/raw/` as `01.png` to
+   `10.png`, then `scripts/store-shots.sh`. Apple requires the app in use, and Family Controls
    does not run in the Simulator, so they can only come off the phone. `design/store/raw/README.md`
    says which screen each frame wants.
 
