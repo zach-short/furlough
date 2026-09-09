@@ -441,7 +441,10 @@ struct UsageView: View {
         }
 
         var fresh = false
-        if model.state.config.targets.first(where: { $0.kind == kind }) == nil {
+        // `target(kind:)` rather than a match on `kind` alone: this app may already be the linked
+        // half of a row — YouTube beside youtube.com — and adding it again would split the pair
+        // back into the two rows linking exists to join.
+        if model.state.config.target(kind: kind) == nil {
             var picked = model.pickerSelection
             switch kind {
             case .application(let token): picked.applicationTokens.insert(token)

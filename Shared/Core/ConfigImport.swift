@@ -192,6 +192,8 @@ struct ImportPlan: Equatable {
         case tier
         case name
         case delay
+        /// A website folded into a row rather than added as one of its own.
+        case half
 
         var label: String {
             switch self {
@@ -200,13 +202,14 @@ struct ImportPlan: Equatable {
             case .tier: "Tier"
             case .name: "Name"
             case .delay: "Loosening delay"
+            case .half: "Also blocks"
             }
         }
 
         /// Whether the label says anything the row's name has not already said. A target and
         /// the delay each carry their own name; a rule, a tier and a nickname are one part of
         /// a row that can have three, so those say which part they are.
-        var isWorthNaming: Bool { self == .rule || self == .tier || self == .name }
+        var isWorthNaming: Bool { self == .rule || self == .tier || self == .name || self == .half }
     }
 
     enum Outcome: Equatable {
@@ -238,6 +241,11 @@ struct ImportPlan: Equatable {
         case addTarget(Target)
         /// The name he gave it. Cosmetic, so it is not gated.
         case setNickname(targetID: UUID, String)
+        /// Websites the file blocks as part of an existing row. More is blocked than a moment
+        /// ago, so this is a tightening and lands at once, like the first rule on a fresh target.
+        /// Only hosts: a token cannot travel, so a linked website that was picked is simply not
+        /// in the file — see `ExportedTarget.alsoBlocks`.
+        case link(targetID: UUID, hosts: [String])
         case applyNow(PendingKind)
         case queue(PendingChange)
     }
@@ -504,6 +512,31 @@ extension ConfigImport {
             }
         }
 
+        // Websites the file blocks as part of this row. A tightening — more is blocked than a
+        // moment ago — so it lands at once, and one that is already covered, or already a row of
+        // its own here, is left alone rather than blocked twice.
+        if let index = working.targets.firstIndex(where: { $0.id == id }) {
+            let wanted = (match.exported.alsoBlocks ?? [])
+                .compactMap(Hosts.normalize)
+                .filter { working.target(host: $0) == nil }
+            if !wanted.isEmpty {
+                for host in wanted {
+                    working.targets[index].also = (working.targets[index].also ?? []) + [.host(host)]
+                }
+                plan.edits.append(.link(targetID: id, hosts: wanted))
+                // No line for a target being added in this same import: its halves are part of
+                // what "added" means, and two rows for one arrival reads as two arrivals.
+                if !isNew {
+                    plan.items.append(.init(
+                        name: name,
+                        subject: .half,
+                        outcome: .now,
+                        delta: PendingText.Delta(now: "Not blocked", becomes: UtilityText.list(wanted))
+                    ))
+                }
+            }
+        }
+
         if let tier = match.exported.utility?.utility, let target = working.target(id: id) {
             let queued = state.pending.contains { change in
                 if case .setUtility(let targetID, _) = change.kind { return targetID == id }
@@ -569,6 +602,13 @@ extension ConfigImport {
             case .setNickname(let id, let nickname):
                 guard let index = state.config.targets.firstIndex(where: { $0.id == id }) else { continue }
                 state.config.targets[index].nickname = nickname
+            case .link(let id, let hosts):
+                guard let index = state.config.targets.firstIndex(where: { $0.id == id }) else { continue }
+                // Re-checked against the state as it stands, not as it stood when the plan was
+                // worked out: a site added by hand in between must not now be blocked twice.
+                for host in hosts where state.config.target(host: host) == nil {
+                    state.config.targets[index].also = (state.config.targets[index].also ?? []) + [.host(host)]
+                }
             case .applyNow(let kind):
                 state.pending.removeAll { supersedes(kind, $0.kind) }
                 Policy.apply(PendingChange(kind: kind, effectiveAt: now), to: &state.config)

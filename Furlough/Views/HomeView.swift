@@ -421,10 +421,27 @@ struct TargetRow: View {
                         .foregroundStyle(Ember.cream)
                         .lineLimit(1)
                 }
-                Text(RowCopy.detail(target: target, status: status, now: now))
-                    .emberBody(11.5)
-                    .foregroundStyle(Ember.muted)
-                    .lineLimit(1)
+                HStack(spacing: 5) {
+                    Text(RowCopy.detail(target: target, status: status, now: now))
+                        .emberBody(11.5)
+                        .foregroundStyle(Ember.muted)
+                        .lineLimit(1)
+                    // One row for one habit, and one small mark to say the row is two doors. A
+                    // second row would be the bug this feature exists to remove.
+                    if target.isLinked {
+                        HStack(spacing: 2.5) {
+                            Image(systemName: "globe")
+                                .font(.system(size: 8.5, weight: .semibold))
+                            if let host = target.hosts.first {
+                                Text(target.hosts.count > 1 ? "\(host) +\(target.hosts.count - 1)" : host)
+                                    .emberBody(10)
+                                    .lineLimit(1)
+                            }
+                        }
+                        .foregroundStyle(Ember.faint)
+                        .layoutPriority(-1)
+                    }
+                }
                 if let pending {
                     Text(RowCopy.pendingLine(pending))
                         .emberBody(10.5, .semibold)

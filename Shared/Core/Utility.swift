@@ -94,12 +94,17 @@ extension Config {
     /// So this warns about what it can see, which is the part Zach chose deliberately.
     var anchorWarning: (utility: Utility, names: [String], detail: String?)? {
         let held = targets
-            .filter { anchor.contains($0.kind) && $0.utility.warnsBeforeAnchoring }
+            .filter { target in target.kinds.contains { anchor.contains($0) } && target.utility.warnsBeforeAnchoring }
             .sorted { $0.utility.rawValue < $1.utility.rawValue }
         guard let worst = held.first?.utility else { return nil }
         let named = held.filter { $0.utility == worst }
         let detail = named.compactMap { AppUtility.suggestion(for: $0)?.detail }.first
-        return (worst, named.map(\.displayName), detail)
+        // Duplicates collapsed: two targets the shield has never named are both "This app", and
+        // "This app and This app" is worse than saying it once. Order kept, so the first name
+        // the list found is the first one read.
+        var seen = Set<String>()
+        let names = named.map(\.displayName).filter { seen.insert($0).inserted }
+        return (worst, names, detail)
     }
 
     /// The longest any single target would wait. Lowering the base delay loosens every target
@@ -128,10 +133,16 @@ enum UtilityText {
     /// Shown before anchoring. The anchor is instant, covers things that are not even targets,
     /// and only the paired tag lifts it — so if the tag is in another room, this is the whole
     /// story until it is found.
+    ///
+    /// The only text here that can be about more than one thing, so the only one that has to
+    /// agree in number. `detail` is dropped once it can: a detail is written about one app
+    /// ("Messages is where the codes texted to you land") and `anchorWarning` hands over the
+    /// first it finds among the names, so using it for several would say something true of one
+    /// of them as if it were true of all.
     static func anchoring(names: [String], utility: Utility, detail: String?) -> String? {
         guard utility.warnsBeforeAnchoring else { return nil }
-        let subject = list(names)
-        let consequence = detail ?? fallback(name: subject, utility: utility)
+        let plural = names.count > 1
+        let consequence = (plural ? nil : detail) ?? fallback(name: list(names), utility: utility, plural: plural)
         switch utility {
         case .essential:
             return "\(consequence) Only the paired tag lifts an anchor. If the tag is not with you, nothing here comes back until you find it."
@@ -140,13 +151,13 @@ enum UtilityText {
         }
     }
 
-    private static func fallback(name: String, utility: Utility) -> String {
+    private static func fallback(name: String, utility: Utility, plural: Bool = false) -> String {
         switch utility {
-        case .essential: "\(name) is how this phone does its job."
+        case .essential: "\(name) \(plural ? "are" : "is") how this phone does its job."
         // Only reachable from `anchoring`: idle is below the line for an ordinary block, and
         // saying it is "worth having around" would be flattery. What is true is that it goes.
-        case .idle: "\(name) goes the moment you anchor."
-        default: "\(name) is worth having around."
+        case .idle: "\(name) \(plural ? "go" : "goes") the moment you anchor."
+        default: "\(name) \(plural ? "are" : "is") worth having around."
         }
     }
 

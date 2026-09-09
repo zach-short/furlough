@@ -276,6 +276,39 @@ struct UtilityTextTests {
         #expect(UtilityText.anchoring(names: ["TikTok"], utility: .hazard, detail: nil) == nil)
     }
 
+    /// The bug this pins was on Zach's Anchor screen 2026-09-08: "This app and This app is worth
+    /// having around". Two faults in one sentence; this is the verb.
+    @Test("The anchor warning agrees in number at every tier that speaks")
+    func anchorWarningAgreesInNumber() {
+        func text(_ names: [String], _ utility: Utility) -> String {
+            UtilityText.anchoring(names: names, utility: utility, detail: nil) ?? ""
+        }
+        for utility in [Utility.essential, .useful, .idle] {
+            #expect(text(["Messages"], utility).contains(" is ") || text(["Messages"], utility).contains(" goes "))
+        }
+        #expect(text(["Messages"], .essential).contains("Messages is how this phone does its job."))
+        #expect(text(["Messages", "Phone"], .essential).contains("Messages and Phone are how this phone does its job."))
+        #expect(text(["Messages", "Phone", "Maps"], .essential).contains("Messages, Phone and Maps are how"))
+
+        #expect(text(["Mail"], .useful).contains("Mail is worth having around."))
+        #expect(text(["Mail", "Notes"], .useful).contains("Mail and Notes are worth having around."))
+
+        #expect(text(["Reddit"], .idle).contains("Reddit goes the moment you anchor."))
+        #expect(text(["Reddit", "YouTube"], .idle).contains("Reddit and YouTube go the moment you anchor."))
+    }
+
+    /// A detail is written about one app, so it cannot stand as the sentence for several. With
+    /// one name it is still preferred over the generic line, which is the whole reason it exists.
+    @Test("A one-app detail is dropped once the anchor holds more than one")
+    func detailIsForOneNameOnly() {
+        let detail = "Messages is where the codes texted to you land."
+        #expect(UtilityText.anchoring(names: ["Messages"], utility: .essential, detail: detail)?
+            .contains(detail) == true)
+        let several = try! #require(UtilityText.anchoring(names: ["Messages", "Phone"], utility: .essential, detail: detail))
+        #expect(several.contains(detail) == false)
+        #expect(several.contains("Messages and Phone are how this phone does its job."))
+    }
+
     @Test("Names read as a sentence")
     func namesReadAsASentence() {
         #expect(UtilityText.list([]) == "This")

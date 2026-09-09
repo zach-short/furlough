@@ -1047,6 +1047,98 @@ The plan for this stretch. Tick each phase off here as it lands.
     beside this gives an iOS `.host` its own exportable host string, so a phone file may hold
     both kinds; the guided remap is for the token half.)
 
+22. **One habit, one row.** Done 2026-09-08. An app and the website it is also at are one target
+    now, not two: `Target.also` carries the other doors and `Target.kinds` is what everything
+    downstream reads, so one status, one schedule, one budget, one removal delay and one row cover
+    both halves. Optional for the same reason `systemName` and `utilityLevel` are — a synthesised
+    `init(from:)` demands every non-optional key and the state on the phone has none.
+
+    Zach's four calls, asked before any of it was built:
+    - **The site inherits the app's nickname and tier.** One habit, one identity, so `also` is a
+      bare `[TargetKind]`. The cost he accepted: anchoring the pair warns with the app's tier for
+      both halves, and the site has no name of its own anywhere.
+    - **Link even when the budget cannot be shared, and say so in one line.** A typed host has no
+      token, so nothing counts it either way — refusing to link would cost a row and buy nothing.
+      `RuleEditorView.linkedHostBudgetNote` is the line, under the slider.
+    - **Merging what is already there is offered.** `MergeOffer` in the editor, one candidate at a
+      time.
+    - **Names come from the tables** (`AppUtility.name(forBundleID:)` via `UsageReader.identities()`),
+      knowing that route needs data access and so mostly runs on his own phone.
+
+    **The budget really is shared, and that is the part worth knowing.** `DeviceActivityEvent`
+    takes applications *and* web domains under one threshold — verified in the iOS 26.5
+    swiftinterface, `DeviceActivity.framework`, two inits at lines 75 and 80 — so
+    `Monitoring.include` now gathers every token a target has into **one** event. 45 minutes is 45
+    across the app and the site together, counted by iOS, with no arithmetic of ours. Two events
+    would have been 45 each, which is 90. The event is still named by target id, so the monitor
+    extension needed no change at all.
+
+    Where the halves came from decides whether the budget reaches them. Both tokenised — an app
+    plus a site from Apple's picker — and it is shared outright. A site typed by name shares the
+    windows and is counted by nothing, and `Target.isCounted` / `uncountedHosts` is how the editor
+    tells the two apart: a lone typed site still gets `hostBudgetNote` and no slider, a linked pair
+    gets the slider plus the one honest line. **The rung-A-by-`FamilyActivityData` path in the
+    hand-off was deliberately not built**: `visitedWebDomains` is data-access-gated, so it would
+    have been a branch that only ever runs on the developer's phone — the same reason step 20(d)
+    declined one-click linking. Adding a site still goes through `AddSiteSheet`, and a pair whose
+    site half was picked gets the shared budget anyway.
+
+    **The sharp edge, and it is tested.** `applyPicker` reads a selection as the whole truth and
+    queues a removal for everything absent from it. A linked typed host is absent from every
+    selection, so judging a row on that would have queued the removal of every pair. The rule is
+    now `Policy.picker(removes:selected:)` — pure, in `Shared/Core`, because the picker itself is
+    iOS-only and unreachable from a test bundle: a row with no tokenised door is never removed, and
+    a linked row survives while *any* of its tokenised doors is still picked. So the picker cannot
+    break a pair, only remove the whole of it. Breaking one half is a loosening and belongs to the
+    editor, where it waits out the delay.
+
+    Linking is a **tightening** and lands at once (more is blocked than a moment ago); unlinking is
+    a **loosening** and queues as `PendingKind.unlink(targetID:kind:)`, so it warns an hour ahead,
+    reads as a delta on the pending card and cancels from the same list as everything else. The
+    face can never be unlinked away — refused where it is queued *and* again in `Policy.apply`,
+    because a change can sit in the queue across an edit that swaps which half is the face.
+
+    Merging is a tightening too, which is why it needs no delay: the tighter of the two rules wins
+    and the two budgets become one. The face is the app wherever one of the pair is an app, the
+    slower tier wins so a merge cannot shorten a wait, and `AppModel.budgeted` replaces the
+    whole-day no-limit sentinel when the merged pair is counted — 1440 was never a chosen budget,
+    only what `savedBudget` forces onto a target nothing counts.
+
+    Also: `Config.target(kind:)` and `target(host:)` search every door, so neither the picker, the
+    usage page nor an import adds a second row for a half already covered. `ExportedTarget.alsoBlocks`
+    carries the halves a name can carry; a linked token cannot travel and is absent, exactly as
+    `identifier` is nil for a token. `ConfigImport.Edit.link` lands them at once with a review line
+    of its own. The Mac's browser sweep reads `Target.hasHost` and `hosts` rather than the face, so
+    an imported linked host is still swept for.
+
+    Tests: `Tests/Core/LinkedTargetTests.swift`, 38 tests over the model, the lookups, enforcement,
+    the anchor reaching through a linked half, the picker rule, unlinking, the import and the
+    export round trip, plus decoding state written before `also` existed. 353 tests in 52 suites.
+
+    **Two things left undone, both on purpose.** The usage page still keys on a bundle identifier
+    and `web:` a domain separately, so a linked pair whose site half is a *tokenised* web domain
+    would rank as two cards. What is fixed is the part that matters for enforcement — the
+    already-managed lookups see linked halves, so Apply lands on the one row instead of splitting
+    the pair — but summing two histograms into one card belongs to whoever owns `UsageAnalysis`,
+    which another session was editing at the time. And `AppUtility.name(forBundleID:)` answers only
+    where exactly one display name maps to an identifier's advice: every essential carries its own
+    detail sentence and so is unique, while the quieter tiers share a bare `.init(.useful)` between
+    many apps and the table genuinely cannot tell which one it is. It says nothing rather than
+    guessing, because a wrong name would go on the shield.
+
+    **Nobody has used this on the phone yet.** Installed 2026-09-08. What to check is in the last
+    message.
+
+    (b) **"This app and This app is worth having around."** From Zach's Anchor screenshot the same
+    day: two faults in one sentence. `UtilityText.fallback` hardcoded singular verbs for all three
+    tiers while `anchoring` is the one function here that can be about several things, so it now
+    takes the count and picks the verb — "are how this phone does its job", "go the moment you
+    anchor". The one-app `detail` is dropped once there is more than one name: `anchorWarning` hands
+    over the first it finds, and "Messages is where your codes land" cannot stand as the sentence
+    for Messages *and* Phone. `anchorWarning` also collapses duplicate names, so the exact sentence
+    Zach saw cannot come back even where the tables cannot name anything. Tests in `UtilityTests`
+    cover one, two and three names at every tier that speaks.
+
 ## Style rules
 
 Swift 6 language mode with approachable concurrency, SwiftUI, `@Observable`, async/await, no

@@ -25,24 +25,36 @@ enum Monitoring {
         // up letting through the edit the other would have caught.
         let windows = ActivityLimit.spans(in: state)
 
+        /// One event per target, whatever it covers. `DeviceActivityEvent` takes applications and
+        /// web domains together under one threshold, so a linked pair genuinely *shares* a
+        /// budget: 45 minutes is 45 across the app and the site together, counted by iOS, with
+        /// no arithmetic of ours. Two events would have meant 45 each, which is 90.
         func include(_ target: Target, _ rule: Rule) {
             guard rule.isEverAllowed else { return }
+            var apps: Set<ApplicationToken> = []
+            var web: Set<WebDomainToken> = []
+            for kind in target.kinds {
+                switch kind {
+                case .application(let token): apps.insert(token)
+                case .webDomain(let token): web.insert(token)
+                case .category:
+                    break
+                // A typed host has no token, and a threshold event needs one, so nothing counts
+                // it. On its own that means no budget event at all; linked to an app it means the
+                // site shares the windows and only the app's minutes are counted. Either way its
+                // window spans are still collected by `ActivityLimit.spans`, so the reconcile at
+                // each window edge still happens.
+                case .host:
+                    break
+                }
+            }
+            guard !apps.isEmpty || !web.isEmpty else { return }
             let minutes = rule.dailyBudgetMinutes
             let name = DeviceActivityEvent.Name(ActivityNaming.budgetEvent(targetID: target.id, minutes: minutes))
             let threshold = DateComponents(hour: minutes / 60, minute: minutes % 60)
-            switch target.kind {
-            case .application(let token):
-                events[name] = DeviceActivityEvent(applications: [token], threshold: threshold, includesPastActivity: true)
-            case .webDomain(let token):
-                events[name] = DeviceActivityEvent(webDomains: [token], threshold: threshold, includesPastActivity: true)
-            case .category:
-                break
-            // A typed host has no token, and a threshold event needs one, so nothing counts it
-            // and it gets no budget event. Its window spans are still collected by
-            // `ActivityLimit.spans`, so the reconcile at each window edge still happens.
-            case .host:
-                break
-            }
+            events[name] = DeviceActivityEvent(
+                applications: apps, webDomains: web, threshold: threshold, includesPastActivity: true
+            )
         }
 
         for target in state.config.targets {

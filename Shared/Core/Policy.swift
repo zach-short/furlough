@@ -166,6 +166,16 @@ enum Policy {
             if let index = config.targets.firstIndex(where: { $0.id == id }) {
                 config.targets[index].utilityLevel = level
             }
+        case .unlink(let id, let kind):
+            // Only ever a linked half: the face is what the row *is*, so dropping it would leave
+            // a target with no identity rather than a looser one. `AppModel.unlink` refuses to
+            // queue that, and this refuses to perform it, because a change can sit in the queue
+            // across an edit that changes which half is the face.
+            if let index = config.targets.firstIndex(where: { $0.id == id }), config.targets[index].kind != kind {
+                var remaining = config.targets[index].also ?? []
+                remaining.removeAll { $0 == kind }
+                config.targets[index].also = remaining.isEmpty ? nil : remaining
+            }
         }
     }
 
@@ -248,6 +258,30 @@ enum Policy {
         return Furlough.minutesPerDay + morning.endMinute
     }
 
+    /// Whether a trip through Apple's picker should schedule `target`'s removal, given the kinds
+    /// that came back in `selected`.
+    ///
+    /// The picker's answer is the whole truth about **tokens** and nothing else, and two kinds of
+    /// door have to be held back from it.
+    ///
+    /// A target with no tokenised door at all — a website typed by name — is never in any
+    /// selection, because it has no token and Apple's picker has never heard of it. Without this,
+    /// one trip through the picker would queue the removal of every site added by name.
+    ///
+    /// And a linked target survives while *any* of its tokenised doors is still picked. Unpicking
+    /// one half of a pair is not how a pair is broken: breaking one is a loosening that waits out
+    /// the delay, and a removal scheduled from here would be a second, quieter way to do the same
+    /// thing — one that takes the whole row rather than the half that was unpicked.
+    ///
+    /// Pure and here rather than inside `AppModel.applyPicker` so that it can be tested: the
+    /// picker itself is iOS-only and unreachable from a test bundle, and this is the rule that
+    /// decides whether a removal is queued.
+    static func picker(removes target: Target, selected: Set<TargetKind>) -> Bool {
+        let tokenised = target.kinds.filter { !$0.isHost }
+        guard !tokenised.isEmpty else { return false }
+        return !tokenised.contains { selected.contains($0) }
+    }
+
     /// The first window on the nearest day after `weekday` that has one, up to a week out.
     /// Nil only when the rule never allows anything.
     static func nextOpen(in rule: Rule, afterWeekday weekday: Int) -> NextOpen? {
@@ -267,16 +301,20 @@ enum Policy {
         for target in config.targets {
             let status = status(of: target, config: config, runtime: runtime, now: now, calendar: calendar)
             decision.statuses[target.id] = status
-            switch target.kind {
-            case .application(let token):
-                if status.isAllowed { decision.allowedApps.insert(token) } else { decision.shieldedApps.insert(token) }
-            case .webDomain(let token):
-                if status.isAllowed { decision.allowedWeb.insert(token) } else { decision.shieldedWeb.insert(token) }
-            case .category(let token):
-                decision.categories.insert(token)
-            case .host(let host):
-                // No allowed set to put an open one in: the filter is the blocked list itself.
-                if !status.isAllowed { decision.filteredHosts.insert(host) }
+            // Every door, not just the face. One status covers the app and the website it is
+            // also at, so linking costs nothing here: the status was only ever per target.
+            for kind in target.kinds {
+                switch kind {
+                case .application(let token):
+                    if status.isAllowed { decision.allowedApps.insert(token) } else { decision.shieldedApps.insert(token) }
+                case .webDomain(let token):
+                    if status.isAllowed { decision.allowedWeb.insert(token) } else { decision.shieldedWeb.insert(token) }
+                case .category(let token):
+                    decision.categories.insert(token)
+                case .host(let host):
+                    // No allowed set to put an open one in: the filter is the blocked list itself.
+                    if !status.isAllowed { decision.filteredHosts.insert(host) }
+                }
             }
         }
         // The anchor can hold things that are not targets at all; while anchored they are all shielded.
@@ -305,9 +343,12 @@ enum Policy {
             let status = status(of: target, config: config, runtime: runtime, now: now, calendar: calendar)
             decision.statuses[target.id] = status
             guard !status.isAllowed else { continue }
-            switch target.kind {
-            case .macApp(let bundleID): decision.blockedApps.insert(bundleID)
-            case .host(let host): decision.blockedHosts.insert(host)
+            // Every door, as on the phone: an imported setup can link a host onto a Mac app.
+            for kind in target.kinds {
+                switch kind {
+                case .macApp(let bundleID): decision.blockedApps.insert(bundleID)
+                case .host(let host): decision.blockedHosts.insert(host)
+                }
             }
         }
         if config.anchor.isAnchored {

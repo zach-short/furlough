@@ -87,6 +87,10 @@ enum PendingNotifications {
             }
             let hours = config.delayHours(forTargetID: targetID)
             return "\(name) becomes \(level.label.lowercased()), so its loosenings will wait \(TimeFormat.delay(hours: hours))."
+        case .unlink(let targetID, let kind):
+            let name = config.target(id: targetID)?.displayName ?? "An app"
+            let half = kind.hostName ?? "its other half"
+            return "\(half) stops being blocked with \(name)."
         }
     }
 

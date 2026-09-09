@@ -127,6 +127,14 @@ struct ExportedTarget: Codable, Equatable {
     /// Absent for a target added but never given a rule. Nothing is enforced for those, and
     /// the file should say so rather than invent an open rule for them.
     var rule: Rule?
+    /// The other doors into this same thing, as hosts: "youtube.com" beside the YouTube app.
+    ///
+    /// Only hosts, for the same reason `identifier` is nil for a token: a Screen Time token means
+    /// nothing off the device that issued it, so a website half that came from Apple's picker
+    /// cannot travel and is simply absent. A site typed by name travels exactly as it does when
+    /// it is a row of its own, which is what lets a linked pair survive the trip to another
+    /// device and back.
+    var alsoBlocks: [String]?
 }
 
 extension ExportedTarget {
@@ -160,5 +168,9 @@ extension ExportedTarget {
         nickname = target.nickname.isEmpty ? nil : target.nickname
         utility = target.utilityLevel.map(Tier.init)
         rule = target.rule
+        // The face is written above; these are the halves beside it, and only the ones a name can
+        // carry. A linked token is dropped rather than guessed at.
+        let linked = (target.also ?? []).compactMap(\.hostName)
+        alsoBlocks = linked.isEmpty ? nil : linked
     }
 }

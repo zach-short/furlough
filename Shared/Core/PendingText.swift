@@ -46,6 +46,15 @@ enum PendingText {
                 now: tier(target?.utility ?? .unset, in: config),
                 becomes: tier(level, in: config)
             )
+        case .unlink(_, let kind):
+            // The rule does not change, so the pair is what the two halves say. A half with no
+            // name of its own — a picked website is an opaque token — is "the other half", which
+            // is all that can honestly be said about it.
+            let half = kind.hostName ?? "the other half"
+            return Delta(
+                now: "\(TimeFormat.rule(target?.rule, calendar: calendar)), \(half) too",
+                becomes: "\(half) no longer blocked"
+            )
         }
     }
 

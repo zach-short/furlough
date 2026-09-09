@@ -124,6 +124,23 @@ enum UsageReader {
         return kinds
     }
 
+    /// Every installed app and visited site, as the key `UsageCollector` would give it against
+    /// the `TargetKind` it is. The inverse of what a target holds: a target has an opaque token
+    /// and wants an identity, and this is the only thing on the device that knows both.
+    ///
+    /// Data access only, so it answers on a development build anywhere and for a customer only in
+    /// the EU (`FamilyActivityData`). Everything that reads it must work without it — see
+    /// `AppModel.nameFromTables`, where the fallback is the name the shield teaches instead.
+    @available(iOS 26.4, *)
+    static func identities() async throws -> [TargetKind: String] {
+        var identities: [TargetKind: String] = [:]
+        let decoder = JSONDecoder()
+        for (key, encoded) in try await encodedKinds() {
+            identities[try decoder.decode(TargetKind.self, from: encoded)] = key
+        }
+        return identities
+    }
+
     /// The target for a usage entry Screen Time named but handed no token for: its key is a
     /// bundle identifier, or "web:" and a domain, looked up among the apps installed and the
     /// domains visited. Nil when it is not there.

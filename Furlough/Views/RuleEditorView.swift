@@ -25,6 +25,12 @@ struct RuleEditorView: View {
     @State private var confirmBlockEssential = false
     /// Set when the companion nudge is taken up: the flow below opens the guide or the picker.
     @State private var addRequest: AddRequest?
+    /// What linking, merging or unlinking a half just did, shown in an alert. The editor stays
+    /// open: the row is the same row, and there is nothing to go back to.
+    @State private var linked: String?
+    /// The half whose unlink is being confirmed. Taking one off loosens the rules, so it is worth
+    /// asking, the same as removing the whole row.
+    @State private var confirmUnlink: TargetKind?
     @FocusState private var nicknameFocused: Bool
 
     /// A window with a stable identity while it is being edited.
@@ -67,12 +73,16 @@ struct RuleEditorView: View {
     /// The rows as Furlough stores them: a night becomes its evening and the morning after.
     private var windows: [TimeWindow] { drafts.flatMap { $0.window.split } }
     private var draft: Rule { Rule(windows: windows, dailyBudgetMinutes: savedBudget) }
-    /// A typed host is saved with a whole day of budget — the value `Rule.unrestricted` uses
-    /// for "no limit" — whatever the slider last held. Forced here rather than in `load()` so
+    /// A target nothing counts is saved with a whole day of budget — the value `Rule.unrestricted`
+    /// uses for "no limit" — whatever the slider last held. Forced here rather than in `load()` so
     /// that no other path into the draft can give one a limit that nothing would enforce:
     /// "Use windows from another app" copies a budget, and the week sheet writes windows back
     /// through the same binding. A budget of 0 would mean blocked all day, so it cannot be that.
-    private var savedBudget: Int { target?.kind.isHost == true ? Furlough.minutesPerDay : budget }
+    ///
+    /// `isCounted` rather than `kind.isHost` since linking: a typed site on its own is counted by
+    /// nothing, but the same site linked to an app shares that app's budget event, and the app's
+    /// minutes are real minutes. So a linked pair gets a real budget and a lone site still does not.
+    private var savedBudget: Int { target?.isCounted == false ? Furlough.minutesPerDay : budget }
     private var trimmedNickname: String { nickname.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var hasChanges: Bool {
         guard let target else { return false }
@@ -150,56 +160,10 @@ struct RuleEditorView: View {
             VStack(alignment: .leading, spacing: 0) {
                 if let target {
                     header(target)
-                    if let companion = model.companion(for: target) {
-                        CompanionNudge(companion: companion) {
-                            switch companion {
-                            // Sites need no picker any more: they are names, so they are added
-                            // on the spot. The nudge then goes on its own, because the hosts it
-                            // was offering are among the ones Furlough knows.
-                            case .sites(let hosts): model.addHosts(hosts)
-                            // Still the picker: only Apple can mint an app's token, and
-                            // `FamilyActivityData` — the one API that could do it without her —
-                            // is EU-only for anyone who installs from the App Store. So the
-                            // trip is made as short as it can be instead: one question, and
-                            // what comes back already wears this target's hours.
-                            case .app(let name):
-                                addRequest = .companion(.application, of: target.id, titled: name)
-                            }
-                        } onDismiss: {
-                            model.dismissCompanion(for: target.id)
-                        }
-                        .padding(.bottom, 14)
-                    }
+                    nudge(target)
                     nicknameCard
                     if !target.kind.isCategory {
-                        SectionLabel(text: "Allowed windows")
-                        windowsCard
-                        if drafts.contains(where: { $0.window.isNight }) {
-                            Footnote(text: Self.nightNote)
-                                .padding(.top, 8)
-                        }
-                        if target.kind.isHost {
-                            Footnote(text: Self.hostBudgetNote)
-                                .padding(.top, 14)
-                        } else {
-                            SectionLabel(text: "Daily budget")
-                            budgetCard
-                        }
-                        SectionLabel(text: "How much it is worth")
-                        UtilityPicker(
-                            selection: $tier,
-                            baseDelayHours: model.state.config.loosenDelayHours,
-                            suggestion: suggestion
-                        )
-                        if let caution {
-                            CautionBanner(text: caution, isSevere: tier == .essential)
-                                .padding(.top, 14)
-                        }
-                        EffectBanner(kind: effect(for: target))
-                            .padding(.top, 14)
-                        ProminentButton(title: "Save") { attemptSave() }
-                            .disabled(!hasChanges || draft.validationError != nil || limitReason != nil)
-                            .padding(.top, 10)
+                        ruleSection(target)
                     } else {
                         Footnote(text: "Categories are always blocked. Apps inside them that you give windows to are excepted.")
                             .padding(.top, 10)
@@ -277,6 +241,13 @@ struct RuleEditorView: View {
         .sheet(isPresented: $showWeek) {
             WeekSheet(week: weekDraft)
         }
+        .modifier(HalfChangeAlerts(
+            unlinking: $confirmUnlink,
+            done: $linked,
+            name: target?.displayName ?? "this app",
+            delay: TimeFormat.delay(hours: model.state.config.delayHours(for: target)),
+            unlink: { kind in linked = model.unlink(kind, from: targetID).message }
+        ))
         .alert("Saved", isPresented: Binding(get: { saved != nil }, set: { if !$0 { saved = nil } }), presenting: saved) { _ in
             Button("OK") {
                 saved = nil
@@ -284,6 +255,161 @@ struct RuleEditorView: View {
             }
         } message: { message in
             Text(message)
+        }
+    }
+
+    // MARK: The editor, in sections
+
+    /// The whole of a rule: hours, budget, the other halves, the tier and Save.
+    ///
+    /// One expression per section rather than one for the screen. SwiftUI's result builder makes
+    /// a body a single expression, and this one grew past what the type checker will solve in
+    /// reasonable time — so the branches are functions now. Nothing about the layout changed.
+    @ViewBuilder
+    private func ruleSection(_ target: Target) -> some View {
+        SectionLabel(text: "Allowed windows")
+        windowsCard
+        if drafts.contains(where: { $0.window.isNight }) {
+            Footnote(text: Self.nightNote)
+                .padding(.top, 8)
+        }
+        budgetSection(target)
+        halves(target)
+        SectionLabel(text: "How much it is worth")
+        UtilityPicker(
+            selection: $tier,
+            baseDelayHours: model.state.config.loosenDelayHours,
+            suggestion: suggestion
+        )
+        if let caution {
+            CautionBanner(text: caution, isSevere: tier == .essential)
+                .padding(.top, 14)
+        }
+        EffectBanner(kind: effect(for: target))
+            .padding(.top, 14)
+        ProminentButton(title: "Save") { attemptSave() }
+            .disabled(!hasChanges || draft.validationError != nil || limitReason != nil)
+            .padding(.top, 10)
+    }
+
+    /// "You have one half of this." Nothing when both halves are in, when the table has never
+    /// heard of this one, or once it has been waved away.
+    @ViewBuilder
+    private func nudge(_ target: Target) -> some View {
+        if let companion = model.companion(for: target) {
+            CompanionNudge(companion: companion) {
+                switch companion {
+                // Sites need no picker: they are names, so they join this row on the spot rather
+                // than becoming rows of their own. The nudge then goes by itself, because the row
+                // now covers both halves.
+                case .sites(let hosts): linked = model.linkHosts(hosts, to: target.id).message
+                // Still the picker: only Apple can mint an app's token, and `FamilyActivityData` —
+                // the one API that could do it without her — is EU-only for anyone who installs
+                // from the App Store. So the trip is made as short as it can be instead: one
+                // question, and what comes back joins this row and becomes its face.
+                case .app(let name):
+                    addRequest = .companion(.application, of: target.id, titled: name)
+                }
+            } onDismiss: {
+                model.dismissCompanion(for: target.id)
+            }
+            .padding(.bottom, 14)
+        }
+    }
+
+    // MARK: The other halves
+
+    /// The budget, or the reason there is not one.
+    ///
+    /// Three cases, and the middle one is new. A target nothing counts has no budget at all and
+    /// says so. A target that is counted gets the slider. A linked pair gets the slider *and* one
+    /// line naming the half the budget cannot reach — the one honest gap in linking, said plainly
+    /// rather than left to be discovered.
+    ///
+    /// Lifted out of `body`, like `halves`, because the editor's body is at the limit of what the
+    /// type checker will take in one expression and these branches put it over.
+    @ViewBuilder
+    private func budgetSection(_ target: Target) -> some View {
+        if !target.isCounted {
+            Footnote(text: Self.hostBudgetNote)
+                .padding(.top, 14)
+        } else {
+            SectionLabel(text: "Daily budget")
+            budgetCard
+            if !target.uncountedHosts.isEmpty {
+                Footnote(text: Self.linkedHostBudgetNote(target.uncountedHosts))
+                    .padding(.top, 8)
+            }
+        }
+    }
+
+    /// The other doors into this thing: what the row already covers, and what it could. Lifted out
+    /// of `body` rather than written inline because the editor's body is at the limit of what the
+    /// type checker will take in one expression, and two more branches put it over.
+    @ViewBuilder
+    private func halves(_ target: Target) -> some View {
+        if target.isLinked {
+            SectionLabel(text: "Also blocks")
+            alsoCard(target)
+        }
+        if let other = mergeCandidate(target) {
+            MergeOffer(name: other.displayName, into: target.displayName) {
+                linked = model.merge(other.id, into: target.id).message
+            }
+            .padding(.top, 14)
+        }
+    }
+
+    /// The one row that could be folded into this one, or nil. One at a time: merging is a
+    /// judgement about two specific rows, and offering three at once would be a list to work
+    /// through rather than a question to answer.
+    private func mergeCandidate(_ target: Target) -> Target? { model.mergeable(with: target).first }
+
+    /// Every half beside the face, each with a way off. Taking one off is a loosening, so it goes
+    /// through the delay — the footnote says so before the button is touched, not after.
+    @ViewBuilder
+    private func alsoCard(_ target: Target) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array((target.also ?? []).enumerated()), id: \.offset) { index, kind in
+                if index > 0 { CardDivider() }
+                HStack(spacing: 10) {
+                    Image(systemName: kind.isHost ? "globe" : "square.grid.2x2.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Ember.faint)
+                        .frame(width: 16)
+                    if let host = kind.hostName {
+                        Text(host)
+                            .emberBody(13)
+                            .foregroundStyle(Ember.cream)
+                    } else {
+                        TokenName(kind: kind, size: .small)
+                    }
+                    Spacer(minLength: 8)
+                    if queuedUnlink(target).contains(kind) {
+                        Text("Coming off")
+                            .emberBody(11, .semibold)
+                            .foregroundStyle(Ember.pending)
+                    } else {
+                        Button("Unlink") { confirmUnlink = kind }
+                            .buttonStyle(.plain)
+                            .emberBody(12, .semibold)
+                            .foregroundStyle(Ember.ember)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+            }
+        }
+        .emberCard()
+        Footnote(text: "Blocked on the hours above, as one thing. Taking a half off loosens your rules, so it takes \(TimeFormat.delay(hours: model.state.config.delayHours(for: target))).")
+            .padding(.top, 8)
+    }
+
+    /// Halves already queued to come off, so the row says so rather than offering Unlink twice.
+    private func queuedUnlink(_ target: Target) -> [TargetKind] {
+        model.state.pending.compactMap { change in
+            if case .unlink(let id, let kind) = change.kind, id == target.id { return kind }
+            return nil
         }
     }
 
@@ -393,6 +519,14 @@ struct RuleEditorView: View {
     /// Why a site added by name has hours and no limit. One line, said where the budget would
     /// have been, rather than left for someone to notice as an absence.
     private static let hostBudgetNote = "No daily budget: iOS counts a site only when it comes from Apple's picker, and this one was typed. Its hours are enforced."
+
+    /// The honest gap in a linked pair, said in one line rather than left to be discovered. The
+    /// windows do cover the site; the budget cannot, and nothing on iOS can make it.
+    private static func linkedHostBudgetNote(_ hosts: [String]) -> String {
+        let list = UtilityText.list(hosts)
+        let it = hosts.count == 1 ? "it" : "them"
+        return "\(list) shares these hours. Time spent there does not come off the budget — iOS counts a site only when it comes from Apple's picker, and \(it) \(hosts.count == 1 ? "was" : "were") typed."
+    }
 
     private var budgetCard: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -998,5 +1132,91 @@ struct EffectBanner: View {
         case .tightening: Ember.moss
         case .loosening: Ember.pending
         }
+    }
+}
+
+/// The two things that can happen to a half, as presentations of their own.
+///
+/// A `ViewModifier` rather than two more links on the editor's chain. SwiftUI solves a modifier
+/// chain as one expression, and the editor's was already long enough that adding a dialog and an
+/// alert to it put the type checker past its time limit — with the error landing somewhere else
+/// in the body entirely. Its own type gets its own budget.
+private struct HalfChangeAlerts: ViewModifier {
+    @Binding var unlinking: TargetKind?
+    @Binding var done: String?
+    let name: String
+    let delay: String
+    let unlink: (TargetKind) -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .confirmationDialog(
+                "Stop blocking the other half?",
+                isPresented: Binding(get: { unlinking != nil }, set: { if !$0 { unlinking = nil } }),
+                titleVisibility: .visible,
+                presenting: unlinking
+            ) { kind in
+                Button("Unlink", role: .destructive) {
+                    unlink(kind)
+                    unlinking = nil
+                }
+                Button("Keep it blocked", role: .cancel) { unlinking = nil }
+            } message: { kind in
+                Text("\(kind.hostName ?? "The other half") stops being blocked and \(name) carries on alone. That loosens your rules, so it takes \(delay).")
+            }
+            // Separate from the editor's "Saved" alert, which dismisses the screen: linking,
+            // merging and unlinking all leave the same row on screen, so there is nowhere to go.
+            .alert(
+                "Done",
+                isPresented: Binding(get: { done != nil }, set: { if !$0 { done = nil } }),
+                presenting: done
+            ) { _ in
+                Button("OK") { done = nil }
+            } message: { message in
+                Text(message)
+            }
+    }
+}
+
+/// "These two are the same thing — make them one row?"
+///
+/// The retroactive case, and the only one that needs asking. A pair added since linking existed
+/// is already one row; a pair added before it is two, and nothing but an offer like this will
+/// ever join them. Merging is a tightening — two budgets become one shared budget and the
+/// tighter schedule wins — so there is no delay to warn about, only a row that goes away.
+struct MergeOffer: View {
+    let name: String
+    let into: String
+    let onMerge: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 9) {
+                Image(systemName: "arrow.triangle.merge")
+                    .font(.system(size: 13, weight: .semibold))
+                    .padding(.top, 1)
+                Text("\(name) is already here, on a row of its own. It is the same thing as \(into) — one row means one schedule and one budget across both, instead of two of each.")
+                    .emberBody(12, .semibold)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .foregroundStyle(Ember.amber)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Button(action: onMerge) {
+                Text("Make them one")
+                    .emberBody(12.5, .semibold)
+                    .foregroundStyle(Ember.ground)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .background(Ember.amber, in: Capsule())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 11)
+        .background(Ember.amber.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Ember.amber.opacity(0.35), lineWidth: 1)
+        )
     }
 }

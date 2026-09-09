@@ -230,12 +230,14 @@ final class Enforcer {
     /// not only the browser in front, and not only its front window. A blocked site left playing
     /// behind the window you are looking at is still a blocked site.
     private func enforceBrowser(decision: Decision, config: Config, runtime: RuntimeState, now: Date) {
-        guard config.targets.contains(where: { $0.kind.isHost }) else { return }
+        // `hasHost` rather than `kind.isHost`: an imported setup can carry a website as the
+        // linked half of an app's row, and that site still needs the browser swept for it.
+        guard config.targets.contains(where: \.hasHost) else { return }
         for browser in browsers.snapshots() {
             for tab in browser.tabs {
                 guard let host = tab.url.host()?.lowercased(), let target = config.target(host: host) else { continue }
                 let status = decision.statuses[target.id]
-                let blocked = status.map { !$0.isAllowed } ?? decision.blockedHosts.contains(target.host)
+                let blocked = status.map { !$0.isAllowed } ?? target.hosts.contains { decision.blockedHosts.contains($0) }
                 guard blocked else { continue }
                 let text = ShieldText.text(name: target.displayName, status: status, rule: target.rule)
                 let glass = HourglassState.of(target, status: status ?? .blockedAllDay, runtime: runtime, now: now)

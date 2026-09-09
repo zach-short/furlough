@@ -67,6 +67,49 @@ enum AppUtility {
             .advice
     }
 
+    /// What to *call* the app with this bundle identifier, or nil when the table cannot tell.
+    ///
+    /// A Screen Time token says nothing, so a target has no name until the shield covers it. The
+    /// two tables here are keyed differently — `bundleIDs` by identifier, `names` by the name the
+    /// shield reports — and this is the bridge between them: take the advice the identifier maps
+    /// to, and answer the display name that maps to the very same advice.
+    ///
+    /// Only when exactly one name does. Every essential carries its own detail sentence, so those
+    /// are unique and answer here; the quieter tiers share a bare `.init(.useful)` between many
+    /// apps, and for those the table genuinely does not know which one this is. Guessing between
+    /// them would put the wrong name on a target and on the shield, which is worse than "This
+    /// app". `Companions` is asked first by the caller and knows the rest by name outright.
+    static func name(forBundleID raw: String) -> String? {
+        guard let advice = byBundleID(raw) else { return nil }
+        let matches = names.filter { $0.value == advice }
+        guard matches.count == 1, let key = matches.keys.first else { return nil }
+        return properName(key)
+    }
+
+    /// A key from `names` as a person writes it. The keys are lowercased because that is how the
+    /// shield reports a name and so how the lookup has to match, which loses the casing — and
+    /// capitalising each word recovers most of it but not all: "facetime" is not "Facetime".
+    /// Only the ones it gets wrong are listed; `Companions` already carries proper names for the
+    /// things that are also websites, and it is asked first.
+    static func properName(_ key: String) -> String {
+        if let exact = properNames[key] { return exact }
+        return key.split(separator: " ").map(\.capitalized).joined(separator: " ")
+    }
+
+    private static let properNames: [String: String] = [
+        "facetime": "FaceTime",
+        "1password": "1Password",
+        "bereal": "BeReal",
+        "youtube": "YouTube",
+        "youtube shorts": "YouTube Shorts",
+        "whatsapp": "WhatsApp",
+        "linkedin": "LinkedIn",
+        "tiktok": "TikTok",
+        "draftkings": "DraftKings",
+        "fanduel": "FanDuel",
+        "iphone": "iPhone",
+    ]
+
     /// Subdomains count: "m.youtube.com" is YouTube.
     static func byHost(_ raw: String?) -> Advice? {
         guard let raw, let host = Hosts.normalize(raw) else { return nil }
