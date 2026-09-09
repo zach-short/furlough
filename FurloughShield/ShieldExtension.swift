@@ -1,6 +1,5 @@
 import ManagedSettings
 import ManagedSettingsUI
-import SwiftUI
 import UIKit
 import WidgetKit
 
@@ -72,30 +71,23 @@ final class ShieldExtension: ShieldConfigurationDataSource {
         )
     }
 
-    /// The icon slot takes a UIImage, so the glass is the app's own view rendered to one still
-    /// frame: the same drawing, at the sand level this rule has reached, without the timeline.
-    /// `ImageRenderer` is main-actor work and iOS calls us on the main thread, but a shield
-    /// that throws is a shield the user never sees, so anything else falls back to the symbol.
+    /// The icon slot takes a UIImage, so the glass is one still frame of the app's own drawing,
+    /// at the sand level this rule has reached, without the timeline.
+    ///
+    /// It is drawn with Core Graphics (`HourglassStill`), not rendered from the SwiftUI view:
+    /// iOS asks for the configuration off the main thread, and `ImageRenderer` is main-actor
+    /// work, so a render that waited for the main thread never ran and the phone showed the
+    /// symbol below every time (2026-09-08). The symbol stays for the one case with no glass
+    /// to draw: an app iOS shields that no rule of ours knows.
     private func icon(for glass: HourglassState?, fallbackTint: UIColor) -> UIImage? {
-        if let glass, Thread.isMainThread {
-            return MainActor.assumeIsolated { Self.still(glass) }
+        // No view context out here to read a trait from, and the slot is small: @3x covers
+        // every device that draws a shield, and UIKit takes it down on a @2x screen.
+        if let glass, let still = HourglassStill.uiImage(glass, size: CGSize(width: 132, height: 176), scale: 3) {
+            return still
         }
         let symbol = UIImage.SymbolConfiguration(pointSize: 72, weight: .medium)
         return UIImage(systemName: "hourglass", withConfiguration: symbol)?
             .withTintColor(fallbackTint, renderingMode: .alwaysOriginal)
-    }
-
-    @MainActor
-    private static func still(_ glass: HourglassState) -> UIImage? {
-        let renderer = ImageRenderer(
-            content: HourglassView(state: glass, phase: 0, motion: false)
-                .frame(width: 132, height: 176)
-        )
-        // No view context out here to read a trait from, and the slot is small: @3x covers
-        // every device that draws a shield, and UIKit takes it down on a @2x screen.
-        renderer.scale = 3
-        renderer.isOpaque = false
-        return renderer.uiImage
     }
 
     /// The shield is the one place Screen Time tells us what an app is called; everywhere else

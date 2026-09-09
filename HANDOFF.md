@@ -99,6 +99,7 @@ small codebase he fully understands over a fork. He is interactive: ask when a d
   hold — a linked target held by half is still offered) and `AnchorProfile.add` (every door,
   after what is held, never twice) are in `Shared/Core/AnchorCandidates.swift`, so the phone
   only shows the offer; `AppModel.addToAnchor(targetIDs:)` lands it, refused while anchored.
+  Seen on the phone 2026-09-08: the sheet, and Apple's picker opening after it.
   It was called the Brick until 2026-09-08 and was renamed because that is another product's
   name. Stored state keeps working: `Config.init(from:)` reads `anchor` and falls back to the
   old `brick` key, and `AnchorProfile.init(from:)` reads `isAnchored`/`anchoredAt` and falls
@@ -394,7 +395,12 @@ Open, and where each one lives:
 - Third-party iOS browsers (does a web-domain shield reach Chrome on the phone?) → step 3; the
   answer goes in README's limits either way.
 - The Live Activity only starting if the app is opened during a window → step 10.
-- The shield icon still being the SF hourglass → step 17.
+- The shield icon still being the SF hourglass → **done**, 2026-09-08 evening, and not the way
+  e9bfff2 tried: iOS calls `ShieldConfigurationDataSource` off the main thread, so a SwiftUI
+  `ImageRenderer` behind a main-thread check never ran and the symbol fallback shipped. The
+  shield now draws the glass with Core Graphics (`Shared/UI/HourglassStill.swift`), which has
+  no thread to wait for. Nothing SwiftUI-rendered can go on a shield; step 17's imagery is
+  for the app and the store, not here.
 - The duplicated Mac UI (`MacComponents.swift`, `MacWeekView.swift`, two `Notifier`s) → step 16.
 - Safari web apps in the Dock bypassing host rules → step 7. No web app on this Mac to test.
 - **The 19-window limit only being checked after Save** — **done**, step 6, as `ActivityLimit`.

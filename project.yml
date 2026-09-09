@@ -136,6 +136,7 @@ targets:
       - path: Shared/UI/AnchorMark.swift
       - path: Shared/UI/Hourglass.swift
       - path: Shared/UI/HourglassGeometry.swift
+      - path: Shared/UI/HourglassStill.swift
       - path: Shared/UI/Theme.swift
       - path: Shared/PrivacyInfo.xcprivacy
         buildPhase: resources

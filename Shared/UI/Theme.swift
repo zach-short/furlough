@@ -20,11 +20,12 @@ enum Ember {
 
     /// Ember to Amber, left to right: the budget slider fill.
     static let sliderFill = LinearGradient(colors: [ember, amber], startPoint: .leading, endPoint: .trailing)
-    /// Sand, top to bottom.
-    static let sand = LinearGradient(
-        stops: [.init(color: sandLight, location: 0), .init(color: amber, location: 0.55), .init(color: ember, location: 1)],
-        startPoint: .top, endPoint: .bottom
-    )
+    /// Sand, top to bottom. The stops are data as well as a gradient so `HourglassStill` can
+    /// hand the same ones to Core Graphics.
+    static let sandStops: [Gradient.Stop] = [
+        .init(color: sandLight, location: 0), .init(color: amber, location: 0.55), .init(color: ember, location: 1),
+    ]
+    static let sand = LinearGradient(stops: sandStops, startPoint: .top, endPoint: .bottom)
 }
 
 /// Bundled faces, addressed by PostScript name (see Furlough/Fonts).

@@ -103,8 +103,9 @@ extension HourglassState.Glass {
         }
     }
 
-    /// The 1 pt edge: bright top left, faint middle, bright bottom right.
-    var stroke: LinearGradient {
+    /// The 1 pt edge: bright top left, faint middle, bright bottom right. Stops first, so the
+    /// Core Graphics still (`HourglassStill`) draws the same edge from the same numbers.
+    var strokeStops: [Gradient.Stop] {
         let (color, top, middle, bottom): (Color, Double, Double, Double) = switch self {
         case .cream: (.white, 0.6, 0.14, 0.45)
         case .amber: (Ember.amber, 0.95, 0.35, 0.8)
@@ -113,14 +114,15 @@ extension HourglassState.Glass {
         case .pending: (Ember.pending, 0.95, 0.55, 0.9)
         case .ink: (.black, 0.8, 0.45, 0.7)
         }
-        return LinearGradient(
-            stops: [
-                .init(color: color.opacity(top), location: 0),
-                .init(color: color.opacity(middle), location: 0.5),
-                .init(color: color.opacity(bottom), location: 1),
-            ],
-            startPoint: .topLeading, endPoint: .bottomTrailing
-        )
+        return [
+            .init(color: color.opacity(top), location: 0),
+            .init(color: color.opacity(middle), location: 0.5),
+            .init(color: color.opacity(bottom), location: 1),
+        ]
+    }
+
+    var stroke: LinearGradient {
+        LinearGradient(stops: strokeStops, startPoint: .topLeading, endPoint: .bottomTrailing)
     }
 
     var capOpacity: Double {
@@ -143,26 +145,22 @@ extension HourglassState.Glass {
 
 extension HourglassState.Tone {
     /// Top to bottom over the whole glass, so the top sand is light and the mound is deep.
-    var gradient: LinearGradient {
+    /// Stops first, for the same reason as `Glass.strokeStops`.
+    var stops: [Gradient.Stop] {
         switch self {
         case .sand:
-            Ember.sand
+            Ember.sandStops
         case .amber:
-            LinearGradient(
-                stops: [.init(color: Ember.sandLight, location: 0), .init(color: Ember.amber, location: 0.6), .init(color: Ember.amber, location: 1)],
-                startPoint: .top, endPoint: .bottom
-            )
+            [.init(color: Ember.sandLight, location: 0), .init(color: Ember.amber, location: 0.6), .init(color: Ember.amber, location: 1)]
         case .ember:
-            LinearGradient(
-                stops: [.init(color: Ember.ember, location: 0), .init(color: Ember.ember, location: 0.5), .init(color: Color(hex: 0x9C3524), location: 1)],
-                startPoint: .top, endPoint: .bottom
-            )
+            [.init(color: Ember.ember, location: 0), .init(color: Ember.ember, location: 0.5), .init(color: Color(hex: 0x9C3524), location: 1)]
         case .grey:
-            LinearGradient(
-                stops: [.init(color: Color(hex: 0x8B847A), location: 0), .init(color: Color(hex: 0x6A635B), location: 0.6), .init(color: Color(hex: 0x4E4841), location: 1)],
-                startPoint: .top, endPoint: .bottom
-            )
+            [.init(color: Color(hex: 0x8B847A), location: 0), .init(color: Color(hex: 0x6A635B), location: 0.6), .init(color: Color(hex: 0x4E4841), location: 1)]
         }
+    }
+
+    var gradient: LinearGradient {
+        LinearGradient(stops: stops, startPoint: .top, endPoint: .bottom)
     }
 }
 
