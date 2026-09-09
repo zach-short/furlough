@@ -444,6 +444,21 @@ struct Target: Codable, Hashable, Identifiable {
     }
 
     var displayName: String { nickname.isEmpty ? defaultName : nickname }
+
+    /// Whether `displayName` is a name rather than a stand-in. A nickname or a name Screen Time
+    /// has taught is; so is a typed host, which names itself. An app that has never yet been
+    /// blocked is not, and reads "This app" until it is. The widget lists the named ones first,
+    /// so that when three open together the two a person knows are the two it shows.
+    var isNamed: Bool {
+        if !nickname.isEmpty { return true }
+        if let systemName, !systemName.isEmpty { return true }
+        #if os(iOS)
+        if case .host = kind { return true }
+        return false
+        #else
+        return true
+        #endif
+    }
 }
 
 /// One tag paired with the anchor: the hardware identifier read over NFC, and a name. The name

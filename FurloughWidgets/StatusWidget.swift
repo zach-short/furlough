@@ -61,14 +61,18 @@ struct StatusWidgetView: View {
 
     /// Home-screen sizes: eyebrow, name in Display, countdown or next time in Geist Mono, detail,
     /// and the status hourglass in the bottom corner.
+    ///
+    /// The glass is laid over the corner rather than given a column of its own: in the small
+    /// widget a column left the text 87 points, which cut "tmrw 1:00 AM" to "tmrw 1…" and
+    /// three names to "YouT…". Only the status lines at the bottom share a row with it, and
+    /// they keep clear of it with trailing padding.
     private var home: some View {
-        HStack(alignment: .bottom, spacing: 6) {
-            homeText
-            Spacer(minLength: 0)
-            HourglassView(state: .of(entry.summary, now: entry.date))
-                .frame(width: 30, height: 40)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        homeText
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .overlay(alignment: .bottomTrailing) {
+                HourglassView(state: .of(entry.summary, now: entry.date))
+                    .frame(width: 30, height: 40)
+            }
     }
 
     private var homeText: some View {
@@ -78,16 +82,20 @@ struct StatusWidgetView: View {
         return VStack(alignment: .leading, spacing: 0) {
             if windowOpen, let until = summary.openUntil {
                 Eyebrow(text: "Open now", color: Ember.amber)
-                name(summary.openNames.joined(separator: ", "))
+                name(headline(summary.openNames))
                 Text(timerInterval: entry.date...until, countsDown: true)
                     .emberNumerals(22)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                     .padding(.top, 4)
                 detail("until \(until.formatted(date: .omitted, time: .shortened))")
             } else if let next = summary.nextOpenAt {
-                Eyebrow(text: "Next", color: Ember.amber)
-                name(summary.nextOpenNames.joined(separator: ", "))
-                Text(nextText(next))
+                Eyebrow(text: nextEyebrow(next), color: Ember.amber)
+                name(headline(summary.nextOpenNames))
+                Text(next.formatted(date: .omitted, time: .shortened))
                     .emberNumerals(22)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                     .padding(.top, 4)
                 if let budget = summary.nextOpenBudgetMinutes {
                     detail("\(TimeFormat.budget(budget)) budget")
@@ -96,7 +104,7 @@ struct StatusWidgetView: View {
                 }
             } else if allDayOnly {
                 Eyebrow(text: "Open all day", color: Ember.moss)
-                name(summary.allDayNames.joined(separator: ", "))
+                name(headline(summary.allDayNames))
                 detail("budget resets at midnight")
             } else if summary.isEmpty {
                 Eyebrow(text: "Furlough", color: Ember.amber)
@@ -108,22 +116,25 @@ struct StatusWidgetView: View {
                 detail("\(summary.blockedCount) blocked all day")
             }
             Spacer(minLength: 0)
-            if !summary.allDayNames.isEmpty, !allDayOnly {
-                Text("\(summary.allDayNames.joined(separator: ", ")) open all day")
-                    .emberBody(10.5, .semibold)
-                    .foregroundStyle(Ember.moss)
-                    .lineLimit(1)
+            Group {
+                if !summary.allDayNames.isEmpty, !allDayOnly {
+                    Text("\(headline(summary.allDayNames)) open all day")
+                        .emberBody(10.5, .semibold)
+                        .foregroundStyle(Ember.moss)
+                        .lineLimit(1)
+                }
+                if summary.isAnchored {
+                    Text("\(summary.anchoredCount) anchored")
+                        .emberBody(10.5, .semibold)
+                        .foregroundStyle(Ember.ember)
+                }
+                if summary.pendingCount > 0 {
+                    Text("\(summary.pendingCount) change\(summary.pendingCount == 1 ? "" : "s") pending")
+                        .emberBody(10.5, .semibold)
+                        .foregroundStyle(Ember.pending)
+                }
             }
-            if summary.isAnchored {
-                Text("\(summary.anchoredCount) anchored")
-                    .emberBody(10.5, .semibold)
-                    .foregroundStyle(Ember.ember)
-            }
-            if summary.pendingCount > 0 {
-                Text("\(summary.pendingCount) change\(summary.pendingCount == 1 ? "" : "s") pending")
-                    .emberBody(10.5, .semibold)
-                    .foregroundStyle(Ember.pending)
-            }
+            .padding(.trailing, 36)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -133,7 +144,7 @@ struct StatusWidgetView: View {
         let summary = entry.summary
         return VStack(alignment: .leading, spacing: 1) {
             if let until = summary.openUntil, !summary.openNames.isEmpty, until > entry.date {
-                Text(summary.openNames.joined(separator: ", "))
+                Text(headline(summary.openNames))
                     .font(EmberFont.displaySmall(14))
                     .lineLimit(1)
                 Text(timerInterval: entry.date...until, countsDown: true)
@@ -142,14 +153,14 @@ struct StatusWidgetView: View {
                 Text("until \(until.formatted(date: .omitted, time: .shortened))")
                     .font(EmberFont.body(11))
             } else if let next = summary.nextOpenAt {
-                Text(summary.nextOpenNames.joined(separator: ", "))
+                Text(headline(summary.nextOpenNames))
                     .font(EmberFont.displaySmall(14))
                     .lineLimit(1)
-                Text("opens \(nextText(next))")
+                Text(accessoryNext(next))
                     .font(EmberFont.numerals(14))
                     .monospacedDigit()
             } else if !summary.allDayNames.isEmpty {
-                Text(summary.allDayNames.joined(separator: ", "))
+                Text(headline(summary.allDayNames))
                     .font(EmberFont.displaySmall(14))
                     .lineLimit(1)
                 Text("open all day")
@@ -168,8 +179,18 @@ struct StatusWidgetView: View {
         Text(text)
             .emberDisplay(15)
             .foregroundStyle(Ember.cream)
-            .lineLimit(2)
+            .lineLimit(family == .systemSmall ? 1 : 2)
             .padding(.top, 3)
+    }
+
+    /// One name and a count rather than a list cut off mid-word: "TikTok +2" in the small
+    /// widget, "TikTok, YouTube +1" in the medium. The summary lists named targets before
+    /// the ones still called "This app", so the names shown are the ones a person knows.
+    private func headline(_ names: [String]) -> String {
+        let shown = family == .systemSmall ? 1 : 2
+        let lead = names.prefix(shown).joined(separator: ", ")
+        let rest = names.count - min(names.count, shown)
+        return rest > 0 ? "\(lead) +\(rest)" : lead
     }
 
     private func detail(_ text: String) -> some View {
@@ -180,14 +201,24 @@ struct StatusWidgetView: View {
             .padding(.top, 2)
     }
 
-    private func nextText(_ date: Date) -> String {
-        if Calendar.current.isDateInToday(date) {
-            return date.formatted(date: .omitted, time: .shortened)
-        }
-        if Calendar.current.isDateInTomorrow(date) {
-            return "tmrw \(date.formatted(date: .omitted, time: .shortened))"
-        }
-        return date.formatted(.dateTime.weekday(.abbreviated).hour().minute())
+    /// The part of a next-open time the numerals cannot carry at widget size: nil for later
+    /// today, "tomorrow", else the short weekday.
+    private func nextDay(_ date: Date) -> String? {
+        if Calendar.current.isDateInToday(date) { return nil }
+        if Calendar.current.isDateInTomorrow(date) { return "tomorrow" }
+        return date.formatted(.dateTime.weekday(.abbreviated))
+    }
+
+    /// "Next" for later today. The day joins it otherwise, because "1:00 AM" on its own
+    /// reads as tonight.
+    private func nextEyebrow(_ date: Date) -> String {
+        nextDay(date).map { "Next · \($0)" } ?? "Next"
+    }
+
+    /// The lock-screen line under the name: "opens 1:00 AM" today, else the day first.
+    private func accessoryNext(_ date: Date) -> String {
+        let time = date.formatted(date: .omitted, time: .shortened)
+        return nextDay(date).map { "\($0) \(time)" } ?? "opens \(time)"
     }
 }
 

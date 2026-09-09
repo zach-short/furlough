@@ -438,6 +438,11 @@ enum Policy {
         let weekday = weekday(now, calendar: calendar)
         var soonestOpen: (until: Int, start: Int, warned: Bool)?
         var soonest: (date: Date, names: [String], budget: Int?, exhausted: Bool)?
+        // Targets still called "This app" go to the end of every list, after the loop, so a
+        // widget that shows one name and a count shows a name somebody recognises.
+        var unnamedAllDay: [String] = []
+        var unnamedOpen: [String] = []
+        var unnamedNext: [String] = []
 
         for target in config.targets {
             switch status(of: target, config: config, runtime: state.runtime, now: now, calendar: calendar) {
@@ -450,10 +455,12 @@ enum Policy {
             case .open(let until):
                 let warned = state.runtime.wasWarned(target.id, dayKey: dayKey(now, calendar: calendar))
                 if target.rule?.isAllDay ?? false {
-                    summary.allDayNames.append(target.displayName)
+                    if target.isNamed { summary.allDayNames.append(target.displayName) }
+                    else { unnamedAllDay.append(target.displayName) }
                     summary.allDayWarned = summary.allDayWarned || warned
                 } else {
-                    summary.openNames.append(target.displayName)
+                    if target.isNamed { summary.openNames.append(target.displayName) }
+                    else { unnamedOpen.append(target.displayName) }
                     if soonestOpen == nil || until < soonestOpen!.until {
                         let start = target.rule?.window(containing: minute, on: weekday)?.startMinute ?? 0
                         soonestOpen = (until, start, warned)
@@ -474,19 +481,26 @@ enum Policy {
             // offering "24 hours budget" as if it were one.
             let budget = target.rule?.limitMinutes
             if let current = soonest {
-                if date < current.date { soonest = (date, [name], budget, exhausted) }
-                else if date == current.date { soonest?.names.append(name) }
+                if date < current.date {
+                    soonest = (date, [], budget, exhausted)
+                    unnamedNext = []
+                } else if date != current.date {
+                    return
+                }
             } else {
-                soonest = (date, [name], budget, exhausted)
+                soonest = (date, [], budget, exhausted)
             }
+            if target.isNamed { soonest?.names.append(name) } else { unnamedNext.append(name) }
         }
         if let soonestOpen {
             summary.openUntil = date(atMinute: soonestOpen.until, of: now, calendar: calendar)
             summary.openStart = date(atMinute: soonestOpen.start, of: now, calendar: calendar)
             summary.openWarned = soonestOpen.warned
         }
+        summary.allDayNames += unnamedAllDay
+        summary.openNames += unnamedOpen
         summary.nextOpenAt = soonest?.date
-        summary.nextOpenNames = soonest?.names ?? []
+        summary.nextOpenNames = (soonest?.names ?? []) + unnamedNext
         summary.nextOpenBudgetMinutes = soonest?.budget
         summary.nextOpenIsExhausted = soonest?.exhausted ?? false
         return summary
