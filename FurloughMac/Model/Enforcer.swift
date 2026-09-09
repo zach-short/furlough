@@ -99,7 +99,7 @@ final class Enforcer {
         ledger.dayKey == Policy.dayKey(now) ? Int(ledger.seconds[id] ?? 0) : 0
     }
 
-    #if DEBUG
+    #if DEBUG || TESTING_TOOLS
     /// Forgets today's counted usage and warnings, for Settings > Testing > Reset everything.
     func resetUsage() {
         ledger = UsageLedger(dayKey: Policy.dayKey(now))

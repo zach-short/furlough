@@ -461,12 +461,13 @@ final class MacModel {
         return result
     }
 
-    #if DEBUG
+    #if DEBUG || TESTING_TOOLS
     // MARK: Testing
 
     /// Wipes every target, rule and pending change, forgets today's counted usage, and
     /// enforces the empty state so the app matches a fresh install that is still onboarded.
-    /// Compiled into Debug builds only: a Release build keeps its promise of no unblock button.
+    /// Compiled in only when the build asked for the testing tools — see `TestingTools` — so the
+    /// shipping build keeps its promise of no unblock button.
     func resetEverything() {
         SharedStore.reset()
         enforcer.resetUsage()

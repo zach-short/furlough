@@ -495,6 +495,9 @@ struct SettingsSheet: View {
     /// What the import just did, waiting to be said. The review is dropped as the alert goes up,
     /// so this is shown over Settings rather than over a screen that is on its way out.
     @State private var imported: String?
+    #if DEBUG || TESTING_TOOLS
+    @State private var showTesting = TestingTools.isShown
+    #endif
 
     private var title: String {
         if showLog { return "Activity log" }
@@ -517,6 +520,11 @@ struct SettingsSheet: View {
         .onAppear {
             delayHours = model.state.config.loosenDelayHours
             model.refreshBrowserAccess()
+            #if DEBUG || TESTING_TOOLS
+            // Help is where the section is asked for — Version, five clicks — and Help is a
+            // sheet of its own, so this screen finds out on the way back in.
+            showTesting = TestingTools.isShown
+            #endif
         }
         .alert("Delay", isPresented: Binding(get: { result != nil }, set: { if !$0 { result = nil } }), presenting: result) { _ in
             Button("OK") { result = nil }
@@ -563,7 +571,7 @@ struct SettingsSheet: View {
         } message: { message in
             Text(message)
         }
-        #if DEBUG
+        #if DEBUG || TESTING_TOOLS
         .confirmationDialog("Reset everything?", isPresented: $confirmReset, titleVisibility: .visible) {
             Button("Reset everything", role: .destructive) {
                 model.resetEverything()
@@ -694,15 +702,22 @@ struct SettingsSheet: View {
                     .padding(.horizontal, 8)
                     .padding(.bottom, 20)
 
-                #if DEBUG
-                SectionLabel(text: "Testing")
-                VStack(spacing: 0) {
-                    CardAction(title: "Reset everything") { confirmReset = true }
+                #if DEBUG || TESTING_TOOLS
+                if showTesting {
+                    SectionLabel(text: "Testing")
+                    VStack(spacing: 0) {
+                        CardAction(title: "Reset everything") { confirmReset = true }
+                        CardDivider()
+                        CardAction(title: "Hide these buttons") {
+                            TestingTools.isShown = false
+                            showTesting = false
+                        }
+                    }
+                    .emberCard()
+                    Footnote(text: "Not in the shipping build. Reset everything forgets every app, website, rule, pending change and today's usage, and lifts every block.\n\nHide these buttons puts this section away; five clicks on Version, under Help > About, brings it back.")
+                        .padding(.top, 8)
+                        .padding(.bottom, 20)
                 }
-                .emberCard()
-                Footnote(text: "Debug builds only. Forgets every app, rule, pending change and today's usage, and lifts every block.")
-                    .padding(.top, 8)
-                    .padding(.bottom, 20)
                 #endif
             }
             .padding(.horizontal, 20)

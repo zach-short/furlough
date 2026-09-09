@@ -14,6 +14,9 @@ struct SettingsView: View {
     @State private var showImporter = false
     @State private var chosenSetup: ChosenSetup?
     @State private var importError: String?
+    #if DEBUG || TESTING_TOOLS
+    @State private var showTesting = TestingTools.isShown
+    #endif
 
     /// A file that has been read and not yet acted on. `ConfigExport` is a value, not an
     /// identity, so the sheet needs one of its own to be presented by.
@@ -40,14 +43,21 @@ struct SettingsView: View {
 
                     aboutCard
 
-                    #if DEBUG
-                    SectionLabel(text: "Testing")
-                    VStack(spacing: 0) {
-                        action("Reset everything") { confirmReset = true }
+                    #if DEBUG || TESTING_TOOLS
+                    if showTesting {
+                        SectionLabel(text: "Testing")
+                        VStack(spacing: 0) {
+                            action("Reset everything") { confirmReset = true }
+                            CardDivider()
+                            action("Hide these buttons") {
+                                TestingTools.isShown = false
+                                showTesting = false
+                            }
+                        }
+                        .emberCard()
+                        Footnote(text: "Not in the App Store build. Reset everything forgets every app, rule, pending change and the Anchor, and lifts all shields.\n\nHide these buttons puts this section away; five taps on Version above brings it back.")
+                            .padding(.top, 8)
                     }
-                    .emberCard()
-                    Footnote(text: "Debug builds only. Forgets every app, rule, pending change and the Anchor, and lifts all shields.")
-                        .padding(.top, 8)
                     #endif
                 }
                 .padding(.horizontal, 16)
@@ -110,7 +120,7 @@ struct SettingsView: View {
             } message: { error in
                 Text(error)
             }
-            #if DEBUG
+            #if DEBUG || TESTING_TOOLS
             .confirmationDialog("Reset everything?", isPresented: $confirmReset, titleVisibility: .visible) {
                 Button("Reset everything", role: .destructive) {
                     model.resetEverything()
@@ -243,6 +253,8 @@ struct SettingsView: View {
         SectionLabel(text: "About")
         VStack(spacing: 0) {
             row("Version", Self.version)
+                .contentShape(Rectangle())
+                .onTapGesture { noteVersionTap() }
             CardDivider()
             action("About Furlough") {
                 if let url = Furlough.helpURL("about") { openURL(url) }
@@ -273,6 +285,15 @@ struct SettingsView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 11)
+    }
+
+    /// Five taps on the Version row ask for the Testing section back. Nothing at all in a build
+    /// that does not carry it — see `TestingTools` for why the section hides itself even when it
+    /// is there.
+    private func noteVersionTap() {
+        #if DEBUG || TESTING_TOOLS
+        if TestingTools.noteVersionClick() { showTesting = true }
+        #endif
     }
 
     private func action(_ title: String, _ perform: @escaping () -> Void) -> some View {

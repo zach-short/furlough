@@ -62,7 +62,7 @@ struct QuitGrace {
         forced = forced.intersection(alive)
     }
 
-    #if DEBUG
+    #if DEBUG || TESTING_TOOLS
     mutating func forgetAll() {
         deadlines = [:]
         forced = []

@@ -1123,12 +1123,13 @@ final class AppModel {
         return result
     }
 
-    #if DEBUG
+    #if DEBUG || TESTING_TOOLS
     // MARK: Testing
 
     /// Wipes every target, rule, pending change, the Anchor and its tag, lifts every shield, and
-    /// enforces the empty state so the app matches a fresh install. Compiled into Debug builds
-    /// only: a Release build keeps its promise of no unblock button.
+    /// enforces the empty state so the app matches a fresh install. Compiled in only when the
+    /// build asked for the testing tools — see `TestingTools` — so the App Store build keeps its
+    /// promise of no unblock button.
     func resetEverything() {
         SharedStore.reset()
         ShieldReconciler.clearEverything()

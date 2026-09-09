@@ -162,7 +162,19 @@ Limits to know about:
 
 ## Testing builds
 
-Debug builds, which is what Xcode and the commands above produce, add **Settings > Testing > Reset everything**. After a confirmation it forgets every app, rule, pending change and the Anchor with its tag, lifts every shield, and leaves the app as it was right after allowing Screen Time access. Use it to start over after trying a week-long delay or a five-minute budget. It is compiled out of Release builds (`-configuration Release`), so a build you mean to live with keeps its promise of no unblock button. A Debug build of the Mac app has the same button; there it also forgets today's counted minutes, and the app stays set up and running.
+Debug builds, which is what Xcode and the commands above produce, add **Settings > Testing > Reset everything**. After a confirmation it forgets every app, rule, pending change and the Anchor with its tag, lifts every shield, and leaves the app as it was right after allowing Screen Time access. Use it to start over after trying a week-long delay or a five-minute budget. The Mac app has the same button; there it also forgets today's counted minutes and today's usage, and the app stays set up and running.
+
+It is compiled out of Release builds, so a build you mean to live with keeps its promise of no unblock button. A Release build that should carry it — a TestFlight round where wiping the setup on the phone is the point — has to ask by name:
+
+```bash
+TESTING_TOOLS=1 scripts/archive.sh
+```
+
+```bash
+xcodebuild -project Furlough.xcodeproj -scheme FurloughMac -configuration Release -derivedDataPath build/DerivedDataMac SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) TESTING_TOOLS' build
+```
+
+TestFlight and the App Store are the same binary — a build is promoted, not rebuilt — so a build made this way still keeps the section put away: it shows only after **five taps on the Version row** (Settings > About on the phone, Help > About on the Mac), and **Hide these buttons** puts it back. `scripts/archive.sh` knows about the flag both ways: it refuses to ship a plain archive that carries the testing code, and refuses a `TESTING_TOOLS=1` archive that does not. A build made with the flag must never be the one submitted for review. See `Shared/Core/TestingTools.swift`.
 
 The rules engine has its own tests. `Shared/Core` is plain Foundation and builds for macOS, so the whole of it — windows, budgets, per-weekday days, tightening versus loosening, the pending queue, the widget's summary, and decoding state written by older builds — is tested on the Mac with no phone and no host app:
 

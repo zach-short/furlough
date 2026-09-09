@@ -238,6 +238,11 @@ struct HelpPage: View {
     @Environment(MacModel.self) private var model
     let topic: HelpTopic
     let onBack: () -> Void
+    #if DEBUG || TESTING_TOOLS
+    /// Set by the fifth click on Version, so the click that opens Settings > Testing says so.
+    /// Nothing else in Help changes.
+    @State private var askedForTesting = false
+    #endif
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -482,6 +487,8 @@ struct HelpPage: View {
         SectionLabel(text: "This build")
         VStack(spacing: 0) {
             row("Version", version)
+                .contentShape(Rectangle())
+                .onTapGesture { noteVersionClick() }
             CardDivider()
             row("Enforced by", "AppKit, Apple Events, launchd")
             CardDivider()
@@ -490,6 +497,21 @@ struct HelpPage: View {
         .emberCard()
         Footnote(text: "Swift and SwiftUI, no third-party code. The three faces are used under the SIL Open Font License.")
             .padding(.top, 8)
+        #if DEBUG || TESTING_TOOLS
+        if askedForTesting {
+            Footnote(text: "Testing buttons are showing in Settings.")
+                .padding(.top, 8)
+        }
+        #endif
+    }
+
+    /// Five clicks on the Version row ask for Settings > Testing back. Nothing at all in a build
+    /// that does not carry it — see `TestingTools` for why the section hides itself even when it
+    /// is there.
+    private func noteVersionClick() {
+        #if DEBUG || TESTING_TOOLS
+        if TestingTools.noteVersionClick() { askedForTesting = true }
+        #endif
     }
 
     private var version: String {

@@ -81,12 +81,19 @@ small codebase he fully understands over a fork. He is interactive: ask when a d
   windows are excepted.
 - Rule-based targets have no unblock action in a Release build, and must never get one.
   Debug builds carry **Settings > Testing > Reset everything** (`AppModel.resetEverything`,
-  behind `#if DEBUG`; Zach asked for it on 2026-09-07 after a week-long delay and a
-  five-minute FaceTime budget locked him out mid-test): after a confirmation it removes the
-  stored state, clears the managed settings, and enforces the empty state, so the app matches
-  a fresh install with Screen Time access still granted. Keep it behind `#if DEBUG`; the
-  commands in this file build Debug, so it is present on the phone until Zach switches to
-  `-configuration Release`. The one exception in every build is the Anchor profile (`Config.anchor`, decided 2026-09-07): a separate
+  behind `#if DEBUG || TESTING_TOOLS`; Zach asked for it on 2026-09-07 after a week-long delay
+  and a five-minute FaceTime budget locked him out mid-test): after a confirmation it removes
+  the stored state, clears the managed settings, and enforces the empty state, so the app
+  matches a fresh install with Screen Time access still granted. Keep it behind that condition;
+  the commands in this file build Debug, so it is present on the phone until Zach switches to
+  `-configuration Release`. A Release build carries it only when built with the
+  `TESTING_TOOLS` compilation condition — `TESTING_TOOLS=1 scripts/archive.sh` — which he asked
+  for on 2026-09-09 so a live build can be reset without a Debug install. Because TestFlight and
+  the App Store are the same binary, such a build still hides the section until five taps on the
+  Version row ask for it (`Shared/Core/TestingTools.swift`, which keeps the switch in the App
+  Group beside the state, not in it). `scripts/archive.sh` gates both directions: it refuses a
+  plain archive carrying `resetEverything`/`clearEverything`/`TestingTools`, and refuses a
+  `TESTING_TOOLS=1` archive that is missing them. The one exception in every build is the Anchor profile (`Config.anchor`, decided 2026-09-07): a separate
   set of kinds that "Anchor" shields instantly without a tag, and that only scanning the paired
   NFC tag in the app can weigh anchor. While anchored, the list and the tag are locked. Anchoring is
   refused until a tag is paired. When the anchor is off, apps fall back to their rules.
@@ -523,7 +530,8 @@ The plan for this stretch. Tick each phase off here as it lands.
    the bundle — and the watchdog agent re-registered from the new bundle. It is **Debug**
    deliberately, for `Settings > Testing > Reset everything` during the pass; that leaves the
    split `Furlough.debug.dylib` shape in `/Applications`, so put README's Release line back
-   when the pass is done. Note the file it replaced was a *single* binary, so the Mac had been
+   when the pass is done. (Since 2026-09-09 a Debug install is no longer the way to get that
+   button: a Release build with `TESTING_TOOLS` carries it, hidden behind the five-click reveal.) Note the file it replaced was a *single* binary, so the Mac had been
    Release, not the Debug this file claimed.
    **Results in so far, 2026-09-08.** The pending card's old → new pair reads right on the Mac
    (a queued `setRule` on `example.com`, "Now 12:00 AM–11:59 PM · 5 min/day" over "Becomes
@@ -1349,7 +1357,11 @@ name `Furlough`, macOS 26, non-sandboxed, hardened runtime with the
   of the editor, with "n of m min used today" from `MacModel.usedSeconds`) and a copy of the
   phone's `HomeGroups` (no Anchored section) that the sidebar uses.
 - Debug builds carry Settings > Testing > Reset everything (`MacModel.resetEverything`,
-  `Enforcer.resetUsage`, both `#if DEBUG`), like the phone.
+  `Enforcer.resetUsage`, `QuitGrace.forgetAll`, all `#if DEBUG || TESTING_TOOLS`), like the
+  phone. A Release build of the Mac carries it when built with
+  `SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) TESTING_TOOLS'`, and then hides it until
+  five clicks on Version under Help > About — the Mac's About lives in the Help sheet, so the
+  reveal is there and the section it opens is in Settings.
 - The desktop widget: target `FurloughMacWidgets` (bundle `com.zachshort.furlough.mac.widgets`,
   sandboxed, same App Group), `MacStatusWidget.swift` is the phone's `StatusWidget` without
   the lock-screen family, small and medium only; `FurloughMacWidgetsBundle` registers the
