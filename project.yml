@@ -131,7 +131,7 @@ targets:
       - path: FurloughShield
       - path: Shared/Core
       # The shield draws the real hourglass (see ShieldExtension.still), so it needs the
-      # drawing, the anchor it stands at the base when the glass is stopped, and the colours
+      # drawing, the anchor it lays across the neck when the glass is stopped, and the colours
       # it fills with — not the rest of Shared/UI.
       - path: Shared/UI/AnchorMark.swift
       - path: Shared/UI/Hourglass.swift

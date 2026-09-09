@@ -120,8 +120,8 @@ enum HourglassStill {
             stroke(context, HourglassPartShape(part: .highlight).path(in: space).cgPath, Color.white.opacity(0.55), width: 2, cap: .round)
             if state.showsAnchor {
                 let anchor = HourglassPartShape(part: .anchor).path(in: space).cgPath
+                stroke(context, anchor, Ember.ground.opacity(0.9), width: 3, join: .round)
                 fill(context, anchor, Ember.ember)
-                stroke(context, anchor, Ember.cream.opacity(0.7), width: 1, join: .round)
             }
         }
     }

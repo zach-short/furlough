@@ -108,7 +108,7 @@ allows: sand while there is plenty, Amber after the 5-minute warning, Ember once
 | Used up today | Dim glass, Ember glow at 45 % | All in the bottom, Ember | Still |
 | Always blocked | Grey glass, no glow | Grey, a low mound | Still |
 | Needs a schedule | Pending outline, no glow | Empty | Outline fades up once on appear |
-| Anchored | Cream glass, Ember glow at 90 % | Frozen mid-stream, an Ember anchor at the base | Still |
+| Anchored | Cream glass, Ember glow at 90 % | Frozen mid-stream, an Ember anchor across the neck with a Ground rim | Still |
 
 Reduce Motion: no pulse, no grains (the stream is a solid line), levels still change.
 

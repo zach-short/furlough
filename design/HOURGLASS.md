@@ -125,7 +125,7 @@ Both facts in one object, each at the precision the API allows.
 | Used up today (opens tomorrow) | Ember glow, dim | All sand in the bottom | Still |
 | Always blocked | Faint grey, no glow | Grey sand in the bottom, or no sand | Still |
 | Needs a schedule | Pending yellow outline | Empty glass | Still; outline pulses once on appear |
-| Anchored | Ember glow | Sand frozen mid-stream (the stream stops dead) | Still. An anchor at the base |
+| Anchored | Ember glow | Sand frozen mid-stream (the stream stops dead) | Still. An anchor across the neck, rimmed in the ground colour |
 | 5 minutes left | Amber | Last grains | Pulse quickens to about 1.2 s |
 
 Reduce Motion: no pulse, no stream particles, levels still change with a plain crossfade.
