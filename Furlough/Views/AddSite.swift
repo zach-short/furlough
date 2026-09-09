@@ -63,6 +63,16 @@ struct AddSiteSheet: View {
                         .submitLabel(.done)
                         .focused($typing)
                         .onSubmit(add)
+                        // The return key adds the site, so it cannot double as the way to put
+                        // the keyboard away, and until this there was none: the sheet fits its
+                        // content, so a drag collapses the sheet instead of scrolling it, and a
+                        // tap above it lands on the backdrop and dismisses it.
+                        .toolbar {
+                            ToolbarItemGroup(placement: .keyboard) {
+                                Spacer()
+                                Button("Done") { typing = false }
+                            }
+                        }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 13)
                 }
