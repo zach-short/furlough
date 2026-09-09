@@ -172,21 +172,30 @@ Per-app daily budgets and allowed hours, set per weekday. Tightening applies at 
 
 ## URLs
 
-**Blocked on the domain.** All three are written against `furlough.app` as the intended host.
-Nothing here is live yet: `site/` is a written but undeployed Astro project with `/privacy` and
-`/support` already in it. Privacy policy and support URLs are both **required** fields, so this is
-one of the two things standing between today and a submission.
+**The domain is `furloughapp.com`** (Zach, 2026-09-08). These are final text; what is outstanding
+is the deploy. `site/` is a written Astro project with `/privacy` and `/support` in it, and it
+builds them to `dist/privacy/index.html` and `dist/support/index.html`, so the clean paths below
+work on any host. Privacy policy and support URLs are both **required** fields.
 
 | Field | Value | Status |
 |---|---|---|
-| Support URL (required) | `https://furlough.app/support` | PENDING deploy |
-| Marketing URL (optional) | `https://furlough.app` | PENDING deploy |
-| Privacy Policy URL (required) | `https://furlough.app/privacy` | PENDING deploy |
+| Support URL (required) | `https://furloughapp.com/support` | live once `site/` is deployed |
+| Marketing URL (optional) | `https://furloughapp.com` | live once `site/` is deployed |
+| Privacy Policy URL (required) | `https://furloughapp.com/privacy` | live once `site/` is deployed |
 
-Apple requires the protocol in the field, so keep the `https://`.
+Apple requires the protocol in the field, so keep the `https://`. No trailing slashes.
 
-If the domain slips, a Vercel subdomain is a real URL that App Store Connect accepts, and moving
-to a custom domain afterwards is a metadata edit, not a new build or a new review.
+**`site/astro.config.mjs` does not set `site`, and now needs to.** Without it `Astro.site` is
+undefined, so `Base.astro` emits no `<link rel="canonical">` at all and resolves the `og:image`
+against `Astro.url` instead, which in a static build is not the public origin. One line fixes
+both, and it is left for Zach rather than changed here:
+
+```
+export default defineConfig({
+  site: 'https://furloughapp.com',
+  output: 'static',
+});
+```
 
 Once the listing is public, set `appStoreURL` in `site/src/site.ts`, which is currently `null`.
 The Apple ID is already known, so the value is:
@@ -432,7 +441,7 @@ Neither of these is copy, and neither can be finished from this machine.
 1. **Real screenshots.** Six captures off the iPhone into `design/store/raw/` as `01.png` to
    `06.png`, then `scripts/store-shots.sh`. Apple requires the app in use, and the Simulator
    cannot produce it.
-2. **The domain, and a deploy of `site/`.** The privacy policy and support URLs are required
-   fields and both are currently unreachable.
+2. **A deploy of `site/` to `furloughapp.com`.** The domain is decided and the URLs are final;
+   the privacy policy and support fields are required and both are currently unreachable.
 
 An App Preview video is optional and none is assumed.
