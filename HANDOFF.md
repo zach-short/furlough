@@ -1102,12 +1102,44 @@ The plan for this stretch. Tick each phase off here as it lands.
     required-reason APIs are UserDefaults `1C8F.1`/`CA92.1` and system boot time `35F9.1` for
     `Clock.uptime`), carried as a resource by all four iOS targets and verified at the root of
     the app and each `.appex`; `scripts/ExportOptions.plist`; and a check that the Release
-    configuration still compiles clean. **Blocked on Zach**: the Family Controls *distribution*
-    entitlement is not yet requested, and it gates every upload, so it goes first. Also missing:
-    an Apple Distribution certificate (this Mac has only the development one), the App Store
-    Connect record, and a privacy-policy and support URL. Note for screenshots: the store wants a
-    6.9-inch set, the phone is 6.3-inch, and Family Controls does not run in the Simulator, so the
-    real screens have to be composed into full-size frames.
+    configuration still compiles clean.
+
+    **Updated 2026-09-09.** Everything this step used to list as blocked has landed, and the
+    paragraph that said so was a day stale. The Family Controls *distribution* entitlement is
+    **granted** for all four App IDs and verified in a signed binary for each, as is
+    `…family-controls.app-and-website-usage` on `Furlough.app`; the Apple Distribution
+    certificate exists (cloud-managed — `scripts/archive.sh` made it itself with
+    `-allowProvisioningUpdates`); the App Store Connect record is created (iOS,
+    `com.zachshort.furlough`, Apple ID **6810006594**); and both URL fields are satisfiable from
+    the live site, `https://furloughapp.com/privacy` and `/support`. Screenshots are rendered:
+    `design/store/raw/` now holds captures and `scripts/store-shots.sh` composes them into the
+    six 1320 × 2868 frames in `build/store-shots/`, so the placeholder fallback DEPLOYMENT.md
+    calls "the only thing still blocking" is spent — nobody has confirmed the composed frames are
+    final, which is the one thing left to look at. The note behind that composing still holds:
+    the store wants a 6.9-inch set, the phone is 6.3-inch, and Family Controls does not run in
+    the Simulator, so the real screens have to be composed into full-size frames rather than
+    captured at size.
+
+    **Where it actually stands**, from `scripts/status.sh` run 2026-09-09 (export `ASC_KEY_ID`
+    and `ASC_ISSUER_ID` — both are in the archive's DEPLOYMENT.md — and re-run it rather than
+    trusting this line):
+
+    ```
+    1.0.1  (202609091529)  VALID  internal=IN_BETA_TESTING  external=READY_FOR_BETA_SUBMISSION
+    1.0    (202609090936)  VALID  internal=IN_BETA_TESTING  external=READY_FOR_BETA_SUBMISSION
+    1.0    (202609090423)  VALID  internal=IN_BETA_TESTING  external=READY_FOR_BETA_SUBMISSION
+    1.0    (202609090224)  VALID  internal=IN_BETA_TESTING  external=WAITING_FOR_BETA_REVIEW
+    1.0    (202609090049)  VALID  internal=IN_BETA_TESTING  external=READY_FOR_BETA_SUBMISSION
+    ```
+
+    Five builds up, all processed VALID, internal TestFlight live on every one. **Nothing has
+    been submitted for App Store review**, which is what pass-off item 1 is the tail of and what
+    gates item 9 (iPad) behind it. DEPLOYMENT.md's status table stops at `202609090224` and does
+    not know about `1.0.1`; the archive is still the map, but `status.sh` is the truth.
+
+    The platform decision that goes with this is in DEPLOYMENT.md section 3: **iOS only** on this
+    record, iPad a later build on the same one, the Mac not an App Store app at all. Section 9
+    has the iPad recipe and why `TARGETED_DEVICE_FAMILY` was deliberately put back to `"1"`.
 
 20. **Both halves of the same thing.** Done 2026-09-08, all three parts.
 
