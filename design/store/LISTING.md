@@ -10,7 +10,7 @@ automatically), [screenshot specifications](https://developer.apple.com/help/app
 (1 to 10 images, no alpha channel, a 6.9-inch set removes the 6.5-inch requirement).
 
 Decisions taken with Zach on 2026-09-08: this ships as **a real product**, distributed
-**worldwide except the EU**, on a **domain still to be bought**, in **Productivity**.
+**worldwide except the EU**, on **furloughapp.com** (live since 2026-09-08), in **Productivity**.
 
 Choices left to taste are marked **PICK ONE**. Everything else is final.
 
@@ -172,18 +172,18 @@ Per-app daily budgets and allowed hours, set per weekday. Tightening applies at 
 
 ## URLs
 
-**The domain is `furloughapp.com`** (Zach, 2026-09-08). These are final text; what is outstanding
-is the deploy. `site/` is a written Astro project with `/privacy` and `/support` in it, and it
-builds them to `dist/privacy/index.html` and `dist/support/index.html`, so the clean paths below
-work on any host. Privacy policy and support URLs are both **required** fields.
+**Live since 2026-09-08.** All three are serving, on `furloughapp.com` through Cloudflare Pages
+(project `furlough`, direct uploads via `cd site && bun run deploy`), with a valid certificate.
 
 | Field | Value | Status |
 |---|---|---|
-| Support URL (required) | `https://furloughapp.com/support` | live once `site/` is deployed |
-| Marketing URL (optional) | `https://furloughapp.com` | live once `site/` is deployed |
-| Privacy Policy URL (required) | `https://furloughapp.com/privacy` | live once `site/` is deployed |
+| Support URL (required) | `https://furloughapp.com/support` | 200 |
+| Marketing URL (optional) | `https://furloughapp.com` | 200 |
+| Privacy Policy URL (required) | `https://furloughapp.com/privacy` | 200 |
 
-Apple requires the protocol in the field, so keep the `https://`. No trailing slashes.
+Apple requires the protocol in the field, so keep the `https://`. Paste them exactly as written:
+Pages 301s each slashless path to its trailing-slash form and returns 200, and Apple follows the
+redirect, so there is no need to add a slash.
 
 **`site/astro.config.mjs` now sets `site`, fixed 2026-09-08.** Without it `Astro.site` was
 undefined, so `Base.astro` emitted no `<link rel="canonical">` at all and resolved the `og:image`
@@ -523,12 +523,17 @@ Per the handoff, wording problems belong here rather than in a quiet edit.
 
 ## What still blocks a submission
 
-Neither of these is copy, and neither can be finished from this machine.
+One thing, and it is not copy.
 
 1. **Real screenshots.** Six captures off the iPhone into `design/store/raw/` as `01.png` to
-   `06.png`, then `scripts/store-shots.sh`. Apple requires the app in use, and the Simulator
-   cannot produce it.
-2. **A deploy of `site/` to `furloughapp.com`.** The domain is decided and the URLs are final;
-   the privacy policy and support fields are required and both are currently unreachable.
+   `06.png`, then `scripts/store-shots.sh`. Apple requires the app in use, and Family Controls
+   does not run in the Simulator, so they can only come off the phone. `design/store/raw/README.md`
+   says which screen each frame wants.
+
+~~2. A deploy of `site/` to `furloughapp.com`.~~ **Done 2026-09-08**; see the URLs section.
+
+Worth doing once the listing is public, though it blocks nothing: `site/src/site.ts` still has
+`appStoreURL: null`, which is why both buttons on the site read "Coming soon to the App Store".
+Set it to `https://apps.apple.com/app/id6810006594` and redeploy.
 
 An App Preview video is optional and none is assumed.
