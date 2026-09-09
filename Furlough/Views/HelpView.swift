@@ -3,11 +3,14 @@ import SwiftUI
 /// What the app will not stop to explain while you are using it: what a rule means, why a
 /// change waits, and the one way out. Reached from the question mark beside the gear on Home.
 ///
-/// Seven pages, one idea each, in the app's own voice. Anything with a number in it reads the
-/// number out of the config rather than repeating the default, so a phone with a week-long
-/// delay is not told about 24 hours.
+/// Seven topics, one idea each, in the app's own voice. Two are pages in the app and five open
+/// furloughapp.com — the split is in `HelpTopics.swift`, and it is the difference between a
+/// topic that has to read this phone's own settings and one that is the same on every phone.
+/// Anything with a number in it reads the number out of the config rather than repeating the
+/// default, so a phone with a week-long delay is not told about 24 hours.
 struct HelpView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         NavigationStack {
@@ -20,6 +23,8 @@ struct HelpView: View {
                     beyondCard
                     SectionLabel(text: "If you need it")
                     needCard
+                    Footnote(text: "Rows with an arrow open furloughapp.com in Safari, where a page can be corrected without an app update. The two that stay here need no connection: one reads the delay off your own settings, and the other is what you want when a shield sticks, which is no time to go looking for a browser.")
+                        .padding(.top, 10)
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 48)
@@ -66,13 +71,6 @@ struct HelpView: View {
 
     private var rulesCard: some View {
         VStack(spacing: 0) {
-            NavigationLink { WindowsHelp() } label: {
-                HelpRow(title: "Windows and budgets", detail: "Hours you allow, minutes a day") {
-                    HelpTile(symbol: "clock")
-                }
-            }
-            .buttonStyle(.plain)
-            CardDivider()
             NavigationLink { DelayHelp() } label: {
                 HelpRow(title: "Why changes wait", detail: "The delay, and what shortens it") {
                     HelpTile(symbol: "hourglass")
@@ -80,31 +78,26 @@ struct HelpView: View {
             }
             .buttonStyle(.plain)
             CardDivider()
-            NavigationLink { TargetsHelp() } label: {
-                HelpRow(title: "Apps and websites", detail: "What Furlough can hold, and how to add it") {
-                    HelpTile(symbol: "square.grid.2x2")
-                }
+            linkRow("Windows and budgets", "Hours you allow, minutes a day", page: "windows-and-budgets") {
+                HelpTile(symbol: "clock")
             }
-            .buttonStyle(.plain)
+            CardDivider()
+            linkRow("Apps and websites", "What Furlough can hold, and how to add it", page: "apps-and-websites") {
+                HelpTile(symbol: "square.grid.2x2")
+            }
         }
         .emberCard()
     }
 
     private var beyondCard: some View {
         VStack(spacing: 0) {
-            NavigationLink { AnchorHelp() } label: {
-                HelpRow(title: "The Anchor", detail: "One tap to lock. The tag to unlock.") {
-                    AnchorGlyph(isAnchored: false)
-                }
+            linkRow("The Anchor", "One tap to lock. The tag to unlock.", page: "the-anchor") {
+                AnchorGlyph(isAnchored: false)
             }
-            .buttonStyle(.plain)
             CardDivider()
-            NavigationLink { ElsewhereHelp() } label: {
-                HelpRow(title: "Outside the app", detail: "Notifications, the widget, the lock screen") {
-                    HelpTile(symbol: "bell")
-                }
+            linkRow("Outside the app", "Notifications, the widget, the lock screen", page: "outside-the-app") {
+                HelpTile(symbol: "bell")
             }
-            .buttonStyle(.plain)
         }
         .emberCard()
     }
@@ -118,14 +111,31 @@ struct HelpView: View {
             }
             .buttonStyle(.plain)
             CardDivider()
-            NavigationLink { AboutHelp() } label: {
-                HelpRow(title: "About Furlough", detail: "What it keeps, and what leaves the phone") {
-                    HelpTile(symbol: "info.circle")
-                }
+            linkRow("About Furlough", "What it keeps, and what leaves the phone", page: "about") {
+                HelpTile(symbol: "info.circle")
             }
-            .buttonStyle(.plain)
         }
         .emberCard()
+    }
+
+    /// A row that leaves the app. The topics with no live data in them are written on the site
+    /// rather than compiled in, so a sentence that turns out to be wrong can be fixed the same
+    /// day instead of waiting on a review. Tapping one hands the address to Safari; Furlough
+    /// makes no request itself, which is why the About page can still say it has no network
+    /// code at all.
+    private func linkRow<Icon: View>(
+        _ title: String,
+        _ detail: String,
+        page: String,
+        @ViewBuilder icon: () -> Icon
+    ) -> some View {
+        Button {
+            if let url = Furlough.helpURL(page) { openURL(url) }
+        } label: {
+            HelpRow(title: title, detail: detail, isExternal: true, icon: icon)
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Opens furloughapp.com in Safari")
     }
 }
 
@@ -157,11 +167,15 @@ struct HelpTile: View {
 struct HelpRow<Icon: View>: View {
     let title: String
     let detail: String
+    /// Whether the row opens the site rather than pushing a page. Only the chevron changes:
+    /// an arrow leaving the corner is the one bit of chrome that says a tap leaves the app.
+    let isExternal: Bool
     let icon: Icon
 
-    init(title: String, detail: String, @ViewBuilder icon: () -> Icon) {
+    init(title: String, detail: String, isExternal: Bool = false, @ViewBuilder icon: () -> Icon) {
         self.title = title
         self.detail = detail
+        self.isExternal = isExternal
         self.icon = icon()
     }
 
@@ -179,7 +193,7 @@ struct HelpRow<Icon: View>: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 8)
-            Image(systemName: "chevron.right")
+            Image(systemName: isExternal ? "arrow.up.right" : "chevron.right")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(Ember.faint)
         }

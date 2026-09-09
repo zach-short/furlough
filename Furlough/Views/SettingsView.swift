@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
     @State private var delayHours = Furlough.defaultLoosenDelayHours
     @State private var result: ProposalResult?
     @State private var confirmReset = false
@@ -36,6 +37,8 @@ struct SettingsView: View {
                         .emberBody(12)
                         .foregroundStyle(Ember.muted)
                         .padding(.horizontal, 8)
+
+                    aboutCard
 
                     #if DEBUG
                     SectionLabel(text: "Testing")
@@ -229,6 +232,32 @@ struct SettingsView: View {
             .padding(.top, 8)
         Footnote(text: "Restoring asks which app each rule was, since the file cannot say. It is a proposal, not a rewind: every rule goes through the same delay the rule editor does, so anything in the file that loosens your rules waits.")
             .padding(.top, 6)
+    }
+
+    /// The version, and the way to the rest of About. The number is the one thing the site
+    /// cannot print: only the running copy knows which build it is, and it is the first thing
+    /// a support mail needs. Everything else — what Furlough keeps, what it is built on — is a
+    /// page rather than a screen, so it can be corrected without shipping a build.
+    @ViewBuilder
+    private var aboutCard: some View {
+        SectionLabel(text: "About")
+        VStack(spacing: 0) {
+            row("Version", Self.version)
+            CardDivider()
+            action("About Furlough") {
+                if let url = Furlough.helpURL("about") { openURL(url) }
+            }
+        }
+        .emberCard()
+        Footnote(text: "Opens furloughapp.com, where what stays on this phone and what Furlough is built on are written out in full.")
+            .padding(.top, 8)
+    }
+
+    private static var version: String {
+        let info = Bundle.main.infoDictionary
+        let short = info?["CFBundleShortVersionString"] as? String ?? "—"
+        let build = info?["CFBundleVersion"] as? String ?? "—"
+        return "\(short) (\(build))"
     }
 
     private func row(_ title: String, _ value: String) -> some View {

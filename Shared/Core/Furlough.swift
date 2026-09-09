@@ -8,6 +8,17 @@ enum Furlough {
     /// profile, and so no registered Mac: the signing team is the proof.
     static let macAppGroupID = "X9V4L6HR2R.com.zachshort.furlough"
     static let storeName = "furlough"
+    /// The public site. The help pages that need no live data live there rather than in the
+    /// binary, so their wording can be corrected without an App Store review; the app links
+    /// out to them. Nothing is ever fetched — `openURL` hands the address to Safari, and
+    /// Furlough itself still makes no network request of any kind.
+    static let siteURL = "https://furloughapp.com"
+    /// The address of one help page on the site. Optional rather than force-unwrapped because
+    /// nothing in this file is worth a crash; a page whose URL would not parse simply does
+    /// nothing when tapped, and every path here is a literal, so none of them can.
+    static func helpURL(_ page: String) -> URL? {
+        URL(string: "\(siteURL)/help/\(page)/")
+    }
     static let bundleID = "com.zachshort.furlough"
     static let minutesPerDay = 1440
     /// DeviceActivity rejects schedules shorter than 15 minutes.
