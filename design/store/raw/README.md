@@ -16,14 +16,13 @@ to get 9:41 in the status bar: Furlough watches for clock changes and holds pend
 changes while the clock disagrees, so you would capture its clock banner instead of
 the screen. Real times are fine; Apple does not care.
 
-At the moment you shoot you need three things at once:
+At the moment you shoot you need two things at once:
 
-- an app that is **closed right now**, with a window later today (frames 1 and 10);
-- an app in an **open window right now** (frame 8);
+- an app that is **closed right now**, with a window later today (frame 1);
 - a **queued loosening** (frame 5).
 
-So give one app a window that has not started yet today, another a window that is
-open now, and make one loosening edit before you begin. Nicknames render in the
+So give one app a window that has not started yet today, and make one loosening
+edit before you begin; frames 8 and 10 were shot with the anchor on. Nicknames render in the
 display face, system names in SF; either is fine, but use the same choice in all ten.
 
 ## What each frame wants, in order
@@ -31,9 +30,10 @@ display face, system names in SF; either is fine, but use the same choice in all
 1. **`01.png` · No unblock button.** Home, hero paged to the closed app. It reads
    "Next window", a countdown, and "opens at 8:00 PM · 30 min a day". "Used up
    today" in ember works too. The list sits below.
-2. **`02.png` · Thirty minutes. Then it's gone.** The rule editor, scrolled so the
-   **Daily budget** card sits near the top: "30 MIN across all windows" over the
-   slider. Set the budget to 30 so it matches the headline.
+2. **`02.png` · Fifty-five minutes. Then it's gone.** The rule editor, scrolled so the
+   **Daily budget** card sits at the top: "55 MIN for the whole day" over the slider,
+   the tier card under it. The headline names the number on the slider, so if the
+   budget changes, change the headline in `../board.html` with it.
 3. **`03.png` · Open only when you said so.** The top of the same editor, **Allowed
    windows**, with **Same every day** off so the day strips show. Two rows: Sun to
    Thu 8:00 to 10:00 PM, and Fri to Sat 8:00 PM to 2:00 AM as one night row. That
@@ -52,18 +52,20 @@ display face, system names in SF; either is fine, but use the same choice in all
    reads "Add reddit.com". The keyboard being up is fine and is what real use looks
    like. If you would rather not show it, the home list with a website row in it
    also fits the caption.
-8. **`08.png` · Watch the window drain.** Place the medium Furlough widget and shoot
-   the **home screen** while a window is open, so it shows the name, the countdown
-   and "until 10:00 PM". Captured from the home screen, not from Furlough. The lock
-   screen with the Live Activity also works: open Furlough during the window first,
-   since only the foreground app can start one.
+8. **`08.png` · One glass, every status.** The **home screen** with the small Furlough
+   widget placed, everything anchored, so it reads "Blocked · All blocked · 20 blocked
+   all day · 20 anchored" with the hourglass stopped. Captured from the home screen,
+   not from Furlough. Any state fits the caption; an open window would show "Open now"
+   and a countdown instead.
 9. **`09.png` · Locked till you tap the tag.** Open the Anchor screen from its card
    on Home, with a tag paired and apps chosen, and tap Anchor. The state card reads
    "Anchored" and "6 apps since 3:12 PM" with the Unanchor button, apps grid below.
    Skip the NFC scan sheet; that is a system overlay.
-10. **`10.png` · Nothing to tap but Close.** From the home screen, open the closed app
-    from frame 1. iOS shows "Instagram opens at 8:00 PM", "You get 30 min per day."
-    and Close. Pick an app that opens later today so it says "at", not "tomorrow at".
+10. **`10.png` · Nothing to tap but Close.** From the home screen, open an anchored app.
+    iOS shows "Instagram is anchored", "Unanchor with your tag in Furlough." and Close.
+    The timed shield fits the caption too: "Instagram opens at 8:00 PM" over "You get
+    30 min per day." Together with frame 9 this is the Anchor story, the lock and then
+    the wall.
 
 Frames 2, 3 and 6 are the same editor at three scroll positions. That is fine; the
 frame around each phone carries the difference.

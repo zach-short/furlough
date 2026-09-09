@@ -463,23 +463,29 @@ requirement, which is what the 1320 × 2868 canvas is for. Guideline 2.3.3: scre
 the app **in use**, not title art or a splash screen; text and image overlays around a real
 capture are explicitly allowed, which is exactly what the board does.
 
-**This is the other blocker.** `design/store/raw/` holds only a README, so all ten frames are
-currently falling back to drawn placeholders. Family Controls does not run in the Simulator, so
-the captures have to come off the phone: take them on the iPhone, convert, and drop them in as
-`01.png` through `10.png`. Then `scripts/store-shots.sh` re-renders and flattens to JPEG.
+**Captures landed 2026-09-09.** All ten of `design/store/raw/01.png` to `10.png` are real phone
+screenshots, rendered and flattened by `scripts/store-shots.sh`. Three captions were reworded
+the same day to match the phone beside them, Zach's call over retaking: frame 2's slider reads
+55, so the headline says fifty-five rather than thirty; frame 8's widget reads "All blocked ·
+20 anchored" with the hourglass stopped, so the caption is about the glass carrying every
+status rather than counting down a window; frame 10 is the anchored shield ("Instagram is
+anchored · Unanchor with your tag in Furlough."), so its line says the shield names the app and
+what would open it, which is true of the timed shield as well. Frame 9 was taken on Home with
+the anchored hero and the Anchor card rather than on the Anchor screen, and reads better for
+it. Frames 9 and 10 now tell the Anchor story in sequence: the lock, then the wall.
 
 | # | Eyebrow | Headline | Line under it | Status |
 |---|---|---|---|---|
 | 1 | The rule | No unblock button. | Pick the apps that eat your time. Furlough shields them when the time is gone. | unchanged |
-| 2 | Budgets | Thirty minutes. Then it's gone. | Give every app a daily budget. Spend it whenever you like. | unchanged |
+| 2 | Budgets | Fifty-five minutes. Then it's gone. | Give every app a daily budget. Spend it whenever you like. | reworded 2026-09-09 |
 | 3 | Windows | Open only when you said so. | Eight to ten on school nights. Later on weekends. Your call, once. | unchanged |
 | 4 | The week | Draw the whole week. | Seven days across, 24 hours down. Tap a day to change its hours, then give them to any other day. | added 2026-09-08 |
 | 5 | The delay | Loosening waits a day. | Tightening is instant. Loosening waits out the delay you set. You can cancel it while it waits. | rewritten 2026-09-08 |
 | 6 | Tiers | The worst apps wait longest. | Each app has a tier that scales its delay. Hazard waits four times as long, Essential a quarter. | added 2026-09-08 |
 | 7 | Websites | Websites, too. | Picked from Apple's picker, a site gets hours and a budget like an app. Typed in, it gets hours. | added 2026-09-08 |
-| 8 | The widget | Watch the window drain. | The widget and the Live Activity count down the open window in the same glass as every row. | added 2026-09-08 |
+| 8 | The widget | One glass, every status. | The widget says what is open, what is blocked and what is anchored, in the same hourglass as every row. | reworded 2026-09-09 |
 | 9 | The Anchor | Locked till you tap the tag. | One tap locks. Only the NFC tag you paired releases it. Leave the tag at home. | rewritten 2026-09-08 |
-| 10 | The shield | Nothing to tap but Close. | The block screen says which app, and when it opens next. That is the whole conversation. | unchanged |
+| 10 | The shield | Nothing to tap but Close. | The block screen says which app is closed and what would open it. That is the whole conversation. | reworded 2026-09-09 |
 
 **The set grew from six frames to ten on 2026-09-08**, which supersedes the six-frame count
 recorded under "Found while writing this" below. The six original frames kept their copy; four
@@ -553,10 +559,9 @@ Per the handoff, wording problems belong here rather than in a quiet edit.
 
 One thing, and it is not copy.
 
-1. **Real screenshots.** Ten captures off the iPhone into `design/store/raw/` as `01.png` to
-   `10.png`, then `scripts/store-shots.sh`. Apple requires the app in use, and Family Controls
-   does not run in the Simulator, so they can only come off the phone. `design/store/raw/README.md`
-   says which screen each frame wants.
+~~1. Real screenshots.~~ **Done 2026-09-09.** All ten captures are in `design/store/raw/` and
+   the upload set is `build/store-shots/01.jpg` to `10.jpg` after `scripts/store-shots.sh`.
+   Nothing blocks the upload.
 
 ~~2. A deploy of `site/` to `furloughapp.com`.~~ **Done 2026-09-08**; see the URLs section.
 
