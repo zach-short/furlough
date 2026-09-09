@@ -358,6 +358,13 @@ final class AppModel {
         SharedStore.save(current)
         SharedStore.log("picker: added \(outcome.added), removals scheduled \(outcome.removalsScheduled)")
         enforce(reason: "picker")
+        // A token straight out of the picker has no name, and half of what the editor can offer
+        // needs one: the companion nudge and the merge offer are both found through the name,
+        // so a freshly added app showed neither until something else named it. Until now that
+        // was the next activation or the first time the shield covered it, which is why the
+        // "add as a website" button appeared for some rows and not others (2026-09-09). Off the
+        // critical path, as at launch — nothing here waits on Screen Time's answer.
+        if outcome.added > 0 { Task { await nameUnnamedTargets() } }
         return outcome
     }
 
@@ -669,10 +676,17 @@ final class AppModel {
         // The more cautious tier of the two: a longer wait is the safe direction, and a merge
         // must not be a way to shorten one.
         current.config.targets[index].utilityLevel = Self.slower(a.utilityLevel, b.utilityLevel)
+        // Read while `index` still means something. Taking the absorbed row out first shifts
+        // every row after it down one, so this line used to read the wrong target — or, when
+        // the kept row was the last one, an index one past the end, which is a crash and not a
+        // wrong name. That only happened merging from the *second* of the two rows: the app was
+        // added before the site, so merging from the site's editor removed a row above the one
+        // being kept. Seen on the phone 2026-09-09 — the app died and the merge was never saved,
+        // while the same merge from the app's side worked.
+        let name = current.config.targets[index].displayName
         current.config.targets.removeAll { $0.id == absorbed }
         // Anything queued for the row that is going would land on a target that no longer exists.
         current.pending.removeAll { $0.targetID == absorbed }
-        let name = current.config.targets[index].displayName
         SharedStore.save(current)
         SharedStore.log("merged \(gone) into \(name)")
         enforce(reason: "merge halves")
