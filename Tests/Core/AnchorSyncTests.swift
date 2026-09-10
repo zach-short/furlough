@@ -228,7 +228,9 @@ struct AnchorSyncMacDropTests {
         // signed-out account as the cause, which the probe behind it cannot actually tell:
         // `isAvailable` reports an unusable store, not an absent account.
         #expect(warning.contains("cannot reach iCloud"))
-        #expect(!warning.contains("iCloud Drive"))
+        // Names iCloud Drive, because that is the switch: the key-value store rides on it, and
+        // a Mac with Drive off receives nothing while looking perfectly signed in.
+        #expect(warning.contains("iCloud Drive"))
     }
 
     let decoder: JSONDecoder = {

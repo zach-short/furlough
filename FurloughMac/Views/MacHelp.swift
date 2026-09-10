@@ -22,7 +22,7 @@ enum HelpTopic: String, Identifiable, CaseIterable {
         case .delay: "Why changes wait"
         case .targets: "Apps and websites"
         case .blocking: "How blocking works here"
-        case .devices: "Across your devices"
+        case .devices: "The Anchor"
         case .elsewhere: "Outside the window"
         case .stuck: "If something gets stuck"
         case .about: "About"
@@ -35,7 +35,7 @@ enum HelpTopic: String, Identifiable, CaseIterable {
         case .delay: "The delay, and what shortens it"
         case .targets: "What Furlough can hold, and how to add it"
         case .blocking: "No Screen Time on the Mac, so Furlough does it"
-        case .devices: "What the Anchor carries from your iPhone"
+        case .devices: "One tap here. Your phone's tag lifts it."
         case .elsewhere: "The menu bar, the widget, notifications"
         case .stuck: "What to try, and the one way out"
         case .about: "What it keeps, and what leaves this Mac"
@@ -86,8 +86,12 @@ struct HelpSheet: View {
                 header
                 SectionLabel(text: "The rules")
                 card([.windows, .delay, .targets])
+                // Its own group rather than a row in the middle of "On this Mac". The Anchor is
+                // a half of Furlough on both devices, not a detail of how this one enforces.
+                SectionLabel(text: "The Anchor")
+                card([.devices])
                 SectionLabel(text: "On this Mac")
-                card([.blocking, .devices, .elsewhere])
+                card([.blocking, .elsewhere])
                 SectionLabel(text: "If you need it")
                 card([.stuck, .about])
             }
@@ -96,7 +100,8 @@ struct HelpSheet: View {
         }
     }
 
-    /// The whole app in three sentences, so someone who reads nothing else has the shape of it.
+    /// Both halves in three sentences, so someone who reads nothing else knows there are two of
+    /// them. It used to describe rules alone, which left the Anchor to be found by accident.
     private var header: some View {
         VStack(alignment: .leading, spacing: 0) {
             Eyebrow(text: "Furlough", color: Ember.amber)
@@ -105,12 +110,12 @@ struct HelpSheet: View {
                 .emberDisplay(26)
                 .foregroundStyle(Ember.cream)
                 .padding(.top, 6)
-            Text("Pick what eats your time. Give each one a daily budget, and the hours it is allowed if you want them. Outside those hours, or once the budget is spent, Furlough closes it.")
+            Text("Two ways to put an app out of reach. A rule gives it a daily budget, and the hours it is allowed if you want them; outside those, or once the budget is spent, Furlough closes it. Making a rule tighter applies at once. Making it looser waits.")
                 .emberBody(13.5)
                 .foregroundStyle(Ember.muted)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 10)
-            Text("Making a rule tighter applies at once. Making it looser waits.")
+            Text("The Anchor is the other. One tap locks a list, or this whole Mac, and the only thing that lifts it is an NFC tag scanned on your iPhone.")
                 .emberBody(13.5)
                 .foregroundStyle(Ember.muted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -498,7 +503,7 @@ struct HelpPage: View {
     /// decides them, so the page and the refused button never disagree.
     private var cloudAndPhoneLine: String {
         if !model.cloudAvailable {
-            return "Right now Furlough cannot reach iCloud, so this Mac will not drop the anchor at all. Check that you are signed in to iCloud in System Settings."
+            return "Right now Furlough cannot reach iCloud, so this Mac will not drop the anchor at all. Turn on iCloud Drive in System Settings > your name > iCloud."
         }
         if !model.phoneSeen {
             return "This Mac has not heard from your iPhone yet, so Drop anchor is refused here. Drop the anchor once on the phone and it will have — after that this Mac can drop its own whenever you like."

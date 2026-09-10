@@ -81,15 +81,15 @@ enum AnchorSync {
         #if os(iOS)
         """
         Furlough cannot reach iCloud, so the Anchor stops at this iPhone. Dropping it here \
-        will not lock your Mac, and scanning your tag will not release one. Check that you \
-        are signed in to iCloud in Settings.
+        will not lock your Mac, and scanning your tag will not release one. Turn on iCloud \
+        Drive in Settings > your name > iCloud — the Anchor travels on it.
         """
         #else
         """
         Furlough cannot reach iCloud, so the Anchor stops at this Mac. Your iPhone's tag is \
         the only thing that can release an anchor dropped here, and it cannot reach this Mac \
-        — so Furlough will not drop one until iCloud is back. Check that you are signed in to \
-        iCloud in System Settings.
+        — so Furlough will not drop one until iCloud is back. Turn on iCloud Drive in System \
+        Settings > your name > iCloud — the Anchor travels on it.
         """
         #endif
     }
@@ -296,22 +296,21 @@ enum AnchorCloud {
 
     static var changeNotification: Notification.Name { NSUbiquitousKeyValueStore.didChangeExternallyNotification }
 
-    /// Whether the key-value store is usable at all.
+    /// Whether iCloud could carry a record at all.
     ///
-    /// Asked of the store itself, which is the only thing that knows. The obvious-looking probe
-    /// — `FileManager.ubiquityIdentityToken` — answers a different question and is always nil
-    /// here: that token belongs to iCloud Drive's *document containers*, and Furlough has none.
-    /// It asks for `ubiquity-kvstore-identifier` and nothing else, so the token is nil on a
-    /// perfectly healthy install, signed in or out. Using it reported every working Mac as cut
-    /// off, and, because `macDrop` refuses on that, stopped the anchor being dropped at all.
+    /// The token tracks iCloud Drive, and that is the point rather than a mismatch: the
+    /// key-value store rides on iCloud Drive, so a Mac with Drive switched off has a store that
+    /// still reads and writes but only ever to itself. Nil means exactly the thing worth
+    /// warning about — signed out, or Drive off.
     ///
-    /// `synchronize()` is narrower than the name of this property suggests, and deliberately so.
-    /// It says the store is configured and reachable — false when the entitlement is missing or
-    /// the store cannot be used — and it does not promise to notice an account signed out from
-    /// Settings. So a false here is trustworthy and worth acting on; a true means "nothing is
-    /// visibly wrong", not "the other device will certainly hear you". The lock-with-no-key
-    /// guard does not rest on this: `phoneSeen` is what actually protects the Mac.
-    static var isAvailable: Bool { NSUbiquitousKeyValueStore.default.synchronize() }
+    /// Not a question about the network. A device with no signal still has a token and its
+    /// writes go out when it next has one.
+    ///
+    /// Briefly replaced with `NSUbiquitousKeyValueStore.synchronize()`, which was a mistake
+    /// worth recording: on 2026-09-09 a Mac with Drive off returned *true* from synchronize
+    /// while receiving nothing for half an hour, so the app cheerfully reported a link that did
+    /// not exist. synchronize answers "is this store configured", never "will anything cross".
+    static var isAvailable: Bool { FileManager.default.ubiquityIdentityToken != nil }
 
     /// Whether a change notification is iCloud saying the account itself moved — signed in,
     /// signed out, or switched. `isAvailable` has to be read again when it does, and the
