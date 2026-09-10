@@ -66,6 +66,11 @@ struct AnchorView: View {
                 tagCard
                 Footnote(text: tagFootnote)
                     .padding(.top, 8)
+                // Nothing else on this phone says the Anchor reaches the Mac at all, and there
+                // is no screen where the link could be found, because there is nothing to set
+                // up. So the Anchor screen — the only screen it is about — carries the way in.
+                SectionLabel(text: "Your Mac")
+                devicesCard
             }
             .padding(.horizontal, 16)
             .padding(.top, 12)
@@ -175,6 +180,19 @@ struct AnchorView: View {
     /// How far the anchor reaches: the list, or the whole phone but the list. Locked while
     /// anchored along with everything else. The list does not survive a switch (see
     /// `AppModel.setAnchorScope`), so a list that holds anything asks first.
+    /// The row into Help's page about the two devices. Pushed onto the stack the Anchor screen
+    /// is already on rather than raised as a sheet, so it reads as one step further in and Back
+    /// returns here — the same row Help's own hub draws, because that is what it is.
+    private var devicesCard: some View {
+        NavigationLink { DevicesHelp() } label: {
+            HelpRow(title: "Across your devices", detail: "What the Anchor carries to your Mac") {
+                HelpTile(symbol: "laptopcomputer.and.iphone")
+            }
+        }
+        .buttonStyle(.plain)
+        .emberCard()
+    }
+
     private var scopeCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 6) {

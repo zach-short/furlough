@@ -63,6 +63,13 @@ enum HelpTopic: String, Identifiable, CaseIterable {
 struct HelpSheet: View {
     @State private var topic: HelpTopic?
 
+    /// Opens straight onto a page rather than the hub, for the places in the app that link to
+    /// one topic — the Anchor sheet's row about the phone. Back still lands on the hub, so
+    /// arriving this way is a shortcut into Help rather than a dead end inside it.
+    init(topic: HelpTopic? = nil) {
+        _topic = State(initialValue: topic)
+    }
+
     var body: some View {
         SheetFrame(title: topic?.title ?? "Help", width: 560, height: 640) {
             if let topic {

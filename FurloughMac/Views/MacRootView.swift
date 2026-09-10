@@ -37,6 +37,12 @@ struct MacHomeView: View {
     @State private var showSettings = false
     @State private var showHelp = false
     @State private var showAnchor = false
+    /// Which page Help opens on: nil for its hub, a topic when something linked to one. Read
+    /// once, when the sheet is built.
+    @State private var helpTopic: HelpTopic?
+    /// A topic the Anchor sheet asked for, held until that sheet has fully gone — the same
+    /// reason `pendingCompanion` waits, and the same handoff.
+    @State private var pendingHelpTopic: HelpTopic?
     /// The other half of what was just added, held until the add sheet has fully gone: a sheet
     /// presented over one still leaving is dropped, so the offer waits for `onDismiss`.
     @State private var pendingCompanion: CompanionPrompt?
@@ -93,8 +99,10 @@ struct MacHomeView: View {
         }
         .sheet(isPresented: $showPending) { PendingSheet() }
         .sheet(isPresented: $showSettings) { SettingsSheet() }
-        .sheet(isPresented: $showAnchor) { AnchorSheet() }
-        .sheet(isPresented: $showHelp) { HelpSheet() }
+        .sheet(isPresented: $showAnchor, onDismiss: openRequestedHelp) {
+            AnchorSheet { pendingHelpTopic = .devices }
+        }
+        .sheet(isPresented: $showHelp) { HelpSheet(topic: helpTopic) }
         .onChange(of: model.state.config.targets.map(\.id)) { _, ids in
             if let selection, !ids.contains(selection) { self.selection = nil }
         }
@@ -112,6 +120,16 @@ struct MacHomeView: View {
         defer { pendingCompanion = nil }
         guard let pending = pendingCompanion, !pending.items.isEmpty else { return }
         companionPrompt = pending
+    }
+
+    /// Opens Help on the page the sheet that just closed asked for, once it has finished
+    /// closing. Nothing happens when it asked for nothing, so closing the Anchor sheet the
+    /// ordinary way is still just closing it.
+    private func openRequestedHelp() {
+        guard let topic = pendingHelpTopic else { return }
+        pendingHelpTopic = nil
+        helpTopic = topic
+        showHelp = true
     }
 
     /// The websites `app` is also at that are not in Furlough yet; a host already covered by a
@@ -149,7 +167,9 @@ struct MacHomeView: View {
                     .help("Pending changes")
                 GlassCircleButton(symbol: "gearshape") { showSettings = true }
                     .help("Settings")
-                GlassCircleButton(symbol: "questionmark") { showHelp = true }
+                // Cleared, not left as it was: the question mark opens the hub, and a topic
+                // still held from the last visit would silently reopen that page instead.
+                GlassCircleButton(symbol: "questionmark") { helpTopic = nil; showHelp = true }
                     .help("Help")
                 Button {
                     showAddChoice = true

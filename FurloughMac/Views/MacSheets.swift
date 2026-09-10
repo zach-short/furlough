@@ -99,6 +99,10 @@ struct AddAppSheet: View {
 /// bundle identifiers and hosts, since a Screen Time token means nothing here.
 struct AnchorSheet: View {
     @Environment(MacModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    /// Asks the window to explain the link to the phone. The sheet closes and Help opens on
+    /// that page: two sheets cannot be up at once here, and this one is the shallower of them.
+    var onExplainDevices: () -> Void = {}
     @State private var apps: [InstalledApp] = []
     @State private var query = ""
     @State private var host = ""
@@ -140,6 +144,11 @@ struct AnchorSheet: View {
                     }
                     Footnote(text: footnote)
                         .padding(.top, 8)
+                    // The footnote above says the anchor reaches the phone; this is where
+                    // someone who wants to know how, or why this Mac is refusing to drop one,
+                    // can go and read it. There is no other screen the link appears on.
+                    SectionLabel(text: "Your iPhone")
+                    devicesCard
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 24)
@@ -208,6 +217,20 @@ struct AnchorSheet: View {
         if !model.cloudAvailable { return "\(held) · iCloud unreachable" }
         if !model.phoneSeen { return "\(held) · waiting to hear from your iPhone" }
         return "\(held) · ready"
+    }
+
+    /// The one row on the Anchor sheet that leaves it: the same row Help's own hub draws, so it
+    /// is plainly a link into Help rather than a setting of its own — there is nothing here to
+    /// switch, which is the first thing the page it opens says.
+    private var devicesCard: some View {
+        Button {
+            onExplainDevices()
+            dismiss()
+        } label: {
+            HelpRow(topic: .devices)
+        }
+        .buttonStyle(.plain)
+        .emberCard()
     }
 
     private var scopeCard: some View {
