@@ -113,6 +113,24 @@ final class MacModel {
         SharedStore.log("iCloud is \(available ? "reachable again" : "unreachable; the anchor cannot cross") (\(reason))")
     }
 
+    /// The link to the phone, as the Anchor sheet shows it. Re-read on demand rather than
+    /// observed: it costs a read of the key-value store, and the sheet asks when it opens and
+    /// when Check now is pressed.
+    private(set) var link = AnchorSync.linkStatus()
+
+    /// Asks iCloud for whatever it has, merges it, and re-reads the link. What Check now does,
+    /// and the one action in Furlough whose whole purpose is to answer "is this working".
+    ///
+    /// Deliberately does all three: a synchronize alone leaves the sheet showing what it read
+    /// before, and a re-read alone would not have asked iCloud for anything new.
+    func checkLink() {
+        AnchorCloud.synchronize()
+        refreshCloudAvailability(reason: "check link")
+        applyRemoteAnchor(reason: "check link")
+        link = AnchorSync.linkStatus()
+        SharedStore.log("link check: \(link.headline) — \(link.detail(now: now))")
+    }
+
     /// Merges what the phone wrote, through `AnchorSync.merge`, and enforces if it changed
     /// anything.
     func applyRemoteAnchor(reason: String) {
@@ -120,6 +138,7 @@ final class MacModel {
         guard let note = AnchorSync.pull(into: &current.config, now: current.now) else { return }
         SharedStore.save(current)
         SharedStore.log("iCloud anchor (\(reason)): \(note)")
+        link = AnchorSync.linkStatus()
         enforce(reason: "iCloud anchor")
     }
 

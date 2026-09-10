@@ -1201,6 +1201,19 @@ final class AppModel {
         }
     }
 
+    /// The link to the Mac, as the Anchor screen shows it. Re-read on demand: it costs a read
+    /// of the key-value store, and the screen asks when it opens and when Check now is pressed.
+    private(set) var link = AnchorSync.linkStatus()
+
+    /// Asks iCloud for whatever it has, merges it, and re-reads the link — what Check now does.
+    func checkLink() {
+        AnchorCloud.synchronize()
+        refreshCloudAvailability(reason: "check link")
+        applyRemoteAnchor(reason: "check link")
+        link = AnchorSync.linkStatus()
+        SharedStore.log("link check: \(link.headline) — \(link.detail(now: clock.now))")
+    }
+
     /// Merges what the other device wrote, through `AnchorSync.merge`, and enforces if it
     /// changed anything. Called on activation, when iCloud says the record changed, and by
     /// every reconcile besides.
@@ -1209,6 +1222,7 @@ final class AppModel {
         guard let note = AnchorSync.pull(into: &current.config, now: current.now) else { return }
         SharedStore.save(current)
         SharedStore.log("iCloud anchor (\(reason)): \(note)")
+        link = AnchorSync.linkStatus()
         if isAuthorized { enforce(reason: "iCloud anchor") } else { reload() }
     }
 

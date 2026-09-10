@@ -244,3 +244,70 @@ struct AnchorSyncMacDropTests {
         #expect(config.anchor.sequence == 0)
     }
 }
+
+/// The link status: what the Anchor screen says about whether the two devices are talking.
+/// Pure, so the awkward cases — nothing in iCloud, only this device's own writes — can be
+/// pinned without an account.
+@Suite("Anchor sync: the link status")
+struct AnchorLinkStatusTests {
+    let noon = at(8, 12, 0)
+
+    private func record(writer: String, platform: AnchorRecord.Platform, anchored: Bool) -> AnchorRecord {
+        AnchorRecord(
+            sequence: 1, isAnchored: anchored, anchoredAt: anchored ? noon : nil, until: nil,
+            writer: writer, platform: platform, origin: anchored ? .drop : .tagScan, writtenAt: noon
+        )
+    }
+
+    @Test("no iCloud is not linked, and says so rather than blaming the other device")
+    func cutOff() {
+        let status = AnchorSync.LinkStatus(
+            cloudAvailable: false, record: nil, thisDevice: "mac-1", platform: .mac, lastHeard: nil
+        )
+        #expect(!status.isLinked)
+        #expect(status.headline == "Not linked")
+        #expect(status.detail(now: noon).contains("cannot reach iCloud"))
+        #expect(status.detail(now: noon).contains("iPhone"))
+    }
+
+    @Test("an empty store is not a failure, and asks for the drop that would fill it")
+    func nothingYet() {
+        let status = AnchorSync.LinkStatus(
+            cloudAvailable: true, record: nil, thisDevice: "mac-1", platform: .mac, lastHeard: nil
+        )
+        #expect(!status.isLinked)
+        #expect(status.headline == "Nothing shared yet")
+        #expect(status.detail(now: noon).contains("Drop the anchor"))
+    }
+
+    /// The case that sent Zach looking: this device has written and heard nothing back. Not
+    /// linked — hearing your own write proves only that you can write.
+    @Test("only this device's own write is not proof of a link")
+    func ownWriteOnly() {
+        let status = AnchorSync.LinkStatus(
+            cloudAvailable: true, record: record(writer: "mac-1", platform: .mac, anchored: true),
+            thisDevice: "mac-1", platform: .mac, lastHeard: nil
+        )
+        #expect(!status.isLinked)
+        #expect(status.headline == "Waiting to hear back")
+        #expect(status.detail(now: noon).contains("has not written since"))
+    }
+
+    @Test("the other device's write is the proof, and the words come from the record")
+    func linked() {
+        let status = AnchorSync.LinkStatus(
+            cloudAvailable: true, record: record(writer: "phone-9", platform: .phone, anchored: true),
+            thisDevice: "mac-1", platform: .mac, lastHeard: noon
+        )
+        #expect(status.isLinked)
+        #expect(status.headline == "Linked")
+        #expect(status.detail(now: noon).contains("iPhone wrote a drop"))
+        #expect(status.detail(now: noon).contains("Last read here"))
+        // A release reads as one, so the line is never wrong about what crossed.
+        let released = AnchorSync.LinkStatus(
+            cloudAvailable: true, record: record(writer: "phone-9", platform: .phone, anchored: false),
+            thisDevice: "mac-1", platform: .phone, lastHeard: nil
+        )
+        #expect(released.detail(now: noon).contains("Mac wrote a release"))
+    }
+}

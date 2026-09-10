@@ -70,7 +70,9 @@ struct AnchorView: View {
                 // is no screen where the link could be found, because there is nothing to set
                 // up. So the Anchor screen — the only screen it is about — carries the way in.
                 SectionLabel(text: "Your Mac")
+                linkCard
                 devicesCard
+                    .padding(.top, 10)
             }
             .padding(.horizontal, 16)
             .padding(.top, 12)
@@ -180,6 +182,41 @@ struct AnchorView: View {
     /// How far the anchor reaches: the list, or the whole phone but the list. Locked while
     /// anchored along with everything else. The list does not survive a switch (see
     /// `AppModel.setAnchorScope`), so a list that holds anything asks first.
+    /// Whether the two devices are actually talking, and a button that asks. The Mac draws the
+    /// same card from the same `LinkStatus`, so both ends describe one link in one set of words.
+    private var linkCard: some View {
+        let status = model.link
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(status.isLinked ? Ember.moss : (status.cloudAvailable ? Ember.amber : Ember.ember))
+                    .frame(width: 8, height: 8)
+                Text(status.headline)
+                    .emberDisplaySmall(14)
+                    .foregroundStyle(Ember.cream)
+                Spacer(minLength: 8)
+                Button("Check now") { model.checkLink() }
+                    .buttonStyle(.plain)
+                    .emberBody(12.5, .semibold)
+                    .foregroundStyle(Ember.ember)
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 13)
+            Text(status.detail(now: model.clock.now))
+                .emberBody(12)
+                .foregroundStyle(Ember.muted)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14)
+                .padding(.top, 6)
+                .padding(.bottom, 13)
+        }
+        .emberCard()
+        // Asked when the screen opens, so the status is about now rather than about whenever
+        // the app last happened to hear something.
+        .task { model.checkLink() }
+    }
+
     /// The row into Help's page about the two devices. Pushed onto the stack the Anchor screen
     /// is already on rather than raised as a sheet, so it reads as one step further in and Back
     /// returns here — the same row Help's own hub draws, because that is what it is.

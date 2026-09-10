@@ -43,6 +43,10 @@ struct AnchorRecord: Codable, Equatable {
 enum AnchorSync {
     private static let deviceKey = "furlough.device.v1"
     private static let phoneSeenKey = "furlough.sync.phoneSeen"
+    private static let lastHeardKey = "furlough.sync.lastHeard"
+
+    /// When this device last read a record the *other* device wrote. Nil until it ever has.
+    static var lastHeard: Date? { SharedStore.defaults.object(forKey: lastHeardKey) as? Date }
 
     /// This device, for the record's `writer`. Made once and kept in the App Group, so every
     /// process on the device signs the same way.
@@ -100,6 +104,80 @@ enum AnchorSync {
     }
     #endif
 
+    /// What the link between the two devices looks like from this one, in words.
+    ///
+    /// Exists because the anchor crossing had no visible state at all: a drop on the phone
+    /// either showed up on the Mac or it did not, and there was nothing anywhere to say which
+    /// half had failed — whether the write left the phone, whether it reached iCloud, whether
+    /// this device had ever heard anything. "Nothing happened" was the entire diagnostic.
+    ///
+    /// So this reports the shared record itself rather than a verdict derived from it. The
+    /// record carries who wrote it, which device they were on and when, and that is the only
+    /// end-to-end proof available without inventing a ping the other side has to answer: if
+    /// what sits in iCloud is your phone's write from a minute ago, the link works, and no
+    /// round trip could say it better.
+    ///
+    /// Pure, and given everything it needs, so the two platforms word it identically and the
+    /// awkward cases can be tested without an iCloud account.
+    struct LinkStatus: Equatable {
+        /// Whether the key-value store answered at all — `AnchorCloud.isAvailable`.
+        var cloudAvailable: Bool
+        /// What is in the shared record right now, if anything.
+        var record: AnchorRecord?
+        /// This device's `deviceID`, to tell its own writes from the other device's.
+        var thisDevice: String
+        /// Which of the two this is.
+        var platform: AnchorRecord.Platform
+        /// When this device last read the other's record.
+        var lastHeard: Date?
+
+        /// What the other device is called, from here.
+        var otherName: String { platform == .phone ? "Mac" : "iPhone" }
+
+        /// True only when the record in iCloud was written by the other device: the one state
+        /// that proves the whole path, both ways, end to end.
+        var isLinked: Bool {
+            guard cloudAvailable, let record else { return false }
+            return record.writer != thisDevice
+        }
+
+        /// The short verdict, for a status line.
+        var headline: String {
+            guard cloudAvailable else { return "Not linked" }
+            guard let record else { return "Nothing shared yet" }
+            return record.writer == thisDevice ? "Waiting to hear back" : "Linked"
+        }
+
+        /// The sentence under it: what is actually in iCloud, and what that means. Says what
+        /// to do next in each case where there is something to do.
+        func detail(now: Date) -> String {
+            guard cloudAvailable else {
+                return "Furlough cannot reach iCloud, so nothing can cross between this device and your \(otherName)."
+            }
+            guard let record else {
+                return "iCloud is reachable, but neither device has written the Anchor yet. Drop the anchor on either one and it will appear here."
+            }
+            let when = TimeFormat.clock(record.writtenAt)
+            let what = record.isAnchored ? "a drop" : "a release"
+            if record.writer == thisDevice {
+                return "The last thing in iCloud is \(what) this device wrote at \(when). Your \(otherName) has not written since, so there is nothing yet to prove it is hearing you."
+            }
+            let heard = lastHeard.map { " Last read here at \(TimeFormat.clock($0))." } ?? ""
+            return "Your \(otherName) wrote \(what) at \(when), and this device has it.\(heard)"
+        }
+    }
+
+    /// The link as it stands, read from iCloud and this device's own store.
+    static func linkStatus() -> LinkStatus {
+        LinkStatus(
+            cloudAvailable: AnchorCloud.isAvailable,
+            record: AnchorCloud.read(),
+            thisDevice: deviceID,
+            platform: platform,
+            lastHeard: lastHeard
+        )
+    }
+
     static func record(_ anchor: AnchorProfile, origin: AnchorRecord.Origin, now: Date) -> AnchorRecord {
         AnchorRecord(
             sequence: anchor.sequence,
@@ -127,6 +205,14 @@ enum AnchorSync {
         guard let remote = AnchorCloud.read() else { return nil }
         if remote.platform == .phone, !phoneSeen {
             SharedStore.defaults.set(true, forKey: phoneSeenKey)
+        }
+        // Stamped before the writer check, and whatever the record turns out to say. A record
+        // that changes nothing here — a release over an anchor already up, a sequence already
+        // seen — still proves the two devices are talking, and that is the whole question the
+        // link status answers. Only this device's own writes are skipped: hearing yourself is
+        // no evidence of anything.
+        if remote.writer != deviceID {
+            SharedStore.defaults.set(now, forKey: lastHeardKey)
         }
         guard remote.writer != deviceID else { return nil }
         let before = config.anchor

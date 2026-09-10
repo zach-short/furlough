@@ -148,13 +148,18 @@ struct AnchorSheet: View {
                     // someone who wants to know how, or why this Mac is refusing to drop one,
                     // can go and read it. There is no other screen the link appears on.
                     SectionLabel(text: "Your iPhone")
+                    linkCard
                     devicesCard
+                        .padding(.top, 10)
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 24)
             }
         }
         .task { apps = AppCatalog.installed() }
+        // Asked once when the sheet opens, so the status is about now rather than about
+        // whenever the app last happened to hear something.
+        .task { model.checkLink() }
         .alert("Anchor", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
             Button("OK") { message = nil }
         } message: {
@@ -217,6 +222,39 @@ struct AnchorSheet: View {
         if !model.cloudAvailable { return "\(held) · iCloud unreachable" }
         if !model.phoneSeen { return "\(held) · waiting to hear from your iPhone" }
         return "\(held) · ready"
+    }
+
+    /// Whether the two devices are actually talking, and a button that asks. Above the help row
+    /// on purpose: someone opening this section wants to know if it works before they want to
+    /// read about how it works.
+    private var linkCard: some View {
+        let status = model.link
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(status.isLinked ? Ember.moss : (status.cloudAvailable ? Ember.amber : Ember.ember))
+                    .frame(width: 8, height: 8)
+                Text(status.headline)
+                    .emberDisplaySmall(13.5)
+                    .foregroundStyle(Ember.cream)
+                Spacer(minLength: 8)
+                Button("Check now") { model.checkLink() }
+                    .buttonStyle(.plain)
+                    .emberBody(12, .semibold)
+                    .foregroundStyle(Ember.ember)
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 12)
+            Text(status.detail(now: model.now))
+                .emberBody(12)
+                .foregroundStyle(Ember.muted)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.top, 6)
+                .padding(.bottom, 12)
+        }
+        .emberCard()
     }
 
     /// The one row on the Anchor sheet that leaves it: the same row Help's own hub draws, so it
