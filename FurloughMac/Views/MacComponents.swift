@@ -46,36 +46,6 @@ struct GhostButton: View {
     }
 }
 
-/// A round glass button with a symbol, for the header.
-struct GlassCircleButton: View {
-    let symbol: String
-    var badge: Int = 0
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Ember.cream)
-                .frame(width: 34, height: 34)
-                .contentShape(Circle())
-        }
-        .buttonStyle(.glass)
-        .clipShape(Circle())
-        .overlay(alignment: .topTrailing) {
-            if badge > 0 {
-                Text("\(badge)")
-                    .font(EmberFont.label(9))
-                    .foregroundStyle(Ember.ground)
-                    .padding(.horizontal, 5)
-                    .frame(height: 15)
-                    .background(Ember.pending, in: Capsule())
-                    .offset(x: 4, y: -3)
-            }
-        }
-    }
-}
-
 struct SectionLabel: View {
     let text: String
 

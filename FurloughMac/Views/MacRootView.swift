@@ -106,7 +106,77 @@ struct MacHomeView: View {
         .onChange(of: model.state.config.targets.map(\.id)) { _, ids in
             if let selection, !ids.contains(selection) { self.selection = nil }
         }
+        .toolbar { windowActions }
     }
+
+    // MARK: Toolbar
+
+    /// The window's actions, in the window's own toolbar rather than a row drawn inside the
+    /// sidebar. The row was hand-built, so it had to say what every button looked like, and
+    /// what it said was a glass circle for four of them and a filled ember one for Add — while
+    /// the phone, whose header is a real `ToolbarItem`, got the system's glass for all five.
+    /// A real toolbar is the same answer on both: macOS 26 draws the Liquid Glass, groups
+    /// adjacent items into one capsule, and keeps the traffic lights clear.
+    @ToolbarContentBuilder
+    private var windowActions: some ToolbarContent {
+        let summary = toolbarSummary
+        // With no window title to sit beside, a primary action packs against the traffic
+        // lights instead of the trailing edge. The flexible spacer is what sends it right.
+        ToolbarSpacer(.flexible, placement: .primaryAction)
+        ToolbarItem(placement: .primaryAction) {
+            Button("Anchor", systemImage: summary.isAnchored ? "lock.fill" : "lock.open") { showAnchor = true }
+                .tint(Ember.cream)
+                .help("Anchor")
+        }
+        ToolbarItem(placement: .primaryAction) {
+            // The count in words, not a badge: a toolbar item has nowhere to hang one, and
+            // saying it is how the phone says it too.
+            if summary.pendingCount > 0 {
+                Button("\(summary.pendingCount) pending") { showPending = true }
+                    .tint(Ember.pending)
+                    .help("Pending changes")
+            } else {
+                Button("Pending changes", systemImage: "clock.arrow.circlepath") { showPending = true }
+                    .tint(Ember.cream)
+                    .help("Pending changes")
+            }
+        }
+        ToolbarItem(placement: .primaryAction) {
+            Button("Settings", systemImage: "gearshape") { showSettings = true }
+                .tint(Ember.cream)
+                .help("Settings")
+        }
+        ToolbarItem(placement: .primaryAction) {
+            // Cleared, not left as it was: the question mark opens the hub, and a topic still
+            // held from the last visit would silently reopen that page instead.
+            Button("Help", systemImage: "questionmark") { helpTopic = nil; showHelp = true }
+                .tint(Ember.cream)
+                .help("Help")
+        }
+        // Add is its own capsule, away from the four that only open something.
+        ToolbarSpacer(.fixed, placement: .primaryAction)
+        ToolbarItem(placement: .primaryAction) {
+            Button("Add", systemImage: "plus") { showAddChoice = true }
+                .tint(Ember.cream)
+                .help("Add an app or website")
+                .popover(isPresented: $showAddChoice, arrowEdge: .bottom) {
+                    AddChoicePopover(
+                        applicationCaption: "Any app on this Mac",
+                        websiteCaption: "A site and its subdomains, in any browser"
+                    ) { choice in
+                        showAddChoice = false
+                        switch choice {
+                        case .application: showAddApp = true
+                        case .website: showAddSite = true
+                        }
+                    }
+                }
+        }
+    }
+
+    /// What the toolbar needs to know. The sidebar works out its own from the same call: this
+    /// is a loop over the targets, not a query, and both are rebuilt on the same clock.
+    private var toolbarSummary: Policy.Summary { Policy.summary(state: model.state, now: now) }
 
     /// What was just added and what goes with it.
     private struct CompanionPrompt: Identifiable {
@@ -159,47 +229,6 @@ struct MacHomeView: View {
         })
         let groups = HomeGroups(targets: targets, statuses: statuses, now: now)
         return VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 8) {
-                Spacer()
-                GlassCircleButton(symbol: summary.isAnchored ? "lock.fill" : "lock.open") { showAnchor = true }
-                    .help("Anchor")
-                GlassCircleButton(symbol: "clock.arrow.circlepath", badge: summary.pendingCount) { showPending = true }
-                    .help("Pending changes")
-                GlassCircleButton(symbol: "gearshape") { showSettings = true }
-                    .help("Settings")
-                // Cleared, not left as it was: the question mark opens the hub, and a topic
-                // still held from the last visit would silently reopen that page instead.
-                GlassCircleButton(symbol: "questionmark") { helpTopic = nil; showHelp = true }
-                    .help("Help")
-                Button {
-                    showAddChoice = true
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Ember.cream)
-                        .frame(width: 34, height: 34)
-                        .contentShape(Circle())
-                }
-                .buttonStyle(.glassProminent)
-                .tint(Ember.ember)
-                .clipShape(Circle())
-                .help("Add an app or website")
-                .popover(isPresented: $showAddChoice, arrowEdge: .bottom) {
-                    AddChoicePopover(
-                        applicationCaption: "Any app on this Mac",
-                        websiteCaption: "A site and its subdomains, in any browser"
-                    ) { choice in
-                        showAddChoice = false
-                        switch choice {
-                        case .application: showAddApp = true
-                        case .website: showAddSite = true
-                        }
-                    }
-                }
-            }
-            .padding(.top, 14)
-            .padding(.horizontal, 16)
-
             VStack(alignment: .leading, spacing: 2) {
                 Eyebrow(text: "Furlough", color: Ember.amber)
                 Text(headline(summary))
