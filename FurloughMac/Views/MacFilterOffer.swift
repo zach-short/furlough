@@ -84,8 +84,13 @@ struct WebFilterOfferSheet: View {
                     .buttonStyle(.glassProminent)
                     .tint(Ember.ember)
                     .keyboardShortcut(.defaultAction)
+                // Explicitly untinted. `.glass` alone inherits the window's ember tint from
+                // `MacRootView`, which drew the way out as a second prominent button beside the
+                // one it is the alternative to — the same two-prominent-buttons mistake the
+                // audit caught on the phone's usage step.
                 Button("Not now") { dismiss() }
                     .buttonStyle(.glass)
+                    .tint(Ember.muted)
             // Nothing but a way out for the states in the middle of the walk: their buttons
             // belong to the step that calls for them, in the directions above.
             case .awaitingApproval, .disabledInSettings, .filterOff, .filterDenied, .installing:
