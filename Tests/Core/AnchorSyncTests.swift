@@ -295,6 +295,51 @@ struct AnchorLinkStatusTests {
         #expect(status.detail(now: noon).contains("has not written since"))
     }
 
+    /// The state Zach's own Mac was in an hour after the one above: the phone had released with
+    /// its tag, this Mac had read that, and then this Mac dropped — overwriting the proof with
+    /// its own write. It used to fall straight back to `ownWriteOnly`'s amber and say there was
+    /// nothing to prove the phone was hearing it, three minutes after the phone had been heard.
+    ///
+    /// Worse on the phone, where every drop is a write of its own and the Mac may not write
+    /// again for days, so the Your Mac row sat at a caution indefinitely.
+    @Test("having heard the other device once survives a write of our own")
+    func ownWriteAfterHearing() {
+        let status = AnchorSync.LinkStatus(
+            cloudAvailable: true, record: record(writer: "mac-1", platform: .mac, anchored: true),
+            thisDevice: "mac-1", platform: .mac, lastHeard: at(8, 11, 30)
+        )
+        #expect(status.isLinked)
+        #expect(status.headline.hasPrefix("Linked · last heard"))
+        // Both facts, and neither of them the claim that nothing has been proven.
+        #expect(status.detail(now: noon).contains("this device wrote at"))
+        #expect(status.detail(now: noon).contains("was last read here at"))
+        #expect(!status.detail(now: noon).contains("nothing yet to prove"))
+    }
+
+    /// The dot is the same colour on both ends, so the phone gets the same reprieve.
+    @Test("the phone's row stops sitting at a caution after its own drop")
+    func phoneOwnDropStaysLinked() {
+        let status = AnchorSync.LinkStatus(
+            cloudAvailable: true, record: record(writer: "phone-9", platform: .phone, anchored: true),
+            thisDevice: "phone-9", platform: .phone, lastHeard: at(8, 11, 30)
+        )
+        #expect(status.isLinked)
+        #expect(status.detail(now: noon).contains("Mac was last read here at"))
+    }
+
+    /// iCloud going away outranks having heard something once: a link proven yesterday carries
+    /// nothing today if the store cannot be reached, and this is the one screen that must not
+    /// say otherwise.
+    @Test("no iCloud is not linked, whatever was heard before")
+    func cutOffOutranksHavingHeard() {
+        let status = AnchorSync.LinkStatus(
+            cloudAvailable: false, record: record(writer: "phone-9", platform: .phone, anchored: true),
+            thisDevice: "mac-1", platform: .mac, lastHeard: at(8, 11, 30)
+        )
+        #expect(!status.isLinked)
+        #expect(status.headline == "Not linked")
+    }
+
     @Test("the other device's write is the proof, and the words come from the record")
     func linked() {
         let status = AnchorSync.LinkStatus(

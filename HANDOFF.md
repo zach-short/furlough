@@ -2292,6 +2292,20 @@ The plan for this stretch. Tick each phase off here as it lands.
     - `Footnote` on the Mac had no `fixedSize(horizontal:false, vertical:true)`, so a footnote
       in a stack that was measuring itself came out as one line and an ellipsis.
 
+    **The link status forgot it had ever been linked.** Zach's own use, minutes after the
+    handover, found it: `AnchorSync.LinkStatus.isLinked` asked only who wrote the record
+    currently in iCloud, so his phone's tag release made the row "Linked" and his Mac drop three
+    minutes later overwrote it and put the row back to an amber "Waiting to hear back" — under
+    the sentence "there is nothing yet to prove it is hearing you", which `lastHeard` already
+    knew was false. Worse on the phone, where every drop is a write of its own and the Mac can
+    drop but never release, so the Your Mac row sat at a caution indefinitely after any drop.
+    `isLinked` is now `record.writer != thisDevice || lastHeard != nil`, the headline in that
+    case is "Linked · last heard 07:32", and the detail names both writes instead of denying the
+    second. iCloud being unreachable still outranks all of it, and a device that has genuinely
+    never heard the other still reads "Waiting to hear back" — both are tested. Zach's call,
+    2026-09-10, from three options; the other two were keeping two states with better words, and
+    a third "Linked · waiting" state.
+
     **Replacing `/Applications/Furlough.app` reset the web filter.** `systemextensionsctl` still
     lists the extension as activated and enabled, but `ExtensionRequest.properties()` comes back
     empty for the new bundle, so Furlough reports *Not installed* and does not connect its XPC

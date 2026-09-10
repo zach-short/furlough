@@ -134,18 +134,30 @@ enum AnchorSync {
         /// What the other device is called, from here.
         var otherName: String { platform == .phone ? "Mac" : "iPhone" }
 
-        /// True only when the record in iCloud was written by the other device: the one state
-        /// that proves the whole path, both ways, end to end.
+        /// True once the path has been proven: the record in iCloud is the other device's, or
+        /// this device has read one of theirs before.
+        ///
+        /// A write of our own does not undo that. It used to: this asked only who wrote the
+        /// record sitting in iCloud, so dropping the anchor overwrote the other device's write
+        /// with your own and the row fell back to a caution — on the phone, permanently, since
+        /// every drop is a write and the Mac can drop but never release, so it may not write
+        /// again for days. The row was saying "no proof" about a link proven minutes earlier,
+        /// which is the opposite of what a row that exists to answer "is this working" is for.
         var isLinked: Bool {
             guard cloudAvailable, let record else { return false }
-            return record.writer != thisDevice
+            return record.writer != thisDevice || lastHeard != nil
         }
 
         /// The short verdict, for a status line.
         var headline: String {
             guard cloudAvailable else { return "Not linked" }
             guard let record else { return "Nothing shared yet" }
-            return record.writer == thisDevice ? "Waiting to hear back" : "Linked"
+            guard record.writer == thisDevice else { return "Linked" }
+            // Ours is the newest write, so whether this is a link still waiting on the other
+            // device or one already proven is the whole question — and the proof carries its
+            // time, because "when" is what someone doubting the link wants next.
+            guard let lastHeard else { return "Waiting to hear back" }
+            return "Linked · last heard \(TimeFormat.clock(lastHeard))"
         }
 
         /// The sentence under it: what is actually in iCloud, and what that means. Says what
@@ -160,7 +172,13 @@ enum AnchorSync {
             let when = TimeFormat.clock(record.writtenAt)
             let what = record.isAnchored ? "a drop" : "a release"
             if record.writer == thisDevice {
-                return "The last thing in iCloud is \(what) this device wrote at \(when). Your \(otherName) has not written since, so there is nothing yet to prove it is hearing you."
+                // Never heard from, and heard from before, are two different sentences. The
+                // second one used to be told the first, which was false the moment the other
+                // device had ever been read.
+                guard let lastHeard else {
+                    return "The last thing in iCloud is \(what) this device wrote at \(when). Your \(otherName) has not written since, so there is nothing yet to prove it is hearing you."
+                }
+                return "The last thing in iCloud is \(what) this device wrote at \(when). Your \(otherName) was last read here at \(TimeFormat.clock(lastHeard))."
             }
             let heard = lastHeard.map { " Last read here at \(TimeFormat.clock($0))." } ?? ""
             return "Your \(otherName) wrote \(what) at \(when), and this device has it.\(heard)"
