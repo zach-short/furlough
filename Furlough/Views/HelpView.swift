@@ -26,8 +26,6 @@ struct HelpView: View {
                     beyondCard
                     SectionLabel(text: "If you need it")
                     needCard
-                    Footnote(text: "Every page here is in the app and needs no connection. The same topics are on furloughapp.com for anyone deciding whether to install Furlough; these are the copies that quote your own settings, and the ones still there when a shield sticks.")
-                        .padding(.top, 10)
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 48)
