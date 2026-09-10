@@ -275,7 +275,15 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   read. Pure, capped at 60 days, and never read by `Policy.decide` — see step 25),
   `RuleSuggestion.swift` (the rule a tier would start something on, and the two named exceptions
   to it: `Draft`, `suggestion(for:chosen:)`, `offer`. Judgements rather than facts, which is why
-  they are not in `AppUtility`; offered by both editors and applied by neither — see step 28).
+  they are not in `AppUtility`; offered by both editors and applied by neither — see step 28),
+  `Brand.swift` (what an app is known by before Screen Time says: `name(forKey:)` over
+  `Companions` then `AppUtility`, `color(forKey:)`, `monogram`, `isLight`, `ink`. What lets a
+  usage card be drawn offline while the token is still being asked for — see step 38),
+  `TokenCache.swift` (the map from a usage key to the encoded `TargetKind` behind it, kept
+  between visits: `entries`, `savedAt`, the pure `refreshed(with:now:)` that replaces rather
+  than merges and refuses an empty answer, and `age(at:)` for the log line. Generic over
+  `[String: Data]` because tokens are not Sendable and `TargetKind.application` is iOS-only —
+  see step 38).
 - `Shared/Intents`: `FurloughIntents.swift` (What's Open, both platforms), `StatusSpeech.swift`
   (its sentence, tested), `DropAnchorIntent.swift` (iOS; compiled into the app and the widget
   extension, see step 8).
@@ -285,8 +293,8 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   `QuitGraceTests`, `PendingNotificationTests`, `UtilityTests`, `UtilityPlanTests`,
   `ActivityLimitTests`, `PendingTextTests`, `CompanionsTests`, `ConfigImportTests`,
   `HostTargetTests`, `HostImportTests`, `AnchorCandidatesTests`, `AnchorScopeTests`,
-  `AnchorScheduleTests`, `AnchorSyncTests`, `DeviceLinkTests`, `SharedAdditionsTests`. 652 tests
-  in 92 suites. It builds for **macOS**, so it
+  `AnchorScheduleTests`, `AnchorSyncTests`, `DeviceLinkTests`, `SharedAdditionsTests`,
+  `BrandTests`, `TokenCacheTests`. 664 tests in 94 suites. It builds for **macOS**, so it
   reads the Mac's `TargetKind` and the Mac's `Decision`: the iOS `Decision.filteredHosts` and
   `ShieldReconciler.apply` cannot be reached from any test, which is why the nil-when-empty
   filter policy is a property of `Decision` rather than a line inside the reconciler.
@@ -2463,6 +2471,101 @@ The plan for this stretch. Tick each phase off here as it lands.
     (its writer is not on the roster), so update both before judging the crossing. Whether the
     extensions can write the store is still the open question from step 18; the roster and the
     rings are only ever written by the apps.
+38. **The usage page stops waiting on Screen Time, and then stops asking twice.** Done
+    2026-09-10, in two commits: "draw the usage cards from the tables and let screen time's
+    icons catch up" (`3208f70`) and this one.
+
+    **The problem.** With data access (item 9; iOS 26.4, development builds anywhere and App
+    Store customers in the EU only) `UsageView` reads the fortnight itself — but Screen Time
+    names an app there by bundle identifier and nothing else. Apple's own name, Apple's icon and
+    the token a rule is written on all come from a *second* query,
+    `FamilyActivityData.shared.installedApplications` + `visitedWebDomains` behind
+    `UsageReader.encodedKinds`, which enumerates every app on the phone. It takes seconds when
+    it answers, comes back empty, throws, or never returns at all — and the page used to wait on
+    it, so "Where the time goes" sat under a running hourglass for minutes at a time.
+
+    **Half one: don't wait.** `Shared/Core/Brand.swift` is the offline half — `name(forKey:)`
+    (`Companions`, then `AppUtility`; a domain is its own name), `color(forKey:)`,
+    `monogram`, and `isLight`/`ink` for the lettering. `UsageEntry.isNamed` is the test the page
+    reads. `load()` draws the cards the moment the fortnight is folded; `MonogramTile`
+    (`Furlough/Views/UsageCard.swift`) puts the first letter of the name on the brand's colour
+    where the icon goes, and `Label(token)` takes over the instant a token lands. Every ask gets
+    `UsageReader.patience` (12 s) through `within(_:_:)`, and `nameApps()` asks
+    `namingAttempts` (3) times a second apart, breaking as soon as Screen Time answers at all —
+    `Naming.answered` is false for an *empty* answer, which is a failed query and not a phone
+    with no apps on it. An app neither the tables nor Screen Time could name is held back while
+    the asking is going on (the "Asking Screen Time about N more apps…" line) and dropped at the
+    end: it has no name to show and no token to write on, and a card like that is furniture. The
+    colour and the letter, never the artwork — the icon is the app's trademark and `Label(token)`
+    is the only source Furlough may draw it from.
+
+    **Half two: don't ask twice.** The answer barely changes between visits — a token is stable
+    for as long as the app is installed — so it is written down.
+    `Shared/Core/TokenCache.swift`: `entries: [String: Data]` keyed the way `UsageCollector`
+    keys an entry (a bundle identifier, or `web:` and a domain) against encoded `TargetKind`s,
+    plus `savedAt`. One pure function decides what is worth keeping,
+    `refreshed(with:now:)`, and it makes two judgements:
+    - **Replaced, never merged.** An app deleted since the last visit is absent from the new
+      answer, and merging would keep its token for ever.
+    - **Nil for an empty answer**, so a failed query cannot wipe a good cache — the same
+      judgement `Naming.answered` makes.
+
+    `SharedStore.tokenCache()` / `save(_:)` under **`furlough.tokens.v1`** in the App Group
+    defaults, logging the entry count and byte size on each save; `reset()` removes it beside
+    the state and the learned names, so **Reset everything forgets the tokens too**. The whole
+    map is kept, not the ranked five: `UsageReader.identities()` reads it to name targets no
+    usage card ever mentioned. **Nobody has measured what that costs on a real phone yet** —
+    that is what the `tokens: cached N entries, B bytes` line in Diagnostics is for. A few
+    hundred apps at a token apiece should be tens of kilobytes; if it comes out over about a
+    megabyte, say so here rather than trimming the map silently, because `identities()` needs
+    all of it.
+
+    `UsageReader.encodedKinds()` now wraps the `@concurrent` query (`queryKinds`) and saves on
+    the way past. `cachedKinds()` reads it back. `fillingTokens(in:from:)` folds a map in with
+    no query at all, and — the one behaviour change worth knowing — it resolves **every** entry
+    rather than only the tokenless ones, clearing a token the map does not name. That is what
+    lets a cached token be taken *away* again. `fillingTokens(in:)` therefore always queries
+    now: a summary that looks complete is exactly the one whose tokens most need checking. And
+    `identities()` reads the cache first and queries only where there is none, so
+    `nameUnnamedTargets` costs nothing on most activations.
+
+    In the view, `fillFromCache()` runs after the fortnight is read and folded and *before*
+    `phase = .ready`: it fills, folds again (an app's half can now pair with its site's, which a
+    key alone could not do), ranks again, and logs
+    `usage: N of M tokens from the cache, written <age> ago`. `nameApps()` runs behind the
+    cards exactly as before and corrects what it finds.
+
+    **The stale window, and what was done about it.** A cached token for an app deleted since
+    the last visit puts a card on the page for the seconds until the fresh answer removes it.
+    **This was not observed on the phone — nobody has run the install-then-delete experiment,
+    and it is worth running.** What is certain from the code is the part that outlives the
+    screen: pressing Apply in that window would add a target on a token no shield will ever
+    cover and nothing can name, and past `AppModel.undoWindow` (30 minutes) it is not undoable
+    from the page. So cached tokens are held back from Apply until naming finishes —
+    `fromCache` on `UsageView`, set by `fillFromCache` and cleared by the first answered pass,
+    and one condition in `apply()` beside the tokenless case that already waited there. The
+    cost is that Apply pressed in the first seconds shows "Applying…" until the answer lands,
+    which is the wait a tokenless card already had; the drawing itself is not held back, so a
+    blank tile for a few seconds is still possible and is the accepted price. If the experiment
+    shows the drawn card is worse than a blank tile, that is a `MonogramTile` question, not an
+    `apply()` one.
+
+    **Deliberately not done:** looking bundle identifiers up over the network (the page promises
+    nothing leaves the phone), bundling app artwork (trademark; `Label(token)` only), and
+    prefetching the query on every launch (it enumerates every app, and the cache is what makes
+    that unnecessary). The cache is iOS only — the Mac names apps from their bundle identifiers
+    already.
+
+    Tests: `Tests/Core/BrandTests.swift` and `Tests/Core/TokenCacheTests.swift` (round trip,
+    replace-not-merge, an empty answer keeping the old cache, the age wording, and older/empty
+    stored shapes decoding). 664 tests in 94 suites; the phone build, the Mac build and the
+    test bundle are all warning-free in our own code.
+
+    **Not seen on the phone.** Open Settings › Where the time goes once and let the real icons
+    arrive. Leave, and open it again: the cards should come up with Apple's icons in the same
+    instant as the cards themselves — no letters, no "Asking Screen Time…" line. Diagnostics
+    should carry the "tokens from the cache" line. Then Reset everything and open it once more:
+    letters first, icons after, as before.
 
 ## Style rules
 

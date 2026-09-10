@@ -119,7 +119,7 @@ enum UsageReader {
         var answered: Bool
     }
 
-    /// The fortnight with its tokens filled in.
+    /// The fortnight with its tokens filled in, out of a fresh answer from Screen Time.
     ///
     /// Data access hands over minutes and a bundle identifier and nothing else: no
     /// `localizedDisplayName`, and no token either. A token is the only thing that names an app
@@ -127,18 +127,34 @@ enum UsageReader {
     /// be written on, so without this every card says "This app" over a blank tile and Apply
     /// has nothing to write on. Matching each key against what is installed puts both back.
     ///
-    /// One walk of the installed list for the whole summary, not one per entry.
+    /// One walk of the installed list for the whole summary, not one per entry. The query is
+    /// always made, even where every entry already has a token: since the cache
+    /// (`TokenCache`) fills them before the first frame, a summary that looks complete is
+    /// exactly the one whose tokens most need checking against what is installed now.
     @available(iOS 26.4, *)
     static func fillingTokens(in summary: UsageSummary) async throws -> Naming {
-        guard summary.entries.contains(where: { $0.targetKind == nil }) else {
-            return Naming(summary: summary, answered: true)
-        }
         let kinds = try await encodedKinds()
+        // An empty answer is a failed query, not a phone with no apps on it, so nothing is
+        // resolved against it — resolving would take away every token the cache just supplied.
+        guard !kinds.isEmpty else { return Naming(summary: summary, answered: false) }
+        return Naming(summary: try fillingTokens(in: summary, from: kinds), answered: true)
+    }
+
+    /// The same fold against a map already in hand — the cache, on the way to the first frame —
+    /// with no query at all, and so nothing to wait for and nothing to fail.
+    ///
+    /// Every entry is resolved, not only the tokenless ones. A token here came from a map, and
+    /// the map is the whole truth about what is installed: an entry the map does not name has no
+    /// token, which is what lets a cached token for an app deleted since the last visit be taken
+    /// away again the moment Screen Time answers.
+    static func fillingTokens(in summary: UsageSummary, from kinds: [String: Data]) throws -> UsageSummary {
         let decoder = JSONDecoder()
         var filled = summary
         filled.entries = try summary.entries.map { entry in
-            guard entry.targetKind == nil, let encoded = kinds[entry.key] else { return entry }
             var found = entry
+            found.applicationToken = nil
+            found.webDomainToken = nil
+            guard let encoded = kinds[entry.key] else { return found }
             switch try decoder.decode(TargetKind.self, from: encoded) {
             case .application(let token): found.applicationToken = token
             case .webDomain(let token): found.webDomainToken = token
@@ -147,16 +163,34 @@ enum UsageReader {
             }
             return found
         }
-        return Naming(summary: filled, answered: !kinds.isEmpty)
+        return filled
+    }
+
+    /// The last answer Screen Time gave, or nil where it has never answered — see `TokenCache`
+    /// for why it is kept. Costs a read of the App Group defaults and nothing else.
+    static func cachedKinds() -> [String: Data]? {
+        guard let cache = SharedStore.tokenCache(), !cache.entries.isEmpty else { return nil }
+        return cache.entries
     }
 
     /// Everything installed and everything visited, keyed the way `UsageCollector` keys an
-    /// entry, as encoded `TargetKind`s. Off the main actor and answering in bytes for the same
-    /// reason `encodedKind` is: `FamilyActivityData` and the arrays it hands back are not
-    /// Sendable, so they may neither be reached from an actor nor returned to one.
+    /// entry, as encoded `TargetKind`s — and written down on the way past, so the next visit
+    /// opens on it rather than on this query.
+    @available(iOS 26.4, *)
+    private static func encodedKinds() async throws -> [String: Data] {
+        let kinds = try await queryKinds()
+        // Only an answer worth keeping: `refreshed` says no to an empty one, so a query that
+        // failed cannot wipe a good cache.
+        if let fresh = TokenCache.refreshed(with: kinds) { SharedStore.save(fresh) }
+        return kinds
+    }
+
+    /// The query itself. Off the main actor and answering in bytes for the same reason
+    /// `encodedKind` is: `FamilyActivityData` and the arrays it hands back are not Sendable, so
+    /// they may neither be reached from an actor nor returned to one.
     @available(iOS 26.4, *)
     @concurrent
-    private static func encodedKinds() async throws -> [String: Data] {
+    private static func queryKinds() async throws -> [String: Data] {
         let encoder = JSONEncoder()
         var kinds: [String: Data] = [:]
         for app in try await FamilyActivityData.shared.installedApplications {
@@ -177,11 +211,23 @@ enum UsageReader {
     /// Data access only, so it answers on a development build anywhere and for a customer only in
     /// the EU (`FamilyActivityData`). Everything that reads it must work without it — see
     /// `AppModel.nameFromTables`, where the fallback is the name the shield teaches instead.
+    ///
+    /// The cache first, and the query only where there is no cache at all: this runs on every
+    /// activation (`AppModel.nameUnnamedTargets`), and enumerating every app on the phone is not
+    /// what an activation should cost. A cache that has gone stale costs nothing here either —
+    /// the worst it can do is name a target after an app that has since been deleted, which is
+    /// still what that target is.
     @available(iOS 26.4, *)
     static func identities() async throws -> [TargetKind: String] {
+        let kinds: [String: Data]
+        if let cached = cachedKinds() {
+            kinds = cached
+        } else {
+            kinds = try await encodedKinds()
+        }
         var identities: [TargetKind: String] = [:]
         let decoder = JSONDecoder()
-        for (key, encoded) in try await encodedKinds() {
+        for (key, encoded) in kinds {
             identities[try decoder.decode(TargetKind.self, from: encoded)] = key
         }
         return identities

@@ -38,8 +38,14 @@ struct UsageView: View {
     @State private var phase = Phase.reading
     /// Screen Time is still being asked for the tokens (`nameApps`). While this is true a card
     /// whose app the tables did not know is held back, because there is nothing to call it yet,
-    /// and Apply waits for the answer rather than asking the same slow question a second time.
+    /// and Apply waits for the answer rather than asking the same slow question a second time —
+    /// over a token out of the cache too, while `fromCache` says so.
     @State private var naming = false
+    /// The tokens on the page came out of `TokenCache` and Screen Time has not confirmed them
+    /// yet. True from the moment the cache is folded in until the first answered pass of
+    /// `nameApps`; it is what holds Apply back over a token that may name an app deleted since
+    /// the last visit — see `apply`.
+    @State private var fromCache = false
     /// How many times to ask Screen Time for the tokens before giving up on them, each ask given
     /// `UsageReader.patience`. Three, a second apart: long enough to ride out a query that simply
     /// did not answer, short enough that the icons stop changing under the reader within the
@@ -408,16 +414,39 @@ struct UsageView: View {
             phase = .failed(error.localizedDescription)
             return
         }
-        // Cards, now. The names come from the tables and the icons are letters until Screen
-        // Time hands the tokens over, which is the slow, unreliable half and no longer the gate.
+        // Apple's icons out of the cache, before anything is drawn — on every visit but the
+        // first, this is where they come from, and Screen Time only corrects them afterwards.
+        fillFromCache()
+        // Cards, now. Anything the cache did not know is named from the tables with a letter for
+        // an icon until Screen Time hands the token over, which is the slow, unreliable half and
+        // no longer the gate.
         phase = .ready
         await nameApps()
+    }
+
+    /// Puts last visit's tokens on the summary, so the first frame has Apple's own icons rather
+    /// than letters. Nothing is asked of Screen Time here and nothing can fail: the map is a read
+    /// of the App Group defaults, and a phone that has never answered simply has none.
+    ///
+    /// Folded a second time, because folding an app's half onto its site's needs to know which
+    /// entry is which target, and for an app that is the token — which is what has just arrived.
+    /// Then ranked again, because a folded pair carries both halves' minutes.
+    private func fillFromCache() {
+        guard let read = summary, let cache = SharedStore.tokenCache(), !cache.entries.isEmpty else { return }
+        guard let filled = try? UsageReader.fillingTokens(in: read, from: cache.entries) else { return }
+        let folded = filled.folded(in: model.state.config)
+        summary = folded
+        advice = folded.recommendations
+        fromCache = true
+        let have = advice.filter { folded.entry(for: $0)?.targetKind != nil }.count
+        SharedStore.log("usage: \(have) of \(advice.count) tokens from the cache, written \(cache.age()) ago")
     }
 
     /// Throws the fortnight away and reads it again, for the button on a failure.
     private func restart() async {
         summary = nil
         advice = []
+        fromCache = false
         await load()
     }
 
@@ -432,11 +461,15 @@ struct UsageView: View {
     /// repeating, while an answer that named only some is Screen Time working, and asking twice
     /// more would only take longer to say the same thing.
     ///
-    /// The cards are on the page throughout, drawn from the tables (`Brand`), and every token
-    /// that lands swaps Apple's artwork in for a letter. Whatever the tables did not know and
-    /// Screen Time never named is dropped at the end rather than drawn: it has no name to show
-    /// and no token to write a rule on, so its card would be furniture. An app used in the last
-    /// fortnight and since deleted is exactly that, and it must not be able to wedge the page.
+    /// The cards are on the page throughout — with last visit's icons already on them where
+    /// there was a cache (`fillFromCache`), and drawn from the tables (`Brand`) where there was
+    /// not — and every token that lands confirms one or swaps Apple's artwork in for a letter.
+    /// A token the cache supplied for an app since deleted is taken away here, because a fresh
+    /// answer resolves every entry rather than only the tokenless ones, and the card goes with
+    /// it. Whatever the tables did not know and Screen Time never named is dropped at the end
+    /// rather than drawn: it has no name to show and no token to write a rule on, so its card
+    /// would be furniture. An app used in the last fortnight and since deleted is exactly that,
+    /// and it must not be able to wedge the page.
     private func nameApps() async {
         guard #available(iOS 26.4, *) else { return }
         naming = true
@@ -447,7 +480,12 @@ struct UsageView: View {
                 let pass = try await UsageReader.fillingTokens(in: read, within: UsageReader.patience)
                 summary = pass.summary
                 SharedStore.log("usage: naming attempt \(attempt) \(pass.answered ? "answered" : "came back empty"), \(tokenless) of \(advice.count) still without a token")
-                if pass.answered { break }
+                if pass.answered {
+                    // Every token on the page has now been checked against what is installed,
+                    // including the ones the cache supplied, so Apply need not wait on anything.
+                    fromCache = false
+                    break
+                }
             } catch is UsageReader.Unanswered {
                 SharedStore.log("usage: naming attempt \(attempt) unanswered after \(UsageReader.patience.components.seconds) s")
             } catch {
@@ -496,10 +534,16 @@ struct UsageView: View {
         defer { busy = nil }
 
         var entry = entry
-        if entry.targetKind == nil, naming {
+        if naming, entry.targetKind == nil || fromCache {
             // `nameApps` is asking Screen Time this very question for every card at once, and
             // asking it again for this one would be a second slow query racing the first. Wait
             // for that answer instead; the button reads "Applying…" meanwhile.
+            //
+            // A token out of the cache waits too, even though it is right here. It says what was
+            // installed at the last visit, and an app deleted since is exactly the case where it
+            // is wrong — writing a rule on it would leave a target nothing can name and no shield
+            // will ever cover, past the half hour `undoFreshTarget` allows. So the one place the
+            // cache is not trusted is the place where being wrong outlives the screen.
             while naming, !Task.isCancelled { try? await Task.sleep(for: .milliseconds(200)) }
             entry = summary?.entry(for: item) ?? entry
         }

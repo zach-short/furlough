@@ -5,6 +5,7 @@ import os
 enum SharedStore {
     private static let stateKey = "furlough.state.v1"
     private static let namesKey = "furlough.names.v1"
+    private static let tokensKey = "furlough.tokens.v1"
     private static let logKey = "furlough.log.v1"
     private static let maxLogEntries = 300
     private static let logger = Logger(subsystem: Furlough.bundleID, category: "shared")
@@ -72,6 +73,34 @@ enum SharedStore {
         return true
     }
 
+    /// What Screen Time last said is installed on this phone, keyed the way a usage entry is.
+    /// The usage page opens on this so Apple's icons are there in the same instant as the cards;
+    /// see `TokenCache` for why it is kept and why it is replaced whole. Nil before the first
+    /// answer, and after a reset. Unreadable bytes are treated as no cache: the cost is one slow
+    /// visit, and the next answer overwrites them.
+    static func tokenCache() -> TokenCache? {
+        guard let data = defaults.data(forKey: tokensKey) else { return nil }
+        do {
+            return try decoder.decode(TokenCache.self, from: data)
+        } catch {
+            log("Failed to decode the token cache: \(error)")
+            return nil
+        }
+    }
+
+    /// Writes down an answer from Screen Time. The whole map, not the ranked few: it is also
+    /// what `UsageReader.identities` reads to name a target that has no name yet, and that asks
+    /// about targets no usage card ever mentioned.
+    static func save(_ cache: TokenCache) {
+        do {
+            let data = try encoder.encode(cache)
+            defaults.set(data, forKey: tokensKey)
+            log("tokens: cached \(cache.count) entries, \(data.count) bytes")
+        } catch {
+            log("Failed to encode the token cache: \(error)")
+        }
+    }
+
     /// Every save records both clocks, which is what lets Furlough keep its own time. The mark
     /// only advances while the device's clock agrees with it; see `Clock`.
     @discardableResult
@@ -86,11 +115,12 @@ enum SharedStore {
         return state
     }
 
-    /// Forgets every target, rule, pending change, the Anchor, and the names iOS gave us. The
-    /// activity log is kept.
+    /// Forgets every target, rule, pending change, the Anchor, the names iOS gave us and the
+    /// tokens it handed over. The activity log is kept.
     static func reset() {
         defaults.removeObject(forKey: stateKey)
         defaults.removeObject(forKey: namesKey)
+        defaults.removeObject(forKey: tokensKey)
     }
 
     @discardableResult
