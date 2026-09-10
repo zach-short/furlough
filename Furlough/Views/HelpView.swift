@@ -18,7 +18,11 @@ struct HelpView: View {
                     header
                     SectionLabel(text: "The rules")
                     rulesCard
-                    SectionLabel(text: "Beyond the rules")
+                    // Its own group rather than the first two rows of "Beyond the rules": the
+                    // Anchor is a half of the app, not an extra hung off the other half.
+                    SectionLabel(text: "The Anchor")
+                    anchorCard
+                    SectionLabel(text: "Beyond the app")
                     beyondCard
                     SectionLabel(text: "If you need it")
                     needCard
@@ -45,7 +49,9 @@ struct HelpView: View {
         .presentationBackground(Ember.ground)
     }
 
-    /// The whole app in three sentences, so someone who reads nothing else has the shape of it.
+    /// Both halves in three sentences, so someone who reads nothing else knows there are two of
+    /// them. This used to describe rules alone, which left the Anchor to be discovered from a
+    /// card on Home by anyone who came here first.
     private var header: some View {
         VStack(alignment: .leading, spacing: 0) {
             Eyebrow(text: "Furlough", color: Ember.amber)
@@ -54,12 +60,12 @@ struct HelpView: View {
                 .emberDisplay(28)
                 .foregroundStyle(Ember.cream)
                 .padding(.top, 6)
-            Text("Pick what eats your time. Give each one a daily budget, and the hours it is allowed if you want them. Outside those hours, or once the budget is spent, iOS shields it.")
+            Text("Two ways to put an app out of reach. A rule gives it a daily budget, and the hours it is allowed if you want them; outside those, or once the budget is spent, iOS shields it. Making a rule tighter applies at once. Making it looser waits.")
                 .emberBody(14.5)
                 .foregroundStyle(Ember.muted)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 12)
-            Text("Making a rule tighter applies at once. Making it looser waits.")
+            Text("The Anchor is the other. One tap locks a list, or the whole phone, and the only thing that lifts it is an NFC tag you paired.")
                 .emberBody(14.5)
                 .foregroundStyle(Ember.muted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -101,10 +107,10 @@ struct HelpView: View {
         .emberCard()
     }
 
-    private var beyondCard: some View {
+    private var anchorCard: some View {
         VStack(spacing: 0) {
             NavigationLink { AnchorHelp() } label: {
-                HelpRow(title: "The Anchor", detail: "One tap to lock. The tag to unlock.") {
+                HelpRow(title: "Using the Anchor", detail: "One tap to lock. The tag to unlock.") {
                     AnchorGlyph(isAnchored: false)
                 }
             }
@@ -116,7 +122,12 @@ struct HelpView: View {
                 }
             }
             .buttonStyle(.plain)
-            CardDivider()
+        }
+        .emberCard()
+    }
+
+    private var beyondCard: some View {
+        VStack(spacing: 0) {
             NavigationLink { ElsewhereHelp() } label: {
                 HelpRow(title: "Outside the app", detail: "Notifications, the widget, the lock screen") {
                     HelpTile(symbol: "bell")

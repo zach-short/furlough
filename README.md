@@ -1,10 +1,12 @@
 # Furlough
 
-A personal iOS and Mac app blocker with no unblock button.
+A personal iOS and Mac app blocker with no unblock button, and two ways to use it.
 
-Pick the apps and websites that eat your time. Give each one a daily minute budget (say 30 minutes) and, if you want, allowed windows (say 8:00–10:00 PM, or 5:00 PM to 4:00 AM for a weekend night), the same every day or different per day of the week (until midnight on school nights, until 2 AM on weekends). With no windows an app is open all day, up to its budget. Outside the windows, or once the budget is spent, iOS shields the app. The only way to loosen a rule is to wait: loosening edits take effect 24 hours after you make them, and you can cancel them in the meantime. Tightening edits apply instantly.
+**Rules** are the everyday half. Pick the apps and websites that eat your time. Give each one a daily minute budget (say 30 minutes) and, if you want, allowed windows (say 8:00–10:00 PM, or 5:00 PM to 4:00 AM for a weekend night), the same every day or different per day of the week (until midnight on school nights, until 2 AM on weekends). With no windows an app is open all day, up to its budget. Outside the windows, or once the budget is spent, iOS shields the app. The only way to loosen a rule is to wait: loosening edits take effect 24 hours after you make them, and you can cancel them in the meantime. Tightening edits apply instantly.
 
-There is also the Anchor: a second set of apps you lock in one tap, from anywhere, and can only unlock by holding your phone to a physical NFC tag you paired. Leave the tag at home and your phone stays anchored until you are back.
+**The Anchor** is the other half, and it is not a footnote to the first. A separate list you lock in one tap from anywhere — or turn inside out, so the whole device is shielded and the list is what stays open. No delay, no timer, no code: the only thing that lifts it is holding your phone to a physical NFC tag you paired. Any NTAG sticker works, including the one that came with another blocking product. It can drop on a schedule, up to three tags can release it, and it crosses to the Mac through your own iCloud, where Furlough can drop one that only the phone's tag will lift.
+
+Either half works on its own; neither needs the other.
 
 Built on Apple's Screen Time API (FamilyControls, ManagedSettings, DeviceActivity) and Core NFC. Swift, SwiftUI, no third-party dependencies.
 

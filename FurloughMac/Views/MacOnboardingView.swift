@@ -1,23 +1,27 @@
 import SwiftUI
 
-/// Two panes. The first is the promise; the second offers the web filter, which is the one
-/// thing on the Mac that needs the person's hand in System Settings, so it is asked for here
-/// rather than found later.
+/// Three panes. The first is the promise, the second is the Anchor, and the third offers the
+/// web filter, which is the one thing on the Mac that needs the person's hand in System
+/// Settings, so it is asked for here rather than found later.
+///
+/// The Anchor has a pane of its own because Furlough is two things and this screen used to
+/// introduce one of them. Someone who came for a tag-and-lock app met three paragraphs about
+/// minute budgets and had to find the Anchor in a sheet on their own.
 struct MacOnboardingView: View {
     @Environment(MacModel.self) private var model
     @State private var requesting = false
     @State private var step = Step.promise
 
-    private enum Step { case promise, filter }
+    private enum Step { case promise, anchor, filter }
 
     var body: some View {
         ZStack {
             EmberWall()
             HStack(spacing: 40) {
-                LivingHourglass(state: .open(level: 0.62, warned: false))
-                    .compositingGroup()
+                // The Anchor's pane wears the anchor. The app's own hourglass standing over a
+                // screen about the Anchor would be the same demotion in a picture.
+                mark
                     .frame(width: 150, height: 200)
-                    .shadow(color: Ember.amber.opacity(0.45), radius: 32)
                 // Scrolls because the filter pane grows: six numbered steps and a caution is a
                 // taller column than the promise, and a step that falls off the bottom of a
                 // fixed window is a step nobody follows.
@@ -25,6 +29,7 @@ struct MacOnboardingView: View {
                     Group {
                         switch step {
                         case .promise: promise
+                        case .anchor: anchor
                         case .filter: filter
                         }
                     }
@@ -37,6 +42,20 @@ struct MacOnboardingView: View {
         }
     }
 
+    @ViewBuilder private var mark: some View {
+        if step == .anchor {
+            AnchorShape()
+                .fill(Ember.ember)
+                .frame(width: 120, height: 150)
+                .shadow(color: Ember.ember.opacity(0.45), radius: 32)
+        } else {
+            LivingHourglass(state: .open(level: 0.62, warned: false))
+                .compositingGroup()
+                .frame(width: 150, height: 200)
+                .shadow(color: Ember.amber.opacity(0.45), radius: 32)
+        }
+    }
+
     private var promise: some View {
         VStack(alignment: .leading, spacing: 0) {
             Eyebrow(text: "Furlough for Mac", color: Ember.amber)
@@ -44,11 +63,15 @@ struct MacOnboardingView: View {
                 .emberDisplay(36)
                 .foregroundStyle(Ember.cream)
                 .padding(.top, 6)
-            Text("Pick the apps and websites that eat your time. Give each one allowed windows, the same every day or different on weekends, and a minute budget. Outside the windows, or once the budget is spent, Furlough quits the app and sends the tab to a shield page.")
+            Text("Two ways to put an app out of reach, and neither of them has a button that hands it back.")
                 .emberBody(14.5)
                 .foregroundStyle(Ember.muted)
                 .padding(.top, 14)
-            Text("Tightening a rule applies instantly. Loosening one waits \(TimeFormat.delay(hours: model.state.config.loosenDelayHours)).")
+            Text("Rules are the everyday half. Pick the apps and websites that eat your time and give each one allowed windows, the same every day or different on weekends, and a minute budget. Outside the windows, or once the budget is spent, Furlough quits the app and sends the tab to a shield page. Tightening a rule applies instantly; loosening one waits \(TimeFormat.delay(hours: model.state.config.loosenDelayHours)).")
+                .emberBody(14.5)
+                .foregroundStyle(Ember.muted)
+                .padding(.top, 10)
+            Text("The Anchor is the other half, and it is next.")
                 .emberBody(14.5)
                 .foregroundStyle(Ember.muted)
                 .padding(.top, 10)
@@ -62,7 +85,7 @@ struct MacOnboardingView: View {
                         requesting = true
                         await model.requestNotifications()
                         requesting = false
-                        withAnimation(.snappy(duration: 0.25)) { step = .filter }
+                        withAnimation(.snappy(duration: 0.25)) { step = .anchor }
                     }
                 }
                 .buttonStyle(.glassProminent)
@@ -70,6 +93,47 @@ struct MacOnboardingView: View {
                 .controlSize(.large)
                 .disabled(requesting)
                 .keyboardShortcut(.defaultAction)
+            }
+            .padding(.top, 24)
+        }
+    }
+
+    /// The Anchor, in the terms this device is in: it can drop one, and it cannot lift one.
+    /// Nothing here needs setting up, so the pane is told rather than asked — the point is that
+    /// a person who came to Furlough for a one-tap lock finds out on the first run that the Mac
+    /// is in it, rather than a week later from a sheet.
+    private var anchor: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Eyebrow(text: "The other half", color: Ember.ember)
+            Text("One tap. Then the tag.")
+                .emberDisplay(36)
+                .foregroundStyle(Ember.cream)
+                .padding(.top, 6)
+            Text("The Anchor is a separate list you lock in one tap — or turn inside out, so every app on this Mac is closed and the list is what stays open. No delay applies, because anchoring only ever takes things away.")
+                .emberBody(14.5)
+                .foregroundStyle(Ember.muted)
+                .padding(.top, 14)
+            Text("This Mac has no NFC reader, so the key is your iPhone's: an anchor lifts when you hold the phone to a tag you paired beforehand. One Anchor covers both devices, and either one can drop it.")
+                .emberBody(14.5)
+                .foregroundStyle(Ember.muted)
+                .padding(.top, 10)
+            Text("There is nothing to pair here and nothing to switch on: both devices signed into your Apple Account is the whole of the link. This Mac has to have heard from the phone once before it will drop an anchor of its own, so that it never holds a lock with no key anywhere.")
+                .emberBody(12.5)
+                .foregroundStyle(Ember.faint)
+                .padding(.top, 14)
+            HStack(spacing: 10) {
+                Button("Continue") {
+                    withAnimation(.snappy(duration: 0.25)) { step = .filter }
+                }
+                .buttonStyle(.glassProminent)
+                .tint(Ember.ember)
+                .controlSize(.large)
+                .keyboardShortcut(.defaultAction)
+                Button("Back") {
+                    withAnimation(.snappy(duration: 0.25)) { step = .promise }
+                }
+                .buttonStyle(.glass)
+                .controlSize(.large)
             }
             .padding(.top, 24)
         }

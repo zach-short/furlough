@@ -383,13 +383,16 @@ struct EmptyHero: View {
                 .frame(width: 74, height: 98)
             VStack(alignment: .leading, spacing: 0) {
                 Eyebrow(text: "Furlough", color: Ember.amber)
-                Text("Nothing managed yet")
+                Text("Nothing held yet")
                     .emberDisplay(24)
                     .foregroundStyle(Ember.cream)
                     .padding(.top, 4)
-                Text("Tap + to choose apps and websites.")
+                // Both ways in, because there are two and only one of them used to be offered.
+                // The Anchor is the card directly under this one, so "below" is where it is.
+                Text("Tap + to give an app hours and a budget, or open the Anchor below to lock in one tap.")
                     .emberBody(11.5)
                     .foregroundStyle(Ember.muted)
+                    .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 6)
             }
             Spacer(minLength: 0)

@@ -23,42 +23,71 @@ const legend = [
       <div class="eyebrow amber">Furlough · for iPhone</div>
       <h1 class="display">No unblock button.</h1>
       <p class="lede">
-        A personal app blocker. Pick the apps and sites that eat your time, give each a daily budget and the hours it's allowed, and the only way to loosen a rule is to wait.
+        Two ways to put an app out of reach, and neither has a button that hands it back. Give apps a daily budget and the hours they're allowed, where the only way to loosen a rule is to wait. Or anchor the phone in one tap, and lift it only with an NFC tag you left somewhere else.
       </p>
       <div class="actions">
         <StoreButton />
         <a class="glass large" href="#how">How it works</a>
       </div>
-      <p class="fine faint">iOS 26 or later. Built on Apple's Screen Time API. Nothing collected.</p>
+      <p class="fine faint">iOS 26 or later, and a Mac app that locks with it. Built on Apple's Screen Time API. Nothing collected.</p>
     </div>
     <div class="hero-demo" data-reveal style="--d: .15s">
       <HeroPage />
     </div>
   </section>
 
-  <!-- The idea -->
+  <!-- The two halves. Furlough is both, and the page used to introduce only the first. -->
   <section class="wrap idea" id="how">
-    <div class="steps">
-      <div class="step card" data-reveal>
-        <div class="num mono">01</div>
-        <h3 class="display">Pick the apps</h3>
-        <p>Apps, categories and websites, from Apple's own picker. Furlough is never told which ones; iOS keeps that to itself.</p>
-      </div>
-      <div class="step card" data-reveal style="--d: .1s">
-        <div class="num mono">02</div>
-        <h3 class="display">Give each a rule</h3>
-        <p>A daily budget in minutes, and if you want, the hours it's allowed, the same every day or different per weekday.</p>
-      </div>
-      <div class="step card" data-reveal style="--d: .2s">
-        <div class="num mono">03</div>
-        <h3 class="display">Wait to loosen</h3>
-        <p>Tightening is instant. Anything that gives you back time waits a delay you set in advance, and you can cancel it while it does.</p>
+    <div class="halves">
+      <a class="half card" href="#budgets" data-reveal>
+        <canvas class="hmark" width="54" height="72" data-hourglass="open:0.45" data-still aria-hidden="true"></canvas>
+        <div class="eyebrow amber">The everyday half</div>
+        <h3 class="display">Rules</h3>
+        <p>Pick apps, categories and websites from Apple's own picker. Give each a daily budget in minutes and, if you want, the hours it's allowed. Tightening is instant; anything that gives you back time waits a delay you set in advance.</p>
+        <span class="more">Budgets, windows and the delay &rsaquo;</span>
+      </a>
+      <a class="half card" href="#anchor" data-reveal style="--d: .1s">
+        <svg class="hmark hmark-anchor" viewBox="0 0 80 100" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="40" cy="15" r="10.5"/><path d="M40 26v56M17 38h46M12 58c0 16 12 26 28 26s28-10 28-26"/><path d="M7 41L2 59l16 9zM73 41l5 18-16 9z" fill="currentColor" stroke-width="2"/></svg>
+        <div class="eyebrow ember">The other half</div>
+        <h3 class="display">The Anchor</h3>
+        <p>A second list you lock in one tap, or turn inside out so the whole phone goes. No delay, no timer, no code. The only thing that lifts it is holding your phone to an NFC tag you paired and left somewhere else.</p>
+        <span class="more">How the Anchor works &rsaquo;</span>
+      </a>
+    </div>
+    <p class="fine faint centered">Use either on its own. Neither one needs the other.</p>
+  </section>
+
+  <!-- The Anchor -->
+  <section class="wrap feature" id="anchor">
+    <div class="copy" data-reveal>
+      <div class="eyebrow ember">The Anchor</div>
+      <h2 class="display">Locked till you tap the tag.</h2>
+      <p class="lede">A second list of apps you lock in one tap, from anywhere. The only thing that unlocks it is holding your phone to an NFC tag you paired. Leave the tag at home and your phone stays anchored until you're back.</p>
+    </div>
+    <div class="demo" data-reveal style="--d: .1s">
+      <div class="card anchor">
+        <div class="ahero">
+          <canvas class="aglass" width="84" height="112" data-hourglass="anchored" aria-hidden="true"></canvas>
+          <div class="text">
+            <div class="eyebrow ember">Anchored · since 6:12 PM</div>
+            <div class="name">Anchor</div>
+            <div class="count mono" data-since>2:14:09</div>
+            <div class="sub">Instagram, Safari, YouTube +3</div>
+          </div>
+        </div>
+        <div class="aactions">
+          <span class="glass prominent">
+            <svg viewBox="0 0 80 100" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="40" cy="15" r="10.5"/><path d="M40 26v56M17 38h46M12 58c0 16 12 26 28 26s28-10 28-26"/><path d="M7 41L2 59l16 9zM73 41l5 18-16 9z" fill="currentColor" stroke-width="2"/></svg>
+            Anchor
+          </span>
+          <span class="glass">Unanchor with the tag</span>
+        </div>
       </div>
     </div>
   </section>
 
   <!-- Budgets -->
-  <section class="wrap feature" id="budgets">
+  <section class="wrap feature flip" id="budgets">
     <div class="copy" data-reveal>
       <div class="eyebrow amber">Budgets</div>
       <h2 class="display">Thirty minutes. Then it's gone.</h2>
@@ -82,7 +111,7 @@ const legend = [
   </section>
 
   <!-- Windows -->
-  <section class="wrap feature flip" id="windows">
+  <section class="wrap feature" id="windows">
     <div class="copy" data-reveal>
       <div class="eyebrow amber">Windows</div>
       <h2 class="display">Open only when you said so.</h2>
@@ -113,7 +142,7 @@ const legend = [
   </section>
 
   <!-- The delay -->
-  <section class="wrap feature" id="delay">
+  <section class="wrap feature flip" id="delay">
     <div class="copy" data-reveal>
       <div class="eyebrow pending">The delay</div>
       <h2 class="display">Loosening waits a day.</h2>
@@ -141,35 +170,6 @@ const legend = [
         </div>
         <div class="bar" aria-hidden="true"><div class="prog"></div></div>
         <div class="pactions"><span class="glass">Cancel</span></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- The Anchor -->
-  <section class="wrap feature flip" id="anchor">
-    <div class="copy" data-reveal>
-      <div class="eyebrow ember">The Anchor</div>
-      <h2 class="display">Locked till you tap the tag.</h2>
-      <p class="lede">A second list of apps you lock in one tap, from anywhere. The only thing that unlocks it is holding your phone to an NFC tag you paired. Leave the tag at home and your phone stays anchored until you're back.</p>
-    </div>
-    <div class="demo" data-reveal style="--d: .1s">
-      <div class="card anchor">
-        <div class="ahero">
-          <canvas class="aglass" width="84" height="112" data-hourglass="anchored" aria-hidden="true"></canvas>
-          <div class="text">
-            <div class="eyebrow ember">Anchored · since 6:12 PM</div>
-            <div class="name">Anchor</div>
-            <div class="count mono" data-since>2:14:09</div>
-            <div class="sub">Instagram, Safari, YouTube +3</div>
-          </div>
-        </div>
-        <div class="aactions">
-          <span class="glass prominent">
-            <svg viewBox="0 0 80 100" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="40" cy="15" r="10.5"/><path d="M40 26v56M17 38h46M12 58c0 16 12 26 28 26s28-10 28-26"/><path d="M7 41L2 59l16 9zM73 41l5 18-16 9z" fill="currentColor" stroke-width="2"/></svg>
-            Anchor
-          </span>
-          <span class="glass">Unanchor with the tag</span>
-        </div>
       </div>
     </div>
   </section>
@@ -278,14 +278,22 @@ const legend = [
     .hero-demo :global(.phone) { transform: none; animation: none; }
   }
 
-  /* Steps */
+  /* The two halves */
   .idea { scroll-margin-top: 80px; }
-  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-  .step { padding: 22px 22px 24px; }
-  .step .num { color: var(--amber); font-size: 12px; letter-spacing: 0.04em; }
-  .step h3 { margin-top: 12px; }
-  .step p { color: var(--muted); font-size: 14.5px; margin-top: 8px; }
-  @media (max-width: 760px) { .steps { grid-template-columns: 1fr; } }
+  .halves { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; align-items: stretch; }
+  .half { display: flex; flex-direction: column; padding: 26px 24px 24px; text-decoration: none; transition: border-color 0.2s var(--ease), transform 0.2s var(--ease); }
+  .half:hover { text-decoration: none; transform: translateY(-2px); border-color: rgba(255, 255, 255, 0.22); }
+  .hmark { width: 40px; height: 54px; margin-bottom: 16px; }
+  /* Not `.hmark.anchor`: the Anchor demo card below owns a bare `.anchor` rule whose
+     padding would collapse this SVG's viewport to nothing. */
+  .hmark-anchor { color: var(--ember); width: 42px; height: 52px; stroke: var(--ember); }
+  .half h3 { margin-top: 10px; font-size: clamp(24px, 3vw, 30px); color: var(--cream); }
+  .half p { color: var(--muted); font-size: 14.5px; margin-top: 10px; }
+  /* Pushed to the bottom edge so the two cards' links line up however the copy wraps. */
+  .half .more { margin-top: auto; padding-top: 16px; color: var(--amber); font-size: 13px; }
+  .half:last-child .more { color: var(--ember); }
+  .centered { text-align: center; margin-top: 18px; }
+  @media (max-width: 760px) { .halves { grid-template-columns: 1fr; } }
 
   /* Features */
   .feature, .legend, .twin, .download { scroll-margin-top: 72px; }

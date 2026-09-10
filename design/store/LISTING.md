@@ -42,28 +42,45 @@ the largest type on the product page.
 
 ## Subtitle
 
-**30 chars, exactly at the limit.**
+**PICK ONE.** Apple indexes the name and the subtitle together for search, so this field is
+where the terms go that the name does not carry.
+
+**A, recommended** (28 chars)
+
+```
+App blocker with an NFC lock
+```
+
+Buys three terms rather than one: **app blocker**, **NFC**, and **lock**. NFC is the term
+somebody looking for a tag-and-lock app actually types, and Furlough's Anchor is that product
+without the proprietary hardware — the audience it reaches is not reachable through "app
+blocker" alone.
+
+**B** (30 chars, exactly at the limit)
 
 ```
 App blocker. No unblock button
 ```
 
-Carries the search term and the one true thing in the same breath. No full stop at the end,
-because that character is the thirty-first.
+Carries the search term and the one true thing in the same breath. Recommended until 2026-09-09,
+when the listing was rebalanced so the Anchor reads as half the app rather than a bonus. The hook
+is still the description's first sentence and the site's headline; the argument for moving it out
+of the subtitle is that it buys no search term, and this field has only thirty characters to
+spend. No full stop at the end, because that character is the thirty-first.
 
 **Alternatives, both under the limit:**
 
-- `App and website blocker` (23): broader term coverage, loses the hook.
+- `App and website blocker` (23): broader term coverage, loses both hooks.
 - `No unblock button` (17): purest, worst for search.
 
 ---
 
 ## Promotional text
 
-**145 chars of 170.** Editable later without a new build.
+**160 chars of 170.** Editable later without a new build.
 
 ```
-An app blocker with no unblock button. Tightening a rule applies at once. Anything that gives you more time waits out a delay you set in advance.
+An app blocker with no unblock button. Rules only loosen after a delay you set in advance. The Anchor locks in one tap and lifts only for an NFC tag you paired.
 ```
 
 **Read this before pasting it.** Promotional text renders **above** the description, so it, not
@@ -76,51 +93,56 @@ description's own opening takes the position instead. That is a legitimate choic
 
 ## Description
 
-**3850 chars of 4000.** Plain text, no HTML, which is what Apple accepts.
+**3983 chars of 4000.** Plain text, no HTML, which is what Apple accepts.
 
-The first three rendered lines are the whole first paragraph: no unblock button, and rules that
-only loosen after a delay. Nothing above them is spent on setup.
+The first three rendered lines are the whole first paragraph, and it now names **both** halves —
+the timed rules and the Anchor — because a reader who stops after three lines used to leave
+believing Furlough was a Screen Time app with a bonus. Nothing above them is spent on setup.
 
 ```
-Furlough is an app blocker with no unblock button. Rules tighten the moment you save them and only loosen after a delay you set in advance. When you want back in, there is nothing to tap.
-
-Pick the apps and websites that eat your time, from Apple's own picker. Give each one a daily budget in minutes and, if you want, the hours it is allowed: eight to ten on school nights, later on weekends, different every day if you like. With no hours set, an app is open all day up to its budget. Outside its hours, or once the budget is spent, iOS shields it until it is due to open again.
-
-THE DELAY
-
-A shorter window, a smaller budget, a day taken off: those apply the moment you save. A longer window, a bigger budget, removing an app: those wait. The wait is a delay you chose beforehand, 24 hours by default. While it waits, the change sits in a list that shows the rule you have now against the one queued to replace it, and you can cancel it right up until it lands.
-
-Each app also gets a tier that scales its delay. Essential waits a quarter of the base, Useful the base itself, Idle twice, Hazard four times. Moving an app toward Essential shortens its future delays, which is itself a loosening, so that waits too.
-
-Blocking something you need is warned about before you save it, by name: blocking a messaging app stops codes texted to you from arriving, blocking an authenticator stops you signing in anywhere. Since there is no emergency unblock, that warning is the last cheap moment to change your mind.
-
-THE SHIELD
-
-The block screen says which app is closed and when it opens next. That is the whole conversation. No snooze, no code to type, no one more minute. While anything is shielded, iOS is told to refuse app deletion, so an app cannot be deleted to get out of a rule you set for yourself.
+Furlough is an app blocker with no unblock button, and two ways to use it. Rules give an app the hours it is allowed and a daily budget, and only ever loosen after a delay you set in advance. The Anchor locks a list, or the whole phone, in one tap, and lifts only when you hold the phone to an NFC tag you paired. Use either on its own.
 
 THE ANCHOR
 
-A second list of apps and sites you lock in one tap, from anywhere. The only thing that releases it is holding your iPhone to an NFC tag you paired beforehand. You supply the tag, and any NTAG sticker works. Leave it at home and your phone stays anchored until you are back. The Anchor is optional and nothing else in Furlough depends on it.
+One tap and everything on the list is gone. No timer to wait out, no code to type, no delay to serve: the only thing that releases it is a physical NFC tag held to the phone. You supply the tag — any NTAG sticker works, as does the one that came with another blocking product. Up to three pair at once, so a key can live wherever you do.
+
+Switch its scope and the list turns inside out: every app and website on the phone is shielded and the list becomes what stays open, starting from the apps you tiered Essential. It can drop on a schedule you set — ten at night on school nights, lifted by the tag in the morning — and it carries to Furlough for Mac, which drops one of its own that only your phone's tag will lift. While it is on, neither the list nor the tags can be edited, so no key can be cut from under the lock.
+
+RULES
+
+Pick the apps and websites that eat your time, from Apple's own picker. Give each one a daily budget in minutes and, if you want, the hours it is allowed: eight to ten on school nights, later on weekends, different every day if you like. Outside its hours, or once the budget is spent, iOS shields it until it is due to open again.
+
+THE DELAY
+
+A shorter window, a smaller budget, a day taken off: those apply the moment you save. A longer window, a bigger budget, removing an app: those wait out a delay you chose beforehand, 24 hours by default. While it waits, a list shows the rule you have now against the one queued to replace it, and you can cancel it right up until it lands.
+
+Each app gets a tier that scales its delay: Essential a quarter of the base, Useful the base, Idle twice, Hazard four times. Moving one toward Essential shortens its future delays, which is itself a loosening, so that waits too.
+
+Blocking something you need is warned about by name before you save: a messaging app stops texted codes arriving, an authenticator stops you signing in. With no emergency unblock, that is the last cheap moment to change your mind.
+
+THE SHIELD
+
+The block screen says which app is closed and when it opens next. That is the whole conversation: no snooze, no code, no one more minute. While anything is shielded, iOS refuses app deletion, so an app cannot be deleted to escape its own rule.
 
 WEBSITES
 
-A site picked from Apple's picker behaves like an app: it gets hours and a daily budget and wears Furlough's shield. A site typed in by name is handled by the system's own web filter instead. That kind gets hours but no daily budget, and iOS shows its own block page rather than Furlough's.
+A site picked from Apple's picker behaves like an app: hours, a daily budget, Furlough's own shield. A site typed in by name goes to the system's web filter instead: hours but no budget, and iOS's block page rather than Furlough's.
 
 THE WAY OUT
 
-There is one, it is Apple's, and it always works: Settings, Screen Time, Apps with Screen Time Access, Furlough, off. It lifts every shield at once and re-enables app deletion. Furlough cannot prevent it and documents it in the app on purpose. Everything else here assumes you would rather not.
+There is one, it is Apple's, and it always works: Settings, Screen Time, Apps with Screen Time Access, Furlough, off. It lifts every shield at once. Furlough cannot prevent it and documents it in the app on purpose. Everything else assumes you'd rather not.
 
 ALSO IN THE APP
 
-A home screen widget and a Live Activity counting down the open window. Notifications when a window opens, five minutes before it closes, five minutes before a budget runs out, and when it is gone. A seven-day grid for drawing hours across the week. One app's rule copied onto any number of others in a single save. A window that runs past midnight, kept as the one row you wrote. Setting the clock forward does not buy time: queued changes are held while the clock runs ahead of the device's own count, and released when it is set back.
+A home screen widget and a Live Activity counting down the open window. Notifications at every edge: a window opening, five minutes before it closes, a budget about to run out. A week of hours drawn on a grid, and one app's rule copied onto any number of others. Setting the clock forward does not buy time.
 
 PRIVACY
 
-No account, no server, no analytics, no third-party code. Apple's Screen Time API is built so Furlough is never told which apps you picked. Rules stay on the iPhone that made them and are not synced anywhere; the one thing that leaves it is the Anchor's state, to your own iCloud, so Furlough on your Mac locks with it.
+No account, no server, no analytics, no third-party code. Apple's Screen Time API is built so Furlough is never told which apps you picked. Rules stay on the iPhone that made them; the one thing that leaves it is the Anchor's state, to your own iCloud, so Furlough on your Mac locks with it.
 
 REQUIREMENTS
 
-iPhone, iOS 26 or later. Screen Time access, which iOS grants only to an adult Apple Account. Furlough asks for individual authorization: the person setting the rules and the person kept to them are the same person. It is not a parental control app.
+iPhone, iOS 26 or later. Screen Time access, which iOS grants only to an adult Apple Account. Furlough asks for individual authorization: the person setting the rules and the person kept to them are the same. It is not a parental control app.
 ```
 
 **What it deliberately does not say**, so nobody re-adds it later:
@@ -133,24 +155,37 @@ iPhone, iOS 26 or later. Screen Time access, which iOS grants only to an adult A
   see App Review notes.
 - The WEBSITES paragraph keeps the two kinds of website apart rather than flattening them. The
   typed kind genuinely has no daily budget and genuinely wears iOS's page, not Furlough's.
-- The Anchor paragraph says **you supply the tag**.
+- The Anchor paragraphs say **you supply the tag**, twice over: no hardware ships with this app
+  and nobody should arrive at a purchase expecting one.
+- The Anchor comes **second, right after the opening**, not fourth. Furlough is two products in
+  one, and the listing that buried the one-tap lock under three paragraphs of minute budgets was
+  selling only the half that every Screen Time wrapper already sells.
 
 ---
 
 ## Keywords
 
-**95 chars of 100.** Commas, no spaces after them, as Apple specifies.
+**93 chars of 100.** Commas, no spaces after them, as Apple specifies.
 
 ```
-screen time,focus,distraction,website,block,limit,restrict,habit,discipline,willpower,scrolling
+screen time,focus,distraction,website,block,limit,restrict,habit,scrolling,nfc,tag,lock,timer
 ```
+
+`discipline,willpower` were dropped on 2026-09-09 to make room for **nfc**, **tag** and **lock**.
+Those three are the terms somebody looking for a tag-and-lock blocker actually types, and they
+were entirely absent from a listing whose second half is exactly that product. `timer` picked up
+the remaining budget.
 
 No app name or company name appears here (guideline 2.3.7 forbids other people's, and Apple
 already indexes your own). "Furlough", "app", and "blocker" are all omitted on purpose: they are
 in the name and subtitle, which are indexed alongside keywords, so repeating them wastes budget.
 No competitor is named anywhere.
 
-**Swap available, 87 chars:** replace `discipline,willpower` with `self control` if you want the
+**Deliberately not here:** `brick`. It reads as a generic verb for locking a phone, but it is
+also a competing product's name, and 2.3.7 is not worth testing over one word. The reach it
+would buy is bought instead by `nfc` and `tag`, which that product's customers search too.
+
+**Swap available, 85 chars:** replace `habit,scrolling` with `self control` if you want the
 higher-intent phrase. It is a common English phrase rather than a trademark, but it is also the
 name of a long-standing blocker on other platforms, which is the only reason it is not the
 default.
@@ -159,13 +194,13 @@ default.
 
 ## What's New in This Version
 
-**461 chars of 4000.** Apple does not require this field for a first version. Fill it in anyway:
+**586 chars of 4000.** Apple does not require this field for a first version. Fill it in anyway:
 it is the only place the product page names what shipped.
 
 ```
 First release.
 
-Per-app daily budgets and allowed hours, set per weekday. Tightening applies at once; anything that gives you back time waits out a delay you set in advance and can be cancelled while it waits. Four utility tiers that scale that delay. The Anchor: a second list of apps locked in one tap and released only by an NFC tag you paired. A home screen widget, a Live Activity, and notifications at every edge. No account, no server, no unblock button.
+Two ways to put an app out of reach. The Anchor: a list — or the whole phone — locked in one tap and released only by an NFC tag you paired, on a schedule if you want one, and carried to Furlough for Mac. Rules: per-app daily budgets and allowed hours, set per weekday, where tightening applies at once and anything that gives you back time waits out a delay you set in advance and can be cancelled while it waits. Four utility tiers that scale that delay. A home screen widget, a Live Activity, and notifications at every edge. No account, no server, no unblock button.
 ```
 
 ---
@@ -480,15 +515,22 @@ it. Frames 9 and 10 now tell the Anchor story in sequence: the lock, then the wa
 | # | Eyebrow | Headline | Line under it | Status |
 |---|---|---|---|---|
 | 1 | The rule | No unblock button. | Pick the apps that eat your time. Furlough shields them when the time is gone. | unchanged |
-| 2 | Budgets | Fifty-five minutes. Then it's gone. | Give every app a daily budget. Spend it whenever you like. | reworded 2026-09-09 |
-| 3 | Windows | Open only when you said so. | Eight to ten on school nights. Later on weekends. Your call, once. | unchanged |
-| 4 | The week | Draw the whole week. | Seven days across, 24 hours down. Tap a day to change its hours, then give them to any other day. | added 2026-09-08 |
-| 5 | The delay | Loosening waits a day. | Tightening is instant. Loosening waits out the delay you set. You can cancel it while it waits. | rewritten 2026-09-08 |
-| 6 | Tiers | The worst apps wait longest. | Each app has a tier that scales its delay. Hazard waits four times as long, Essential a quarter. | added 2026-09-08 |
-| 7 | Websites | Websites, too. | Picked from Apple's picker, a site gets hours and a budget like an app. Typed in, it gets hours. | added 2026-09-08 |
-| 8 | The widget | One glass, every status. | The widget says what is open, what is blocked and what is anchored, in the same hourglass as every row. | reworded 2026-09-09 |
-| 9 | The Anchor | Locked till you tap the tag. | One tap locks. Only the NFC tag you paired releases it. Leave the tag at home. | rewritten 2026-09-08 |
+| 2 | The Anchor | Locked till you tap the tag. | One tap locks. Only the NFC tag you paired releases it. Leave the tag at home. | moved from 9 on 2026-09-09 |
+| 3 | Budgets | Fifty-five minutes. Then it's gone. | Give every app a daily budget. Spend it whenever you like. | reworded 2026-09-09 |
+| 4 | Windows | Open only when you said so. | Eight to ten on school nights. Later on weekends. Your call, once. | unchanged |
+| 5 | The week | Draw the whole week. | Seven days across, 24 hours down. Tap a day to change its hours, then give them to any other day. | added 2026-09-08 |
+| 6 | The delay | Loosening waits a day. | Tightening is instant. Loosening waits out the delay you set. You can cancel it while it waits. | rewritten 2026-09-08 |
+| 7 | Tiers | The worst apps wait longest. | Each app has a tier that scales its delay. Hazard waits four times as long, Essential a quarter. | added 2026-09-08 |
+| 8 | Websites | Websites, too. | Picked from Apple's picker, a site gets hours and a budget like an app. Typed in, it gets hours. | added 2026-09-08 |
+| 9 | The widget | One glass, every status. | The widget says what is open, what is blocked and what is anchored, in the same hourglass as every row. | reworded 2026-09-09 |
 | 10 | The shield | Nothing to tap but Close. | The block screen says which app is closed and what would open it. That is the whole conversation. | reworded 2026-09-09 |
+
+**The Anchor is second on purpose, as of 2026-09-09.** Most people see the first two or three
+images and never swipe. Ninth put the one-tap lock — the half of Furlough that no other Screen
+Time wrapper has — behind a swipe nobody makes, and left the visible three saying "another app
+blocker". The board's per-slot transforms stayed where they were and only the contents moved, so
+the fan is unchanged; `design/store/raw/NN.png` was renumbered to match, and the raw README lists
+the shots in the new order.
 
 **The set grew from six frames to ten on 2026-09-08**, which supersedes the six-frame count
 recorded under "Found while writing this" below. The six original frames kept their copy; four
