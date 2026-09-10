@@ -1133,6 +1133,36 @@ final class AppModel {
         return result
     }
 
+    /// What a tag held up on the Anchor screen turned out to be. The scan itself is one call;
+    /// which of the three things it means is `AnchorProfile.reading(of:)`.
+    enum TagRead: Equatable {
+        case read(AnchorProfile.TagReading)
+        /// The sheet closed with nothing read — cancelled, or the minute run out. Nothing to
+        /// say: a reader armed without being asked for is allowed to come to nothing.
+        case quiet
+        case failed(String)
+    }
+
+    /// Reads one tag and says what it would mean, without acting on it. The Anchor screen arms
+    /// this the moment it appears, so the only thing left is holding the tag up; what happens
+    /// then is the tag's to decide rather than a button's.
+    ///
+    /// Read against the store rather than `state`, because the scan is a long await and the
+    /// anchor can move under it — a schedule can drop it while the sheet is open.
+    func readTag(prompt: String) async -> TagRead {
+        let scanned: Data
+        do {
+            scanned = try await scanner.scan(prompt: prompt)
+        } catch {
+            if let scan = error as? TagScanner.ScanError, scan.isQuiet { return .quiet }
+            return .failed(error.localizedDescription)
+        }
+        return .read(SharedStore.load().config.anchor.reading(of: scanned))
+    }
+
+    /// Ends an armed read: the Anchor screen going away with its sheet still up.
+    func stopReadingTags() { scanner.cancel() }
+
     /// The only unblock in Furlough: scans a tag and, if it is one of the paired ones, lifts the
     /// anchor. Every paired tag is equal here — they are keys to one lock.
     func unanchorWithTag() async -> AnchorOutcome {
@@ -1142,6 +1172,14 @@ final class AppModel {
         } catch {
             return outcome(for: error)
         }
+        return weighAnchor(with: scanned)
+    }
+
+    /// Lifts the anchor with a tag already read. Split from the scan so the Anchor screen's one
+    /// armed session can end in this or in a pairing, decided by the tag rather than by which
+    /// button opened the sheet.
+    @discardableResult
+    func weighAnchor(with scanned: Data) -> AnchorOutcome {
         var current = SharedStore.load()
         guard current.config.anchor.isAnchored else { return .released }
         guard let matched = current.config.anchor.tag(matching: scanned) else {
@@ -1260,15 +1298,22 @@ final class AppModel {
     /// state can move under it. Adding a key does not queue behind the loosen delay: it can only
     /// be done with the anchor already off, where nothing is being held to wait for.
     func pairTag() async -> AnchorOutcome {
-        if let refusal = pairingRefusal(state.config.anchor) { return .failed(refusal) }
+        if let refusal = state.config.anchor.pairingRefusal { return .failed(refusal) }
         let scanned: Data
         do {
             scanned = try await scanner.scan(prompt: "Hold your iPhone to the tag you want to pair.")
         } catch {
             return outcome(for: error)
         }
+        return pair(identifier: scanned)
+    }
+
+    /// Pairs a tag already read. The cap and the lock are checked again here rather than only
+    /// at the scan, because the scan is a long await and the state can move under it.
+    @discardableResult
+    func pair(identifier scanned: Data) -> AnchorOutcome {
         var current = SharedStore.load()
-        if let refusal = pairingRefusal(current.config.anchor) { return .failed(refusal) }
+        if let refusal = current.config.anchor.pairingRefusal { return .failed(refusal) }
         // Scanning a tag already paired is a mistake worth naming, not a second identical key.
         if let already = current.config.anchor.tag(matching: scanned) {
             return .failed("That tag is already paired, as \(already.name).")
@@ -1279,15 +1324,6 @@ final class AppModel {
         SharedStore.log("paired an anchor tag: \(tag.name)")
         reload()
         return .paired(tag)
-    }
-
-    /// Why this anchor may not take another tag right now, in the words the alert uses.
-    private func pairingRefusal(_ anchor: AnchorProfile) -> String? {
-        if anchor.isAnchored { return "Unanchor first." }
-        if !anchor.canPairMore {
-            return "\(Furlough.maxAnchorTags) tags is the limit. Forget one to pair another."
-        }
-        return nil
     }
 
     /// Names a paired tag. The name is the whole reason more than one is usable, so an empty one
@@ -1318,7 +1354,7 @@ final class AppModel {
     }
 
     private func outcome(for error: any Error) -> AnchorOutcome {
-        if let scan = error as? TagScanner.ScanError, scan == .cancelled { return .cancelled }
+        if let scan = error as? TagScanner.ScanError, scan.isQuiet { return .cancelled }
         return .failed(error.localizedDescription)
     }
 

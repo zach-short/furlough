@@ -27,6 +27,18 @@ struct AnchorView: View {
     @State private var liftMinute = 18 * 60
     @State private var pickingLift = false
     @State private var editingSchedule = false
+    /// A reader is armed and Apple's sheet is up. Only ever seen after the fact, since that
+    /// sheet covers this screen while it is true, but it keeps a second one from being armed
+    /// under the first.
+    @State private var listening = false
+    /// A paired tag was held up with the anchor off, so the tag would lock rather than unlock.
+    /// Held here until it is confirmed: a tag that can also anchor is a tag you can shut
+    /// yourself out with by walking past the drawer it lives in.
+    @State private var droppingWithTag: PairedTag?
+    /// An unpaired tag was held up, waiting on the offer to keep it.
+    @State private var pairingScanned: Data?
+
+    @Environment(\.scenePhase) private var scenePhase
 
     private var anchor: AnchorProfile { model.state.config.anchor }
     private var anchorCaution: (text: String, isSevere: Bool)? { model.anchorCaution }
@@ -46,6 +58,12 @@ struct AnchorView: View {
                 }
                 if !anchor.isAnchored {
                     timedCard
+                        .padding(.top, 10)
+                }
+                // Under the timed card, because what a tag held up here does is the drop that
+                // card describes, and above everything that is only a setting.
+                if TagScanner.isAvailable {
+                    readerCard
                         .padding(.top, 10)
                 }
                 SectionLabel(text: "Scope")
@@ -79,6 +97,23 @@ struct AnchorView: View {
             .padding(.bottom, 48)
         }
         .background(EmberWall())
+        // Armed on sight, so that holding a tag up is the whole of it. Only when the scan has
+        // something to do though: someone who came here to choose apps has no tag in hand, and
+        // a system sheet in the face every time this screen opens would be the price of a
+        // convenience they are not using yet. The row arms it either way.
+        .task {
+            guard anchor.isAnchored || anchor.canAnchor else { return }
+            await listen()
+        }
+        // Core NFC reads for the foreground app only, and the sheet belongs to this screen.
+        // Leaving with it still up would hand the reader to nobody.
+        .onDisappear { model.stopReadingTags() }
+        // Backgrounding only. A system sheet over the app can take the scene to `.inactive`,
+        // and Apple's scan sheet is one — tearing down there would cancel the reader the
+        // moment it was armed. iOS ends the session on its own when the app truly leaves.
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background { model.stopReadingTags() }
+        }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) {
@@ -133,6 +168,39 @@ struct AnchorView: View {
             Text(switchingTo == .everythingExcept
                 ? "The list becomes what stays open, starting from every app you tiered Essential. What it holds now is not carried over."
                 : "The list becomes what is held, starting empty. What you already block is offered first.")
+        }
+        // A tag held up with the anchor off would lock, not unlock. The tag has never been able
+        // to do that before, so it says what it is about to take away and waits to be told yes.
+        .confirmationDialog(
+            "Anchor with \(droppingWithTag?.name ?? "this tag")?",
+            isPresented: Binding(get: { droppingWithTag != nil }, set: { if !$0 { droppingWithTag = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button("Anchor now", role: anchorCaution?.isSevere == true ? .destructive : nil) {
+                droppingWithTag = nil
+                dropWithTag()
+            }
+            Button("Not yet", role: .cancel) { droppingWithTag = nil }
+        } message: {
+            Text(tagDropMessage)
+        }
+        // The offer and the name in one, rather than a dialog handing off to an alert — the
+        // second of two presentations asked for in the same breath is the one SwiftUI drops.
+        // Naming is the confirmation anyway: what you call it is where you will leave it.
+        .alert(
+            anchor.isPaired ? "Pair this as another key?" : "Pair this tag?",
+            isPresented: Binding(get: { pairingScanned != nil }, set: { if !$0 { pairingScanned = nil } })
+        ) {
+            TextField("Kitchen drawer", text: $draftName)
+            Button("Pair it") {
+                if let scanned = pairingScanned { keep(scanned) }
+                pairingScanned = nil
+            }
+            Button("Not this one", role: .cancel) { pairingScanned = nil }
+        } message: {
+            Text(anchor.isPaired
+                ? "Furlough does not know this tag. Every paired tag lifts the anchor on its own, so this is a key at a second place — \(tagCount) used. Name it for the place it will live in."
+                : "Furlough does not know this tag. Pair it and it becomes the key: nothing else lifts an anchor once it is down. Name it for the place it will live in.")
         }
         .confirmationDialog(
             "Forget this tag?",
@@ -369,6 +437,133 @@ struct AnchorView: View {
         guard let until = timedUntil else { return "Only the tag lifts it." }
         let day = Calendar.current.isDateInToday(until) ? "today" : "tomorrow"
         return "Anchor lifts \(day) at \(TimeFormat.clock(until)), or sooner with the tag."
+    }
+
+    /// The screen's live gesture: one reader, armed, whose outcome the tag decides. Tapping it
+    /// arms it again — after the cancel, or after the minute Core NFC gives a session runs out.
+    private var readerCard: some View {
+        Button {
+            Task { await listen() }
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "wave.3.right")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(readerIsUseful ? Ember.ember : Ember.muted)
+                    .frame(width: 22)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(readerTitle)
+                        .emberBody(13, .semibold)
+                        .foregroundStyle(Ember.cream)
+                    Text(readerLine)
+                        .emberBody(11.5)
+                        .foregroundStyle(Ember.muted)
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer(minLength: 8)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 11)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(listening)
+        .emberCard()
+    }
+
+    /// Whether a tag held up right now would do the thing this screen is for, rather than be
+    /// turned into a key. Only the colour of the glyph turns on it.
+    private var readerIsUseful: Bool { anchor.isAnchored || anchor.canAnchor }
+
+    private var readerTitle: String {
+        if listening { return "Listening" }
+        if anchor.isAnchored { return "Hold your tag up to weigh anchor" }
+        if !anchor.isPaired { return "Hold a tag up to pair it" }
+        if !anchor.hasSomethingToHold { return "Choose what the anchor holds" }
+        return "Hold your tag up to anchor"
+    }
+
+    private var readerLine: String {
+        if listening { return "Hold the top of your phone to the tag." }
+        if anchor.isAnchored {
+            return "Any paired tag lifts it. An unknown tag is refused while the anchor is down."
+        }
+        if !anchor.isPaired {
+            return "Any NTAG sticker, or the tag that came with another blocking product."
+        }
+        if !anchor.hasSomethingToHold {
+            return "A key with nothing to lock. Choose apps above and the tag anchors from here."
+        }
+        return "A paired tag anchors, and asks first. A tag Furlough does not know is offered as another key."
+    }
+
+    /// What a tag-drop would take away, and how it comes back. The caution the Anchor button
+    /// shows, where there is one, plus the lift the timed card is set to — the two halves of
+    /// what someone is agreeing to when the tag becomes the lock as well as the key.
+    private var tagDropMessage: String {
+        let lift = timedUntil.map { "It lifts at \(TimeFormat.clock($0)), or sooner with a tag." }
+            ?? "Nothing but a tag lifts it."
+        if let caution = anchorCaution { return "\(caution.text) \(lift)" }
+        return "\(anchor.heldDescription) goes behind the tag. \(lift)"
+    }
+
+    /// Arms one reader and acts on what it reads. Never in a loop: Core NFC stops listening
+    /// after about a minute, and a sheet that came back on its own would be a sheet nobody
+    /// asked for — the card is there to ask again.
+    private func listen() async {
+        guard TagScanner.isAvailable, !listening else { return }
+        listening = true
+        defer { listening = false }
+        switch await model.readTag(prompt: readerPrompt) {
+        case .read(let reading): act(on: reading)
+        case .failed(let why): message = why
+        // Cancelled, or the minute run out. An answer, not a fault.
+        case .quiet: break
+        }
+    }
+
+    /// What Apple's sheet says while it waits. Written from the state the reader was armed in,
+    /// which is the state the person holding the tag is looking at.
+    private var readerPrompt: String {
+        if anchor.isAnchored { return "Hold your iPhone to a paired tag to weigh anchor." }
+        if !anchor.isPaired { return "Hold your iPhone to the tag you want to pair." }
+        return "Hold your iPhone to a tag. A paired one anchors; a new one is offered as another key."
+    }
+
+    /// The one branch. Releasing goes straight through — it is what a tag has always done, and
+    /// it was just held up to say so. The other two ask first.
+    private func act(on reading: AnchorProfile.TagReading) {
+        switch reading {
+        case .weigh(let tag):
+            if case .failed(let why) = model.weighAnchor(with: tag.id) { message = why }
+        case .drop(let tag):
+            droppingWithTag = tag
+        case .pairFirst(let scanned), .pairAnother(let scanned):
+            draftName = ""
+            pairingScanned = scanned
+        case .refused(let why):
+            message = why
+        }
+    }
+
+    /// The drop a tag asked for, on the terms the screen is showing: the timed card's lift if
+    /// it is on, the tag alone if it is not — the same drop its own Anchor button makes.
+    private func dropWithTag() {
+        switch model.anchor(until: timedUntil) {
+        case .failed(let reason): message = reason
+        default: break
+        }
+    }
+
+    /// Keeps a tag that was held up and not recognised, under the name typed in the same
+    /// breath. An empty name is left as the placeholder the model assigned — `renameTag`
+    /// ignores it — so a tag is never nameless, only unhelpfully named.
+    private func keep(_ scanned: Data) {
+        switch model.pair(identifier: scanned) {
+        case .paired(let tag): model.renameTag(id: tag.id, to: draftName)
+        case .failed(let reason): message = reason
+        default: break
+        }
     }
 
     private var sortedSchedules: [AnchorSchedule] {
