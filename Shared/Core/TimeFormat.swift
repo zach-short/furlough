@@ -27,10 +27,21 @@ enum TimeFormat {
     static func shortMinute(_ minute: Int, calendar: Calendar = .current) -> String {
         let wrapped = minute % Furlough.minutesPerDay
         let date = Policy.date(atMinute: wrapped, of: .now, calendar: calendar)
-        if wrapped % 60 == 0 {
+        // A whole hour drops its minutes: "8 PM" rather than "8:00 PM", which is how it is said.
+        // Never on a 24-hour clock, where the same style leaves "09" — a number, not a time, and
+        // "Open 09 to 22" is not a sentence anybody writes.
+        if wrapped % 60 == 0, !isTwentyFourHour(calendar) {
             return date.formatted(style(calendar).hour(.defaultDigits(amPM: .abbreviated)))
         }
         return date.formatted(style(calendar).hour(.defaultDigits(amPM: .abbreviated)).minute())
+    }
+
+    /// Whether this calendar's locale counts the hours to 23 rather than to 12.
+    private static func isTwentyFourHour(_ calendar: Calendar) -> Bool {
+        switch (calendar.locale ?? .autoupdatingCurrent).hourCycle {
+        case .zeroToTwentyThree, .oneToTwentyFour: true
+        default: false
+        }
     }
 
     /// A time of day read off a date, for the places that already hold one rather than a

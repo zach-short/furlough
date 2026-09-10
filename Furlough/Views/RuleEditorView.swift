@@ -33,6 +33,14 @@ struct RuleEditorView: View {
     /// an answer — see `answeredTier`.
     @State private var tierTouched = false
     @State private var confirmBlockEssential = false
+    /// The first-rule card handed over: "Change it" was tapped, and the full editor is on
+    /// screen holding the rule the card was showing. One-way for this visit — the card was an
+    /// offer, and a person who has started editing has already answered it.
+    @State private var changing = false
+    /// The suggestion currently sitting in the fields, so the offer inside the editor knows not
+    /// to offer what is already there. Set by `applySuggestion` however the fields were filled:
+    /// from the card's "Change it", or from the offer itself.
+    @State private var appliedSuggestion: RuleSuggestion.Draft?
     /// Set when the companion nudge is taken up: the flow below opens the guide or the picker.
     @State private var addRequest: AddRequest?
     /// What linking, merging or unlinking a half just did, shown in an alert. The editor stays
@@ -124,6 +132,19 @@ struct RuleEditorView: View {
     private var ruleSuggestion: RuleSuggestion.Draft? {
         guard let target, pendingRule == nil else { return nil }
         return RuleSuggestion.suggestion(for: target, chosen: answeredTier)
+    }
+
+    /// The suggestion the editor opens on instead of its own sections, or nil for the ordinary
+    /// full editor.
+    ///
+    /// The second step of the Rules guide is "give the first one a rule", and this is what that
+    /// step lands on: one card saying the rule Furlough would write, a Save, and a way to write
+    /// it yourself. Only ever on a target with no rule at all — an editor that opened on a card
+    /// over a rule someone is living under would be a second way to edit that rule, which is the
+    /// thing `RuleSuggestion` is not allowed to be.
+    private var firstRule: RuleSuggestion.Draft? {
+        guard !changing, let target, !target.kind.isCategory else { return nil }
+        return ruleSuggestion
     }
 
     /// The tier the rule suggestion answers to, or nil while nobody has answered. "Useful" from
@@ -225,39 +246,19 @@ struct RuleEditorView: View {
                 if let target {
                     header(target)
                     undoCard(target)
-                    nudge(target)
-                    nicknameCard
-                    if let name = nicknameOffer {
-                        SuggestionOffer(text: "Call it \(name)") { nickname = name }
-                            .padding(.top, 8)
-                            .padding(.horizontal, 8)
-                    }
-                    if !target.kind.isCategory {
-                        ruleSection(target)
+                    // The first rule is one card and a Save; everything else waits behind
+                    // "Change it". Both branches keep the header above and the way out below,
+                    // so the screen is the same screen either way.
+                    if let suggestion = firstRule {
+                        firstRulePane(target, suggestion)
                     } else {
-                        Footnote(text: "Categories are always blocked. Apps inside them that you give windows to are excepted.")
-                            .padding(.top, 10)
-                        ProminentButton(title: "Save nickname") { save() }
-                            .disabled(!hasChanges)
-                            .padding(.top, 14)
+                        fullEditor(target)
                     }
                     GhostButton(title: "Remove from Furlough") { confirmRemove = true }
                         .padding(.top, 4)
                     Footnote(text: removalNote(target), alignment: .center)
                 } else {
-                    VStack(spacing: 8) {
-                        Image(systemName: "checkmark.circle")
-                            .font(.system(size: 34, weight: .medium))
-                            .foregroundStyle(Ember.moss)
-                        Text("Removed")
-                            .emberDisplay(24)
-                            .foregroundStyle(Ember.cream)
-                        Text("This item is no longer managed.")
-                            .emberBody(13)
-                            .foregroundStyle(Ember.muted)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 80)
+                    removedPane
                 }
             }
             .padding(.horizontal, 16)
@@ -341,6 +342,82 @@ struct RuleEditorView: View {
 
     // MARK: The editor, in sections
 
+    /// Everything under the header once there is a rule to edit — or once somebody has asked to
+    /// write one themselves. Lifted out of `body` with the pane beside it, for the reason the
+    /// sections below are lifted out of it: this body is one expression to the type checker and
+    /// it has been over its budget before.
+    @ViewBuilder
+    private func fullEditor(_ target: Target) -> some View {
+        nudge(target)
+        nicknameCard
+        if let name = nicknameOffer {
+            SuggestionOffer(text: "Call it \(name)") { nickname = name }
+                .padding(.top, 8)
+                .padding(.horizontal, 8)
+        }
+        if !target.kind.isCategory {
+            ruleSection(target)
+        } else {
+            Footnote(text: "Categories are always blocked. Apps inside them that you give windows to are excepted.")
+                .padding(.top, 10)
+            ProminentButton(title: "Save nickname") { save() }
+                .disabled(!hasChanges)
+                .padding(.top, 14)
+        }
+    }
+
+    /// The rule Furlough would write, and two ways to answer it.
+    ///
+    /// A first rule is the one edit where the app has something to say before it is asked: it
+    /// knows what this app is, and the whole editor underneath is a lot of screen for a person
+    /// whose real answer is "yes, that". So Save takes the suggestion exactly as stated, and
+    /// "Change it" puts the same rule in the fields and gets out of the way.
+    @ViewBuilder
+    private func firstRulePane(_ target: Target, _ suggestion: RuleSuggestion.Draft) -> some View {
+        SectionLabel(text: "The first rule")
+        VStack(alignment: .leading, spacing: 4) {
+            Text(RuleSuggestion.statement(suggestion, counted: target.isCounted))
+                .emberDisplaySmall(16)
+                .foregroundStyle(Ember.cream)
+                .fixedSize(horizontal: false, vertical: true)
+            if let tier = RuleSuggestion.tier(for: target, chosen: answeredTier) {
+                Text(RuleSuggestion.because(tier))
+                    .emberBody(12)
+                    .foregroundStyle(Ember.muted)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 14)
+        .emberCard()
+        ProminentButton(title: "Save this rule") { saveFirstRule(suggestion) }
+            .padding(.top, 14)
+        GhostButton(title: "Change it", color: Ember.muted) { beginChanging(suggestion) }
+            .padding(.top, 2)
+        Footnote(text: Self.firstRuleNote, alignment: .center)
+    }
+
+    /// The fact that belongs to this moment rather than to an onboarding pane three screens
+    /// back: adding an app did nothing, and this is the button that starts it.
+    private static let firstRuleNote = "Adding an app enforces nothing on its own. Saving its first rule is what starts it."
+
+    /// What is shown when the target this editor was opened on has been removed.
+    private var removedPane: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "checkmark.circle")
+                .font(.system(size: 34, weight: .medium))
+                .foregroundStyle(Ember.moss)
+            Text("Removed")
+                .emberDisplay(24)
+                .foregroundStyle(Ember.cream)
+            Text("This item is no longer managed.")
+                .emberBody(13)
+                .foregroundStyle(Ember.muted)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 80)
+    }
+
     /// The whole of a rule: hours, budget, the other halves, the tier and Save.
     ///
     /// One expression per section rather than one for the screen. SwiftUI's result builder makes
@@ -350,7 +427,10 @@ struct RuleEditorView: View {
     private func ruleSection(_ target: Target) -> some View {
         SectionLabel(text: "Allowed windows")
         windowsCard
-        if let draft = ruleSuggestion {
+        // Not while the fields already hold it: after "Change it" the offer would be pointing at
+        // what is on screen. It comes back the moment it would say something different — moving
+        // the tier chips changes what Furlough would suggest, and that is worth offering again.
+        if let draft = ruleSuggestion, draft != appliedSuggestion {
             SuggestionOffer(text: RuleSuggestion.offer(draft, counted: target.isCounted)) {
                 applySuggestion(draft)
             }
@@ -794,6 +874,7 @@ struct RuleEditorView: View {
     /// what the slider held, because a slider that has never been moved is holding a default
     /// rather than an answer.
     private func applySuggestion(_ draft: RuleSuggestion.Draft) {
+        appliedSuggestion = draft
         withAnimation(.snappy) {
             budget = draft.budgetMinutes
             budgetByDay = false
@@ -803,6 +884,24 @@ struct RuleEditorView: View {
                 byDay = !drafts.allSatisfy { $0.window.days == .all }
             }
         }
+    }
+
+    /// The card's Save: exactly what it said, through the same door every other save goes
+    /// through. The suggestion goes into the fields first rather than being written straight
+    /// out, so what is saved is the draft the editor holds — the one thing that can be true of
+    /// both buttons on this pane — and so the editor is showing that rule if the save comes
+    /// back with something to say.
+    private func saveFirstRule(_ suggestion: RuleSuggestion.Draft) {
+        applySuggestion(suggestion)
+        attemptSave()
+    }
+
+    /// "Change it": the same rule, in the fields, with the editor around it. The suggestion is
+    /// applied rather than discarded because *it* is what is being changed — an editor that
+    /// opened on empty fields would have thrown away the thing the card was about.
+    private func beginChanging(_ suggestion: RuleSuggestion.Draft) {
+        applySuggestion(suggestion)
+        withAnimation(.snappy) { changing = true }
     }
 
     /// Replaces the draft with another target's rule. Nothing is saved until Save.

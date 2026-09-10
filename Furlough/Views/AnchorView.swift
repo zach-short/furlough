@@ -19,18 +19,13 @@ struct AnchorPage: View {
     /// The rules sheet was left for Apple's picker, which opens once the sheet is gone.
     @State private var pickerAfterSheet = false
     @State private var message: String?
-    @State private var forgetting: PairedTag?
-    @State private var renaming: PairedTag?
+    /// The name typed into the pairing alert, for a tag the reader found and did not know.
     @State private var draftName = ""
-    /// The scope tapped while the list still holds something, waiting on a confirmation:
-    /// switching starts the list again, and a curated list is worth a second look first.
-    @State private var switchingTo: AnchorProfile.Scope?
     /// A drop made from here lifts by itself at `liftMinute`. Off, the tag is the only way
     /// back, as ever. Not stored: it is how the next drop is made, not a setting.
     @State private var liftsBySelf = false
     @State private var liftMinute = 18 * 60
     @State private var pickingLift = false
-    @State private var editingSchedule = false
     /// A reader is armed and Apple's sheet is up. Only ever seen after the fact, since that
     /// sheet covers this screen while it is true, but it keeps a second one from being armed
     /// under the first.
@@ -100,7 +95,6 @@ struct AnchorPage: View {
     /// and it bears on the third step.
     private var guidePane: some View {
         VStack(alignment: .leading, spacing: 0) {
-            header
             if !model.cloudAvailable {
                 CautionBanner(text: AnchorSync.cutOffWarning, isSevere: true)
                     .padding(.bottom, 6)
@@ -138,53 +132,25 @@ struct AnchorPage: View {
         }
     }
 
+    /// One action, one list, four rows.
+    ///
+    /// It used to be eleven blocks and four footnotes, with the two a person actually taps
+    /// sixth and ninth. What is left is the drop at the top, what it holds under that, and one
+    /// card of rows for everything that is a setting rather than an act — each opening on the
+    /// screen where its own footnote is the first sentence.
+    ///
+    /// No banners. The one about the anchor holding something worth keeping lives on the
+    /// button, which already stops to ask before it drops; the one about iCloud is the Your Mac
+    /// row's status, where the thing it is about is.
     private var setUpPane: some View {
         VStack(alignment: .leading, spacing: 0) {
-            header
             stateCard
-            // Above the timed card and everything under it, because it is about where the
-            // anchor reaches rather than about anything on this screen's lists. Severe: a
-            // tag that cannot release a locked Mac is the one failure Furlough has no
-            // other way out of.
-            if !model.cloudAvailable {
-                CautionBanner(text: AnchorSync.cutOffWarning, isSevere: true)
-                    .padding(.top, 12)
-            }
-            if !anchor.isAnchored {
-                timedCard
-                    .padding(.top, 10)
-            }
-            // Under the timed card, because what a tag held up here does is the drop that
-            // card describes, and above everything that is only a setting.
-            if TagScanner.isAvailable {
-                readerCard
-                    .padding(.top, 10)
-            }
-            SectionLabel(text: "Scope")
-            scopeCard
-            SectionLabel(text: anchor.anchorsEverything ? "Stays open" : "Apps")
+            SectionLabel(text: anchor.anchorsEverything ? "Stays open" : "Held")
             appsCard
-            if let caution = anchorCaution {
-                CautionBanner(text: caution.text, isSevere: caution.isSevere)
-                    .padding(.top, 12)
-            }
+            SectionLabel(text: "Settings")
+            settingsCard
             Footnote(text: listFootnote)
                 .padding(.top, 8)
-            SectionLabel(text: "Schedule")
-            scheduleCard
-            Footnote(text: scheduleFootnote)
-                .padding(.top, 8)
-            SectionLabel(text: "Tags")
-            tagCard
-            Footnote(text: tagFootnote)
-                .padding(.top, 8)
-            // Nothing else on this phone says the Anchor reaches the Mac at all, and there
-            // is no screen where the link could be found, because there is nothing to set
-            // up. So the Anchor screen — the only screen it is about — carries the way in.
-            SectionLabel(text: "Your Mac")
-            linkCard
-            devicesCard
-                .padding(.top, 10)
         }
     }
 
@@ -207,9 +173,6 @@ struct AnchorPage: View {
             .sheet(isPresented: $pickingLift) {
                 TimePickerSheet(title: "Lifts at", minute: $liftMinute)
             }
-            .sheet(isPresented: $editingSchedule) {
-                AnchorScheduleSheet(schedules: anchor.schedules)
-            }
             .sheet(isPresented: $showFromRules, onDismiss: {
                 guard pickerAfterSheet else { return }
                 pickerAfterSheet = false
@@ -225,21 +188,6 @@ struct AnchorPage: View {
                 Button("OK") { message = nil }
             } message: {
                 Text(message ?? "")
-            }
-            .confirmationDialog(
-                "Start the list again?",
-                isPresented: Binding(get: { switchingTo != nil }, set: { if !$0 { switchingTo = nil } }),
-                titleVisibility: .visible
-            ) {
-                Button(switchingTo == .everythingExcept ? "Anchor everything except a list" : "Anchor chosen apps only") {
-                    if let scope = switchingTo { model.setAnchorScope(scope) }
-                    switchingTo = nil
-                }
-                Button("Keep it as it is", role: .cancel) { switchingTo = nil }
-            } message: {
-                Text(switchingTo == .everythingExcept
-                    ? "The list becomes what stays open, starting from every app you tiered Essential. What it holds now is not carried over."
-                    : "The list becomes what is held, starting empty. What you already block is offered first.")
             }
             // A tag held up with the anchor off would lock, not unlock. The tag has never been able
             // to do that before, so it says what it is about to take away and waits to be told yes.
@@ -274,39 +222,6 @@ struct AnchorPage: View {
                     ? "Furlough does not know this tag. Every paired tag lifts the anchor on its own, so this is a key at a second place — \(tagCount) used. Name it for the place it will live in."
                     : "Furlough does not know this tag. Pair it and it becomes the key: nothing else lifts an anchor once it is down. Name it for the place it will live in.")
             }
-            .confirmationDialog(
-                "Forget this tag?",
-                isPresented: Binding(get: { forgetting != nil }, set: { if !$0 { forgetting = nil } }),
-                titleVisibility: .visible
-            ) {
-                Button("Forget \(forgetting?.name ?? "tag")", role: .destructive) {
-                    if let tag = forgetting { model.unpairTag(id: tag.id) }
-                    forgetting = nil
-                }
-                Button("Keep it", role: .cancel) { forgetting = nil }
-            } message: {
-                Text(anchor.tags.count == 1
-                    ? "This is the last key. Anchoring is refused until you pair another."
-                    : "The other tags still release the anchor.")
-            }
-            .alert(
-                "Name this tag",
-                isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })
-            ) {
-                TextField("Home", text: $draftName)
-                Button("Save") {
-                    if let tag = renaming { model.renameTag(id: tag.id, to: draftName) }
-                    renaming = nil
-                }
-                Button("Cancel", role: .cancel) { renaming = nil }
-            } message: {
-                Text("Name it for the place it lives in, so you know which key you are looking for.")
-            }
-    }
-
-    private var tagFootnote: String {
-        let cap = "Up to \(Furlough.maxAnchorTags), so a key can live at each place you do."
-        return "Anchoring works without a tag. Weighing anchor needs one, so keep every tag somewhere that makes you think. \(cap)"
     }
 
     private var listFootnote: String {
@@ -319,140 +234,132 @@ struct AnchorPage: View {
         }
     }
 
-    /// How far the anchor reaches: the list, or the whole phone but the list. Locked while
-    /// anchored along with everything else. The list does not survive a switch (see
-    /// `AppModel.setAnchorScope`), so a list that holds anything asks first.
-    /// Whether the two devices are actually talking, and a button that asks. The Mac draws the
-    /// same card from the same `LinkStatus`, so both ends describe one link in one set of words.
-    private var linkCard: some View {
-        let status = model.link
-        return VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(status.isLinked ? Ember.moss : (status.cloudAvailable ? Ember.amber : Ember.ember))
-                    .frame(width: 8, height: 8)
-                Text(status.headline)
-                    .emberDisplaySmall(14)
-                    .foregroundStyle(Ember.cream)
+    /// Everything about the drop itself, in one card: where the anchor stands, the button that
+    /// changes it, whether the next drop lifts by itself, and what a tag held up right now would
+    /// do. Three rows that are all the same act, rather than three cards down the page.
+    ///
+    /// The mark is here rather than in a header of its own. The page used to open on an anchor
+    /// glyph beside the word "Anchor", which is what the segment in the toolbar already says;
+    /// what the glyph is actually good for is saying at a glance whether the anchor is down, and
+    /// that is this card's whole job.
+    private var stateCard: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                AnchorGlyph(isAnchored: anchor.isAnchored, size: 44)
+                VStack(alignment: .leading, spacing: 3) {
+                    Eyebrow(text: anchor.isAnchored ? "Anchored" : "Free", color: anchor.isAnchored ? Ember.ember : Ember.moss)
+                    Text(stateLine)
+                        .emberBody(13)
+                        .foregroundStyle(Ember.cream)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 Spacer(minLength: 8)
-                Button("Check now") { model.checkLink() }
-                    .buttonStyle(.plain)
-                    .emberBody(12.5, .semibold)
-                    .foregroundStyle(Ember.ember)
+                AnchorToggleButton(until: timedUntil)
             }
-            .padding(.horizontal, 14)
-            .padding(.top, 13)
-            Text(status.detail(now: model.clock.now))
-                .emberBody(12)
-                .foregroundStyle(Ember.muted)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 14)
-                .padding(.top, 6)
-                .padding(.bottom, 13)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
+            if !anchor.isAnchored {
+                CardDivider()
+                timedRow
+            }
+            // Last, because it is the one row that is not a control: it says what the phone is
+            // already listening for, and tapping it only starts listening again.
+            if TagScanner.isAvailable {
+                CardDivider()
+                readerRow
+            }
         }
         .emberCard()
-        // Asked when the screen opens, so the status is about now rather than about whenever
-        // the app last happened to hear something.
+    }
+
+    /// Schedule, Tags, Scope and Your Mac: the four things about the anchor that are settings
+    /// rather than acts. Each was a card and a footnote on this page; each is a row and a screen
+    /// now, and the footnote is the first sentence you read when the screen opens.
+    private var settingsCard: some View {
+        VStack(spacing: 0) {
+            settingsRow(title: "Schedule", detail: scheduleSummary) { AnchorScheduleScreen() }
+            CardDivider()
+            settingsRow(title: "Tags", detail: tagSummary) { AnchorTagsScreen() }
+            CardDivider()
+            settingsRow(title: "Scope", detail: scopeSummary) { AnchorScopeScreen() }
+            CardDivider()
+            // The dot, and the iCloud warning folded into the words beside it. It used to be a
+            // severe banner at the top of the page; it belongs on the one row it is about, which
+            // is also the only row that can be wrong without anybody having done anything.
+            settingsRow(title: "Your Mac", detail: macSummary, dot: macDot) { AnchorMacScreen() }
+        }
+        .emberCard()
+        // Asked when the page opens, so the row is about now rather than about whenever the app
+        // last happened to hear something.
         .task { model.checkLink() }
     }
 
-    /// The row into Help's page about the two devices. Pushed onto the stack the Anchor screen
-    /// is already on rather than raised as a sheet, so it reads as one step further in and Back
-    /// returns here — the same row Help's own hub draws, because that is what it is.
-    private var devicesCard: some View {
-        NavigationLink { DevicesHelp() } label: {
-            HelpRow(title: "Across your devices", detail: "What the Anchor carries to your Mac") {
-                HelpTile(symbol: "laptopcomputer.and.iphone")
-            }
-        }
-        .buttonStyle(.plain)
-        .emberCard()
-    }
-
-    private var scopeCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 6) {
-                scopeChip(.chosen, "Chosen apps")
-                scopeChip(.everythingExcept, "Everything except")
+    private func settingsRow<Screen: View>(
+        title: String,
+        detail: String,
+        dot: Color? = nil,
+        @ViewBuilder screen: @escaping () -> Screen
+    ) -> some View {
+        NavigationLink { screen() } label: {
+            HStack(spacing: 10) {
+                if let dot {
+                    Circle()
+                        .fill(dot)
+                        .frame(width: 8, height: 8)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .emberDisplaySmall(13.5)
+                        .foregroundStyle(Ember.cream)
+                    Text(detail)
+                        .emberBody(11.5)
+                        .foregroundStyle(Ember.muted)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Ember.faint)
             }
             .padding(.horizontal, 12)
-            .padding(.top, 12)
-            Text(scopeSummary)
-                .emberBody(12)
-                .foregroundStyle(Ember.muted)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 12)
-                .padding(.top, 10)
-                .padding(.bottom, 14)
+            .padding(.vertical, 11)
+            .contentShape(Rectangle())
         }
-        .emberCard()
+        .buttonStyle(.plain)
+    }
+
+    /// "10:00 PM weekdays · lifts 7:00 AM". More than one drop time is a count: a row has space
+    /// for a fact, and the screen behind it has space for the list.
+    private var scheduleSummary: String {
+        let all = anchor.schedules.sorted { ($0.minuteOfDay, $0.days.rawValue) < ($1.minuteOfDay, $1.days.rawValue) }
+        guard let first = all.first else { return "No drop times" }
+        guard all.count == 1 else { return "\(all.count) drop times" }
+        let lift = first.liftMinuteOfDay.map { "lifts \(TimeFormat.minute($0))" } ?? "until the tag"
+        return "\(TimeFormat.minute(first.minuteOfDay)) \(TimeFormat.daysInline(first.days)) · \(lift)"
+    }
+
+    /// "Kitchen drawer · 1 of 3". The first key's name, because that is what a person is looking
+    /// for when they open this, and the count because the cap is worth knowing before the drawer.
+    private var tagSummary: String {
+        guard let first = anchor.tags.first else { return "None paired" }
+        return "\(first.name) · \(tagCount)"
     }
 
     private var scopeSummary: String {
-        switch anchor.scope {
-        case .chosen: "Only what is listed is held. Everything else keeps its own rules."
-        case .everythingExcept: "Every app and website is held. Only what is listed stays open."
-        }
+        anchor.anchorsEverything ? "Everything except a list" : "Chosen apps"
     }
 
-    private func scopeChip(_ scope: AnchorProfile.Scope, _ title: String) -> some View {
-        let isOn = anchor.scope == scope
-        return Button {
-            guard !isOn else { return }
-            if anchor.kinds.isEmpty { model.setAnchorScope(scope) } else { switchingTo = scope }
-        } label: {
-            Text(title)
-                .emberBody(12, .semibold)
-                .foregroundStyle(isOn ? Ember.ground : Ember.muted)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(isOn ? Ember.amber : Color.white.opacity(0.06))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(isOn ? .clear : Ember.cardBorder, lineWidth: 1)
-                )
-        }
-        .buttonStyle(.plain)
-        .disabled(anchor.isAnchored)
-        .accessibilityAddTraits(isOn ? .isSelected : [])
+    private var macSummary: String {
+        let status = model.link
+        guard status.cloudAvailable else { return "Not linked · iCloud Drive is off" }
+        return status.headline
     }
 
-    private var header: some View {
-        HStack(spacing: 12) {
-            AnchorGlyph(isAnchored: anchor.isAnchored, size: 48)
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Anchor")
-                    .emberDisplay(19)
-                    .foregroundStyle(Ember.cream)
-                Text("One tap to lock. The tag to unlock.")
-                    .emberBody(11.5)
-                    .foregroundStyle(Ember.muted)
-            }
-        }
-        .padding(.horizontal, 6)
-        .padding(.top, 4)
-        .padding(.bottom, 14)
-    }
-
-    private var stateCard: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                Eyebrow(text: anchor.isAnchored ? "Anchored" : "Free", color: anchor.isAnchored ? Ember.ember : Ember.moss)
-                Text(stateLine)
-                    .emberBody(13)
-                    .foregroundStyle(Ember.cream)
-            }
-            Spacer(minLength: 8)
-            AnchorToggleButton(until: timedUntil)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 12)
-        .emberCard()
+    private var macDot: Color {
+        let status = model.link
+        if status.isLinked { return Ember.moss }
+        return status.cloudAvailable ? Ember.amber : Ember.ember
     }
 
     private var stateLine: String {
@@ -479,8 +386,10 @@ struct AnchorPage: View {
         return Policy.date(atMinute: liftMinute, of: tomorrow)
     }
 
-    /// Whether the next drop lifts by itself. Off, the tag is the only way back, as ever.
-    private var timedCard: some View {
+    /// Whether the next drop lifts by itself. Off, the tag is the only way back, as ever. A row
+    /// inside the state card rather than a card of its own: it is a term of the drop the button
+    /// above it makes, and reads as one only while it is beside that button.
+    private var timedRow: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 12) {
                 Text("Lifts by itself")
@@ -502,7 +411,6 @@ struct AnchorPage: View {
                 .padding(.horizontal, 12)
                 .padding(.bottom, 10)
         }
-        .emberCard()
     }
 
     private var timedLine: String {
@@ -511,9 +419,9 @@ struct AnchorPage: View {
         return "Anchor lifts \(day) at \(TimeFormat.clock(until)), or sooner with the tag."
     }
 
-    /// The screen's live gesture: one reader, armed, whose outcome the tag decides. Tapping it
+    /// The page's live gesture: one reader, armed, whose outcome the tag decides. Tapping it
     /// arms it again — after the cancel, or after the minute Core NFC gives a session runs out.
-    private var readerCard: some View {
+    private var readerRow: some View {
         Button {
             Task { await listen() }
         } label: {
@@ -540,7 +448,6 @@ struct AnchorPage: View {
         }
         .buttonStyle(.plain)
         .disabled(listening)
-        .emberCard()
     }
 
     /// Whether a tag held up right now would do the thing this screen is for, rather than be
@@ -638,84 +545,9 @@ struct AnchorPage: View {
         }
     }
 
-    private var sortedSchedules: [AnchorSchedule] {
-        anchor.schedules.sorted { ($0.minuteOfDay, $0.days.rawValue) < ($1.minuteOfDay, $1.days.rawValue) }
-    }
-
-    /// The drop times, and the way to change them while the anchor is off. Edited as one draft
-    /// in `AnchorScheduleSheet`, because the whole set is classified at once.
-    private var scheduleCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if anchor.schedules.isEmpty {
-                Text("No scheduled drops.")
-                    .emberBody(13)
-                    .foregroundStyle(Ember.muted)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 11)
-            } else {
-                ForEach(Array(sortedSchedules.enumerated()), id: \.element.id) { index, schedule in
-                    if index > 0 { CardDivider() }
-                    scheduleRow(schedule)
-                }
-            }
-            if !anchor.isAnchored {
-                CardDivider()
-                Button {
-                    editingSchedule = true
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: anchor.schedules.isEmpty ? "plus" : "clock")
-                            .font(.system(size: 12, weight: .bold))
-                        Text(anchor.schedules.isEmpty ? "Add a drop time" : "Change the schedule")
-                            .emberBody(13, .semibold)
-                    }
-                    .foregroundStyle(Ember.ember)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 11)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .emberCard()
-    }
-
-    private func scheduleRow(_ schedule: AnchorSchedule) -> some View {
-        HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("\(TimeFormat.minute(schedule.minuteOfDay)) · \(TimeFormat.days(schedule.days))")
-                    .emberBody(13)
-                    .monospacedDigit()
-                    .foregroundStyle(Ember.cream)
-                Text(schedule.liftMinuteOfDay.map { "Lifts at \(TimeFormat.minute($0))" } ?? "Until the tag")
-                    .emberBody(11.5)
-                    .foregroundStyle(Ember.muted)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-    }
-
-    private var scheduleFootnote: String {
-        if anchor.isAnchored { return "Unanchor with your tag to change the schedule." }
-        let rule = "Adding a time applies at once. Removing or shortening one waits out the delay, and can be cancelled from Pending until then."
-        guard let next = anchor.schedules.nextDrop(after: model.clock.now) else {
-            return "The anchor drops by itself at each time, on its days. \(rule)"
-        }
-        return "Next drop \(nextDropWords(next)). \(rule)"
-    }
-
-    /// "today at 10:00 PM", "tomorrow at 10:00 PM", "Monday at 10:00 PM".
-    private func nextDropWords(_ date: Date) -> String {
-        let calendar = Calendar.current
-        let time = TimeFormat.clock(date)
-        if calendar.isDateInToday(date) { return "today at \(time)" }
-        if calendar.isDateInTomorrow(date) { return "tomorrow at \(time)" }
-        return "\(date.formatted(.dateTime.weekday(.wide))) at \(time)"
-    }
-
+    /// What the anchor holds, as a grid of icons, and the one way to change it. The list itself
+    /// is the page's second card; everything about *how* the list is read — the scope it is a
+    /// list under — is a row in the third.
     private var appsCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             if anchor.kinds.isEmpty {
@@ -755,103 +587,6 @@ struct AnchorPage: View {
         .emberCard()
     }
 
-    private var tagCard: some View {
-        VStack(spacing: 0) {
-            if anchor.tags.isEmpty {
-                HStack {
-                    Text("None paired")
-                        .emberBody(13)
-                        .foregroundStyle(Ember.muted)
-                    Spacer(minLength: 0)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 11)
-            } else {
-                ForEach(Array(anchor.tags.enumerated()), id: \.element.id) { index, tag in
-                    if index > 0 { CardDivider() }
-                    tagRow(tag)
-                }
-            }
-            if !anchor.isAnchored {
-                CardDivider()
-                if anchor.canPairMore {
-                    Button {
-                        Task { await pair() }
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "wave.3.right")
-                                .font(.system(size: 12, weight: .bold))
-                            Text(anchor.isPaired ? "Pair another tag" : "Pair a tag")
-                                .emberBody(13, .semibold)
-                            Spacer(minLength: 8)
-                            Text(tagCount)
-                                .emberBody(11.5)
-                                .monospacedDigit()
-                                .foregroundStyle(Ember.muted)
-                        }
-                        .foregroundStyle(Ember.ember)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 11)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                } else {
-                    HStack {
-                        Text("\(tagCount) · forget one to pair another")
-                            .emberBody(11.5)
-                            .foregroundStyle(Ember.muted)
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 11)
-                }
-            }
-        }
-        .emberCard()
-    }
-
-    /// One key: what it is called, what it is, and the way to change either. Both controls are
-    /// gone while anchored, like the app list above them.
-    private func tagRow(_ tag: PairedTag) -> some View {
-        HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(tag.name)
-                    .emberBody(13)
-                    .foregroundStyle(Ember.cream)
-                    .lineLimit(1)
-                Text(tagLabel(tag.id))
-                    .emberBody(11)
-                    .monospacedDigit()
-                    .foregroundStyle(Ember.muted)
-            }
-            Spacer(minLength: 8)
-            if !anchor.isAnchored {
-                Button {
-                    draftName = tag.name
-                    renaming = tag
-                } label: {
-                    Text("Rename")
-                        .emberBody(12, .semibold)
-                        .foregroundStyle(Ember.ember)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                Button {
-                    forgetting = tag
-                } label: {
-                    Text("Forget")
-                        .emberBody(12, .semibold)
-                        .foregroundStyle(Ember.muted)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 11)
-    }
-
     private var tagCount: String { "\(anchor.tags.count) of \(Furlough.maxAnchorTags)" }
 
     private var chooseTitle: String {
@@ -881,23 +616,6 @@ struct AnchorPage: View {
     private func openPicker() {
         selection = model.anchorSelection
         showPicker = true
-    }
-
-    private func pair() async {
-        switch await model.pairTag() {
-        // Straight into the name: an identifier's last four digits are not a place, and the
-        // scan is done, so nothing is waiting on the typing.
-        case .paired(let tag):
-            draftName = ""
-            renaming = tag
-        case .failed(let reason): message = reason
-        default: break
-        }
-    }
-
-    private func tagLabel(_ id: Data) -> String {
-        let hex = id.map { String(format: "%02X", $0) }.joined()
-        return "…\(hex.suffix(4))"
     }
 }
 

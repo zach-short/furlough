@@ -192,6 +192,36 @@ struct RuleSuggestionOfferTests {
         let idle = RuleSuggestion.draft(for: .idle) ?? .init(budgetMinutes: 0)
         #expect(RuleSuggestion.offer(idle, calendar: cal) == "Furlough would start it at 1 hour a day")
     }
+
+    @Test("The card states the rule rather than the act of taking it")
+    func statementReadsAsARule() {
+        let hazard = RuleSuggestion.draft(for: .hazard) ?? .init(budgetMinutes: 0)
+        #expect(plainSpaces(RuleSuggestion.statement(hazard, calendar: cal))
+            == "Open 9 AM to 10 PM, 30 min a day.")
+        // Nothing counts a typed site's minutes, so the hours are the whole rule and no figure
+        // is promised that nothing would enforce.
+        #expect(plainSpaces(RuleSuggestion.statement(hazard, counted: false, calendar: cal))
+            == "Open 9 AM to 10 PM.")
+        let idle = RuleSuggestion.draft(for: .idle) ?? .init(budgetMinutes: 0)
+        #expect(RuleSuggestion.statement(idle, calendar: cal) == "Open at any hour, 1 hour a day.")
+    }
+
+    @Test("A 24-hour clock still reads as a time")
+    func statementOnATwentyFourHourClock() {
+        var british = fixedCalendar()
+        british.locale = Locale(identifier: "en_GB")
+        let hazard = RuleSuggestion.draft(for: .hazard) ?? .init(budgetMinutes: 0)
+        // "Open 09 to 22." is a pair of numbers, not a sentence. A clock that counts to 23 keeps
+        // its minutes on a whole hour, so the card reads as hours either way.
+        #expect(plainSpaces(RuleSuggestion.statement(hazard, calendar: british))
+            == "Open 09:00 to 22:00, 30 min a day.")
+    }
+
+    @Test("The reason names the tier in the word the chips use")
+    func becauseNamesTheTier() {
+        #expect(RuleSuggestion.because(.hazard) == "Furlough would call this Hazard.")
+        #expect(RuleSuggestion.because(.idle) == "Furlough would call this Idle.")
+    }
 }
 
 @Suite("The name Furlough already knows")

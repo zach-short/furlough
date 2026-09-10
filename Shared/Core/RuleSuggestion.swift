@@ -115,6 +115,31 @@ enum RuleSuggestion {
         return "Furlough would start it at \(parts.joined(separator: ", "))"
     }
 
+    /// The same suggestion as the rule itself, for the card the editor opens on when a target
+    /// has no rule yet.
+    ///
+    /// `offer` is a nudge inside an editor somebody is already reading: it says what tapping
+    /// would put in the fields. This is read before there is an editor at all, so it states the
+    /// rule rather than the act of taking it — hours first, because that is what a person
+    /// pictures, then the budget those hours are spent out of.
+    static func statement(_ draft: Draft, counted: Bool = true, calendar: Calendar = .current) -> String {
+        let budget = "\(TimeFormat.budget(draft.budgetMinutes)) a day"
+        guard let window = draft.window else { return "Open at any hour, \(budget)." }
+        let hours = "Open \(TimeFormat.span(window, calendar: calendar))"
+        // Nothing counts a typed site's minutes, so on one of those the hours are the whole rule
+        // and a figure here would be a promise the phone cannot keep.
+        return counted ? "\(hours), \(budget)." : "\(hours)."
+    }
+
+    /// Why those numbers, in the word the editor's own chips use for it.
+    ///
+    /// Conditional on purpose: nothing has been written, and the tier is Furlough's reading of
+    /// what this thing is rather than an answer anyone gave. The picker under the editor is
+    /// where it is argued with.
+    static func because(_ tier: Utility) -> String {
+        "Furlough would call this \(tier.label)."
+    }
+
     // MARK: Exceptions
 
     /// One app's refinement of its tier's default, and the tier it was written against.
