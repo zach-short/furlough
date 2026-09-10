@@ -47,193 +47,261 @@ struct AnchorPage: View {
     private var anchor: AnchorProfile { model.state.config.anchor }
     private var anchorCaution: (text: String, isSevere: Bool)? { model.anchorCaution }
 
+    /// The three steps this half is set up in. See `HalfGuide`.
+    private var guide: HalfGuide {
+        HalfGuide.anchor(config: model.state.config, finished: model.finishedGuides.contains(.anchor))
+    }
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                header
-                stateCard
-                // Above the timed card and everything under it, because it is about where the
-                // anchor reaches rather than about anything on this screen's lists. Severe: a
-                // tag that cannot release a locked Mac is the one failure Furlough has no
-                // other way out of.
-                if !model.cloudAvailable {
-                    CautionBanner(text: AnchorSync.cutOffWarning, isSevere: true)
-                        .padding(.top, 12)
+        withPresentations(
+            ScrollView {
+                Group {
+                    // Before it is set up this page is the checklist and nothing else. Eleven blocks
+                    // with the two that matter sixth and ninth is what it used to be, and it is the
+                    // thing this guide exists to replace rather than to sit on top of.
+                    if guide.isRunning { guidePane } else { setUpPane }
                 }
-                if !anchor.isAnchored {
-                    timedCard
-                        .padding(.top, 10)
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 48)
+            }
+            .background(EmberWall())
+            // No title of its own: Home's segment names this page, and a second "Anchor" in the
+            // same bar would be the app saying it twice.
+            //
+            // Armed on sight, so that holding a tag up is the whole of it. Only when this is the
+            // page in front, and only when the scan has something to do: someone who came here to
+            // choose apps has no tag in hand, and a system sheet in the face every time this page
+            // arrives would be the price of a convenience they are not using yet. The guide's first
+            // step and the reader row both arm it by hand.
+            //
+            // Keyed on `isCurrent` so a swipe onto this page arms it, the way arriving used to.
+            .task(id: isCurrent) {
+                guard isCurrent, anchor.isAnchored || anchor.canAnchor else { return }
+                await listen()
+            }
+            // Core NFC reads for the foreground app only, and the sheet belongs to this page.
+            // Swiping to the other half with it still up would hand the reader to nobody.
+            .onChange(of: isCurrent) { _, current in
+                if !current { model.stopReadingTags() }
+            }
+            .onDisappear { model.stopReadingTags() }
+            // Backgrounding only. A system sheet over the app can take the scene to `.inactive`,
+            // and Apple's scan sheet is one — tearing down there would cancel the reader the
+            // moment it was armed. iOS ends the session on its own when the app truly leaves.
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .background { model.stopReadingTags() }
+            }
+        )
+    }
+
+    /// Pair a tag, choose what it holds, drop it. The severe banner outranks even this: a tag
+    /// that cannot release a locked Mac is the one failure Furlough has no other way out of,
+    /// and it bears on the third step.
+    private var guidePane: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            header
+            if !model.cloudAvailable {
+                CautionBanner(text: AnchorSync.cutOffWarning, isSevere: true)
+                    .padding(.bottom, 6)
+            }
+            GuideCard(guide: guide) { guideButton(at: guide.live) }
+        }
+    }
+
+    @ViewBuilder
+    private func guideButton(at live: Int?) -> some View {
+        switch live {
+        case 0:
+            if TagScanner.isAvailable {
+                GuideButton(
+                    title: listening ? "Listening…" : "Hold a tag up",
+                    systemImage: "wave.3.right"
+                ) {
+                    Task { await listen() }
                 }
-                // Under the timed card, because what a tag held up here does is the drop that
-                // card describes, and above everything that is only a setting.
-                if TagScanner.isAvailable {
-                    readerCard
-                        .padding(.top, 10)
-                }
-                SectionLabel(text: "Scope")
-                scopeCard
-                SectionLabel(text: anchor.anchorsEverything ? "Stays open" : "Apps")
-                appsCard
-                if let caution = anchorCaution {
-                    CautionBanner(text: caution.text, isSevere: caution.isSevere)
-                        .padding(.top, 12)
-                }
-                Footnote(text: listFootnote)
-                    .padding(.top, 8)
-                SectionLabel(text: "Schedule")
-                scheduleCard
-                Footnote(text: scheduleFootnote)
-                    .padding(.top, 8)
-                SectionLabel(text: "Tags")
-                tagCard
-                Footnote(text: tagFootnote)
-                    .padding(.top, 8)
-                // Nothing else on this phone says the Anchor reaches the Mac at all, and there
-                // is no screen where the link could be found, because there is nothing to set
-                // up. So the Anchor screen — the only screen it is about — carries the way in.
-                SectionLabel(text: "Your Mac")
-                linkCard
-                devicesCard
+                .disabled(listening)
+            } else {
+                Text("This iPhone has no reader Furlough can use, so a tag cannot be paired on it.")
+                    .emberBody(11.5)
+                    .foregroundStyle(Ember.ember)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        case 1:
+            GuideButton(title: "Choose apps", systemImage: "plus") { chooseApps() }
+        case 2:
+            // The real one, so the first drop goes through exactly what every later drop does,
+            // caution dialog and all.
+            AnchorToggleButton()
+        default:
+            EmptyView()
+        }
+    }
+
+    private var setUpPane: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            header
+            stateCard
+            // Above the timed card and everything under it, because it is about where the
+            // anchor reaches rather than about anything on this screen's lists. Severe: a
+            // tag that cannot release a locked Mac is the one failure Furlough has no
+            // other way out of.
+            if !model.cloudAvailable {
+                CautionBanner(text: AnchorSync.cutOffWarning, isSevere: true)
+                    .padding(.top, 12)
+            }
+            if !anchor.isAnchored {
+                timedCard
                     .padding(.top, 10)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 48)
-        }
-        .background(EmberWall())
-        // Armed on sight, so that holding a tag up is the whole of it. Only when this is the
-        // page in front, and only when the scan has something to do: someone who came here to
-        // choose apps has no tag in hand, and a system sheet in the face every time this page
-        // arrives would be the price of a convenience they are not using yet. The row arms it
-        // either way.
-        //
-        // Keyed on `isCurrent` so a swipe onto this page arms it, the way arriving used to.
-        .task(id: isCurrent) {
-            guard isCurrent, anchor.isAnchored || anchor.canAnchor else { return }
-            await listen()
-        }
-        // Core NFC reads for the foreground app only, and the sheet belongs to this page.
-        // Swiping to the other half with it still up would hand the reader to nobody.
-        .onChange(of: isCurrent) { _, current in
-            if !current { model.stopReadingTags() }
-        }
-        .onDisappear { model.stopReadingTags() }
-        // Backgrounding only. A system sheet over the app can take the scene to `.inactive`,
-        // and Apple's scan sheet is one — tearing down there would cancel the reader the
-        // moment it was armed. iOS ends the session on its own when the app truly leaves.
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .background { model.stopReadingTags() }
-        }
-        // No title of its own: Home's segment names this page, and a second "Anchor" in the
-        // same bar would be the app saying it twice.
-        .familyActivityPicker(
-            headerText: anchor.anchorsEverything ? "Choose what stays open while anchored" : "Choose what the anchor holds",
-            footerText: anchor.anchorsEverything ? "Picking a category keeps every app in it open." : "Picking a category locks every app in it.",
-            isPresented: $showPicker,
-            selection: $selection
-        )
-        .onChange(of: showPicker) { _, presented in
-            guard !presented else { return }
-            model.setAnchorSelection(selection)
-        }
-        .sheet(isPresented: $pickingLift) {
-            TimePickerSheet(title: "Lifts at", minute: $liftMinute)
-        }
-        .sheet(isPresented: $editingSchedule) {
-            AnchorScheduleSheet(schedules: anchor.schedules)
-        }
-        .sheet(isPresented: $showFromRules, onDismiss: {
-            guard pickerAfterSheet else { return }
-            pickerAfterSheet = false
-            openPicker()
-        }) {
-            AnchorFromRulesSheet(candidates: model.state.config.anchorCandidates) { ids in
-                model.addToAnchor(targetIDs: ids)
-            } onPickOthers: {
-                pickerAfterSheet = true
+            // Under the timed card, because what a tag held up here does is the drop that
+            // card describes, and above everything that is only a setting.
+            if TagScanner.isAvailable {
+                readerCard
+                    .padding(.top, 10)
             }
-        }
-        .alert("Anchor", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
-            Button("OK") { message = nil }
-        } message: {
-            Text(message ?? "")
-        }
-        .confirmationDialog(
-            "Start the list again?",
-            isPresented: Binding(get: { switchingTo != nil }, set: { if !$0 { switchingTo = nil } }),
-            titleVisibility: .visible
-        ) {
-            Button(switchingTo == .everythingExcept ? "Anchor everything except a list" : "Anchor chosen apps only") {
-                if let scope = switchingTo { model.setAnchorScope(scope) }
-                switchingTo = nil
+            SectionLabel(text: "Scope")
+            scopeCard
+            SectionLabel(text: anchor.anchorsEverything ? "Stays open" : "Apps")
+            appsCard
+            if let caution = anchorCaution {
+                CautionBanner(text: caution.text, isSevere: caution.isSevere)
+                    .padding(.top, 12)
             }
-            Button("Keep it as it is", role: .cancel) { switchingTo = nil }
-        } message: {
-            Text(switchingTo == .everythingExcept
-                ? "The list becomes what stays open, starting from every app you tiered Essential. What it holds now is not carried over."
-                : "The list becomes what is held, starting empty. What you already block is offered first.")
+            Footnote(text: listFootnote)
+                .padding(.top, 8)
+            SectionLabel(text: "Schedule")
+            scheduleCard
+            Footnote(text: scheduleFootnote)
+                .padding(.top, 8)
+            SectionLabel(text: "Tags")
+            tagCard
+            Footnote(text: tagFootnote)
+                .padding(.top, 8)
+            // Nothing else on this phone says the Anchor reaches the Mac at all, and there
+            // is no screen where the link could be found, because there is nothing to set
+            // up. So the Anchor screen — the only screen it is about — carries the way in.
+            SectionLabel(text: "Your Mac")
+            linkCard
+            devicesCard
+                .padding(.top, 10)
         }
-        // A tag held up with the anchor off would lock, not unlock. The tag has never been able
-        // to do that before, so it says what it is about to take away and waits to be told yes.
-        .confirmationDialog(
-            "Anchor with \(droppingWithTag?.name ?? "this tag")?",
-            isPresented: Binding(get: { droppingWithTag != nil }, set: { if !$0 { droppingWithTag = nil } }),
-            titleVisibility: .visible
-        ) {
-            Button("Anchor now", role: anchorCaution?.isSevere == true ? .destructive : nil) {
-                droppingWithTag = nil
-                dropWithTag()
+    }
+
+    /// Every sheet, alert and dialog this page can raise, gathered here because the body is
+    /// at the type-checker's limit without them, and because both panes raise the same ones:
+    /// pairing a tag from the guide's first step ends in the naming alert exactly as the tag
+    /// row does.
+    private func withPresentations(_ content: some View) -> some View {
+        content
+            .familyActivityPicker(
+                headerText: anchor.anchorsEverything ? "Choose what stays open while anchored" : "Choose what the anchor holds",
+                footerText: anchor.anchorsEverything ? "Picking a category keeps every app in it open." : "Picking a category locks every app in it.",
+                isPresented: $showPicker,
+                selection: $selection
+            )
+            .onChange(of: showPicker) { _, presented in
+                guard !presented else { return }
+                model.setAnchorSelection(selection)
             }
-            Button("Not yet", role: .cancel) { droppingWithTag = nil }
-        } message: {
-            Text(tagDropMessage)
-        }
-        // The offer and the name in one, rather than a dialog handing off to an alert — the
-        // second of two presentations asked for in the same breath is the one SwiftUI drops.
-        // Naming is the confirmation anyway: what you call it is where you will leave it.
-        .alert(
-            anchor.isPaired ? "Pair this as another key?" : "Pair this tag?",
-            isPresented: Binding(get: { pairingScanned != nil }, set: { if !$0 { pairingScanned = nil } })
-        ) {
-            TextField("Kitchen drawer", text: $draftName)
-            Button("Pair it") {
-                if let scanned = pairingScanned { keep(scanned) }
-                pairingScanned = nil
+            .sheet(isPresented: $pickingLift) {
+                TimePickerSheet(title: "Lifts at", minute: $liftMinute)
             }
-            Button("Not this one", role: .cancel) { pairingScanned = nil }
-        } message: {
-            Text(anchor.isPaired
-                ? "Furlough does not know this tag. Every paired tag lifts the anchor on its own, so this is a key at a second place — \(tagCount) used. Name it for the place it will live in."
-                : "Furlough does not know this tag. Pair it and it becomes the key: nothing else lifts an anchor once it is down. Name it for the place it will live in.")
-        }
-        .confirmationDialog(
-            "Forget this tag?",
-            isPresented: Binding(get: { forgetting != nil }, set: { if !$0 { forgetting = nil } }),
-            titleVisibility: .visible
-        ) {
-            Button("Forget \(forgetting?.name ?? "tag")", role: .destructive) {
-                if let tag = forgetting { model.unpairTag(id: tag.id) }
-                forgetting = nil
+            .sheet(isPresented: $editingSchedule) {
+                AnchorScheduleSheet(schedules: anchor.schedules)
             }
-            Button("Keep it", role: .cancel) { forgetting = nil }
-        } message: {
-            Text(anchor.tags.count == 1
-                ? "This is the last key. Anchoring is refused until you pair another."
-                : "The other tags still release the anchor.")
-        }
-        .alert(
-            "Name this tag",
-            isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })
-        ) {
-            TextField("Home", text: $draftName)
-            Button("Save") {
-                if let tag = renaming { model.renameTag(id: tag.id, to: draftName) }
-                renaming = nil
+            .sheet(isPresented: $showFromRules, onDismiss: {
+                guard pickerAfterSheet else { return }
+                pickerAfterSheet = false
+                openPicker()
+            }) {
+                AnchorFromRulesSheet(candidates: model.state.config.anchorCandidates) { ids in
+                    model.addToAnchor(targetIDs: ids)
+                } onPickOthers: {
+                    pickerAfterSheet = true
+                }
             }
-            Button("Cancel", role: .cancel) { renaming = nil }
-        } message: {
-            Text("Name it for the place it lives in, so you know which key you are looking for.")
-        }
+            .alert("Anchor", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
+                Button("OK") { message = nil }
+            } message: {
+                Text(message ?? "")
+            }
+            .confirmationDialog(
+                "Start the list again?",
+                isPresented: Binding(get: { switchingTo != nil }, set: { if !$0 { switchingTo = nil } }),
+                titleVisibility: .visible
+            ) {
+                Button(switchingTo == .everythingExcept ? "Anchor everything except a list" : "Anchor chosen apps only") {
+                    if let scope = switchingTo { model.setAnchorScope(scope) }
+                    switchingTo = nil
+                }
+                Button("Keep it as it is", role: .cancel) { switchingTo = nil }
+            } message: {
+                Text(switchingTo == .everythingExcept
+                    ? "The list becomes what stays open, starting from every app you tiered Essential. What it holds now is not carried over."
+                    : "The list becomes what is held, starting empty. What you already block is offered first.")
+            }
+            // A tag held up with the anchor off would lock, not unlock. The tag has never been able
+            // to do that before, so it says what it is about to take away and waits to be told yes.
+            .confirmationDialog(
+                "Anchor with \(droppingWithTag?.name ?? "this tag")?",
+                isPresented: Binding(get: { droppingWithTag != nil }, set: { if !$0 { droppingWithTag = nil } }),
+                titleVisibility: .visible
+            ) {
+                Button("Anchor now", role: anchorCaution?.isSevere == true ? .destructive : nil) {
+                    droppingWithTag = nil
+                    dropWithTag()
+                }
+                Button("Not yet", role: .cancel) { droppingWithTag = nil }
+            } message: {
+                Text(tagDropMessage)
+            }
+            // The offer and the name in one, rather than a dialog handing off to an alert — the
+            // second of two presentations asked for in the same breath is the one SwiftUI drops.
+            // Naming is the confirmation anyway: what you call it is where you will leave it.
+            .alert(
+                anchor.isPaired ? "Pair this as another key?" : "Pair this tag?",
+                isPresented: Binding(get: { pairingScanned != nil }, set: { if !$0 { pairingScanned = nil } })
+            ) {
+                TextField("Kitchen drawer", text: $draftName)
+                Button("Pair it") {
+                    if let scanned = pairingScanned { keep(scanned) }
+                    pairingScanned = nil
+                }
+                Button("Not this one", role: .cancel) { pairingScanned = nil }
+            } message: {
+                Text(anchor.isPaired
+                    ? "Furlough does not know this tag. Every paired tag lifts the anchor on its own, so this is a key at a second place — \(tagCount) used. Name it for the place it will live in."
+                    : "Furlough does not know this tag. Pair it and it becomes the key: nothing else lifts an anchor once it is down. Name it for the place it will live in.")
+            }
+            .confirmationDialog(
+                "Forget this tag?",
+                isPresented: Binding(get: { forgetting != nil }, set: { if !$0 { forgetting = nil } }),
+                titleVisibility: .visible
+            ) {
+                Button("Forget \(forgetting?.name ?? "tag")", role: .destructive) {
+                    if let tag = forgetting { model.unpairTag(id: tag.id) }
+                    forgetting = nil
+                }
+                Button("Keep it", role: .cancel) { forgetting = nil }
+            } message: {
+                Text(anchor.tags.count == 1
+                    ? "This is the last key. Anchoring is refused until you pair another."
+                    : "The other tags still release the anchor.")
+            }
+            .alert(
+                "Name this tag",
+                isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })
+            ) {
+                TextField("Home", text: $draftName)
+                Button("Save") {
+                    if let tag = renaming { model.renameTag(id: tag.id, to: draftName) }
+                    renaming = nil
+                }
+                Button("Cancel", role: .cancel) { renaming = nil }
+            } message: {
+                Text("Name it for the place it lives in, so you know which key you are looking for.")
+            }
     }
 
     private var tagFootnote: String {
@@ -667,17 +735,7 @@ struct AnchorPage: View {
             if !anchor.isAnchored {
                 CardDivider()
                 Button {
-                    // An empty list starts from the rules: what Furlough already blocks is
-                    // offered first, and Apple's picker, which lists every app on the phone,
-                    // is one tap further on. Once the anchor holds anything, straight to the
-                    // picker, filled in with the list. The offer is for the chosen scope only:
-                    // under everything-except what is already blocked is already held, and
-                    // the list is what stays open, so it goes straight to the picker too.
-                    if anchor.scope == .chosen, anchor.kinds.isEmpty, !model.state.config.anchorCandidates.isEmpty {
-                        showFromRules = true
-                    } else {
-                        openPicker()
-                    }
+                    chooseApps()
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "plus")
@@ -802,6 +860,21 @@ struct AnchorPage: View {
         case (.chosen, false): "Change apps"
         case (.everythingExcept, true): "Choose what stays open"
         case (.everythingExcept, false): "Change what stays open"
+        }
+    }
+
+    /// The way in to what the anchor holds, from the card and from the guide's second step.
+    ///
+    /// An empty list starts from the rules: what Furlough already blocks is offered first, and
+    /// Apple's picker, which lists every app on the phone, is one tap further on. Once the
+    /// anchor holds anything, straight to the picker, filled in with the list. The offer is for
+    /// the chosen scope only: under everything-except what is already blocked is already held,
+    /// and the list is what stays open, so that goes straight to the picker too.
+    private func chooseApps() {
+        if anchor.scope == .chosen, anchor.kinds.isEmpty, !model.state.config.anchorCandidates.isEmpty {
+            showFromRules = true
+        } else {
+            openPicker()
         }
     }
 

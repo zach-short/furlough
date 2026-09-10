@@ -77,6 +77,18 @@ final class AppModel {
     /// leaves the other half's guide running too. Stored beside it and for the same reason.
     private(set) var wantsBothHalves = UserDefaults.standard.bool(forKey: AppModel.bothHalvesKey)
     private static let bothHalvesKey = "furlough.bothHalves"
+    /// The halves whose three-step guide has been walked to the end. Beside the rest in the
+    /// app's own defaults, for the same reason.
+    ///
+    /// A flag rather than a derived fact because the last step of each guide is not something
+    /// the config can answer: reading your own list is done when you say it is, and an anchor
+    /// that has been dropped once lifts again later without the guide being owed a second
+    /// showing. The first two steps of each are derived — see `HalfGuide`.
+    private(set) var finishedGuides = AppModel.storedFinishedGuides
+    private static let finishedGuidesKey = "furlough.finishedGuides"
+    private static var storedFinishedGuides: Set<Half> {
+        Set((UserDefaults.standard.stringArray(forKey: finishedGuidesKey) ?? []).compactMap(Half.init(rawValue:)))
+    }
     #if DEBUG || TESTING_TOOLS
     /// A testing reset has asked for the first run back — see `resetEverything`. Beside the
     /// three above for the same reason, and read at launch like them, so a phone relaunched
@@ -115,9 +127,17 @@ final class AppModel {
     /// is the one way out.
     private(set) var showsUsageStep = false
 
-    /// Turns the step on the first time Furlough has access and nothing to enforce yet.
+    /// Turns the step on the first time Furlough has access and nothing to enforce yet — and
+    /// only where the app can read the numbers itself.
+    ///
+    /// Without data access the step still has something to show: the report extension draws
+    /// real cards inside its own sandbox. What it cannot do is hand a rule back, so every card
+    /// ends in a manual trip to the picker and the editor. That is a decent thing to find in
+    /// Settings and a poor first screen, so on a phone without access the Rules guide's first
+    /// step opens the picker instead and "Where the time goes" keeps the tour.
     private func considerUsageStep() {
-        guard !hasSeenUsageStep, isAuthorized, state.config.targets.isEmpty else { return }
+        guard !hasSeenUsageStep, isAuthorized, UsageReader.hasDataAccess(authorization) else { return }
+        guard state.config.targets.isEmpty else { return }
         showsUsageStep = true
     }
 
@@ -129,6 +149,31 @@ final class AppModel {
         UserDefaults.standard.set(both, forKey: Self.bothHalvesKey)
         startHalf = half
         wantsBothHalves = both
+    }
+
+    /// One half's guide is done with: its last step was pressed, or the anchor it was walking
+    /// towards has been dropped.
+    func finishGuide(_ half: Half) {
+        guard !finishedGuides.contains(half) else { return }
+        write(finishedGuides: finishedGuides.union([half]))
+    }
+
+    /// A phone that arrives already set up has no guide owed to it. Run once, on the first
+    /// launch of a build that has guides at all: without it an update would put a checklist in
+    /// front of someone who has been using Furlough for months. The key being absent is what
+    /// "never asked" means, so writing an empty set is what closes the question.
+    private func seedFinishedGuides() {
+        guard UserDefaults.standard.object(forKey: Self.finishedGuidesKey) == nil else { return }
+        var seeded: Set<Half> = []
+        let config = state.config
+        if config.targets.contains(where: { $0.rule != nil }) { seeded.insert(.rules) }
+        if config.anchor.isPaired, config.anchor.hasSomethingToHold { seeded.insert(.anchor) }
+        write(finishedGuides: seeded)
+    }
+
+    private func write(finishedGuides halves: Set<Half>) {
+        UserDefaults.standard.set(halves.map(\.rawValue).sorted(), forKey: Self.finishedGuidesKey)
+        finishedGuides = halves
     }
 
     /// The step is done with, whether it was worked through or waved away.
@@ -150,6 +195,8 @@ final class AppModel {
         note(AuthorizationCenter.shared.authorizationStatus)
         reload()
         applyRemoteAnchor(reason: "activate")
+        // After the reload, because what it seeds from is what is already set up.
+        seedFinishedGuides()
         considerUsageStep()
         Task { await refreshNotificationStatus() }
         // Names for anything the shield has not covered yet, where this phone can read them.
@@ -1105,11 +1152,15 @@ final class AppModel {
         switch AnchorDrop.drop(until: until, reason: "anchor") {
         case .refused(.alreadyAnchored):
             reload()
+            finishGuide(.anchor)
             return .anchored
         case .refused(let why):
             return .failed(why.message)
         case .anchored:
             enforce(reason: "anchor")
+            // The guide's last step is "drop it", and this is it — from the guide's own button,
+            // the widget, or Siri. It lifts later; the guide is not owed a second showing.
+            finishGuide(.anchor)
             return .anchored
         }
     }
@@ -1510,6 +1561,10 @@ final class AppModel {
         UserDefaults.standard.removeObject(forKey: Self.bothHalvesKey)
         startHalf = .rules
         wantsBothHalves = false
+        // Removed rather than emptied: absent is what "never asked" means, so the next launch
+        // seeds from a config that a reset has just emptied and both guides come round again.
+        UserDefaults.standard.removeObject(forKey: Self.finishedGuidesKey)
+        finishedGuides = []
         UserDefaults.standard.set(true, forKey: Self.restartsOnboardingKey)
         restartsOnboarding = true
         lastError = nil

@@ -29,7 +29,9 @@ struct HomeView: View {
             // tapped. Selection is the same `half` the segment reads, so the two ways of moving
             // cannot disagree.
             TabView(selection: $half) {
-                RulesPage()
+                // The guide's first step opens the same picker the + does, so it hands the
+                // request up rather than growing a second add flow of its own.
+                RulesPage(onChooseApps: { addRequest = .plain(.application) })
                     .tag(Half.rules)
                 // The Anchor arms an NFC reader on sight, and a pager builds the page beside the
                 // one you are looking at. So it is told whether it is the page in front, and
@@ -128,17 +130,67 @@ struct HalfSegment: View {
     }
 }
 
-/// The everyday half: the hero, and the list grouped by next opening.
+/// The everyday half: the hero, and the list grouped by next opening — with the three-step
+/// guide above them until this half is set up.
+///
+/// The guide sits over the page rather than replacing it, because its own last step is about
+/// the list: by the time "Read your list" is live there is a list to read, and hiding it to
+/// show a card telling you to read it would be the joke this pass is trying not to make. On an
+/// empty page there is nothing underneath anyway — `EmptyHero` stands down while the guide
+/// runs, since the guide is the better version of the same sentence.
 private struct RulesPage: View {
     @Environment(AppModel.self) private var model
+    let onChooseApps: () -> Void
+
+    private var hasUsageNumbers: Bool { UsageReader.hasDataAccess(model.authorization) }
 
     var body: some View {
         TimelineView(.everyMinute) { context in
+            let config = model.state.config
+            let guide = HalfGuide.rules(
+                config: config,
+                hasUsageNumbers: hasUsageNumbers,
+                finished: model.finishedGuides.contains(.rules)
+            )
             ScrollView {
-                HomeContent(now: model.clock.honest(context.date))
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 48)
+                VStack(alignment: .leading, spacing: 0) {
+                    if guide.isRunning {
+                        GuideCard(guide: guide) { button(at: guide.live, config: config) }
+                            .padding(.bottom, 6)
+                    }
+                    HomeContent(now: model.clock.honest(context.date), showsEmptyHero: !guide.isRunning)
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 48)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func button(at live: Int?, config: Config) -> some View {
+        switch live {
+        case 0:
+            // Where Furlough can read the fortnight, the shortest way to a first rule is the
+            // fortnight. Where it cannot, the picker is the step and the tour stays in Settings.
+            if hasUsageNumbers {
+                NavigationLink { UsageView() } label: {
+                    GuideButtonLabel(title: "See where the time went", systemImage: "chart.bar.fill")
+                }
+                .guideButton()
+            } else {
+                GuideButton(title: "Choose apps", systemImage: "plus") { onChooseApps() }
+            }
+        case 1:
+            if let next = config.targets.first(where: { $0.rule == nil }) {
+                NavigationLink(value: next.id) {
+                    GuideButtonLabel(title: "Write the rule", systemImage: "hourglass")
+                }
+                .guideButton()
+            }
+        case 2:
+            GuideButton(title: "Done") { model.finishGuide(.rules) }
+        default:
+            EmptyView()
         }
     }
 }
@@ -148,6 +200,10 @@ private struct RulesPage: View {
 struct HomeContent: View {
     @Environment(AppModel.self) private var model
     let now: Date
+    /// False while the guide is running: an empty hero saying "tap +" under a checklist whose
+    /// live step is a Choose apps button would be the same instruction twice, in the weaker
+    /// words.
+    var showsEmptyHero = true
     /// The hero page being shown; survives the minute ticks that rebuild this view.
     @State private var featured: UUID?
 
@@ -163,7 +219,7 @@ struct HomeContent: View {
         let groups = HomeGroups(targets: config.targets, statuses: statuses, now: now)
 
         VStack(alignment: .leading, spacing: 0) {
-            HeroPager(groups: groups, statuses: statuses, glasses: glasses, runtime: state.runtime, anchor: config.anchor, featured: $featured)
+            HeroPager(groups: groups, statuses: statuses, glasses: glasses, runtime: state.runtime, anchor: config.anchor, showsEmptyHero: showsEmptyHero, featured: $featured)
             ForEach(groups.sections) { section in
                 SectionLabel(text: section.title)
                 VStack(spacing: 0) {
@@ -268,6 +324,7 @@ struct HeroPager: View {
     let glasses: [UUID: HourglassState]
     let runtime: RuntimeState
     let anchor: AnchorProfile
+    var showsEmptyHero = true
     @Binding var featured: UUID?
 
     private var pages: [Target] { groups.ordered }
@@ -275,7 +332,7 @@ struct HeroPager: View {
 
     var body: some View {
         if pages.isEmpty {
-            EmptyHero()
+            if showsEmptyHero { EmptyHero() }
         } else {
             VStack(spacing: 0) {
                 ScrollView(.horizontal) {
