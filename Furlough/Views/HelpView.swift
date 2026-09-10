@@ -3,7 +3,7 @@ import SwiftUI
 /// What the app will not stop to explain while you are using it: what a rule means, why a
 /// change waits, and the one way out. Reached from the question mark beside the gear on Home.
 ///
-/// Eight pages, one idea each, in the app's own voice, and all eight of them here rather than
+/// Nine pages, one idea each, in the app's own voice, and all nine of them here rather than
 /// on the site — the pages are in `HelpTopics.swift`. Help is wanted at the moment the app is
 /// in the way, which is no time to be handed to a browser that may itself be shielded, and
 /// anything with a number in it reads the number out of the config rather than repeating the
@@ -106,6 +106,13 @@ struct HelpView: View {
             NavigationLink { AnchorHelp() } label: {
                 HelpRow(title: "The Anchor", detail: "One tap to lock. The tag to unlock.") {
                     AnchorGlyph(isAnchored: false)
+                }
+            }
+            .buttonStyle(.plain)
+            CardDivider()
+            NavigationLink { DevicesHelp() } label: {
+                HelpRow(title: "Across your devices", detail: "What the Anchor carries to your Mac") {
+                    HelpTile(symbol: "laptopcomputer.and.iphone")
                 }
             }
             .buttonStyle(.plain)

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The eight pages behind the question mark. Each one answers a single question and stops.
+/// The nine pages behind the question mark. Each one answers a single question and stops.
 ///
 /// All of them are in the binary rather than on the site, because help is wanted at the moment
 /// the app is in the way: on a train with no signal, on a phone whose browser may itself be
@@ -249,6 +249,77 @@ struct AnchorHelp: View {
             HelpProse("Anchoring something Essential warns first and asks again before it drops. The anchor is instant and only a tag lifts it, so a tag in another room means Messages stays gone until you find it. Keep every tag somewhere that makes you think — a key in your bag is no lock at all.")
                 .padding(.top, 2)
         }
+    }
+}
+
+// MARK: - Across your devices
+
+/// The page nobody could find, because there is nothing to find: the link between the phone and
+/// the Mac is an Apple Account, so it has no screen, no switch and no setup step, and until this
+/// page existed the only way to learn it was already working was to watch it work.
+///
+/// Written from the phone's side. `HelpTopic.devices` on the Mac answers the same questions from
+/// the other end, and the two are deliberately not one shared string: the interesting fact on
+/// this device is that its tag is the only key either device has, and on the Mac it is that it
+/// holds a lock it cannot open.
+struct DevicesHelp: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        HelpPage(
+            title: "Across your devices",
+            heading: "One Anchor, both devices",
+            lead: "Furlough on your Mac and Furlough on this iPhone share one Anchor. There is nothing to pair and nothing to switch on: both are signed into your Apple Account, and that is the whole of the link."
+        ) {
+            HelpProse("No account of Furlough's, no server of Furlough's, no code to type and no list of devices to manage. Install it on the Mac, and if that Mac is signed into the same Apple Account with iCloud Drive on, the two are already linked.")
+                .padding(.top, 12)
+
+            SectionLabel(text: "What crosses")
+            HelpPoints([
+                .init("The Anchor's state", "Whether it is down, since when, and until when. That is the entire message, and Furlough writes it to your own iCloud, where only your devices can read it."),
+                .init("Not your rules", "Screen Time names an app with a token that means nothing off the iPhone that minted it, and the Mac names one with a bundle identifier that means nothing on a phone. So each device keeps its own list, on purpose — see Moving a setup across below."),
+                .init("Not your tags", "A tag is a physical key, read over NFC. Macs have no reader, so every tag is paired here, and this phone is the only place one can be read."),
+            ])
+
+            SectionLabel(text: "Which way it goes")
+            HelpPoints([
+                .init("Drop here, and the Mac locks", "Whatever the Mac's own Anchor list holds is shielded there too — its list, not this one, because the lists cannot travel."),
+                .init("Drop on the Mac, and this iPhone locks", "The same, the other way round. Either device can start it."),
+                .init("Your tag releases both", "The one release either device will take. Scan it here and the anchor lifts on the phone and on the Mac together."),
+                .init("The Mac can lock but never unlock", "With no reader it has no key of its own, so an anchor dropped on the Mac waits for a scan on this phone. That is why it will not drop until it has heard from you: a Mac that locked itself before this phone had ever spoken to it would be a lock with nothing to open it."),
+            ])
+            Footnote(text: "So the first drop is worth making here. Once this iPhone has dropped the anchor even once, the Mac has heard from it and will drop its own from then on.")
+                .padding(.top, 10)
+
+            SectionLabel(text: "When it does not cross")
+            HelpPoints([
+                .init("Out of signal", "Nothing unlocks by going offline. Each device keeps the state it has and sends what it wrote when it can reach iCloud again."),
+                .init("About half a minute", "How long a drop takes to show up on the other device once it has reached iCloud."),
+                .init("Signed out of iCloud", cloudLine),
+            ])
+
+            SectionLabel(text: "Moving a setup across")
+            HelpProse("Since rules cannot sync, they travel as a file instead. Settings > Save setup writes your rules, budgets, tiers and delay as JSON; the other device opens it and shows you every line before anything happens.")
+                .padding(.top, 2)
+            HelpPoints([
+                .init("A proposal, never a restore", "Every rule in a file goes through the same gate the editor does, so the tightenings land and the loosenings wait out your delay. A file cannot hand you back time by going round it."),
+                .init("A phone file names apps in words", "A token cannot travel, so a file written here records what each app was called. A Mac can look those names up; another phone has to be shown the app in the picker."),
+                .init("The Anchor is not in it", "Its list is tokens and its key is a physical tag, so none of it would survive the trip. A file that looked like it carried the Anchor would be worse than one that plainly does not."),
+            ])
+
+            SectionLabel(text: "Turning it off")
+            HelpProse("There is no switch for it, because the link is your Apple Account rather than anything Furlough runs. Signing out of iCloud, or turning off iCloud Drive, stops the Anchor crossing — and then the Mac refuses to drop one at all, since your tag could not reach it. Nothing already anchored is released by any of that.")
+                .padding(.top, 2)
+        }
+    }
+
+    /// Read live, because it is the one line on this page that can be false while it is being
+    /// read, and a phone whose tag cannot release a locked Mac should be told so where it is
+    /// looking rather than left to work it out.
+    private var cloudLine: String {
+        model.cloudAvailable
+            ? "The Anchor stops at the device it was dropped on: a drop here would not lock your Mac, and your tag could not release one. Both apps say so on the Anchor screen if it happens, rather than letting you find out at the tag."
+            : "This is the case right now — Furlough cannot reach your iCloud account, so the Anchor is going no further than this iPhone. Sign in to iCloud in Settings, with iCloud Drive on."
     }
 }
 

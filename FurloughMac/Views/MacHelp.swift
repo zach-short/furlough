@@ -12,7 +12,7 @@ import SwiftUI
 /// A page of help and the row that opens it. One case per page, so the sheet's title and the
 /// hub's rows cannot drift apart.
 enum HelpTopic: String, Identifiable, CaseIterable {
-    case windows, delay, targets, blocking, elsewhere, stuck, about
+    case windows, delay, targets, blocking, devices, elsewhere, stuck, about
 
     var id: String { rawValue }
 
@@ -22,6 +22,7 @@ enum HelpTopic: String, Identifiable, CaseIterable {
         case .delay: "Why changes wait"
         case .targets: "Apps and websites"
         case .blocking: "How blocking works here"
+        case .devices: "Across your devices"
         case .elsewhere: "Outside the window"
         case .stuck: "If something gets stuck"
         case .about: "About"
@@ -34,6 +35,7 @@ enum HelpTopic: String, Identifiable, CaseIterable {
         case .delay: "The delay, and what shortens it"
         case .targets: "What Furlough can hold, and how to add it"
         case .blocking: "No Screen Time on the Mac, so Furlough does it"
+        case .devices: "What the Anchor carries from your iPhone"
         case .elsewhere: "The menu bar, the widget, notifications"
         case .stuck: "What to try, and the one way out"
         case .about: "What it keeps, and what leaves this Mac"
@@ -46,6 +48,7 @@ enum HelpTopic: String, Identifiable, CaseIterable {
         case .delay: "hourglass"
         case .targets: "square.grid.2x2"
         case .blocking: "bolt.shield"
+        case .devices: "laptopcomputer.and.iphone"
         case .elsewhere: "menubar.arrow.up.rectangle"
         case .stuck: "wrench.and.screwdriver"
         case .about: "info.circle"
@@ -77,7 +80,7 @@ struct HelpSheet: View {
                 SectionLabel(text: "The rules")
                 card([.windows, .delay, .targets])
                 SectionLabel(text: "On this Mac")
-                card([.blocking, .elsewhere])
+                card([.blocking, .devices, .elsewhere])
                 SectionLabel(text: "If you need it")
                 card([.stuck, .about])
             }
@@ -287,6 +290,7 @@ struct HelpPage: View {
         case .delay: "Tighter now, looser later"
         case .targets: "What Furlough can hold"
         case .blocking: "No Screen Time on the Mac"
+        case .devices: "One Anchor, both devices"
         case .elsewhere: "Where Furlough shows up"
         case .stuck: "When a block will not lift"
         case .about: "About Furlough"
@@ -303,6 +307,8 @@ struct HelpPage: View {
             "The + button asks Application or Website. An app is any app on this Mac; a website is an address you type."
         case .blocking:
             "Apple's Screen Time API does not exist on macOS — FamilyControls, ManagedSettings and DeviceActivity are all unavailable — so nothing here can ask the system to shield an app. Furlough shares the phone's rules engine and does the blocking itself."
+        case .devices:
+            "Furlough on this Mac and Furlough on your iPhone share one Anchor. There is nothing to pair and nothing to switch on: both are signed into your Apple Account, and that is the whole of the link."
         case .elsewhere:
             "The window is where rules are written. Almost everything else happens while it is closed."
         case .stuck:
@@ -319,6 +325,7 @@ struct HelpPage: View {
         case .delay: delay
         case .targets: targets
         case .blocking: blocking
+        case .devices: devices
         case .elsewhere: elsewhere
         case .stuck: stuck
         case .about: about
@@ -423,6 +430,73 @@ struct HelpPage: View {
         SectionLabel(text: "Underneath")
         HelpProse("Once a second Furlough re-derives the whole picture from saved state: which apps are blocked, which tabs are on a blocked site, and how much of today's budget each thing has spent. Nothing is remembered between ticks that could drift out of step with the rules, which is why closing the window or restarting the Mac changes nothing about what is enforced.")
             .padding(.top, 2)
+    }
+
+    // MARK: Across your devices
+
+    /// The page nobody could find, because there is nothing to find: the link between this Mac
+    /// and the phone is an Apple Account, so it has no screen, no switch and no setup step, and
+    /// until this page existed the only way to learn it was already working was to watch it work.
+    ///
+    /// Written from the Mac's side, where the interesting fact is that this device holds a lock
+    /// it cannot open. `DevicesHelp` on the phone answers the same questions from the end that
+    /// holds the key, which is why the two are not one shared string.
+    ///
+    /// Both live lines are read from the model rather than written down, on the principle the
+    /// rest of Help follows: a page that states what this Mac's own situation is has to be right
+    /// about it, and both of these can change while the sheet is open.
+    @ViewBuilder
+    private var devices: some View {
+        HelpProse("No account of Furlough's, no server of Furlough's, no code to type and no list of devices to manage. If this Mac and your iPhone are signed into the same Apple Account with iCloud Drive on, they are already linked.")
+            .padding(.top, 12)
+
+        SectionLabel(text: "What crosses")
+        HelpPoints([
+            .init("The Anchor's state", "Whether it is down, since when, and until when. That is the entire message, and Furlough writes it to your own iCloud, where only your devices can read it."),
+            .init("Not your rules", "This Mac names an app with a bundle identifier, which means nothing on a phone, and Screen Time names one with a token, which means nothing off the phone that minted it. So each device keeps its own list — see Moving a setup across below."),
+            .init("Not your tags", "A tag is a physical key, read over NFC. This Mac has no reader, so every tag is paired on the phone, and the phone is the only place one can be read."),
+        ])
+
+        SectionLabel(text: "Which way it goes")
+        HelpPoints([
+            .init("Drop here, and your iPhone locks", "Whatever the phone's own Anchor list holds is shielded there too — its list, not this one, because the lists cannot travel."),
+            .init("Drop on the iPhone, and this Mac locks", "The same, the other way round. Either device can start it."),
+            .init("Only the phone's tag releases either", "With no reader this Mac has no key of its own. An anchor dropped here waits for a scan on your iPhone, and there is no way round that from this side — which is the point of it."),
+            .init("Where this Mac stands", cloudAndPhoneLine),
+        ])
+
+        SectionLabel(text: "When it does not cross")
+        HelpPoints([
+            .init("Out of signal", "Nothing unlocks by going offline. Each device keeps the state it has and sends what it wrote when it can reach iCloud again."),
+            .init("About half a minute", "How long a drop on the phone takes to reach this Mac. Furlough asks iCloud again on that beat whether or not it has been told anything changed."),
+            .init("Signed out of iCloud", "The Anchor stops at the device it was dropped on, and this Mac then refuses to drop one at all: your tag could not reach it, so the lock would have no key. The Anchor screen says so rather than letting you find out at the tag."),
+        ])
+
+        SectionLabel(text: "Moving a setup across")
+        HelpProse("Since rules cannot sync, they travel as a file instead. Settings > Save setup writes your rules, budgets, tiers and delay as JSON; the other device opens it and shows you every line before anything happens.")
+            .padding(.top, 2)
+        HelpPoints([
+            .init("A proposal, never a restore", "Every rule in a file goes through the same gate the editor does, so the tightenings land and the loosenings wait out your delay. A file cannot hand you back time by going round it."),
+            .init("A Mac file travels whole", "An app here is a bundle identifier and a site is an address, and another Mac can look either one up. A file from a phone carries every rule but can only say what each app was called, because a token cannot travel."),
+            .init("The Anchor is not in it", "Its list is this Mac's own and its key is a physical tag, so none of it would survive the trip. A file that looked like it carried the Anchor would be worse than one that plainly does not."),
+        ])
+
+        SectionLabel(text: "Turning it off")
+        HelpProse("There is no switch for it, because the link is your Apple Account rather than anything Furlough runs. Signing out of iCloud, or turning off iCloud Drive in System Settings, stops the Anchor crossing — and stops this Mac dropping one. Nothing already anchored is released by any of that.")
+            .padding(.top, 2)
+    }
+
+    /// Where this Mac actually stands: cut off, still waiting for its first word from a phone,
+    /// or linked. The three states `AnchorSync.macDrop` decides between, said in the order it
+    /// decides them, so the page and the refused button never disagree.
+    private var cloudAndPhoneLine: String {
+        if !model.cloudAvailable {
+            return "Right now Furlough cannot reach your iCloud account, so this Mac will not drop the anchor at all. Sign in to iCloud in System Settings, with iCloud Drive on."
+        }
+        if !model.phoneSeen {
+            return "This Mac has not heard from your iPhone yet, so Drop anchor is refused here. Drop the anchor once on the phone and it will have — after that this Mac can drop its own whenever you like."
+        }
+        return "This Mac has heard from your iPhone, so Drop anchor works here. Before that first word it is refused, because a Mac that locked itself with no phone to unlock it would be a lock with nothing to open it."
     }
 
     // MARK: Outside the window
