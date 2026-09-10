@@ -89,8 +89,9 @@ small codebase he fully understands over a fork. He is interactive: ask when a d
   Debug builds carry **Settings > Testing > Reset everything** (`AppModel.resetEverything`,
   behind `#if DEBUG || TESTING_TOOLS`; Zach asked for it on 2026-09-07 after a week-long delay
   and a five-minute FaceTime budget locked him out mid-test): after a confirmation it removes
-  the stored state, clears the managed settings, and enforces the empty state, so the app
-  matches a fresh install with Screen Time access still granted. Keep it behind that condition;
+  the stored state, clears the managed settings, hands Screen Time access back and enforces the
+  empty state, so the app matches a fresh install and comes up on onboarding — see item 32
+  below for why it goes that far and what holds the first screen when iOS refuses the revoke. Keep it behind that condition;
   the commands in this file build Debug, so it is present on the phone until Zach switches to
   `-configuration Release`. A Release build carries it only when built with the
   `TESTING_TOOLS` compilation condition — `TESTING_TOOLS=1 scripts/archive.sh` — which he asked
@@ -1920,8 +1921,10 @@ The plan for this stretch. Tick each phase off here as it lands.
       is real.
     - `AppModel.startTrialIfNeeded` runs at `requestAuthorization`, which is the only moment
       it can: before access there is nothing to be forgiven for, and every path back there
-      goes through Settings. Debug's `resetEverything` grants one too, or the feature could
-      not be tested on a phone whose access is already granted.
+      goes through Settings. Debug's `resetEverything` used to grant one outright, or the
+      feature could not be tested on a phone whose access is already granted; since 2026-09-09
+      it hands the access back instead, so the grant on the way through onboarding starts the
+      week and this stays the only place a week begins.
     - `AppModel.assign` records the undo only where a rule lands *now*. A loosening arriving
       after its delay needs none: undoing a loosening is a tightening, and those are instant.
     - UI: `UndoCard` (high in `RuleEditorView`, above the nickname — someone who opens the
@@ -2074,6 +2077,41 @@ The plan for this stretch. Tick each phase off here as it lands.
     and iOS, Mac Debug, Mac Release and Mac Release + `TESTING_TOOLS` all build warning-free.
     **Nobody has run it on the Mac yet** — doing so wipes the real App Group state, so it is
     Zach's to trigger, and the `/Applications` copy predates it.
+
+32. **The phone's reset goes back to onboarding too.** Done 2026-09-09, because Zach asked: a
+    reset during a test pass should land on the first screen every time, so the run he is
+    reviewing can be walked from the start. It stopped one screen short — the state was gone but
+    Screen Time access was not, so the app came up on Home with nothing in it, and the grant,
+    the first week it starts and the usage step were all behind him for good.
+
+    `AppModel.resetEverything` now hands access back with
+    `AuthorizationCenter.revokeAuthorization`, which the app is allowed to do and which the
+    onboarding button undoes in one tap — no trip through Settings, which is why keeping access
+    was the right call before and is not any more. With it goes the eager
+    `Forgiveness.startTrial` the reset used to make: `SharedStore.reset` clears the marker that
+    refuses a second week, so `startTrialIfNeeded` at the grant starts one, exactly as on a
+    fresh install, and `requestAuthorization` stays the only place a week begins.
+
+    The revoke is asynchronous and iOS can refuse it, so it is not what the root reads.
+    `AppModel.restartsOnboarding` is — a flag in the app's own defaults beside `wasAuthorized`
+    and `sawUsageStep`, set by the reset, read at launch so a relaunch mid-pass starts in the
+    same place, and cleared only by a successful `requestAuthorization`. Not by `note`, which
+    every activation and every tick of the authorization stream runs through: clearing it there
+    would take the first screen straight back off a phone whose revoke was refused, which is the
+    one case the flag is for. `RootView` asks `model.showsOnboarding` (access, or the flag) and
+    then `showsUsageStep`, in that order, so onboarding wins while both are true. The reset also
+    puts `wasAuthorized` and `sawUsageStep` back, so the launch screen is not held for a phone
+    about to be asked for access, and the usage step comes round again after the grant.
+
+    What it keeps is the notification permission, which iOS only asks about once and no app can
+    hand back, and the activity log, which is the record of what just happened — the log now
+    says which way the revoke went, because from the onboarding screen the two look identical.
+
+    Touched `AppModel` (the reset, `showsOnboarding`, `restartsOnboarding`, `revokeAuthorization`,
+    `finishOnboardingRestart`), `RootView`'s branch order, the Settings sheet's dialog and
+    footnote, and the Mac comments that described the phone's old line. No `Shared/Core`
+    behaviour changed, so no new tests; iOS Debug, Release and Release + `TESTING_TOOLS` all
+    build warning-free. Not yet run on the phone.
 
 ## Style rules
 

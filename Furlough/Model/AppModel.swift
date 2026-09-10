@@ -43,8 +43,10 @@ final class AppModel {
     @ObservationIgnored private var wantsWeighAnchor = false
     /// Screen Time access stood at the end of an earlier run. FamilyControls reports "not
     /// determined" for a moment after a cold start, so the root trusts this to hold the launch
-    /// screen instead of flashing onboarding. Kept in the app's own defaults: a Debug reset
-    /// keeps access, so it keeps this too.
+    /// screen instead of flashing onboarding. Kept in the app's own defaults rather than the
+    /// App Group: it records what iOS last said, not what is blocked. A testing reset hands
+    /// access back, so it puts this back too, or the next launch would hold a launch screen
+    /// for a phone that is about to be asked to grant access again.
     let wasAuthorized = UserDefaults.standard.bool(forKey: AppModel.wasAuthorizedKey)
     private static let wasAuthorizedKey = "furlough.wasAuthorized"
     /// Targets whose "the other half is missing" nudge has been waved away. Beside
@@ -58,6 +60,13 @@ final class AppModel {
     /// must not wait out a loosening delay.
     private(set) var hasSeenUsageStep = UserDefaults.standard.bool(forKey: AppModel.usageStepKey)
     private static let usageStepKey = "furlough.sawUsageStep"
+    #if DEBUG || TESTING_TOOLS
+    /// A testing reset has asked for the first run back — see `resetEverything`. Beside the
+    /// three above for the same reason, and read at launch like them, so a phone relaunched
+    /// part-way through a pass still starts where the reset left it.
+    private(set) var restartsOnboarding = UserDefaults.standard.bool(forKey: AppModel.restartsOnboardingKey)
+    private static let restartsOnboardingKey = "furlough.testing.restartOnboarding"
+    #endif
 
     var isAuthorized: Bool {
         switch authorization {
@@ -65,6 +74,17 @@ final class AppModel {
         case .notDetermined, .denied: false
         default: true // approvedWithDataAccess (iOS 26.4+) and any future approved variants
         }
+    }
+
+    /// Whether the first-run screen is what belongs on screen. Access decides it: a phone that
+    /// has not granted it has nothing Furlough could enforce, and a phone that has is past this
+    /// screen for good — except after a testing reset, which asks for the first run back and is
+    /// answered here rather than by pretending access is gone. See `resetEverything`.
+    var showsOnboarding: Bool {
+        #if DEBUG || TESTING_TOOLS
+        if restartsOnboarding { return true }
+        #endif
+        return !isAuthorized
     }
 
     /// Whether the usage step is on screen. It sits between Screen Time access and the first
@@ -177,6 +197,9 @@ final class AppModel {
         }
         note(AuthorizationCenter.shared.authorizationStatus)
         if isAuthorized {
+            #if DEBUG || TESTING_TOOLS
+            finishOnboardingRestart()
+            #endif
             startTrialIfNeeded()
             enforce(reason: "authorized")
         }
@@ -1368,10 +1391,28 @@ final class AppModel {
     #if DEBUG || TESTING_TOOLS
     // MARK: Testing
 
-    /// Wipes every target, rule, pending change, the Anchor and its tag, lifts every shield, and
-    /// enforces the empty state so the app matches a fresh install. Compiled in only when the
-    /// build asked for the testing tools — see `TestingTools` — so the App Store build keeps its
-    /// promise of no unblock button.
+    /// Wipes every target, rule, pending change, the Anchor and its tag, lifts every shield,
+    /// hands Screen Time access back and enforces the empty state, so the phone matches a fresh
+    /// install and comes up where one does: onboarding, then the usage step, then Home. That is
+    /// the whole point of the button during a test pass — the first run is the part hardest to
+    /// get back to, and Zach asked on 2026-09-09 to land there every time.
+    ///
+    /// Access used to be the one thing the reset kept, on the grounds that the app could not
+    /// give it back. It can: `revokeAuthorization` hands it in and the onboarding button asks
+    /// for it again, one tap, no trip through Settings. The first week comes back with it, so
+    /// nothing starts one here any more — granting access does, exactly as on a fresh install,
+    /// and `startTrialIfNeeded` is free to say yes because `SharedStore.reset` has just cleared
+    /// the marker that refuses a second one.
+    ///
+    /// The revoke is asynchronous and iOS can refuse it, so it is not what the root reads.
+    /// `restartsOnboarding` is, and only the grant lifts it: a phone that kept its access still
+    /// lands on the first screen and still leaves it through that button.
+    ///
+    /// What is kept is the notification permission, which iOS only ever asks about once, and
+    /// the activity log, which is the record of what just happened, including this.
+    ///
+    /// Compiled in only when the build asked for the testing tools — see `TestingTools` — so
+    /// the App Store build keeps its promise of no unblock button.
     func resetEverything() {
         SharedStore.reset()
         ShieldReconciler.clearEverything()
@@ -1379,14 +1420,49 @@ final class AppModel {
         AnchorCloud.clear()
         companionDismissed = []
         UserDefaults.standard.removeObject(forKey: AppModel.companionDismissedKey)
-        SharedStore.log("reset everything (Debug build)")
-        // A reset leaves Screen Time access granted, so `requestAuthorization` never runs
-        // again and the first week would never start. A fresh install gets one; this is meant
-        // to look like a fresh install.
-        var current = SharedStore.load()
-        if Forgiveness.startTrial(&current.config, now: current.now) { SharedStore.save(current) }
+        // Everything that records what has been shown rather than what is blocked, put back to
+        // what a fresh install has: no access remembered for the launch screen to trust, the
+        // usage step unseen so it comes round again after the grant, and the first screen asked
+        // for whatever iOS does with the revoke below.
+        UserDefaults.standard.set(false, forKey: Self.wasAuthorizedKey)
+        UserDefaults.standard.removeObject(forKey: Self.usageStepKey)
+        hasSeenUsageStep = false
+        showsUsageStep = false
+        UserDefaults.standard.set(true, forKey: Self.restartsOnboardingKey)
+        restartsOnboarding = true
         lastError = nil
+        SharedStore.log("reset everything (Debug build)")
+        // Before the revoke: this is the last moment the shields can be lifted through an
+        // access iOS is still honouring.
         enforce(reason: "reset")
+        Task { await revokeAuthorization() }
+    }
+
+    /// Hands Screen Time access back to iOS, so the onboarding a reset returns to has something
+    /// left to ask for. Quiet when iOS refuses — the flag has already put that screen up and its
+    /// button re-requests either way — but the log says which of the two happened, because from
+    /// the screen itself the two look the same.
+    private func revokeAuthorization() async {
+        await withCheckedContinuation { continuation in
+            AuthorizationCenter.shared.revokeAuthorization { result in
+                if case .failure(let error) = result {
+                    SharedStore.log("revoking Screen Time access failed: \(error.localizedDescription)")
+                }
+                continuation.resume()
+            }
+        }
+        note(AuthorizationCenter.shared.authorizationStatus)
+        SharedStore.log("reset: Screen Time access is \(isAuthorized ? "still granted" : "handed back")")
+    }
+
+    /// The first run a reset asked for is over, because access has just been granted again.
+    /// Only a grant clears it: activation and the authorization stream both run through `note`,
+    /// and clearing it there would take the first screen back off a phone whose revoke iOS
+    /// refused — the one case the flag exists for.
+    private func finishOnboardingRestart() {
+        guard restartsOnboarding else { return }
+        UserDefaults.standard.set(false, forKey: Self.restartsOnboardingKey)
+        restartsOnboarding = false
     }
     #endif
 }

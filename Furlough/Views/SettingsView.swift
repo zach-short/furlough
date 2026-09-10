@@ -56,7 +56,7 @@ struct SettingsView: View {
                             }
                         }
                         .emberCard()
-                        Footnote(text: "Not in the App Store build. Reset everything forgets every app, rule, pending change and the Anchor, and lifts all shields.\n\nHide these buttons puts this section away. Show testing buttons, or five taps on Version above, brings it back.")
+                        Footnote(text: "Not in the App Store build. Reset everything forgets every app, rule, pending change and the Anchor, lifts all shields, hands Screen Time access back and returns to onboarding — a fresh install, apart from the notification permission, which iOS only asks about once.\n\nHide these buttons puts this section away. Show testing buttons, or five taps on Version above, brings it back.")
                             .padding(.top, 8)
                     } else {
                         // A way back that does not have to be known about. The five taps still
@@ -137,7 +137,7 @@ struct SettingsView: View {
                     dismiss()
                 }
             } message: {
-                Text("Every app, rule, pending change and the Anchor are forgotten and all shields lift. Screen Time access is kept.")
+                Text("Every app, rule, pending change and the Anchor are forgotten, all shields lift, and Screen Time access is handed back, so Furlough starts again at onboarding.")
             }
             #endif
         }
