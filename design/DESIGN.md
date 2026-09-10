@@ -160,9 +160,15 @@ that pauses when the state is still. Respect Reduce Motion.
   hourglass mid-pour, an ember pool under it, drawn by `scripts/make-icon.swift` through
   `HourglassStill`: the same paths and the same colours the phone draws, so the home screen
   shows the thing itself rather than a picture of one. The Mac set and the site's
-  `icon-1024`, `icon-512` and `apple-touch-icon` come off the same script; under 40 px the
-  drawing switches to its own bolder chip form, which is what the 16 and 32 Mac icons get.
-  The generated hourglasses it replaced are gone; re-run the script to rebuild any size.
+  `icon-1024`, `icon-512` and `apple-touch-icon` come off the same script. Under 40 px the
+  script draws a chip instead (`MakeIcon.chip`): the Mac's 16 and 32 have too few pixels for
+  the glass — at 16 the ink is nine across, the caps land on half a pixel and the ember pool
+  spreads into the mound — so the chip says the same hourglass in whole pixels, on a 16-unit
+  grid snapped to the output, with the pool, the funnel, the rim highlight and the anchor mark
+  left out. It still reads the state off `HourglassGeometry`, so a chip and a glass at the
+  same level agree. 32 has a pixel to spare for an outline and 16 spends it on the body
+  instead. Everything from 64 up is the drawing, untouched. The generated hourglasses it
+  replaced are gone; re-run the script to rebuild any size.
 - Still to generate, only after Zach approves each: a transparent-background hourglass for
   the shield icon and the home hero, an onboarding hero and empty-state illustration in the
   same style, and short clips for the README.
