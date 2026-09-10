@@ -211,8 +211,19 @@ struct AnchorHelp: View {
             HelpSteps([
                 .init("Choose apps", "The first time, the anchor offers what you already block, every one checked. Keep what it should hold, or go on to the picker for anything else. After that, Change apps opens the picker with the list filled in."),
                 .init("Pair a tag", "Hold the phone to any NTAG sticker, or the tag that came with another blocking product if you already own one. Furlough reads its hardware identifier and writes nothing to it. Up to \(maxTags) can be paired, so a key can live at each place you do — name each one for its place."),
-                .init("Anchor", "Everything on the list is shielded immediately. No tag is needed to lock and no delay applies."),
-                .init("Unanchor", "Opens the reader. Only a tag you paired lifts the anchor, and any of them does, at once. This is the one unblock in Furlough, and it exists only here."),
+                .init("Anchor", "Everything on the list is shielded immediately. No tag is needed to lock and no delay applies. A paired tag held up on the Anchor screen does the same, after asking."),
+                .init("Unanchor", "Only a tag you paired lifts the anchor, and any of them does, at once. Hold it up on the Anchor screen, or tap Unanchor anywhere else. This is the one unblock in Furlough, and it exists only here."),
+            ])
+
+            SectionLabel(text: "Holding a tag up")
+            HelpProse("The Anchor screen listens on its own. Open it with the anchor down, or with a list and a tag ready, and the reader is already waiting — holding a tag to the top of the phone is the whole of it. What happens then is the tag's to decide rather than a button's.")
+                .padding(.top, 2)
+            HelpPoints([
+                .init("A paired tag, anchored", "Weighs anchor at once. It is what a tag has always done, and it was just held up to say so."),
+                .init("A paired tag, free", "Offers to anchor, naming what goes behind the tag and when it lifts. It asks first because a tag that locks as well as unlocks is one you could shut yourself out with by walking past the drawer it lives in."),
+                .init("A tag Furlough does not know", "Offers to keep it as a key, and asks what to call it. The first becomes the key; a later one is a key at a second place."),
+                .init("An unknown tag while anchored", "Refused, like every other change under the lock. A key cut under the lock is no lock."),
+                .init("It stops listening", "The sheet is Apple's, not Furlough's, and Apple gives a reader about a minute — Core NFC has no way to read a tag quietly behind a screen. Tap the row to listen again."),
             ])
 
             SectionLabel(text: "The tag")
