@@ -243,7 +243,7 @@ final class WebFilter {
                 lines.append("  version \(info.bundleVersion): enabled=\(info.isEnabled) awaitingApproval=\(info.isAwaitingUserApproval)")
             }
         } else {
-            lines.append("  NO ANSWER \u{2014} macOS was asked and did not reply")
+            lines.append("  NO ANSWER \u{2014} macOS was asked and did not reply (the service is stuck; a restart clears it)")
         }
 
         lines.append("")
@@ -387,7 +387,13 @@ final class WebFilter {
             return nil
         }
         guard let found = await ExtensionRequest.properties() else {
-            status = .failed("macOS did not answer when asked about the extension.")
+            // Not a refusal, and worth saying so: the service that answers this is stuck, which
+            // is a state a Mac can be left in by replacing the app while it holds a reference to
+            // the extension. Pressing Install submits a fresh activation request, which often
+            // replaces the stuck record; a restart is what clears it when that does not. Seen on
+            // Zach's Mac 2026-09-10 after several reinstalls in a row, alongside a filter
+            // permission refused in under a second — the pair is the signature of this.
+            status = .failed("macOS did not answer when it was asked about the extension. That is not a refusal — the service that answers is stuck. Install again below; if it still will not turn on, restart the Mac and install again.")
             return nil
         }
         if let enabled = found.first(where: \.isEnabled) {
