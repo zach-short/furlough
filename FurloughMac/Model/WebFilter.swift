@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import Security
 import NetworkExtension
 import Observation
 import SystemExtensions
@@ -236,39 +237,54 @@ final class WebFilter {
 
         lines.append("")
         lines.append("What macOS says about the extension:")
-        do {
-            let found = try await ExtensionRequest.properties()
-            if found.isEmpty {
-                lines.append("  none installed")
-            }
+        if let found = await ExtensionRequest.properties() {
+            if found.isEmpty { lines.append("  none installed") }
             for info in found {
                 lines.append("  version \(info.bundleVersion): enabled=\(info.isEnabled) awaitingApproval=\(info.isAwaitingUserApproval)")
             }
-        } catch let error as OSSystemExtensionError where error.code == .extensionNotFound {
-            lines.append("  none installed (extensionNotFound)")
-        } catch {
-            lines.append("  could not ask: \(error.localizedDescription)")
+        } else {
+            lines.append("  NO ANSWER \u{2014} macOS was asked and did not reply")
         }
 
         lines.append("")
         lines.append("What macOS says about the filter permission:")
-        let manager = NEFilterManager.shared()
-        do {
-            try await manager.loadFromPreferences()
-            lines.append("  enabled: \(manager.isEnabled)")
-            lines.append("  configuration: \(manager.providerConfiguration == nil ? "none" : "present")")
-            if let configuration = manager.providerConfiguration {
-                lines.append("  provider: \(configuration.filterDataProviderBundleIdentifier ?? "unset")")
-                lines.append("  sockets: \(configuration.filterSockets)")
-                lines.append("  rules: \(FilterRules(vendorConfiguration: configuration.vendorConfiguration) == nil ? "unreadable" : "readable")")
+        let configuration = await readConfiguration()
+        if !configuration.answered {
+            lines.append("  NO ANSWER \u{2014} loadFromPreferences did not reply")
+        } else if let error = configuration.error {
+            lines.append("  could not load: \(error)")
+        } else {
+            lines.append("  enabled: \(configuration.isEnabled)")
+            lines.append("  configuration: \(configuration.hasConfiguration ? "present" : "none")")
+            if configuration.hasConfiguration {
+                lines.append("  provider: \(configuration.provider ?? "unset")")
+                lines.append("  sockets: \(configuration.filtersSockets)")
+                lines.append("  rules: \(configuration.rulesReadable ? "readable" : "unreadable")")
             }
-        } catch {
-            lines.append("  could not load: \(error.localizedDescription)")
         }
+
+        lines.append("")
+        lines.append("Entitlement Furlough is signed with:")
+        lines.append("  \(Self.networkExtensionEntitlement)")
 
         lines.append("")
         lines.append("Read at \(Date.now.formatted(date: .numeric, time: .standard))")
         return lines.joined(separator: "\n")
+    }
+
+    /// The `com.apple.developer.networking.networkextension` values this copy is signed with.
+    ///
+    /// In the report because it is the difference between "you refused it" and "this build was
+    /// never allowed to ask": a system extension content filter wants
+    /// `content-filter-provider-systemextension`, and a development-signed build carries the
+    /// plain `content-filter-provider` because that is all a Mac Team Provisioning Profile
+    /// grants. Nothing on screen says which one you have.
+    static var networkExtensionEntitlement: String {
+        guard let task = SecTaskCreateFromSelf(nil),
+              let value = SecTaskCopyValueForEntitlement(task, "com.apple.developer.networking.networkextension" as CFString, nil)
+        else { return "could not be read" }
+        if let values = value as? [String] { return values.joined(separator: ", ") }
+        return String(describing: value)
     }
 
     /// Puts the same block in the activity log, so a failure leaves its evidence behind whether
@@ -370,17 +386,13 @@ final class WebFilter {
             status = .notInApplications
             return nil
         }
-        let found: [ExtensionRequest.Info]
-        do {
-            found = try await ExtensionRequest.properties()
-        } catch let error as OSSystemExtensionError where error.code == .extensionNotFound {
-            found = []
-        } catch {
-            status = .failed(error.localizedDescription)
+        guard let found = await ExtensionRequest.properties() else {
+            status = .failed("macOS did not answer when asked about the extension.")
             return nil
         }
         if let enabled = found.first(where: \.isEnabled) {
-            status = await filterConfigurationIsOn() ? .on : .filterOff
+            let configuration = await readConfiguration()
+            status = configuration.isOn ? .on : .filterOff
             if status.isOn { link.connect() } else { link.disconnect() }
             return enabled.bundleVersion
         }
@@ -557,14 +569,85 @@ final class WebFilter {
         }
     }
 
-    private func filterConfigurationIsOn() async -> Bool {
-        let manager = NEFilterManager.shared()
-        do {
-            try await manager.loadFromPreferences()
-        } catch {
-            return false
+    /// What `NEFilterManager` says about the permission, or that it said nothing.
+    ///
+    /// Raced, like the extension query, and for the same reason: this call has been watched
+    /// never returning, and when it hangs it takes the caller with it — `refresh()` at launch
+    /// and Copy diagnostics both, which is how an app that had plenty to say ended up saying
+    /// nothing at all.
+    struct ConfigurationReport: Sendable {
+        var answered = true
+        var error: String?
+        var isEnabled = false
+        var hasConfiguration = false
+        var provider: String?
+        var filtersSockets = false
+        var rulesReadable = false
+
+        var isOn: Bool { answered && isEnabled && hasConfiguration }
+    }
+
+    private func readConfiguration() async -> ConfigurationReport {
+        await firstOf(8, work: {
+            let manager = NEFilterManager.shared()
+            do {
+                try await manager.loadFromPreferences()
+            } catch {
+                return ConfigurationReport(error: error.localizedDescription)
+            }
+            let configuration = manager.providerConfiguration
+            return ConfigurationReport(
+                isEnabled: manager.isEnabled,
+                hasConfiguration: configuration != nil,
+                provider: configuration?.filterDataProviderBundleIdentifier,
+                filtersSockets: configuration?.filterSockets ?? false,
+                rulesReadable: configuration.map { FilterRules(vendorConfiguration: $0.vendorConfiguration) != nil } ?? false
+            )
+        }, timedOut: ConfigurationReport(answered: false))
+    }
+}
+
+/// One value, delivered once, to whichever of two racers gets there first.
+private final class OneShot<T: Sendable>: @unchecked Sendable {
+    private var continuation: CheckedContinuation<T, Never>?
+    private let lock = NSLock()
+
+    init(_ continuation: CheckedContinuation<T, Never>) { self.continuation = continuation }
+
+    func resume(_ value: T) {
+        lock.lock()
+        let waiting = continuation
+        continuation = nil
+        lock.unlock()
+        waiting?.resume(returning: value)
+    }
+}
+
+/// `work`, or `timedOut` if it has not answered in `seconds`, abandoning whichever loses.
+///
+/// Deliberately **not** a task group. A group does not return until every child has finished,
+/// so racing a hung call against `Task.sleep` inside one still hangs — which is exactly what
+/// the first attempt at this did on 2026-09-09: a deadline that could never fire, watched not
+/// firing for five minutes. Cancellation is no help either, because the calls that hang here
+/// belong to macOS and do not honour it. So the loser is left running with nobody listening,
+/// which is the only arrangement that actually returns.
+///
+/// Two calls in this file have been seen never returning: the system extension properties
+/// request, and `NEFilterManager.loadFromPreferences`. Both are macOS answering about state it
+/// owns, and either one hanging took `start()`, `refresh()` and Copy diagnostics down with it —
+/// the app could not even say what was wrong, which is worse than any answer would have been.
+private func firstOf<T: Sendable>(
+    _ seconds: Double,
+    work: @escaping @Sendable () async -> T,
+    timedOut: T
+) async -> T {
+    await withCheckedContinuation { continuation in
+        let once = OneShot(continuation)
+        Task { once.resume(await work()) }
+        Task {
+            try? await Task.sleep(for: .seconds(seconds))
+            once.resume(timedOut)
         }
-        return manager.isEnabled && manager.providerConfiguration != nil
     }
 }
 
@@ -612,38 +695,26 @@ private final class ExtensionRequest: NSObject, OSSystemExtensionRequestDelegate
         return outcome
     }
 
-    /// macOS was asked and said nothing. A state of its own, because it is not the same as an
-    /// answer of "no extension" and must not be reported as one.
-    struct Silence: LocalizedError {
-        var errorDescription: String? { "macOS did not answer when asked about the extension." }
-    }
-
-    /// Every copy macOS knows about, enabled or not. Throws `.extensionNotFound` on a Mac that
-    /// has never had one, and `Silence` when macOS does not answer at all.
+    /// Every copy macOS knows about, enabled or not, or nil when macOS does not answer at all.
     ///
-    /// The deadline is not defensive habit; it is a bug that was watched happening. On
-    /// 2026-09-09 this call never returned at launch: the log read "web filter: asking macOS
-    /// for its state" and then nothing, ever. `start()` never finished its Task, so the status
-    /// was never read, the version check never ran, and the diagnostics written unconditionally
-    /// on a launch that finds the filter off were never reached — the one place they were most
-    /// wanted. A request macOS ignores has to become a line on the screen, not a hang.
-    static func properties(within seconds: Double = 10) async throws -> [Info] {
-        try await withThrowingTaskGroup(of: [Info].self) { group in
-            group.addTask {
-                let request = ExtensionRequest(properties: true)
+    /// Nil is a third answer and must not be flattened into "no extension installed": one means
+    /// the Mac has none, the other means the question went unanswered, and they need opposite
+    /// things said about them.
+    static func properties() async -> [Info]? {
+        await firstOf(10, work: {
+            let request = ExtensionRequest(properties: true)
+            do {
                 let answer = try await request.submit(.propertiesRequest(forExtensionWithIdentifier: FilterXPC.extensionID, queue: .main))
                 guard case .found(let infos) = answer else { return [] }
                 return infos
+            } catch let error as OSSystemExtensionError where error.code == .extensionNotFound {
+                return []
+            } catch {
+                return nil
             }
-            group.addTask {
-                try await Task.sleep(for: .seconds(seconds))
-                throw Silence()
-            }
-            defer { group.cancelAll() }
-            guard let answered = try await group.next() else { return [] }
-            return answered
-        }
+        }, timedOut: nil)
     }
+
 
     private func submit(_ request: OSSystemExtensionRequest) async throws -> Answer {
         try await withCheckedThrowingContinuation { continuation in
