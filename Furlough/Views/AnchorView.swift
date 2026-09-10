@@ -1,13 +1,17 @@
 import FamilyControls
 import SwiftUI
 
-enum AnchorRoute: Hashable {
-    case editor
-}
+/// The Anchor: apps locked behind a physical tag. One of Home's two pages, beside Rules, rather
+/// than a screen pushed off a card in the middle of the other half — that card is gone, and the
+/// segment in the toolbar is how you get here.
+///
+/// `isCurrent` is whether this is the page in front. A page-style `TabView` builds the page next
+/// to the one you are looking at, and this one arms an NFC reader on sight: without the flag,
+/// opening Home on Rules would put Apple's scan sheet in front of someone who never asked for it.
+struct AnchorPage: View {
+    /// Whether this is the half on screen. See above.
+    let isCurrent: Bool
 
-/// The Anchor profile: apps locked behind a physical tag. Anchor from here or from the home
-/// card; weigh anchor only by scanning one of the paired tags.
-struct AnchorView: View {
     @Environment(AppModel.self) private var model
     @State private var showPicker = false
     @State private var selection = FamilyActivitySelection(includeEntireCategory: true)
@@ -97,16 +101,22 @@ struct AnchorView: View {
             .padding(.bottom, 48)
         }
         .background(EmberWall())
-        // Armed on sight, so that holding a tag up is the whole of it. Only when the scan has
-        // something to do though: someone who came here to choose apps has no tag in hand, and
-        // a system sheet in the face every time this screen opens would be the price of a
-        // convenience they are not using yet. The row arms it either way.
-        .task {
-            guard anchor.isAnchored || anchor.canAnchor else { return }
+        // Armed on sight, so that holding a tag up is the whole of it. Only when this is the
+        // page in front, and only when the scan has something to do: someone who came here to
+        // choose apps has no tag in hand, and a system sheet in the face every time this page
+        // arrives would be the price of a convenience they are not using yet. The row arms it
+        // either way.
+        //
+        // Keyed on `isCurrent` so a swipe onto this page arms it, the way arriving used to.
+        .task(id: isCurrent) {
+            guard isCurrent, anchor.isAnchored || anchor.canAnchor else { return }
             await listen()
         }
-        // Core NFC reads for the foreground app only, and the sheet belongs to this screen.
-        // Leaving with it still up would hand the reader to nobody.
+        // Core NFC reads for the foreground app only, and the sheet belongs to this page.
+        // Swiping to the other half with it still up would hand the reader to nobody.
+        .onChange(of: isCurrent) { _, current in
+            if !current { model.stopReadingTags() }
+        }
         .onDisappear { model.stopReadingTags() }
         // Backgrounding only. A system sheet over the app can take the scene to `.inactive`,
         // and Apple's scan sheet is one — tearing down there would cancel the reader the
@@ -114,14 +124,8 @@ struct AnchorView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { model.stopReadingTags() }
         }
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Text("Anchor")
-                    .emberBody(15, .semibold)
-                    .foregroundStyle(Ember.cream)
-            }
-        }
+        // No title of its own: Home's segment names this page, and a second "Anchor" in the
+        // same bar would be the app saying it twice.
         .familyActivityPicker(
             headerText: anchor.anchorsEverything ? "Choose what stays open while anchored" : "Choose what the anchor holds",
             footerText: anchor.anchorsEverything ? "Picking a category keeps every app in it open." : "Picking a category locks every app in it.",
@@ -1268,52 +1272,6 @@ struct AnchorToggleButton: View {
         case .failed(let reason): message = reason
         default: break
         }
-    }
-}
-
-/// The home-screen entry to the Anchor profile, with its state and the Anchor / Unanchor button.
-struct AnchorCard: View {
-    let anchor: AnchorProfile
-
-    var body: some View {
-        HStack(spacing: 12) {
-            NavigationLink(value: AnchorRoute.editor) {
-                HStack(spacing: 10) {
-                    AnchorGlyph(isAnchored: anchor.isAnchored, size: 34)
-                    VStack(alignment: .leading, spacing: 1) {
-                        HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            Text("Anchor")
-                                .emberDisplaySmall(13.5)
-                                .foregroundStyle(Ember.cream)
-                            Eyebrow(text: anchor.isAnchored ? "Anchored" : "Free", color: anchor.isAnchored ? Ember.ember : Ember.moss, size: 9)
-                        }
-                        Text(subtitle)
-                            .emberBody(11.5)
-                            .foregroundStyle(Ember.muted)
-                            .lineLimit(1)
-                    }
-                    Spacer(minLength: 0)
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            AnchorToggleButton()
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .emberCard()
-    }
-
-    /// "3 items · ready", or under the wider scope "Everything except 3 · since 6:12 PM".
-    private var subtitle: String {
-        let held = anchor.heldDescription
-        if anchor.scope == .chosen, anchor.kinds.isEmpty { return "Tap to choose apps and pair a tag" }
-        if !anchor.isPaired { return "\(held) · pair a tag to enable" }
-        if anchor.isAnchored, let since = anchor.anchoredAt {
-            let lift = anchor.until.map { " · lifts \(TimeFormat.clock($0))" } ?? ""
-            return "\(held) · since \(since.formatted(date: .omitted, time: .shortened))\(lift)"
-        }
-        return "\(held) · ready"
     }
 }
 

@@ -30,7 +30,9 @@ struct RootView: View {
                 UsageView(role: .onboarding)
                     .transition(.opacity)
             } else {
-                HomeView()
+                // The half the intro was told to start on. Read once, here, so Home's own state
+                // owns it from then on and a swipe is not undone by the next rebuild.
+                HomeView(start: model.startHalf)
                     .transition(.opacity)
             }
         }

@@ -1,7 +1,18 @@
 import SwiftUI
 
+/// Home: the two halves as two pages under one toolbar.
+///
+/// Rules and the Anchor are co-equal, and this screen used to say otherwise. The hero, the list
+/// and the + were Rules', and the Anchor was a card in the middle of them that pushed a screen
+/// away — a feature of the app rather than half of it. Now the segment in the title's place
+/// switches between two pages, a swipe does the same, and the toolbar is about whichever page
+/// is under it. Which one it opens on is the intro's question, answered on the start pane and
+/// kept in `AppModel.startHalf`.
 struct HomeView: View {
     @Environment(AppModel.self) private var model
+    /// Which half is on screen. Seeded from the intro's answer and this view's own after that,
+    /// so a swipe holds for the rest of the run rather than snapping back on every rebuild.
+    @State private var half: Half
     /// The Application / Website popover under the + button.
     @State private var showAddChoice = false
     /// What the popover asked for; `addTargetsFlow` takes it from here to Apple's picker.
@@ -10,23 +21,28 @@ struct HomeView: View {
     @State private var showHelp = false
     @State private var showPending = false
 
+    init(start: Half) { _half = State(initialValue: start) }
+
     var body: some View {
         NavigationStack {
-            TimelineView(.everyMinute) { context in
-                ScrollView {
-                    HomeContent(now: model.clock.honest(context.date))
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 48)
-                }
+            // A pager rather than a switch, so the two halves can be swiped between as well as
+            // tapped. Selection is the same `half` the segment reads, so the two ways of moving
+            // cannot disagree.
+            TabView(selection: $half) {
+                RulesPage()
+                    .tag(Half.rules)
+                // The Anchor arms an NFC reader on sight, and a pager builds the page beside the
+                // one you are looking at. So it is told whether it is the page in front, and
+                // only the page in front listens.
+                AnchorPage(isCurrent: half == .anchor)
+                    .tag(Half.anchor)
             }
+            .tabViewStyle(.page(indexDisplayMode: .never))
             .background(EmberWall())
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: UUID.self) { id in
                 RuleEditorView(targetID: id)
-            }
-            .navigationDestination(for: AnchorRoute.self) { _ in
-                AnchorView()
             }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -36,6 +52,9 @@ struct HomeView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Help", systemImage: "questionmark.circle.fill") { showHelp = true }
                         .tint(Ember.cream)
+                }
+                ToolbarItem(placement: .principal) {
+                    HalfSegment(half: $half)
                 }
                 if !model.state.pending.isEmpty {
                     ToolbarItem(placement: .topBarTrailing) {
@@ -47,19 +66,24 @@ struct HomeView: View {
                     }
                     ToolbarSpacer(.fixed, placement: .topBarTrailing)
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Add", systemImage: "plus") { showAddChoice = true }
-                        .tint(Ember.cream)
-                        .popover(isPresented: $showAddChoice, arrowEdge: .top) {
-                            AddChoicePopover(
-                                applicationCaption: "Apps and categories, from Apple's picker",
-                                websiteCaption: "Type the address. Hours, but no daily limit"
-                            ) { choice in
-                                showAddChoice = false
-                                addRequest = .plain(choice)
+                // The + acts on the page it is over. The Anchor page chooses what it holds from
+                // its own row, so until that + has an anchor destination of its own it is not
+                // drawn over a page it cannot add to.
+                if half == .rules {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Add", systemImage: "plus") { showAddChoice = true }
+                            .tint(Ember.cream)
+                            .popover(isPresented: $showAddChoice, arrowEdge: .top) {
+                                AddChoicePopover(
+                                    applicationCaption: "Apps and categories, from Apple's picker",
+                                    websiteCaption: "Type the address. Hours, but no daily limit"
+                                ) { choice in
+                                    showAddChoice = false
+                                    addRequest = .plain(choice)
+                                }
+                                .presentationCompactAdaptation(.popover)
                             }
-                            .presentationCompactAdaptation(.popover)
-                        }
+                    }
                 }
             }
             .addTargetsFlow($addRequest)
@@ -70,7 +94,57 @@ struct HomeView: View {
     }
 }
 
-/// Everything below the toolbar: the hero and the list grouped by next opening.
+/// Rules · Anchor, in the title's place: the one control that says the app is two things and
+/// neither of them is the main one. Glass, because it sits in the toolbar with the buttons.
+struct HalfSegment: View {
+    @Binding var half: Half
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(Half.allCases, id: \.self) { value in
+                Button {
+                    guard value != half else { return }
+                    // withAnimation, because a page-style TabView slides for a gesture but jumps
+                    // for a plain assignment, and the two ways across should be one movement.
+                    withAnimation(.snappy(duration: 0.3)) { half = value }
+                } label: {
+                    Text(value.title)
+                        .emberBody(12.5, .bold)
+                        .foregroundStyle(value == half ? Ember.cream : Ember.muted)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 5)
+                        .background(
+                            Capsule().fill(value == half ? Color.white.opacity(0.14) : .clear)
+                        )
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(value.title)
+                .accessibilityAddTraits(value == half ? [.isButton, .isSelected] : .isButton)
+            }
+        }
+        .padding(3)
+        .glassEffect(.regular, in: .capsule)
+    }
+}
+
+/// The everyday half: the hero, and the list grouped by next opening.
+private struct RulesPage: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        TimelineView(.everyMinute) { context in
+            ScrollView {
+                HomeContent(now: model.clock.honest(context.date))
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 48)
+            }
+        }
+    }
+}
+
+/// Everything below the toolbar on the Rules page: the hero and the list grouped by next
+/// opening. The Anchor's card used to sit between the two; it is the page beside this one now.
 struct HomeContent: View {
     @Environment(AppModel.self) private var model
     let now: Date
@@ -90,8 +164,6 @@ struct HomeContent: View {
 
         VStack(alignment: .leading, spacing: 0) {
             HeroPager(groups: groups, statuses: statuses, glasses: glasses, runtime: state.runtime, anchor: config.anchor, featured: $featured)
-            AnchorCard(anchor: config.anchor)
-                .padding(.top, 10)
             ForEach(groups.sections) { section in
                 SectionLabel(text: section.title)
                 VStack(spacing: 0) {
@@ -388,8 +460,9 @@ struct EmptyHero: View {
                     .foregroundStyle(Ember.cream)
                     .padding(.top, 4)
                 // Both ways in, because there are two and only one of them used to be offered.
-                // The Anchor is the card directly under this one, so "below" is where it is.
-                Text("Tap + to give an app hours and a budget, or open the Anchor below to lock in one tap.")
+                // The Anchor is the page beside this one now, not a card under this hero, so
+                // "below" would send someone looking at the list for it.
+                Text("Tap + to give an app hours and a budget. The Anchor — one tap, one tag — is the page beside this one.")
                     .emberBody(11.5)
                     .foregroundStyle(Ember.muted)
                     .fixedSize(horizontal: false, vertical: true)

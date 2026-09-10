@@ -1,36 +1,41 @@
 import FamilyControls
 import SwiftUI
 
-/// The first run: four panes, then the ask.
+/// The first run: the promise, the question, the ask.
 ///
-/// It is four rather than one because Furlough is two things and used to introduce only one of
-/// them. Rules — hours, budgets, the delay — are the everyday half, and the Anchor is the other:
-/// one tap, the whole phone if you want it, and a physical tag as the only key. Someone who came
-/// for a tag-and-lock app used to meet three paragraphs about minute budgets and had to find the
-/// Anchor on their own, from a card on Home. Now each half gets a pane and its own mark, and the
-/// promise that covers both — no unblock button — is what opens.
+/// Three panes, and the middle one is the point. Furlough is two things — Rules, which are hours
+/// and budgets and a delay on anything that hands time back, and the Anchor, which is one tap and
+/// a physical tag as the only key. The intro used to name both and then hand everyone the same
+/// app, built around Rules, with the Anchor a card someone had to find. So the second pane asks
+/// which half you came for, and the answer is what the app opens on and which guide runs. The
+/// two panes that used to explain a half each are gone: every sentence on them now lands inside
+/// the guide step it describes, where it can be acted on rather than read and forgotten.
 ///
 /// The ask is last and on its own, because both halves are enforced by Screen Time and because
 /// the gentler first week starts the moment access is granted, which is a thing to be told
-/// immediately before granting it rather than three screens earlier.
+/// immediately before granting it rather than two screens earlier.
 struct OnboardingView: View {
     @Environment(AppModel.self) private var model
     @State private var requesting = false
     @State private var pane: Pane = .promise
+    /// The start pane's answer, held until Continue. The Anchor leads: it is the half nobody
+    /// was being offered, and a preselected first row asks the question without putting a dead
+    /// button under it.
+    @State private var chosen: Half = .anchor
+    @State private var wantsBoth = false
 
-    /// The panes in order. `access` carries the button; the other three carry Continue.
+    /// The panes in order. `access` carries the button; the other two carry Continue.
     private enum Pane: Int, CaseIterable {
-        case promise, rules, anchor, access
+        case promise, start, access
 
         var next: Pane? { Pane(rawValue: rawValue + 1) }
         var previous: Pane? { Pane(rawValue: rawValue - 1) }
 
-        /// Every pane has one, so the button sits at the same height on all four.
+        /// Every pane has one, so the button sits at the same height on all three.
         var footnote: String {
             switch self {
             case .promise: "Screen Time access is asked for at the end, once you know what for."
-            case .rules: "Adding an app enforces nothing on its own. Saving its first rule is what starts it."
-            case .anchor: "The Anchor is optional, and nothing else in Furlough depends on it."
+            case .start: "Nothing is decided here. Both halves are a swipe apart afterwards, whichever you pick."
             case .access: "You can turn this off any time in Settings > Screen Time."
             }
         }
@@ -75,21 +80,35 @@ struct OnboardingView: View {
         // A phone that has already been through the panes and had access refused comes back to
         // the ask rather than to page one. The intro is not the thing it is stuck on.
         .onAppear { if model.authorization == .denied { pane = .access } }
+        // The answer is committed on the way forward off the start pane, which is the one place
+        // both ways of leaving it meet: Continue sets `pane` and so does a swipe. Going Back
+        // does not commit, so a finger on its way somewhere else changes nothing.
+        .onChange(of: pane) { old, new in
+            guard old == .start, new.rawValue > Pane.start.rawValue else { return }
+            model.chooseStart(half: chosen, both: wantsBoth)
+        }
     }
 
     // MARK: The mark
 
-    /// The glass for the three panes it belongs to, the anchor for the one it does not. The
-    /// Anchor's pane wearing the app's hourglass would be the same demotion in a picture.
+    /// The glass on the panes about the whole app, and both marks together on the one that asks
+    /// you to choose between them — the picture of the question, in the order the rows are in.
+    /// Bare marks rather than the row tiles they wear elsewhere: glowing objects, no furniture.
     @ViewBuilder private func mark(for pane: Pane) -> some View {
-        if pane == .anchor {
-            // The bare mark rather than the row tile it wears elsewhere, so it stands here the
-            // way the hourglass stands on the other three: one glowing object, no furniture.
-            AnchorShape()
-                .fill(Ember.ember)
-                .frame(width: 100, height: 128)
-                .shadow(color: Ember.ember.opacity(0.5), radius: 24)
-                .frame(width: 106, height: 140)
+        if pane == .start {
+            HStack(spacing: 16) {
+                AnchorShape()
+                    .fill(chosen == .anchor ? Ember.ember : Ember.faint)
+                    .frame(width: 72, height: 92)
+                    .shadow(color: Ember.ember.opacity(chosen == .anchor ? 0.5 : 0), radius: 20)
+                LivingHourglass(state: .open(level: 0.62, warned: false))
+                    .compositingGroup()
+                    .frame(width: 76, height: 100)
+                    .shadow(color: Ember.amber.opacity(chosen == .rules ? 0.45 : 0), radius: 20)
+                    .opacity(chosen == .rules ? 1 : 0.45)
+            }
+            .frame(height: 140)
+            .animation(.snappy(duration: 0.25), value: chosen)
         } else {
             LivingHourglass(state: .open(level: 0.62, warned: false))
                 .compositingGroup()
@@ -103,8 +122,7 @@ struct OnboardingView: View {
     @ViewBuilder private func content(for pane: Pane) -> some View {
         switch pane {
         case .promise: promise
-        case .rules: rules
-        case .anchor: anchor
+        case .start: start
         case .access: access
         }
     }
@@ -124,19 +142,21 @@ struct OnboardingView: View {
                 .foregroundStyle(Ember.muted)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 14)
+            // The Anchor first here and on the next pane, so the intro lists the two halves in
+            // one order throughout and the row you read first is the row you land on.
             VStack(spacing: 0) {
-                HalfRow(
-                    title: "Rules",
-                    detail: "Allowed hours and a daily budget for the apps that eat your day. Tightening one applies at once; anything that gives you back time waits."
-                ) {
-                    HelpTile(symbol: "hourglass")
-                }
-                CardDivider()
                 HalfRow(
                     title: "The Anchor",
                     detail: "One tap locks a list, or the whole phone. The only thing that lifts it is an NFC tag you paired and left somewhere else."
                 ) {
                     AnchorGlyph(isAnchored: false)
+                }
+                CardDivider()
+                HalfRow(
+                    title: "Rules",
+                    detail: "Allowed hours and a daily budget for the apps that eat your day. Tightening one applies at once; anything that gives you back time waits."
+                ) {
+                    HelpTile(symbol: "hourglass")
                 }
             }
             .emberCard()
@@ -146,56 +166,72 @@ struct OnboardingView: View {
         }
     }
 
-    private var rules: some View {
+    /// The question the app never asked. Two rows and a quieter third line; the answer sets the
+    /// page Furlough opens on and the guide that runs on it. Tapping a row only selects it —
+    /// Continue is what commits, and it is live from the moment the pane arrives, because a
+    /// disabled button under a question is the thing this pass is removing from Home.
+    private var start: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Eyebrow(text: "The everyday half", color: Ember.amber)
+            Eyebrow(text: "Two halves", color: Ember.amber)
                 .padding(.top, 30)
-            Text("By the clock.")
+            Text("Where do you want to start?")
                 .emberDisplay(34)
                 .foregroundStyle(Ember.cream)
                 .padding(.top, 6)
-            Text("Pick the apps and websites that eat your time. Give each one a minute budget, and allowed windows if you want them, the same every day or different on weekends. Once the budget is spent, or outside the windows, iOS shields the app.")
+            Text("Furlough opens on the half you pick and walks you through setting it up. The other one is one swipe away, whenever you want it.")
                 .emberBody(15)
                 .foregroundStyle(Ember.muted)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 14)
-            Text("Tightening a rule applies instantly. Loosening one waits \(TimeFormat.delay(hours: model.state.config.loosenDelayHours)), and you can cancel it while it does.")
-                .emberBody(15)
-                .foregroundStyle(Ember.muted)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 10)
-            Text("The shield says which app is closed and when it opens next. There is nothing else on it.")
-                .emberBody(15)
-                .foregroundStyle(Ember.muted)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 10)
+            VStack(spacing: 0) {
+                StartRow(
+                    title: "The Anchor",
+                    detail: "Lock a list, or the whole phone, in one tap. A tag you paired is the only way back.",
+                    isOn: chosen == .anchor && !wantsBoth
+                ) {
+                    AnchorGlyph(isAnchored: false)
+                } action: {
+                    chosen = .anchor
+                    wantsBoth = false
+                }
+                CardDivider()
+                StartRow(
+                    title: "Rules",
+                    detail: "Give the apps that eat your day allowed hours and a daily budget.",
+                    isOn: chosen == .rules && !wantsBoth
+                ) {
+                    HelpTile(symbol: "hourglass")
+                } action: {
+                    chosen = .rules
+                    wantsBoth = false
+                }
+            }
+            .emberCard()
+            .padding(.top, 18)
+            // Quieter and outside the card, because it is not a third thing to be — it is the
+            // two above, in the order they are in.
+            Button {
+                chosen = .anchor
+                wantsBoth = true
+            } label: {
+                HStack(spacing: 7) {
+                    Image(systemName: wantsBoth ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("Both, the Anchor first")
+                        .emberBody(13, .semibold)
+                    Spacer(minLength: 0)
+                }
+                .foregroundStyle(wantsBoth ? Ember.ember : Ember.muted)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 10)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 4)
+            .accessibilityAddTraits(wantsBoth ? .isSelected : [])
         }
-    }
-
-    private var anchor: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Eyebrow(text: "The other half", color: Ember.ember)
-                .padding(.top, 30)
-            Text("One tap. Then the tag.")
-                .emberDisplay(34)
-                .foregroundStyle(Ember.cream)
-                .padding(.top, 6)
-            Text("The Anchor is a separate list you lock in one tap, from anywhere — or turn inside out, so every app on the phone is shielded and the list is what stays open. No delay applies, because anchoring only ever takes things away.")
-                .emberBody(15)
-                .foregroundStyle(Ember.muted)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 14)
-            Text("What lifts it is holding your phone to an NFC tag you paired. Any NTAG sticker works, and so does the tag that came with another blocking product. Leave it at home and the phone stays anchored until you are back.")
-                .emberBody(15)
-                .foregroundStyle(Ember.muted)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 10)
-            Text("It can also drop on a schedule you set, and it carries to Furlough on your Mac.")
-                .emberBody(15)
-                .foregroundStyle(Ember.muted)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 10)
-        }
+        .animation(.snappy(duration: 0.25), value: chosen)
+        .animation(.snappy(duration: 0.25), value: wantsBoth)
     }
 
     private var access: some View {
@@ -306,6 +342,60 @@ private struct HalfRow<Icon: View>: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 12)
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// One half offered on the start pane: `HalfRow` with a tap and a chosen state. The mark keeps
+/// its own colour when the row is not chosen — an anchor greyed out is a different anchor — and
+/// the row says which it is with its border and its check.
+private struct StartRow<Icon: View>: View {
+    let title: String
+    let detail: String
+    let isOn: Bool
+    let icon: Icon
+    let action: () -> Void
+
+    init(
+        title: String,
+        detail: String,
+        isOn: Bool,
+        @ViewBuilder icon: () -> Icon,
+        action: @escaping () -> Void
+    ) {
+        self.title = title
+        self.detail = detail
+        self.isOn = isOn
+        self.icon = icon()
+        self.action = action
+    }
+
+    var body: some View {
+        Button(action: action) {
+            HStack(alignment: .top, spacing: 10) {
+                icon
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .emberDisplaySmall(14)
+                        .foregroundStyle(Ember.cream)
+                    Text(detail)
+                        .emberBody(12)
+                        .foregroundStyle(Ember.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+                Image(systemName: isOn ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(isOn ? Ember.ember : Ember.cream.opacity(0.22))
+                    .padding(.top, 2)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
+            .background(isOn ? Ember.ember.opacity(0.08) : .clear)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : .isButton)
     }
 }
 

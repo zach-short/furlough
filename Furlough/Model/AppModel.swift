@@ -60,6 +60,23 @@ final class AppModel {
     /// must not wait out a loosening delay.
     private(set) var hasSeenUsageStep = UserDefaults.standard.bool(forKey: AppModel.usageStepKey)
     private static let usageStepKey = "furlough.sawUsageStep"
+    /// The half the intro was told to start on: the page Home opens on, and the guide that runs
+    /// first. Beside the three above in the app's own defaults, for the same reason — it records
+    /// what was asked for, not what is blocked, so it must not travel in an exported setup and
+    /// must not wait out a loosening delay.
+    ///
+    /// Rules when nothing has been asked: a phone upgrading from a build that never had the
+    /// question comes up on the screen it has always come up on. A fresh install answers the
+    /// pane before it ever reaches Home.
+    private(set) var startHalf = AppModel.storedStartHalf
+    private static let startHalfKey = "furlough.startHalf"
+    private static var storedStartHalf: Half {
+        UserDefaults.standard.string(forKey: startHalfKey).flatMap(Half.init(rawValue:)) ?? .rules
+    }
+    /// The start pane's third line, which is not a third page: "Both" opens on `startHalf` and
+    /// leaves the other half's guide running too. Stored beside it and for the same reason.
+    private(set) var wantsBothHalves = UserDefaults.standard.bool(forKey: AppModel.bothHalvesKey)
+    private static let bothHalvesKey = "furlough.bothHalves"
     #if DEBUG || TESTING_TOOLS
     /// A testing reset has asked for the first run back — see `resetEverything`. Beside the
     /// three above for the same reason, and read at launch like them, so a phone relaunched
@@ -102,6 +119,16 @@ final class AppModel {
     private func considerUsageStep() {
         guard !hasSeenUsageStep, isAuthorized, state.config.targets.isEmpty else { return }
         showsUsageStep = true
+    }
+
+    /// The start pane, answered. Written when Continue is pressed rather than on each tap, so
+    /// backing out of the intro and coming at it again does not leave a half chosen by a finger
+    /// that was on its way somewhere else.
+    func chooseStart(half: Half, both: Bool) {
+        UserDefaults.standard.set(half.rawValue, forKey: Self.startHalfKey)
+        UserDefaults.standard.set(both, forKey: Self.bothHalvesKey)
+        startHalf = half
+        wantsBothHalves = both
     }
 
     /// The step is done with, whether it was worked through or waved away.
@@ -1472,12 +1499,17 @@ final class AppModel {
         UserDefaults.standard.removeObject(forKey: AppModel.companionDismissedKey)
         // Everything that records what has been shown rather than what is blocked, put back to
         // what a fresh install has: no access remembered for the launch screen to trust, the
-        // usage step unseen so it comes round again after the grant, and the first screen asked
-        // for whatever iOS does with the revoke below.
+        // usage step unseen so it comes round again after the grant, no half chosen so the
+        // start pane asks again, and the first screen asked for whatever iOS does with the
+        // revoke below.
         UserDefaults.standard.set(false, forKey: Self.wasAuthorizedKey)
         UserDefaults.standard.removeObject(forKey: Self.usageStepKey)
         hasSeenUsageStep = false
         showsUsageStep = false
+        UserDefaults.standard.removeObject(forKey: Self.startHalfKey)
+        UserDefaults.standard.removeObject(forKey: Self.bothHalvesKey)
+        startHalf = .rules
+        wantsBothHalves = false
         UserDefaults.standard.set(true, forKey: Self.restartsOnboardingKey)
         restartsOnboarding = true
         lastError = nil
