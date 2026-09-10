@@ -2210,11 +2210,78 @@ The plan for this stretch. Tick each phase off here as it lands.
     Diagnostics row in both its moss and ember states (the healthy line forced with a
     harness-only env var, since the simulator can never authorize Screen Time), the Diagnostics
     screen, and the stuck page opening from About. Not yet run on the phone.
-    **Still open in the build order: item 6, the Mac, which follows the phone file for file —
-    the sidebar segment, `AnchorSheet` as a pane with the guide, the start pane in onboarding,
-    `SettingsSheet` regrouped the same way (Web and Browsers stay; the six-step walkthrough
-    collapses behind the filter's status until that status is not On), and the padlock in the
-    toolbar replaced by the app's own anchor mark.**
+
+35. **The Mac follows (the two-halves pass, item 6 — the last one).** Done 2026-09-10. The Mac
+    was still the shape the phone had before this pass: one window built around Rules, with the
+    Anchor behind an unlabelled SF padlock in the toolbar opening a sheet of eleven blocks. Now
+    it is two halves under one segment, file for file with the phone:
+
+    - **The segment.** `MacHalfSegment` (in `MacComponents.swift`, so the offscreen harness can
+      draw it) sits under the sidebar headline rather than in the title's place — a Mac window's
+      toolbar has no free slot. The sidebar and the detail pane both switch on `half`: Rules is
+      the list of targets and the rule editor, the Anchor is what it holds and `MacAnchorPane`.
+      The padlock is gone from the toolbar; the app's own anchor mark is on the pane's state card
+      (`AnchorGlyph`, the phone's, copied into `MacAnchorPane.swift`). While the anchor is down
+      the Rules header carries an ember "Anchored · 3 items", because that changes what every
+      rule on the list means.
+    - **`AnchorSheet` is `MacAnchorPane`.** The 366-line sheet is gone. What it holds moved to
+      the sidebar, where the half's list belongs, so the pane is the state card, two rows —
+      **Scope** and **Your iPhone** — and a footnote. Two rather than the phone's four: this Mac
+      has no tag reader and no scheduled drops, so Tags and Schedule would be rows about nothing.
+      Each row opens a screen in place with a Back link (`WeekSheet` and `LogView` do the same;
+      the detail pane is not in a navigation stack), and each screen's lead is the footnote that
+      used to sit under its card. The pane owns no picker: the sheet's own app search and host
+      field are gone, and both halves add through the one flow.
+    - **The guides.** `HalfGuide` moved to `Shared/Core/HalfGuide.swift`; the phone's two step
+      lists stayed in `Furlough/Views/Guides.swift` (the first Rules step reads `UsageReader`)
+      and the Mac's two are `macRules`/`macAnchor` under `#if os(macOS)` in that file, where
+      they are pure and tested. The Anchor's first step is not *Pair a tag* — this Mac has no
+      reader — but **"Drop it once from your iPhone"**, on `AnchorSync.phoneSeen`, with the link
+      status under the button, which is the same fact from the other end and the thing
+      `macDrop` refuses a drop without. `GuideCard` is copied into `MacGuides.swift` for the
+      reason `MacComponents.swift` gives: `SectionLabel` and friends live in each app's own
+      views, and Shared/UI is compiled into the iOS widget extension, which has none of them.
+    - **Onboarding is three panes: promise, start, filter.** The Anchor pane — told rather than
+      asked — is gone, and its sentences are in the guide steps they describe. The start pane is
+      the phone's: the Anchor first, Rules second, "Both, the Anchor first" quieter underneath,
+      committed on Continue. The promise pane keeps the Mac-only paragraph about there being no
+      Screen Time API here, because it is the one thing to know before agreeing to anything.
+    - **Settings, the same diet.** Start (Opens on, the + preference, Run the setup guide again
+      — no "Where the time goes", since there is no usage API here), Rules, Web, Browsers,
+      Enforcement (the two toggles, with *The one escape* shrunk from a paragraph to a
+      footnote), Your setup (one sentence, from four lines), Diagnostics, Testing. The six-step
+      web-filter walkthrough and its explainer now draw only while the status is not On: a page
+      of directions under a status that reads On was the tallest thing on the screen.
+      `MacDiagnosticsView` holds what Enforcement listed. About is not here — it is Help > About
+      on the Mac, and the five-click reveal stays there.
+
+    `Diagnostics` gained a `MacReading` and `macSummary`: different questions, because the Mac
+    enforces on its own — a filter that was installed and switched off, a browser that refused
+    Automation, the App Group, notifications, and an uninstalled filter last, since that one was
+    offered and declined. `MacModel` gained `startHalf`/`wantsBothHalves`/`anchorHalfAdds`/
+    `finishedGuides` in the App Group beside `furlough.mac.onboarded`, `chooseStart`,
+    `setStartHalf`, `setAnchorHalfAdds`, `addDestination(on:)`, `finishGuide`, `restartGuides`,
+    `seedFinishedGuides` (so an update does not put a checklist in front of a Mac that is set
+    up), `addToAnchor(_:)` and a `diagnostics` reading; the testing reset forgets all four keys.
+    Help's stale pointers now say "Settings > Diagnostics", "Settings > Diagnostics > Activity
+    log" and "Settings > Your setup". The + over the Anchor half adds to the anchor by default
+    (`anchorHalfAdds`, a Settings chip pair), but the half's *own* Choose apps row never asks
+    that preference — it is about what the + means, not about a button that says what it does.
+    Each of the three places that asks Application-or-Website has its own popover, because a
+    popover pops from the control that was clicked.
+
+    One copy fix that touches the phone: the Anchor guide's last step said
+    "\(heldDescription) goes out of reach", which reads wrong half the time — a count takes a
+    plural verb and "Everything except 3" a singular one. Both platforms now say
+    "Out of reach: 3 items."
+
+    619 Core tests pass (19 new: `MacGuideTests`, and the Mac half of `DiagnosticsTests`); both
+    apps build warning-free. **Verified visually** only for the guide cards and the segment, on
+    an offscreen `swiftc` harness (the recipe in the Mac-screenshots memory) — both guides in
+    each of their three live states, the ticks, the dimming and the ember buttons. The window
+    itself has **not** been run: Zach's installed copy was running and the launch hook cannot
+    get a window while it is (see that memory), so the sidebar halves, the anchor pane, the new
+    onboarding and the regrouped Settings have been built and read but not seen.
 
 ## Style rules
 

@@ -66,6 +66,9 @@ struct Footnote: View {
             .emberBody(10.5)
             .foregroundStyle(Ember.faint)
             .multilineTextAlignment(alignment)
+            // Its ideal height is the wrapped height. Without this a footnote in a stack that
+            // is measuring itself gets one line and an ellipsis.
+            .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: alignment == .center ? .center : .leading)
             .padding(.horizontal, 8)
     }
@@ -81,18 +84,30 @@ struct CardDivider: View {
 struct CardAction: View {
     let title: String
     var symbol: String?
+    /// A line under the title, for a button whose effect is worth saying before it is pressed —
+    /// and, once it has been, worth saying it happened. The phone's `actionRow` has one for the
+    /// same reason: a row that answers for itself beats a row that raises an alert.
+    var detail: String?
     var color: Color = Ember.ember
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 6) {
-                if let symbol {
-                    Image(systemName: symbol).font(.system(size: 12, weight: .bold))
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    if let symbol {
+                        Image(systemName: symbol).font(.system(size: 12, weight: .bold))
+                    }
+                    Text(title).emberBody(13, .semibold)
                 }
-                Text(title).emberBody(13, .semibold)
+                .foregroundStyle(color)
+                if let detail {
+                    Text(detail)
+                        .emberBody(11.5)
+                        .foregroundStyle(Ember.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
-            .foregroundStyle(color)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12)
             .padding(.vertical, 11)
@@ -513,5 +528,40 @@ struct StepFigure: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
             .background(picked ? Ember.ember : Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+    }
+}
+
+/// Rules · Anchor, at the top of the sidebar: the one control that says the app is two things and
+/// neither of them is the main one.
+///
+/// The phone puts this where its title is; a Mac window's toolbar has no such slot free, so it
+/// sits under the headline it belongs to, above the list it changes.
+struct MacHalfSegment: View {
+    @Binding var half: Half
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(Half.allCases, id: \.self) { value in
+                Button {
+                    guard value != half else { return }
+                    withAnimation(.snappy(duration: 0.25)) { half = value }
+                } label: {
+                    Text(value.title)
+                        .emberBody(12.5, .bold)
+                        .foregroundStyle(value == half ? Ember.cream : Ember.muted)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule().fill(value == half ? Color.white.opacity(0.14) : .clear)
+                        )
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(value.title)
+                .accessibilityAddTraits(value == half ? [.isButton, .isSelected] : .isButton)
+            }
+        }
+        .padding(3)
+        .glassEffect(.regular, in: .capsule)
     }
 }

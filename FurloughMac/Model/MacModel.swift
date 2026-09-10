@@ -43,7 +43,41 @@ final class MacModel {
     /// it stands still until the view is made again.
     private(set) var now = Date.now
 
+    /// The half the intro was told to start on: the one the window opens on, and the guide that
+    /// runs first. In the App Group beside `furlough.mac.onboarded`, and for the same reason as
+    /// the phone keeps its copy out of the shared state — it records what was asked for, not
+    /// what is blocked, so it must not travel in an exported setup or wait out a delay.
+    ///
+    /// Rules when nothing has been asked, so a Mac updating from a build that never had the
+    /// question comes up on the window it has always come up on.
+    private(set) var startHalf = MacModel.storedStartHalf
+    /// The start pane's third line, which is not a third choice: "Both" opens on `startHalf` and
+    /// leaves the other half's guide running too.
+    private(set) var wantsBothHalves = SharedStore.defaults.bool(forKey: MacModel.bothHalvesKey)
+    /// What the + button adds while the Anchor half is the one on screen. The anchor, because the
+    /// + acts on the half you are looking at — with a way to change it, for somebody who set the
+    /// anchor up once and reads + as "give an app hours" wherever it is. See the phone's
+    /// `AppModel.anchorPageAdds`.
+    private(set) var anchorHalfAdds = MacModel.storedAnchorHalfAdds
+    /// The halves whose three-step guide has been walked to the end. A flag rather than a derived
+    /// fact because the last step of each is not something the config can answer; the first two
+    /// are derived — see `HalfGuide`.
+    private(set) var finishedGuides = MacModel.storedFinishedGuides
+
     private static let onboardedKey = "furlough.mac.onboarded"
+    private static let startHalfKey = "furlough.mac.startHalf"
+    private static let bothHalvesKey = "furlough.mac.bothHalves"
+    private static let anchorHalfAddsKey = "furlough.mac.anchorHalfAdds"
+    private static let finishedGuidesKey = "furlough.mac.finishedGuides"
+    private static var storedStartHalf: Half {
+        SharedStore.defaults.string(forKey: startHalfKey).flatMap(Half.init(rawValue:)) ?? .rules
+    }
+    private static var storedAnchorHalfAdds: Half {
+        SharedStore.defaults.string(forKey: anchorHalfAddsKey).flatMap(Half.init(rawValue:)) ?? .anchor
+    }
+    private static var storedFinishedGuides: Set<Half> {
+        Set((SharedStore.defaults.stringArray(forKey: finishedGuidesKey) ?? []).compactMap(Half.init(rawValue:)))
+    }
     @ObservationIgnored private var ticker: Timer?
 
     // MARK: Lifecycle
@@ -68,6 +102,7 @@ final class MacModel {
         enforcer.start()
         startTicking()
         reload()
+        seedFinishedGuides()
         Task { await refreshNotificationStatus() }
         refreshBrowserAccess()
         // Force Quit is still the way out, but it should not last until the next login.
@@ -76,6 +111,97 @@ final class MacModel {
         AnchorCloud.synchronize()
         SharedStore.log("iCloud at launch: \(cloudAvailable ? "reachable" : "unreachable; the anchor cannot cross")")
         enforce(reason: "launch")
+    }
+
+    // MARK: The two halves
+
+    /// The start pane, answered. Written when Continue is pressed rather than on each click, so
+    /// backing out of the intro and coming at it again does not leave a half chosen by a mouse
+    /// that was on its way somewhere else.
+    func chooseStart(half: Half, both: Bool) {
+        SharedStore.defaults.set(half.rawValue, forKey: Self.startHalfKey)
+        SharedStore.defaults.set(both, forKey: Self.bothHalvesKey)
+        startHalf = half
+        wantsBothHalves = both
+    }
+
+    /// The same answer, changed later from Settings. `wantsBothHalves` rides along unchanged:
+    /// moving the half the window opens on says nothing about whether the other half's guide
+    /// still runs.
+    func setStartHalf(_ half: Half) {
+        guard half != startHalf else { return }
+        chooseStart(half: half, both: wantsBothHalves)
+    }
+
+    /// Which half the + adds to over the Anchor half. See `anchorHalfAdds`.
+    func setAnchorHalfAdds(_ half: Half) {
+        guard half != anchorHalfAdds else { return }
+        SharedStore.defaults.set(half.rawValue, forKey: Self.anchorHalfAddsKey)
+        anchorHalfAdds = half
+    }
+
+    /// Where a + click lands, given the half it was clicked over. Rules always adds a rule
+    /// target; the Anchor half asks the preference.
+    func addDestination(on half: Half) -> Half {
+        half == .rules ? .rules : anchorHalfAdds
+    }
+
+    /// One half's guide is done with: its last step was pressed, or the anchor it was walking
+    /// towards has been dropped.
+    func finishGuide(_ half: Half) {
+        guard !finishedGuides.contains(half) else { return }
+        write(finishedGuides: finishedGuides.union([half]))
+    }
+
+    /// Both checklists, asked for again from Settings. Only the last step of each is a flag, so
+    /// this is the whole of what can be undone: a half that is set up comes back showing its
+    /// third step live rather than pretending the apps were never picked.
+    func restartGuides() {
+        guard !finishedGuides.isEmpty else { return }
+        write(finishedGuides: [])
+    }
+
+    /// A Mac that arrives already set up has no guide owed to it. Run once, on the first launch
+    /// of a build that has guides at all: without it an update would put a checklist in front of
+    /// somebody who has been using Furlough for months. The key being absent is what "never
+    /// asked" means, so writing an empty set is what closes the question.
+    private func seedFinishedGuides() {
+        guard SharedStore.defaults.object(forKey: Self.finishedGuidesKey) == nil else { return }
+        var seeded: Set<Half> = []
+        let config = state.config
+        if config.targets.contains(where: { $0.rule != nil }) { seeded.insert(.rules) }
+        if phoneSeen, config.anchor.hasSomethingToHold { seeded.insert(.anchor) }
+        write(finishedGuides: seeded)
+    }
+
+    private func write(finishedGuides halves: Set<Half>) {
+        SharedStore.defaults.set(halves.map(\.rawValue).sorted(), forKey: Self.finishedGuidesKey)
+        finishedGuides = halves
+    }
+
+    /// The four questions the old Enforcement section asked, answered as one sentence. The rows
+    /// themselves are a screen in now — see `Diagnostics` and `MacDiagnosticsView`.
+    var diagnostics: Diagnostics {
+        Diagnostics.macSummary(
+            Diagnostics.MacReading(
+                filter: filterReading,
+                refusedBrowser: browserAccess.first { $0.status == .denied }?.name,
+                appGroupAvailable: SharedStore.isAppGroupAvailable,
+                notificationsAllowed: notificationsGranted
+            )
+        )
+    }
+
+    /// The filter's nine states, as the four the row asks about. `notInApplications` is broken
+    /// rather than not-installed: it was asked for and macOS will not load it from where the app
+    /// is sitting.
+    private var filterReading: Diagnostics.MacReading.Filter {
+        switch enforcer.webFilter.status {
+        case .notInstalled: .notInstalled
+        case .installing, .awaitingApproval: .waiting
+        case .on: .on
+        case .disabledInSettings, .filterOff, .filterDenied, .failed, .notInApplications: .broken
+        }
     }
 
     // MARK: The anchor across devices
@@ -163,6 +289,25 @@ final class MacModel {
         SharedStore.log("anchored (Mac): \(current.config.anchor.heldDescription)")
         enforce(reason: "anchor")
         AnchorSync.publish(current.config.anchor, origin: .drop, now: now)
+        // The guide's last step was Drop it, and this is a drop however it was asked for.
+        finishGuide(.anchor)
+        return nil
+    }
+
+    /// Adds one app or website to the anchor's list — what the + button does over the Anchor
+    /// half. Refused while the anchor is down, like every other change to the list. Returns why
+    /// not, or nil.
+    @discardableResult
+    func addToAnchor(_ kind: TargetKind) -> String? {
+        let current = SharedStore.load()
+        let anchor = current.config.anchor
+        if anchor.isHolding(at: current.now) {
+            return "The anchor is down. Scan your tag on your iPhone to change the list."
+        }
+        guard !anchor.contains(kind) else {
+            return anchor.anchorsEverything ? "That already stays open." : "That is already held."
+        }
+        setAnchorKinds(anchor.kinds + [kind])
         return nil
     }
 
@@ -643,6 +788,19 @@ final class MacModel {
         watchdogIsOn = Watchdog.isOn
         SharedStore.defaults.removeObject(forKey: Self.onboardedKey)
         isOnboarded = false
+        // The intro's answer and the guides with it, so the reset opens on the start pane with
+        // nothing chosen and both checklists owed — which is what a fresh install is. Removed
+        // rather than written empty: an absent `finishedGuides` key is what "never asked" means
+        // to `seedFinishedGuides`, and a Mac that has just forgotten every rule seeds to nothing
+        // anyway.
+        SharedStore.defaults.removeObject(forKey: Self.startHalfKey)
+        SharedStore.defaults.removeObject(forKey: Self.bothHalvesKey)
+        SharedStore.defaults.removeObject(forKey: Self.anchorHalfAddsKey)
+        SharedStore.defaults.removeObject(forKey: Self.finishedGuidesKey)
+        startHalf = .rules
+        wantsBothHalves = false
+        anchorHalfAdds = .anchor
+        finishedGuides = []
         SharedStore.log("reset everything (Debug build)")
         enforce(reason: "reset")
     }

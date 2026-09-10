@@ -528,7 +528,7 @@ struct HelpPage: View {
         ])
 
         SectionLabel(text: "Moving a setup across")
-        HelpProse("Since rules cannot sync, they travel as a file instead. Settings > Save setup writes your rules, budgets, tiers and delay as JSON; the other device opens it and shows you every line before anything happens.")
+        HelpProse("Since rules cannot sync, they travel as a file instead. Settings > Your setup writes your rules, budgets, tiers and delay as JSON; the other device opens it and shows you every line before anything happens.")
             .padding(.top, 2)
         HelpPoints([
             .init("A proposal, never a restore", "Every rule in a file goes through the same gate the editor does, so the tightenings land and the loosenings wait out your delay. A file cannot hand you back time by going round it."),
@@ -585,9 +585,9 @@ struct HelpPage: View {
     private var stuck: some View {
         SectionLabel(text: "What to try")
         HelpPoints([
-            .init("Re-apply enforcement now", "Settings > Enforcement. Does the whole pass again on demand rather than waiting for the next tick."),
+            .init("Re-apply enforcement now", "Settings > Diagnostics. Does the whole pass again on demand rather than waiting for the next tick."),
             .init("A site is not blocked", "Settings > Web. A browser marked Refused is not enforced; Ask for browser access now puts the question again, and System Settings > Privacy & Security > Automation is where a past refusal is undone. If the web filter says Off in System Settings, General > Login Items & Extensions > Network Extensions is where it went."),
-            .init("Activity log", "Settings > Activity log. Says what Furlough has been doing and when, including every block it applied and every browser it could not read."),
+            .init("Activity log", "Settings > Diagnostics > Activity log. Says what Furlough has been doing and when, including every block it applied and every browser it could not read."),
         ])
 
         SectionLabel(text: "The one escape")

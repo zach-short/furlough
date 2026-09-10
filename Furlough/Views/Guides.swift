@@ -1,45 +1,12 @@
 import SwiftUI
 
-/// The three steps a half is set up in, and which of them is still owed.
+/// The phone's two guides: the steps themselves, and the card that draws them.
 ///
-/// Derived from the config rather than stored, so it cannot drift from what is actually true:
-/// a target added from the widget, a tag paired from the Anchor's own row and an anchor dropped
-/// by Siri all move the guide along without anything having to tell it. The one thing the
-/// config cannot answer is the last step of each — reading your own list is done when you say
-/// it is, and an anchor lifts again without owing the guide a second showing — so that step
-/// reads `AppModel.finishedGuides`.
-///
-/// The Mac's guide, when it comes, is this shape with `Pair a tag` replaced by "Drop once from
-/// your iPhone": three steps, one live, the same card.
-struct HalfGuide {
-    struct Step: Identifiable {
-        var title: String
-        var detail: String
-        /// Sits under the whole card while this step is the live one, so the fact that belongs
-        /// to a step arrives with the step rather than three screens earlier.
-        var footnote: String?
-        var isDone: Bool
-        var id: String { title }
-    }
-
-    var half: Half
-    var steps: [Step]
-
-    /// The step to act on: the first one not done. Nil once the guide has nothing left to say,
-    /// which is when the card folds away and the page underneath is the whole page.
-    var live: Int? { steps.firstIndex { !$0.isDone } }
-    var isRunning: Bool { live != nil }
-    var footnote: String? { live.flatMap { steps[$0].footnote } }
-
-    /// What the card is called. Not "Get started": it names the half, because the other half is
-    /// one swipe away and may be running a guide of its own.
-    var title: String {
-        switch half {
-        case .rules: "Setting up Rules"
-        case .anchor: "Setting up the Anchor"
-        }
-    }
-
+/// The shape they are built in — three steps, one live, the rest dimmed — is `HalfGuide` in
+/// Shared/Core, because the Mac draws the same card from the same struct. What is here is the
+/// phone's own three of each, which are not shared: the first Rules step changes its words with
+/// Screen Time data access, and the Anchor's first step is a tag this Mac has no reader for.
+extension HalfGuide {
     // MARK: The two guides
 
     /// Pick the apps, give the first one a rule, read the list.
@@ -98,8 +65,11 @@ struct HalfGuide {
                 // Before anything is chosen `heldDescription` counts an empty list — "0 items" —
                 // which is a true sentence about a step that has not happened and a poor one to
                 // read two steps ahead of it.
+                // "\(heldDescription) goes out of reach" reads wrong half the time — a count
+                // takes a plural verb and "Everything except 3" a singular one. Naming the thing
+                // after the colon sidesteps the agreement rather than picking a verb per scope.
                 detail: anchor.hasSomethingToHold
-                    ? "One tap, from here or from the widget. \(anchor.heldDescription) goes out of reach."
+                    ? "One tap, from here or from the widget. Out of reach: \(anchor.heldDescription)."
                     : "One tap, from here or from the widget, and what you chose goes out of reach.",
                 footnote: "Only a paired tag lifts it. Furlough has no unblock button, and this is the half that means it.",
                 isDone: finished

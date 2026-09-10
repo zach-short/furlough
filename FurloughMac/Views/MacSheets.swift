@@ -93,378 +93,11 @@ struct AddAppSheet: View {
 }
 
 /// A website by host.
-/// The Anchor on the Mac: its list, its scope, and one button to drop it. No release here — a
-/// Mac has no tag reader — so the release arrives through iCloud from the phone's tag scan,
-/// and dropping is refused until a phone has been heard from. The list is this Mac's own,
-/// bundle identifiers and hosts, since a Screen Time token means nothing here.
-struct AnchorSheet: View {
-    @Environment(MacModel.self) private var model
-    /// Asks the window to explain the link to the phone. Help opens on that page in its own
-    /// window, beside this sheet rather than instead of it, so the list being read about is
-    /// still on screen.
-    var onExplainDevices: () -> Void = {}
-    @State private var apps: [InstalledApp] = []
-    @State private var query = ""
-    @State private var host = ""
-    @State private var message: String?
-    @State private var switchingTo: AnchorProfile.Scope?
-
-    private var anchor: AnchorProfile { model.state.config.anchor }
-    private var isHolding: Bool { anchor.isHolding(at: model.now) }
-
-    /// Installed apps matching the search and not already listed, a handful at a time.
-    private var found: [InstalledApp] {
-        let trimmed = query.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return [] }
-        return Array(apps.filter { app in
-            !anchor.contains(.macApp(bundleID: app.bundleID))
-                && (app.name.localizedCaseInsensitiveContains(trimmed) || app.bundleID.localizedCaseInsensitiveContains(trimmed))
-        }.prefix(8))
-    }
-
-    var body: some View {
-        SheetFrame(title: "Anchor", width: 560, height: 640) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    stateCard
-                    // Under the state, above everything about the list: a Mac that cannot
-                    // reach iCloud will not drop at all, so this explains the refused button
-                    // before someone goes looking for what is wrong with their list.
-                    if !model.cloudAvailable {
-                        CautionBanner(text: AnchorSync.cutOffWarning, isSevere: true)
-                            .padding(.top, 12)
-                    }
-                    SectionLabel(text: "Scope")
-                    scopeCard
-                    SectionLabel(text: anchor.anchorsEverything ? "Stays open" : "Held")
-                    listCard
-                    if !isHolding {
-                        addCard
-                            .padding(.top, 10)
-                    }
-                    Footnote(text: footnote)
-                        .padding(.top, 8)
-                    // The footnote above says the anchor reaches the phone; this is where
-                    // someone who wants to know how, or why this Mac is refusing to drop one,
-                    // can go and read it. There is no other screen the link appears on.
-                    SectionLabel(text: "Your iPhone")
-                    linkCard
-                    devicesCard
-                        .padding(.top, 10)
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 24)
-            }
-        }
-        .task { apps = AppCatalog.installed() }
-        // Asked once when the sheet opens, so the status is about now rather than about
-        // whenever the app last happened to hear something.
-        .task { model.checkLink() }
-        .alert("Anchor", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
-            Button("OK") { message = nil }
-        } message: {
-            Text(message ?? "")
-        }
-        .confirmationDialog(
-            "Start the list again?",
-            isPresented: Binding(get: { switchingTo != nil }, set: { if !$0 { switchingTo = nil } }),
-            titleVisibility: .visible
-        ) {
-            Button(switchingTo == .everythingExcept ? "Anchor everything except a list" : "Anchor chosen apps only") {
-                if let scope = switchingTo { model.setAnchorScope(scope) }
-                switchingTo = nil
-            }
-            Button("Keep it as it is", role: .cancel) { switchingTo = nil }
-        } message: {
-            Text(switchingTo == .everythingExcept
-                ? "The list becomes what stays open, starting from every app you tiered Essential. What it holds now is not carried over."
-                : "The list becomes what is held, starting empty.")
-        }
-    }
-
-    private var stateCard: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                Eyebrow(text: isHolding ? "Anchored" : "Free", color: isHolding ? Ember.ember : Ember.moss)
-                Text(stateLine)
-                    .emberBody(13)
-                    .foregroundStyle(Ember.cream)
-            }
-            Spacer(minLength: 8)
-            if !isHolding {
-                Button {
-                    if let why = model.dropAnchor() { message = why }
-                } label: {
-                    Text("Drop anchor")
-                        .emberBody(13, .bold)
-                        .foregroundStyle(Ember.cream)
-                        .padding(.horizontal, 6)
-                }
-                .buttonStyle(.glassProminent)
-                .tint(Ember.ember)
-                .disabled(!anchor.hasSomethingToHold)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 12)
-        .emberCard()
-    }
-
-    private var stateLine: String {
-        let held = anchor.heldDescription
-        if isHolding, let since = anchor.anchoredAt {
-            let lift = anchor.until.map { " · lifts \(TimeFormat.clock($0))" } ?? ""
-            return "\(held) since \(since.formatted(date: .omitted, time: .shortened))\(lift)"
-        }
-        if anchor.scope == .chosen, anchor.kinds.isEmpty { return "Nothing chosen yet" }
-        // Ahead of `phoneSeen`, and for the same reason `macDrop` checks it first: a latch set
-        // by some earlier account says nothing about whether a phone can be heard from now.
-        if !model.cloudAvailable { return "\(held) · iCloud unreachable" }
-        if !model.phoneSeen { return "\(held) · waiting to hear from your iPhone" }
-        return "\(held) · ready"
-    }
-
-    /// Whether the two devices are actually talking, and a button that asks. Above the help row
-    /// on purpose: someone opening this section wants to know if it works before they want to
-    /// read about how it works.
-    private var linkCard: some View {
-        let status = model.link
-        return VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(status.isLinked ? Ember.moss : (status.cloudAvailable ? Ember.amber : Ember.ember))
-                    .frame(width: 8, height: 8)
-                Text(status.headline)
-                    .emberDisplaySmall(13.5)
-                    .foregroundStyle(Ember.cream)
-                Spacer(minLength: 8)
-                Button("Check now") { model.checkLink() }
-                    .buttonStyle(.plain)
-                    .emberBody(12, .semibold)
-                    .foregroundStyle(Ember.ember)
-            }
-            .padding(.horizontal, 12)
-            .padding(.top, 12)
-            Text(status.detail(now: model.now))
-                .emberBody(12)
-                .foregroundStyle(Ember.muted)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 12)
-                .padding(.top, 6)
-                .padding(.bottom, 12)
-        }
-        .emberCard()
-    }
-
-    /// The one row on the Anchor sheet that opens something else: the same row Help's own hub
-    /// draws, so it is plainly a link into Help rather than a setting of its own — there is
-    /// nothing here to switch, which is the first thing the page it opens says.
-    private var devicesCard: some View {
-        Button(action: onExplainDevices) {
-            HelpRow(topic: .devices)
-        }
-        .buttonStyle(.plain)
-        .emberCard()
-    }
-
-    private var scopeCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 6) {
-                scopeChip(.chosen, "Chosen apps")
-                scopeChip(.everythingExcept, "Everything except")
-            }
-            .padding(.horizontal, 12)
-            .padding(.top, 12)
-            Text(anchor.anchorsEverything
-                ? "Every app and website is held. Only what is listed stays open."
-                : "Only what is listed is held. Everything else keeps its own rules.")
-                .emberBody(12)
-                .foregroundStyle(Ember.muted)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 12)
-                .padding(.top, 10)
-                .padding(.bottom, 14)
-        }
-        .emberCard()
-    }
-
-    private func scopeChip(_ scope: AnchorProfile.Scope, _ title: String) -> some View {
-        let isOn = anchor.scope == scope
-        return Button {
-            guard !isOn else { return }
-            if anchor.kinds.isEmpty { model.setAnchorScope(scope) } else { switchingTo = scope }
-        } label: {
-            Text(title)
-                .emberBody(12, .semibold)
-                .foregroundStyle(isOn ? Ember.ground : Ember.muted)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(isOn ? Ember.amber : Color.white.opacity(0.06))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(isOn ? .clear : Ember.cardBorder, lineWidth: 1)
-                )
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .disabled(isHolding)
-    }
-
-    private var listCard: some View {
-        VStack(spacing: 0) {
-            if anchor.kinds.isEmpty {
-                Text(anchor.anchorsEverything ? "Nothing stays open." : "Nothing held yet.")
-                    .emberBody(13)
-                    .foregroundStyle(Ember.muted)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 11)
-                if anchor.scope == .chosen, !isHolding, !model.state.config.anchorCandidates.isEmpty {
-                    CardDivider()
-                    Button {
-                        var copy = anchor
-                        copy.add(model.state.config.anchorCandidates)
-                        model.setAnchorKinds(copy.kinds)
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 12, weight: .bold))
-                            Text("Add everything you already block")
-                                .emberBody(13, .semibold)
-                        }
-                        .foregroundStyle(Ember.ember)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 11)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            ForEach(Array(anchor.kinds.enumerated()), id: \.offset) { index, kind in
-                if index > 0 { CardDivider() }
-                HStack(spacing: 10) {
-                    KindTile(kind: kind, size: 28)
-                    Text(name(of: kind))
-                        .emberBody(13, .medium)
-                        .foregroundStyle(Ember.cream)
-                        .lineLimit(1)
-                    Spacer()
-                    if !isHolding {
-                        Button {
-                            model.setAnchorKinds(anchor.kinds.filter { $0 != kind })
-                        } label: {
-                            Image(systemName: "minus.circle")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(Ember.muted)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .help("Take it off the list")
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-            }
-        }
-        .emberCard()
-    }
-
-    private var addCard: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Ember.faint)
-                TextField("Add an app", text: $query)
-                    .textFieldStyle(.plain)
-                    .emberBody(13)
-                    .foregroundStyle(Ember.cream)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            ForEach(found) { app in
-                CardDivider()
-                Button {
-                    add(.macApp(bundleID: app.bundleID))
-                    query = ""
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(nsImage: app.icon).resizable().interpolation(.high).frame(width: 24, height: 24)
-                        Text(app.name).emberBody(13, .medium).foregroundStyle(Ember.cream)
-                        Spacer()
-                        Image(systemName: "plus.circle")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(Ember.ember)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
-            CardDivider()
-            HStack(spacing: 8) {
-                Image(systemName: "globe")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Ember.amber)
-                TextField("Add a website, like youtube.com", text: $host)
-                    .textFieldStyle(.plain)
-                    .emberBody(13)
-                    .foregroundStyle(Ember.cream)
-                    .onSubmit(addHost)
-                Button(action: addHost) {
-                    Text("Add")
-                        .emberBody(12, .semibold)
-                        .foregroundStyle(Hosts.normalize(host) == nil ? Ember.faint : Ember.ember)
-                }
-                .buttonStyle(.plain)
-                .disabled(Hosts.normalize(host) == nil)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-        }
-        .emberCard()
-    }
-
-    private var footnote: String {
-        if isHolding {
-            return "Scan the paired tag in Furlough on your iPhone to release it, there and here. The list cannot change until then."
-        }
-        let reach = anchor.anchorsEverything
-            ? "Everything not listed is blocked while anchored: apps are quit, and sites go to the shield page in every browser Furlough may read. Finder, the Dock and System Settings are never blocked."
-            : "Anything listed is blocked while anchored. Windows and budgets still apply the rest of the time."
-        return "\(reach) Dropping anchor here locks your iPhone too, through your iCloud account, and dropping it there locks this Mac. Only the tag on your iPhone releases either."
-    }
-
-    private func name(of kind: TargetKind) -> String {
-        switch kind {
-        case .macApp(let bundleID):
-            model.state.config.target(bundleID: bundleID)?.displayName ?? AppInfo.name(for: bundleID) ?? bundleID
-        case .host(let host):
-            host
-        }
-    }
-
-    private func add(_ kind: TargetKind) {
-        guard !anchor.contains(kind) else { return }
-        model.setAnchorKinds(anchor.kinds + [kind])
-    }
-
-    private func addHost() {
-        guard let normalized = Hosts.normalize(host) else { return }
-        add(.host(normalized))
-        host = ""
-    }
-}
-
 struct AddSiteSheet: View {
-    let onAdd: (String) -> MacModel.AddOutcome
+    /// Returns why not, or nil when it landed and the sheet should close. A refusal rather than
+    /// an outcome, because since the halves this sheet feeds two of them: what the Anchor does
+    /// with a host is put it on a list, and there is no `Target` to hand back.
+    let onAdd: (String) -> String?
     @Environment(\.dismiss) private var dismiss
     @State private var text = ""
     @State private var message: String?
@@ -505,8 +138,7 @@ struct AddSiteSheet: View {
     }
 
     private func add() {
-        let outcome = onAdd(text)
-        if outcome.added != nil { dismiss() } else { message = outcome.message }
+        if let why = onAdd(text) { message = why } else { dismiss() }
     }
 }
 
@@ -855,6 +487,10 @@ struct SettingsSheet: View {
     @State private var delayHours = Furlough.defaultLoosenDelayHours
     @State private var result: ProposalResult?
     @State private var showLog = false
+    /// The screen behind the one Diagnostics row. In place, with a Back link, like the log:
+    /// this is a sheet, and a sheet that grew a navigation stack for two pushes would be
+    /// carrying a bar it has no use for.
+    @State private var showDiagnostics = false
     @State private var confirmReset = false
     @State private var confirmRemoveFilter = false
     /// Two seconds of "Copied" after the diagnostics go to the pasteboard.
@@ -874,13 +510,16 @@ struct SettingsSheet: View {
 
     private var title: String {
         if showLog { return "Activity log" }
+        if showDiagnostics { return "Diagnostics" }
         return review == nil ? "Settings" : "Restore from a file"
     }
 
     var body: some View {
         SheetFrame(title: title, width: 560, height: 640) {
             if showLog {
-                LogView(onBack: { showLog = false })
+                LogView(backTitle: showDiagnostics ? "Diagnostics" : "Settings") { showLog = false }
+            } else if showDiagnostics {
+                MacDiagnosticsView(onBack: { showDiagnostics = false }, onOpenLog: { showLog = true })
             } else if let review {
                 MacImportReview(plan: review, onBack: { self.review = nil }) {
                     imported = model.applyImport(review)
@@ -969,133 +608,19 @@ struct SettingsSheet: View {
     private var settings: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                SectionLabel(text: "Loosening delay")
-                VStack(spacing: 0) {
-                    HStack(spacing: 12) {
-                        Text("Delay").emberBody(13).foregroundStyle(Ember.cream)
-                        Spacer()
-                        Text(TimeFormat.delay(hours: delayHours))
-                            .emberBody(13, .semibold)
-                            .monospacedDigit()
-                            .foregroundStyle(Ember.cream)
-                        Stepper("Loosening delay", value: $delayHours, in: 1...168, step: delayHours >= 24 ? 24 : 1)
-                            .labelsHidden()
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    CardDivider()
-                    GhostButton(title: "Save delay") { result = model.setDelay(hours: delayHours) }
-                        .disabled(delayHours == model.state.config.loosenDelayHours)
-                        .opacity(delayHours == model.state.config.loosenDelayHours ? 0.4 : 1)
-                }
-                .emberCard()
-                Footnote(text: "Raising the delay applies immediately. Lowering it waits out the current delay.")
-                    .padding(.top, 8)
+                startCard
 
-                SectionLabel(text: "Web")
-                filterCard
-                Footnote(text: WebFilter.explainer)
-                    .padding(.top, 8)
-                FilterDirections(
-                    guidance: model.enforcer.webFilter.status.guidance,
-                    size: 11.5,
-                    perform: model.enforcer.webFilter.perform
-                )
-                .padding(.horizontal, 8)
-                .padding(.top, 10)
+                delayCard
 
-                SectionLabel(text: "Browsers")
-                VStack(spacing: 0) {
-                    if model.browserAccess.isEmpty {
-                        Text("No supported browser is running. Furlough asks for access the first time one is in front.")
-                            .emberBody(12)
-                            .foregroundStyle(Ember.muted)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 10)
-                    }
-                    ForEach(model.browserAccess) { browser in
-                        row(browser.name, label(browser.status), color: browser.status == .denied ? Ember.ember : Ember.muted)
-                        CardDivider()
-                    }
-                    CardAction(title: "Ask for browser access now") {
-                        model.enforcer.browsers.requestAccess()
-                        model.refreshBrowserAccess()
-                    }
-                }
-                .emberCard()
-                Footnote(text: "The tab reader: Furlough reads each browser's address bar and sends a blocked tab to its shield page, so macOS asks once per browser. If one was refused, allow Furlough under System Settings > Privacy & Security > Automation.")
-                    .padding(.top, 8)
+                webCard
 
-                SectionLabel(text: "Enforcement")
-                VStack(spacing: 0) {
-                    HStack {
-                        Text("Open at login").emberBody(13).foregroundStyle(Ember.cream)
-                        Spacer()
-                        Toggle("Open at login", isOn: Binding(get: { model.launchesAtLogin }, set: { model.setLaunchAtLogin($0) }))
-                            .labelsHidden()
-                            .toggleStyle(.switch)
-                            .tint(Ember.ember)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    CardDivider()
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Reopen after a Force Quit").emberBody(13).foregroundStyle(Ember.cream)
-                            Text("Force Quit still lifts every block. This brings Furlough back within a minute.")
-                                .emberBody(11.5)
-                                .foregroundStyle(Ember.muted)
-                        }
-                        Spacer()
-                        Toggle("Reopen after a Force Quit", isOn: Binding(get: { model.watchdogIsOn }, set: { model.setWatchdog($0) }))
-                            .labelsHidden()
-                            .toggleStyle(.switch)
-                            .tint(Ember.ember)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    CardDivider()
-                    row("Notifications", model.notificationsGranted == true ? "Allowed" : "Off")
-                    CardDivider()
-                    // The phone shows this too. It matters more here: the desktop widget reads
-                    // the rules through the group, so without it the widget is simply blank,
-                    // with nothing anywhere to say why.
-                    row(
-                        "App Group",
-                        SharedStore.isAppGroupAvailable ? "OK" : "Missing",
-                        color: SharedStore.isAppGroupAvailable ? Ember.muted : Ember.ember
-                    )
-                    CardDivider()
-                    row("Last enforcement", stamp(model.state.runtime.lastReconcile))
-                    CardDivider()
-                    CardAction(title: "Re-apply enforcement now") { model.enforce(reason: "manual") }
-                    if model.notificationsGranted != true {
-                        CardDivider()
-                        CardAction(title: "Allow notifications") { Task { await model.requestNotifications() } }
-                    }
-                    CardDivider()
-                    CardAction(title: "Activity log", symbol: "list.bullet", color: Ember.cream) { showLog = true }
-                }
-                .emberCard()
+                browsersCard
 
-                SectionLabel(text: "Your setup")
-                VStack(spacing: 0) {
-                    CardAction(title: "Download my setup", symbol: "square.and.arrow.down", color: Ember.cream) { exportSetup() }
-                    CardDivider()
-                    CardAction(title: "Restore from a file", symbol: "square.and.arrow.up", color: Ember.cream) { showImporter = true }
-                }
-                .emberCard()
-                Footnote(text: "Saves your apps, websites, rules, budgets, tiers and delay as a JSON file. Mac targets are bundle identifiers and hosts, so this file is the whole setup and another Mac can take it as it stands.\n\nRestoring is a proposal, not a rewind: every rule in the file goes through the same delay the rule editor does, so anything in it that loosens your rules waits. You see the whole of it before any of it happens.")
-                    .padding(.top, 8)
-                    .padding(.bottom, 20)
+                enforcementCard
 
-                SectionLabel(text: "The one escape")
-                Text("Furlough has no unblock button. On the Mac it enforces by quitting blocked apps and sending blocked tabs to its shield page, so it has to keep running: Quit is refused while anything is blocked. Force Quit (Option-Command-Escape) ends enforcement until Furlough is opened again, the way turning off Screen Time access does on the phone. It is documented on purpose.")
-                    .emberBody(12)
-                    .foregroundStyle(Ember.muted)
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 20)
+                setupCard
+
+                diagnosticsCard
 
                 #if DEBUG || TESTING_TOOLS
                 if showTesting {
@@ -1126,6 +651,284 @@ struct SettingsSheet: View {
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 24)
+        }
+    }
+
+    // MARK: Start
+
+    /// The three things about how Furlough opens: which half the window opens on, what the +
+    /// means over the Anchor half, and the checklists again.
+    ///
+    /// At the top because these are the settings a person came here to change. The intro asks
+    /// the first one once, in the pane that says the app is two halves; this is the only other
+    /// place it can be answered, and the pane is not coming back.
+    @ViewBuilder
+    private var startCard: some View {
+        SectionLabel(text: "Start")
+        VStack(spacing: 0) {
+            halfRow(title: "Opens on", selection: model.startHalf) { model.setStartHalf($0) }
+            CardDivider()
+            addRow
+            CardDivider()
+            CardAction(
+                title: "Run the setup guide again",
+                detail: guideDetail,
+                color: model.finishedGuides.isEmpty ? Ember.faint : Ember.ember
+            ) {
+                model.restartGuides()
+            }
+            .disabled(model.finishedGuides.isEmpty)
+        }
+        .emberCard()
+        Footnote(text: "Over the Rules half + always makes a rule.")
+            .padding(.top, 8)
+    }
+
+    /// What + does over the Anchor half.
+    ///
+    /// The + acts on the half you are looking at, which over the Anchor means its list — and the
+    /// one person that reading fails is the one who set the anchor up months ago and has read +
+    /// as "give an app hours" ever since. So it is a preference rather than a rule, and only
+    /// about the Anchor half: over Rules the button has no second reading to choose between.
+    private var addRow: some View {
+        HStack(spacing: 12) {
+            Text("On the Anchor half, + adds")
+                .emberBody(13)
+                .foregroundStyle(Ember.cream)
+            Spacer(minLength: 8)
+            HStack(spacing: 4) {
+                chip("To the anchor", isOn: model.anchorHalfAdds == .anchor) { model.setAnchorHalfAdds(.anchor) }
+                chip("A new rule", isOn: model.anchorHalfAdds == .rules) { model.setAnchorHalfAdds(.rules) }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+    }
+
+    /// Says what pressing it would do, and then what it did — both derived from the same set, so
+    /// the row answers for itself rather than raising an alert to say something happened.
+    private var guideDetail: String {
+        let finished = model.finishedGuides
+        guard !finished.isEmpty else { return "Both checklists are showing in the window." }
+        if finished.count == 1, let only = finished.first {
+            return "Puts the three steps back on the \(only.title) half."
+        }
+        return "Puts the three steps back on both halves."
+    }
+
+    private func halfRow(title: String, selection: Half, onPick: @escaping (Half) -> Void) -> some View {
+        HStack(spacing: 12) {
+            Text(title)
+                .emberBody(13)
+                .foregroundStyle(Ember.cream)
+            Spacer(minLength: 8)
+            HStack(spacing: 4) {
+                ForEach(Half.allCases, id: \.self) { half in
+                    chip(half.title, isOn: half == selection) { onPick(half) }
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+    }
+
+    /// One of a pair: the chosen one is filled, the other an outline. Not a `Picker`, because
+    /// both choices have to be readable at once — the question is which of two things this
+    /// means, and a menu that shows one answer at a time is a poor way to ask it.
+    private func chip(_ title: String, isOn: Bool, _ perform: @escaping () -> Void) -> some View {
+        Button(action: perform) {
+            Text(title)
+                .emberBody(12, .semibold)
+                .foregroundStyle(isOn ? Ember.ground : Ember.muted)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(isOn ? Ember.amber : Color.white.opacity(0.06))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(isOn ? .clear : Ember.cardBorder, lineWidth: 1)
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isOn ? .isSelected : [])
+    }
+
+    // MARK: Rules
+
+    @ViewBuilder
+    private var delayCard: some View {
+        SectionLabel(text: "Rules")
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Text("Loosening delay").emberBody(13).foregroundStyle(Ember.cream)
+                Spacer()
+                Text(TimeFormat.delay(hours: delayHours))
+                    .emberBody(13, .semibold)
+                    .monospacedDigit()
+                    .foregroundStyle(Ember.cream)
+                Stepper("Loosening delay", value: $delayHours, in: 1...168, step: delayHours >= 24 ? 24 : 1)
+                    .labelsHidden()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            CardDivider()
+            GhostButton(title: "Save delay") { result = model.setDelay(hours: delayHours) }
+                .disabled(delayHours == model.state.config.loosenDelayHours)
+                .opacity(delayHours == model.state.config.loosenDelayHours ? 0.4 : 1)
+        }
+        .emberCard()
+        Footnote(text: "Raising the delay applies immediately. Lowering it waits out the current delay.")
+            .padding(.top, 8)
+    }
+
+    // MARK: Web
+
+    /// The filter, and the walkthrough — which is only here while there is something to walk
+    /// through. Six numbered steps under a status that reads On is a page of directions to a
+    /// place you are already standing in, and it was the tallest thing on this screen.
+    @ViewBuilder
+    private var webCard: some View {
+        let status = model.enforcer.webFilter.status
+        SectionLabel(text: "Web")
+        filterCard
+        if !status.isOn {
+            Footnote(text: WebFilter.explainer)
+                .padding(.top, 8)
+            FilterDirections(
+                guidance: status.guidance,
+                size: 11.5,
+                perform: model.enforcer.webFilter.perform
+            )
+            .padding(.horizontal, 8)
+            .padding(.top, 10)
+        }
+    }
+
+    // MARK: Browsers
+
+    @ViewBuilder
+    private var browsersCard: some View {
+        SectionLabel(text: "Browsers")
+        VStack(spacing: 0) {
+            if model.browserAccess.isEmpty {
+                Text("No supported browser is running. Furlough asks for access the first time one is in front.")
+                    .emberBody(12)
+                    .foregroundStyle(Ember.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+            }
+            ForEach(model.browserAccess) { browser in
+                row(browser.name, label(browser.status), color: browser.status == .denied ? Ember.ember : Ember.muted)
+                CardDivider()
+            }
+            CardAction(title: "Ask for browser access now") {
+                model.enforcer.browsers.requestAccess()
+                model.refreshBrowserAccess()
+            }
+        }
+        .emberCard()
+        Footnote(text: "Furlough reads each browser's address bar and sends a blocked tab to its shield page, so macOS asks once per browser. Allow a refused one under System Settings > Privacy & Security > Automation.")
+            .padding(.top, 8)
+    }
+
+    // MARK: Enforcement
+
+    /// The two switches, and the one escape in a footnote rather than a paragraph. Everything
+    /// else that stood under this label was a status row or a button for when something looks
+    /// wrong, and all of it is one push behind Diagnostics now.
+    @ViewBuilder
+    private var enforcementCard: some View {
+        SectionLabel(text: "Enforcement")
+        VStack(spacing: 0) {
+            HStack {
+                Text("Open at login").emberBody(13).foregroundStyle(Ember.cream)
+                Spacer()
+                Toggle("Open at login", isOn: Binding(get: { model.launchesAtLogin }, set: { model.setLaunchAtLogin($0) }))
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .tint(Ember.ember)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            CardDivider()
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Reopen after a Force Quit").emberBody(13).foregroundStyle(Ember.cream)
+                    Text("Force Quit still lifts every block. This brings Furlough back within a minute.")
+                        .emberBody(11.5)
+                        .foregroundStyle(Ember.muted)
+                }
+                Spacer()
+                Toggle("Reopen after a Force Quit", isOn: Binding(get: { model.watchdogIsOn }, set: { model.setWatchdog($0) }))
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .tint(Ember.ember)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+        }
+        .emberCard()
+        Footnote(text: "Furlough enforces by quitting blocked apps, so Quit is refused while anything is blocked. Force Quit is the one escape, and it is documented on purpose.")
+            .padding(.top, 8)
+    }
+
+    // MARK: Your setup
+
+    @ViewBuilder
+    private var setupCard: some View {
+        SectionLabel(text: "Your setup")
+        VStack(spacing: 0) {
+            CardAction(title: "Download my setup", symbol: "square.and.arrow.down", color: Ember.cream) { exportSetup() }
+            CardDivider()
+            CardAction(title: "Restore from a file", symbol: "square.and.arrow.up", color: Ember.cream) { showImporter = true }
+        }
+        .emberCard()
+        Footnote(text: "Rules, budgets, tiers and delay, as a file. The Anchor stays on this Mac. Restoring goes through the same delay as editing.")
+            .padding(.top, 8)
+    }
+
+    // MARK: Diagnostics
+
+    /// One row: whether anything is wrong, and the first thing that is if something is.
+    ///
+    /// The rows it replaced are all still here, one push in. What changed is that a person who
+    /// came to Settings to change the delay no longer reads five statuses on the way.
+    @ViewBuilder
+    private var diagnosticsCard: some View {
+        let summary = model.diagnostics
+        SectionLabel(text: "Diagnostics")
+        VStack(spacing: 0) {
+            Button { showDiagnostics = true } label: {
+                HStack(spacing: 10) {
+                    Circle().fill(dot(for: summary.level)).frame(width: 8, height: 8)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(summary.line).emberBody(13).foregroundStyle(Ember.cream)
+                        Text(Diagnostics.macDetail).emberBody(11.5).foregroundStyle(Ember.muted)
+                    }
+                    Spacer(minLength: 8)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Ember.faint)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 11)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .emberCard()
+        .padding(.bottom, 20)
+    }
+
+    private func dot(for level: Diagnostics.Level) -> Color {
+        switch level {
+        case .well: Ember.moss
+        case .warn: Ember.amber
+        case .bad: Ember.ember
         }
     }
 
@@ -1194,10 +997,6 @@ struct SettingsSheet: View {
         .padding(.vertical, 10)
     }
 
-    private func stamp(_ date: Date?) -> String {
-        date?.formatted(date: .abbreviated, time: .shortened) ?? "Never"
-    }
-
     /// Builds the file and opens the save panel. Reading the store is the whole of it: an
     /// export changes nothing, so alone among the buttons on this screen it needs no delay,
     /// no confirmation and no enforcement pass afterwards.
@@ -1214,6 +1013,9 @@ struct SettingsSheet: View {
 }
 
 struct LogView: View {
+    /// What the Back link says. The log is one push behind Diagnostics now and Diagnostics is
+    /// one behind Settings, so the link has to name the screen it actually returns to.
+    var backTitle = "Settings"
     let onBack: () -> Void
     @State private var entries = SharedStore.logEntries()
 
@@ -1223,7 +1025,7 @@ struct LogView: View {
                 Button { onBack() } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "chevron.left").font(.system(size: 11, weight: .bold))
-                        Text("Settings").emberBody(12.5, .semibold)
+                        Text(backTitle).emberBody(12.5, .semibold)
                     }
                     .foregroundStyle(Ember.ember)
                 }
@@ -1261,5 +1063,98 @@ struct LogView: View {
                 .padding(.bottom, 24)
             }
         }
+    }
+}
+
+/// Everything the Settings screen used to say under Enforcement, one push behind the row that
+/// says whether any of it is wrong.
+///
+/// Nothing here is a setting. It is what Furlough can see about itself — the two permissions,
+/// the App Group the widget reads through, what the web filter is doing, when enforcement last
+/// ran — and the two things a person can do about it: run the whole pass again, and read what
+/// the enforcer has been doing. Help's *If something gets stuck* sends people here by name.
+struct MacDiagnosticsView: View {
+    @Environment(MacModel.self) private var model
+    let onBack: () -> Void
+    let onOpenLog: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button(action: onBack) {
+                HStack(spacing: 4) {
+                    Image(systemName: "chevron.left").font(.system(size: 11, weight: .bold))
+                    Text("Settings").emberBody(12.5, .semibold)
+                }
+                .foregroundStyle(Ember.ember)
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 8)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    VStack(spacing: 0) {
+                        row("Notifications", model.notificationsGranted == true ? "Allowed" : "Off")
+                        CardDivider()
+                        // The phone shows this too. It matters more here: the desktop widget
+                        // reads the rules through the group, so without it the widget is simply
+                        // blank, with nothing anywhere to say why.
+                        row(
+                            "App Group",
+                            SharedStore.isAppGroupAvailable ? "OK" : "Missing",
+                            color: SharedStore.isAppGroupAvailable ? Ember.muted : Ember.ember
+                        )
+                        CardDivider()
+                        row("Web filter", model.enforcer.webFilter.status.label)
+                        CardDivider()
+                        row("Browsers", browserSummary)
+                        CardDivider()
+                        row("Last enforcement", stamp(model.state.runtime.lastReconcile))
+                    }
+                    .emberCard()
+
+                    SectionLabel(text: "If something looks wrong")
+                    VStack(spacing: 0) {
+                        CardAction(title: "Re-apply enforcement now") { model.enforce(reason: "manual") }
+                        if model.notificationsGranted != true {
+                            CardDivider()
+                            CardAction(title: "Allow notifications") { Task { await model.requestNotifications() } }
+                        }
+                        CardDivider()
+                        CardAction(title: "Activity log", symbol: "list.bullet", color: Ember.cream) { onOpenLog() }
+                    }
+                    .emberCard()
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 24)
+            }
+        }
+        .onAppear { model.refreshBrowserAccess() }
+    }
+
+    /// The per-browser rows stay in Settings > Browsers, where the button that asks for access
+    /// is. This is the count, so a refused one is visible from here without saying it twice.
+    private var browserSummary: String {
+        let running = model.browserAccess
+        guard !running.isEmpty else { return "None running" }
+        let refused = running.filter { $0.status == .denied }
+        if refused.isEmpty { return "\(running.count) running · all readable" }
+        return "\(refused.count) of \(running.count) refused"
+    }
+
+    private func row(_ title: String, _ value: String, color: Color = Ember.muted) -> some View {
+        HStack {
+            Text(title).emberBody(13).foregroundStyle(Ember.cream)
+            Spacer()
+            Text(value)
+                .emberBody(13)
+                .foregroundStyle(color)
+                .multilineTextAlignment(.trailing)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+    }
+
+    private func stamp(_ date: Date?) -> String {
+        date?.formatted(date: .abbreviated, time: .shortened) ?? "Never"
     }
 }

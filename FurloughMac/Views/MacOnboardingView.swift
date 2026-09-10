@@ -1,35 +1,43 @@
 import SwiftUI
 
-/// Three panes. The first is the promise, the second is the Anchor, and the third offers the
-/// web filter, which is the one thing on the Mac that needs the person's hand in System
-/// Settings, so it is asked for here rather than found later.
+/// The first run: the promise, the question, the one thing to allow.
 ///
-/// The Anchor has a pane of its own because Furlough is two things and this screen used to
-/// introduce one of them. Someone who came for a tag-and-lock app met three paragraphs about
-/// minute budgets and had to find the Anchor in a sheet on their own.
+/// Three panes, and the middle one is the point. Furlough is two things — Rules, which are hours
+/// and budgets and a delay on anything that hands time back, and the Anchor, which is one click
+/// and your phone's tag as the only key. This screen used to name both and then hand everyone
+/// the same window, built around Rules, with the Anchor a padlock somebody had to find. So the
+/// second pane asks which half you came for, and the answer is what the window opens on and
+/// which guide runs. The pane that used to explain the Anchor is gone: every sentence on it now
+/// lands inside the guide step it describes, where it can be acted on rather than read once.
+///
+/// The web filter is last and stays a pane of its own: both halves block websites, and it is the
+/// one thing on the Mac that needs the person's hand in System Settings.
 struct MacOnboardingView: View {
     @Environment(MacModel.self) private var model
     @State private var requesting = false
-    @State private var step = Step.promise
+    @State private var pane = Pane.promise
+    /// The start pane's answer, held until Continue. The Anchor leads: it is the half nobody was
+    /// being offered, and a preselected first row asks the question without putting a dead button
+    /// under it.
+    @State private var chosen: Half = .anchor
+    @State private var wantsBoth = false
 
-    private enum Step { case promise, anchor, filter }
+    private enum Pane { case promise, start, filter }
 
     var body: some View {
         ZStack {
             EmberWall()
             HStack(spacing: 40) {
-                // The Anchor's pane wears the anchor. The app's own hourglass standing over a
-                // screen about the Anchor would be the same demotion in a picture.
                 mark
-                    .frame(width: 150, height: 200)
+                    .frame(width: 170, height: 200)
                 // Scrolls because the filter pane grows: six numbered steps and a caution is a
                 // taller column than the promise, and a step that falls off the bottom of a
                 // fixed window is a step nobody follows.
                 ScrollView(.vertical) {
                     Group {
-                        switch step {
+                        switch pane {
                         case .promise: promise
-                        case .anchor: anchor
+                        case .start: start
                         case .filter: filter
                         }
                     }
@@ -42,12 +50,22 @@ struct MacOnboardingView: View {
         }
     }
 
+    /// The glass on the panes about the whole app, and both marks together on the one that asks
+    /// you to choose between them — the picture of the question, in the order the rows are in.
     @ViewBuilder private var mark: some View {
-        if step == .anchor {
-            AnchorShape()
-                .fill(Ember.ember)
-                .frame(width: 120, height: 150)
-                .shadow(color: Ember.ember.opacity(0.45), radius: 32)
+        if pane == .start {
+            HStack(spacing: 16) {
+                AnchorShape()
+                    .fill(chosen == .anchor ? Ember.ember : Ember.faint)
+                    .frame(width: 78, height: 100)
+                    .shadow(color: Ember.ember.opacity(chosen == .anchor ? 0.5 : 0), radius: 24)
+                LivingHourglass(state: .open(level: 0.62, warned: false))
+                    .compositingGroup()
+                    .frame(width: 82, height: 108)
+                    .shadow(color: Ember.amber.opacity(chosen == .rules ? 0.45 : 0), radius: 24)
+                    .opacity(chosen == .rules ? 1 : 0.45)
+            }
+            .animation(.snappy(duration: 0.25), value: chosen)
         } else {
             LivingHourglass(state: .open(level: 0.62, warned: false))
                 .compositingGroup()
@@ -56,6 +74,8 @@ struct MacOnboardingView: View {
         }
     }
 
+    /// Both halves on one screen, named, with a row each. Whatever else is skipped, this is the
+    /// screen that has to leave behind the fact that there are two of them.
     private var promise: some View {
         VStack(alignment: .leading, spacing: 0) {
             Eyebrow(text: "Furlough for Mac", color: Ember.amber)
@@ -63,21 +83,39 @@ struct MacOnboardingView: View {
                 .emberDisplay(36)
                 .foregroundStyle(Ember.cream)
                 .padding(.top, 6)
-            Text("Two ways to put an app out of reach, and neither of them has a button that hands it back.")
+            Text("Two ways to put an app out of reach. Neither of them has a button that hands it back.")
                 .emberBody(14.5)
                 .foregroundStyle(Ember.muted)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 14)
-            Text("Rules are the everyday half. Pick the apps and websites that eat your time and give each one allowed windows, the same every day or different on weekends, and a minute budget. Outside the windows, or once the budget is spent, Furlough quits the app and sends the tab to a shield page. Tightening a rule applies instantly; loosening one waits \(TimeFormat.delay(hours: model.state.config.loosenDelayHours)).")
-                .emberBody(14.5)
-                .foregroundStyle(Ember.muted)
+            // The Anchor first here and on the next pane, so the intro lists the two halves in
+            // one order throughout and the row you read first is the row you land on.
+            VStack(spacing: 0) {
+                MacHalfRow(
+                    title: "The Anchor",
+                    detail: "One click locks a list, or every app on this Mac. The only thing that lifts it is the tag you paired on your iPhone."
+                ) {
+                    AnchorGlyph(isAnchored: false)
+                }
+                CardDivider()
+                MacHalfRow(
+                    title: "Rules",
+                    detail: "Allowed windows and a daily budget for the apps and websites that eat your time. Tightening one applies at once; anything that gives you back time waits."
+                ) {
+                    HelpTile(symbol: "hourglass")
+                }
+            }
+            .emberCard()
+            .padding(.top, 18)
+            Footnote(text: "Use either on its own. Neither one needs the other.")
                 .padding(.top, 10)
-            Text("The Anchor is the other half, and it is next.")
-                .emberBody(14.5)
-                .foregroundStyle(Ember.muted)
-                .padding(.top, 10)
-            Text("The Mac has no Screen Time API for apps like this, so macOS will ask once per browser whether Furlough may read the address bar. Furlough opens at login and refuses to quit while something is blocked; Force Quit is the one escape.")
+            // The one thing about this Mac that has to be said before anything is agreed to: it
+            // enforces by hand because there is no Screen Time API here, which is why it has to
+            // keep running and why Force Quit is the way out.
+            Text("The Mac has no Screen Time API for apps like this, so Furlough quits blocked apps itself and macOS will ask once per browser whether it may read the address bar. Furlough opens at login and refuses to quit while something is blocked; Force Quit is the one escape.")
                 .emberBody(12.5)
                 .foregroundStyle(Ember.faint)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 14)
             HStack(spacing: 10) {
                 Button(requesting ? "Asking…" : "Start") {
@@ -85,7 +123,7 @@ struct MacOnboardingView: View {
                         requesting = true
                         await model.requestNotifications()
                         requesting = false
-                        withAnimation(.snappy(duration: 0.25)) { step = .anchor }
+                        withAnimation(.snappy(duration: 0.25)) { pane = .start }
                     }
                 }
                 .buttonStyle(.glassProminent)
@@ -98,45 +136,91 @@ struct MacOnboardingView: View {
         }
     }
 
-    /// The Anchor, in the terms this device is in: it can drop one, and it cannot lift one.
-    /// Nothing here needs setting up, so the pane is told rather than asked — the point is that
-    /// a person who came to Furlough for a one-tap lock finds out on the first run that the Mac
-    /// is in it, rather than a week later from a sheet.
-    private var anchor: some View {
+    /// The question the app never asked. Two rows and a quieter third line; the answer sets the
+    /// half the window opens on and the guide that runs in it. Clicking a row only selects it —
+    /// Continue is what commits, and it is live from the moment the pane arrives.
+    private var start: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Eyebrow(text: "The other half", color: Ember.ember)
-            Text("One tap. Then the tag.")
+            Eyebrow(text: "Two halves", color: Ember.amber)
+            Text("Where do you want to start?")
                 .emberDisplay(36)
                 .foregroundStyle(Ember.cream)
                 .padding(.top, 6)
-            Text("The Anchor is a separate list you lock in one tap — or turn inside out, so every app on this Mac is closed and the list is what stays open. No delay applies, because anchoring only ever takes things away.")
+            Text("Furlough opens on the half you pick and walks you through setting it up. The other one is one click away, whenever you want it.")
                 .emberBody(14.5)
                 .foregroundStyle(Ember.muted)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 14)
-            Text("This Mac has no NFC reader, so the key is your iPhone's: an anchor lifts when you hold the phone to a tag you paired beforehand. One Anchor covers both devices, and either one can drop it.")
-                .emberBody(14.5)
-                .foregroundStyle(Ember.muted)
+            VStack(spacing: 0) {
+                MacStartRow(
+                    title: "The Anchor",
+                    detail: "Lock a list, or every app on this Mac, in one click. Your iPhone's tag is the only way back.",
+                    isOn: chosen == .anchor && !wantsBoth
+                ) {
+                    AnchorGlyph(isAnchored: false)
+                } action: {
+                    chosen = .anchor
+                    wantsBoth = false
+                }
+                CardDivider()
+                MacStartRow(
+                    title: "Rules",
+                    detail: "Give the apps and websites that eat your time allowed windows and a daily budget.",
+                    isOn: chosen == .rules && !wantsBoth
+                ) {
+                    HelpTile(symbol: "hourglass")
+                } action: {
+                    chosen = .rules
+                    wantsBoth = false
+                }
+            }
+            .emberCard()
+            .padding(.top, 18)
+            // Quieter and outside the card, because it is not a third thing to be — it is the
+            // two above, in the order they are in.
+            Button {
+                chosen = .anchor
+                wantsBoth = true
+            } label: {
+                HStack(spacing: 7) {
+                    Image(systemName: wantsBoth ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("Both, the Anchor first")
+                        .emberBody(13, .semibold)
+                    Spacer(minLength: 0)
+                }
+                .foregroundStyle(wantsBoth ? Ember.ember : Ember.muted)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 10)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 4)
+            .accessibilityAddTraits(wantsBoth ? .isSelected : [])
+            Footnote(text: "Nothing is decided here. Both halves are one click apart afterwards, whichever you pick.")
                 .padding(.top, 10)
-            Text("There is nothing to pair here and nothing to switch on: both devices signed into your Apple Account is the whole of the link. This Mac has to have heard from the phone once before it will drop an anchor of its own, so that it never holds a lock with no key anywhere.")
-                .emberBody(12.5)
-                .foregroundStyle(Ember.faint)
-                .padding(.top, 14)
             HStack(spacing: 10) {
                 Button("Continue") {
-                    withAnimation(.snappy(duration: 0.25)) { step = .filter }
+                    // Committed on the way forward rather than on each click, so backing out and
+                    // coming at it again does not leave a half chosen by a mouse on its way
+                    // somewhere else.
+                    model.chooseStart(half: chosen, both: wantsBoth)
+                    withAnimation(.snappy(duration: 0.25)) { pane = .filter }
                 }
                 .buttonStyle(.glassProminent)
                 .tint(Ember.ember)
                 .controlSize(.large)
                 .keyboardShortcut(.defaultAction)
                 Button("Back") {
-                    withAnimation(.snappy(duration: 0.25)) { step = .promise }
+                    withAnimation(.snappy(duration: 0.25)) { pane = .promise }
                 }
                 .buttonStyle(.glass)
                 .controlSize(.large)
             }
             .padding(.top, 24)
         }
+        .animation(.snappy(duration: 0.25), value: chosen)
+        .animation(.snappy(duration: 0.25), value: wantsBoth)
     }
 
     /// The web filter, offered once. Whatever is chosen here, Settings > Web has the same
@@ -145,7 +229,7 @@ struct MacOnboardingView: View {
         let filter = model.enforcer.webFilter
         let status = filter.status
         return VStack(alignment: .leading, spacing: 0) {
-            Eyebrow(text: "One more thing", color: Ember.amber)
+            Eyebrow(text: "One thing to allow", color: Ember.amber)
             Text("The web filter.")
                 .emberDisplay(36)
                 .foregroundStyle(Ember.cream)
@@ -154,6 +238,7 @@ struct MacOnboardingView: View {
                 Text("Furlough reads the tabs of Safari and the Chromium browsers and sends a blocked one to its shield page. It cannot read Firefox, a site saved to the Dock as an app, or an app that loads a site on its own. The web filter closes those: a system extension that refuses the connection instead, from any app.")
                     .emberBody(14.5)
                     .foregroundStyle(Ember.muted)
+                    .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 14)
             } else {
                 // Once Install has been pressed, what the filter is matters less than what is
@@ -191,10 +276,100 @@ struct MacOnboardingView: View {
                         .tint(Ember.ember)
                         .keyboardShortcut(.defaultAction)
                 }
+                Button("Back") {
+                    withAnimation(.snappy(duration: 0.25)) { pane = .start }
+                }
+                .buttonStyle(.glass)
             }
             .controlSize(.large)
             .padding(.top, 24)
         }
         .task { await filter.refresh() }
+    }
+}
+
+/// One half of the app on the promise pane: its mark, its name, and what it is in two lines.
+private struct MacHalfRow<Icon: View>: View {
+    let title: String
+    let detail: String
+    let icon: Icon
+
+    init(title: String, detail: String, @ViewBuilder icon: () -> Icon) {
+        self.title = title
+        self.detail = detail
+        self.icon = icon()
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            icon
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .emberDisplaySmall(14)
+                    .foregroundStyle(Ember.cream)
+                Text(detail)
+                    .emberBody(12)
+                    .foregroundStyle(Ember.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// One half offered on the start pane: `MacHalfRow` with a click and a chosen state. The mark
+/// keeps its own colour when the row is not chosen — an anchor greyed out is a different anchor
+/// — and the row says which it is with its tint and its check.
+private struct MacStartRow<Icon: View>: View {
+    let title: String
+    let detail: String
+    let isOn: Bool
+    let icon: Icon
+    let action: () -> Void
+
+    init(
+        title: String,
+        detail: String,
+        isOn: Bool,
+        @ViewBuilder icon: () -> Icon,
+        action: @escaping () -> Void
+    ) {
+        self.title = title
+        self.detail = detail
+        self.isOn = isOn
+        self.icon = icon()
+        self.action = action
+    }
+
+    var body: some View {
+        Button(action: action) {
+            HStack(alignment: .top, spacing: 10) {
+                icon
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .emberDisplaySmall(14)
+                        .foregroundStyle(Ember.cream)
+                    Text(detail)
+                        .emberBody(12)
+                        .foregroundStyle(Ember.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+                Image(systemName: isOn ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(isOn ? Ember.ember : Ember.cream.opacity(0.22))
+                    .padding(.top, 2)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
+            .background(isOn ? Ember.ember.opacity(0.08) : .clear)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(isOn ? [.isButton, .isSelected] : .isButton)
     }
 }
