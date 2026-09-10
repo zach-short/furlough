@@ -309,7 +309,7 @@ final class WebFilter {
 
     /// What the filter is, for the two screens that offer it. Separate from `Guidance`, which
     /// only ever says what to do next.
-    static let explainer = "The web filter is a system extension that sees every connection this Mac opens and refuses the ones to a blocked site, from any app: Firefox, a site saved to the Dock, anything that loads a site outside a browser. Those get the floating card rather than the shield page."
+    static let explainer = "The web filter is a system extension that sees every connection this Mac opens and refuses the ones to a blocked site, whatever opened it. Those get the floating card rather than the shield page.\n\nWithout it a site is held only in the browsers Furlough recognises, by reading the address bar: Safari, Chrome, Arc, Brave, Edge and the other Chromium ones. Anything off that list goes through — Firefox, a browser Furlough has not met, a site saved to the Dock, or an app that loads a page on its own."
 
     private(set) var status: Status = .notInstalled
     /// Set once Install is pressed and cleared by Remove, so a launch that finds the extension

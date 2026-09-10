@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// The first run: the promise, the question, the one thing to allow.
+/// The first run: the promise, and the question.
 ///
-/// Three panes, and the middle one is the point. Furlough is two things — Rules, which are hours
+/// Two panes, and the second one is the point. Furlough is two things — Rules, which are hours
 /// and budgets and a delay on anything that hands time back, and the Anchor, which is one click
 /// and your phone's tag as the only key. This screen used to name both and then hand everyone
 /// the same window, built around Rules, with the Anchor a padlock somebody had to find. So the
@@ -10,8 +10,11 @@ import SwiftUI
 /// which guide runs. The pane that used to explain the Anchor is gone: every sentence on it now
 /// lands inside the guide step it describes, where it can be acted on rather than read once.
 ///
-/// The web filter is last and stays a pane of its own: both halves block websites, and it is the
-/// one thing on the Mac that needs the person's hand in System Settings.
+/// The web filter used to be a third pane here, and it is gone. It does nothing until some
+/// website is blocked, so asking for a trip to System Settings before there is a single rule
+/// charged everybody up front for something most people would never need — and anyone who only
+/// blocks applications was answering for a feature that could not do anything for them. It is
+/// offered at the first website instead; see `WebFilterOfferSheet`.
 struct MacOnboardingView: View {
     @Environment(MacModel.self) private var model
     @State private var requesting = false
@@ -22,7 +25,7 @@ struct MacOnboardingView: View {
     @State private var chosen: Half = .anchor
     @State private var wantsBoth = false
 
-    private enum Pane { case promise, start, filter }
+    private enum Pane { case promise, start }
 
     var body: some View {
         ZStack {
@@ -30,15 +33,13 @@ struct MacOnboardingView: View {
             HStack(spacing: 40) {
                 mark
                     .frame(width: 170, height: 200)
-                // Scrolls because the filter pane grows: six numbered steps and a caution is a
-                // taller column than the promise, and a step that falls off the bottom of a
-                // fixed window is a step nobody follows.
+                // Scrolls so a pane taller than a short window is still reachable rather than
+                // cut off at the bottom.
                 ScrollView(.vertical) {
                     Group {
                         switch pane {
                         case .promise: promise
                         case .start: start
-                        case .filter: filter
                         }
                     }
                     .frame(maxWidth: 460, alignment: .leading)
@@ -200,12 +201,14 @@ struct MacOnboardingView: View {
             Footnote(text: "Nothing is decided here. Both halves are one click apart afterwards, whichever you pick.")
                 .padding(.top, 10)
             HStack(spacing: 10) {
-                Button("Continue") {
+                // The last button of the first run now that the filter pane has gone, so it says
+                // where it lands rather than "Continue", which promised another pane.
+                Button(wantsBoth ? "Start with the Anchor" : "Start with \(chosen == .anchor ? "the Anchor" : "Rules")") {
                     // Committed on the way forward rather than on each click, so backing out and
                     // coming at it again does not leave a half chosen by a mouse on its way
                     // somewhere else.
                     model.chooseStart(half: chosen, both: wantsBoth)
-                    withAnimation(.snappy(duration: 0.25)) { pane = .filter }
+                    model.finishOnboarding()
                 }
                 .buttonStyle(.glassProminent)
                 .tint(Ember.ember)
@@ -222,71 +225,8 @@ struct MacOnboardingView: View {
         .animation(.snappy(duration: 0.25), value: chosen)
         .animation(.snappy(duration: 0.25), value: wantsBoth)
     }
-
-    /// The web filter, offered once. Whatever is chosen here, Settings > Web has the same
-    /// buttons later.
-    private var filter: some View {
-        let filter = model.enforcer.webFilter
-        let status = filter.status
-        return VStack(alignment: .leading, spacing: 0) {
-            Eyebrow(text: "One thing to allow", color: Ember.amber)
-            Text("The web filter.")
-                .emberDisplay(36)
-                .foregroundStyle(Ember.cream)
-                .padding(.top, 6)
-            if status == .notInstalled {
-                Text("Furlough reads the tabs of Safari and the Chromium browsers and sends a blocked one to its shield page. It cannot read Firefox, a site saved to the Dock as an app, or an app that loads a site on its own. The web filter closes those: a system extension that refuses the connection instead, from any app.")
-                    .emberBody(14.5)
-                    .foregroundStyle(Ember.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 14)
-            } else {
-                // Once Install has been pressed, what the filter is matters less than what is
-                // being waited on, and the steps need the room the paragraph was using.
-                Text(status.label)
-                    .emberBody(13, .semibold)
-                    .foregroundStyle(status.isOn ? Ember.moss : Ember.pending)
-                    .padding(.top, 14)
-            }
-            FilterDirections(guidance: status.guidance, perform: filter.perform)
-                .padding(.top, 14)
-            HStack(spacing: 10) {
-                switch status {
-                case .notInstalled, .failed:
-                    Button("Install the web filter") { filter.install() }
-                        .buttonStyle(.glassProminent)
-                        .tint(Ember.ember)
-                        .keyboardShortcut(.defaultAction)
-                    Button("Not now") { model.finishOnboarding() }
-                        .buttonStyle(.glass)
-                case .awaitingApproval, .disabledInSettings, .filterOff, .filterDenied:
-                    // No Open System Settings or Check again here: the walkthrough puts each of
-                    // them on the step that calls for it, and a second copy down here would be
-                    // a button to press at the wrong time.
-                    Button("Continue") { model.finishOnboarding() }
-                        .buttonStyle(.glass)
-                        .keyboardShortcut(.defaultAction)
-                case .installing:
-                    Button("Continue") { model.finishOnboarding() }
-                        .buttonStyle(.glass)
-                        .keyboardShortcut(.defaultAction)
-                case .on, .notInApplications:
-                    Button("Continue") { model.finishOnboarding() }
-                        .buttonStyle(.glassProminent)
-                        .tint(Ember.ember)
-                        .keyboardShortcut(.defaultAction)
-                }
-                Button("Back") {
-                    withAnimation(.snappy(duration: 0.25)) { pane = .start }
-                }
-                .buttonStyle(.glass)
-            }
-            .controlSize(.large)
-            .padding(.top, 24)
-        }
-        .task { await filter.refresh() }
-    }
 }
+
 
 /// One half of the app on the promise pane: its mark, its name, and what it is in two lines.
 private struct MacHalfRow<Icon: View>: View {

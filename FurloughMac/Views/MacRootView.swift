@@ -60,6 +60,11 @@ struct MacHomeView: View {
     /// presented over one still leaving is dropped, so the offer waits for `onDismiss`.
     @State private var pendingCompanion: CompanionPrompt?
     @State private var companionPrompt: CompanionPrompt?
+    /// A website was just added and the filter has never been offered. Held until every other
+    /// sheet in the chain has finished, for the reason `offerCompanion` gives: a sheet presented
+    /// over one still leaving is dropped.
+    @State private var pendingFilterHost: String?
+    @State private var filterOfferHost: FilterOfferHost?
     /// The window's clock, kept on the model so the sidebar and the detail pane count in step.
     private var now: Date { model.now }
 
@@ -78,7 +83,7 @@ struct MacHomeView: View {
         }
         .sheet(isPresented: $showAddApp, onDismiss: offerCompanion) { addAppSheet }
         .sheet(isPresented: $showAddSite, onDismiss: offerCompanion) { addSiteSheet }
-        .sheet(item: $companionPrompt) { prompt in
+        .sheet(item: $companionPrompt, onDismiss: offerWebFilter) { prompt in
             CompanionSheet(added: prompt.added, items: prompt.items) { chosen in
                 var hosts: [String] = []
                 var apps: [(bundleID: String, name: String)] = []
@@ -91,6 +96,9 @@ struct MacHomeView: View {
                 model.addHosts(hosts)
                 model.addApps(apps)
             }
+        }
+        .sheet(item: $filterOfferHost) { host in
+            WebFilterOfferSheet(host: host.value)
         }
         .sheet(isPresented: $showPending) { PendingSheet() }
         .sheet(isPresented: $showSettings) { SettingsSheet() }
@@ -128,7 +136,9 @@ struct MacHomeView: View {
         AddSiteSheet { raw in
             guard addDestination == .rules else {
                 guard let host = Hosts.normalize(raw) else { return "That does not look like a website." }
-                return model.addToAnchor(.host(host))
+                let refusal = model.addToAnchor(.host(host))
+                if refusal == nil { pendingFilterHost = host }
+                return refusal
             }
             let isNew = Hosts.normalize(raw).map { model.state.config.target(host: $0) == nil } ?? false
             let outcome = model.addHost(raw)
@@ -136,6 +146,7 @@ struct MacHomeView: View {
             selection = added.id
             if isNew, case .host(let host) = added.kind {
                 pendingCompanion = CompanionPrompt(added: added, items: companionApps(for: host))
+                pendingFilterHost = host
             }
             return nil
         }
@@ -226,11 +237,28 @@ struct MacHomeView: View {
         let items: [CompanionSheet.Item]
     }
 
-    /// Runs once the add sheet is gone. Nothing to offer means no sheet.
+    /// The site the filter offer is about. `String` is not `Identifiable`, and the sheet needs
+    /// something to be presented by.
+    private struct FilterOfferHost: Identifiable {
+        let value: String
+        var id: String { value }
+    }
+
+    /// Runs once the add sheet is gone. Nothing to offer means no sheet — and then the web
+    /// filter gets its turn, since it is the last thing in the chain either way.
     private func offerCompanion() {
         defer { pendingCompanion = nil }
-        guard let pending = pendingCompanion, !pending.items.isEmpty else { return }
+        guard let pending = pendingCompanion, !pending.items.isEmpty else { return offerWebFilter() }
         companionPrompt = pending
+    }
+
+    /// The web filter, once a website is actually in Furlough and every sheet the add raised has
+    /// gone. Asks `MacModel` rather than deciding here: the condition is about the config and the
+    /// filter's own state, not about which button was pressed. See `shouldOfferWebFilter`.
+    private func offerWebFilter() {
+        defer { pendingFilterHost = nil }
+        guard let host = pendingFilterHost, model.shouldOfferWebFilter else { return }
+        filterOfferHost = FilterOfferHost(value: host)
     }
 
     /// Puts Help on a page, then brings its window up — in that order, since the window reads

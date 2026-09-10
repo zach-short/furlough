@@ -64,7 +64,14 @@ final class MacModel {
     /// are derived — see `HalfGuide`.
     private(set) var finishedGuides = MacModel.storedFinishedGuides
 
+    /// The web filter has been put in front of someone once, off the back of a website they
+    /// added. Asked once and not again: Settings > Web has the same buttons for anyone who says
+    /// no and changes their mind, and a prompt that comes back every time a site is added is the
+    /// thing people learn to click past.
+    private(set) var hasOfferedWebFilter = SharedStore.defaults.bool(forKey: MacModel.filterOfferedKey)
+
     private static let onboardedKey = "furlough.mac.onboarded"
+    private static let filterOfferedKey = "furlough.mac.filterOffered"
     private static let startHalfKey = "furlough.mac.startHalf"
     private static let bothHalvesKey = "furlough.mac.bothHalves"
     private static let anchorHalfAddsKey = "furlough.mac.anchorHalfAdds"
@@ -339,6 +346,30 @@ final class MacModel {
         isOnboarded = true
         setLaunchAtLogin(true)
         setWatchdog(true)
+    }
+
+    /// Whether the web filter is worth putting in front of someone right now.
+    ///
+    /// It used to be the last pane of the first run, which asked for a trip to System Settings
+    /// before there was a single rule to enforce — a cost paid up front for a benefit that did
+    /// not exist yet, and the one step most people met before they met anything else. The filter
+    /// does nothing at all until some host is blocked, which is the same condition `Enforcer`
+    /// already uses before it reads a browser at all. So the offer waits for the first website,
+    /// where the reason for it is concrete and on screen.
+    ///
+    /// Somebody who only ever blocks applications is never asked, which is the whole saving, and
+    /// it costs them no question to get it.
+    var shouldOfferWebFilter: Bool {
+        guard !hasOfferedWebFilter, isOnboarded else { return false }
+        guard !enforcer.webFilter.isWanted, !enforcer.webFilter.status.isOn else { return false }
+        return state.config.hasAnyHost
+    }
+
+    /// The offer has been made, whichever way it was answered.
+    func noteWebFilterOffered() {
+        guard !hasOfferedWebFilter else { return }
+        SharedStore.defaults.set(true, forKey: Self.filterOfferedKey)
+        hasOfferedWebFilter = true
     }
 
     func requestNotifications() async {

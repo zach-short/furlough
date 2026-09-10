@@ -288,3 +288,48 @@ struct AnchorScopeWarningTests {
         #expect(try #require(config.anchorWarning).names == ["Messages"])
     }
 }
+
+/// The condition the Mac's web filter offer waits on. Pure, and about the config rather than
+/// about which button was pressed, so the offer cannot drift from the thing that makes it worth
+/// making — see `MacModel.shouldOfferWebFilter`.
+@Suite("A config that has a website in it anywhere")
+struct ConfigHasAnyHostTests {
+    @Test("apps alone are not a reason to ask for a web filter")
+    func appsOnly() {
+        var config = Config()
+        config.targets = [Target(kind: .macApp(bundleID: "com.hnc.Discord"), systemName: "Discord")]
+        #expect(!config.hasAnyHost)
+    }
+
+    @Test("a website of its own counts")
+    func hostTarget() {
+        var config = Config()
+        config.targets = [Target(kind: .host("youtube.com"))]
+        #expect(config.hasAnyHost)
+    }
+
+    @Test("a site linked to an app counts, because the app's row is the site's door too")
+    func linkedSite() {
+        var config = Config()
+        var target = Target(kind: .macApp(bundleID: "com.hnc.Discord"), systemName: "Discord")
+        target.also = [.host("discord.com")]
+        config.targets = [target]
+        #expect(config.hasAnyHost)
+    }
+
+    /// A site the anchor holds is exactly as unenforceable in a browser Furlough has never met
+    /// as one held by a rule, so it earns the same offer.
+    @Test("a site on the anchor's list counts even with no rule anywhere")
+    func anchorHost() {
+        var config = Config()
+        config.anchor.kinds = [.host("reddit.com")]
+        #expect(config.hasAnyHost)
+        config.anchor.kinds = [.macApp(bundleID: "com.hnc.Discord")]
+        #expect(!config.hasAnyHost)
+    }
+
+    @Test("an empty config asks for nothing")
+    func empty() {
+        #expect(!Config().hasAnyHost)
+    }
+}

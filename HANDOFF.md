@@ -2313,6 +2313,44 @@ The plan for this stretch. Tick each phase off here as it lands.
     puts it back, with macOS's approval. Worth knowing before the next install: any reinstall
     costs the filter, and the app cannot tell that from a filter nobody ever installed.
 
+36. **The web filter leaves the first run and is offered at the first website.** Zach asked
+    whether the filter step could be skipped for the many people who use only Safari and Chrome —
+    ask up front which browsers they use, and walk only the Firefox minority through it. The
+    premise does not hold, and the reason is worth keeping: `Browsers.known` is a **hardcoded
+    allowlist of fifteen bundle identifiers**, and `snapshots()` skips any running app that is
+    not on it — not blocked, not warned about, invisible. So the gap is not Firefox and a Dock
+    web app, which is what the old copy named and what taught everyone the wrong model; it is
+    everything off that list, including any Chromium fork, and closing it takes a sixty-second
+    download. Furlough's adversary is the same person later, and somebody answering "just Safari"
+    at onboarding is telling the truth about their habits and nothing about their workaround.
+    Skipping the filter does not even skip System Settings: the tab reader needs an Automation
+    grant per browser. And the reader lets the page load — `pollInterval` is 2 s, so a blocked
+    site renders and is then replaced by the shield, where the filter refuses the connection.
+
+    What was right in the question is that the step is asked at the wrong time, not of the wrong
+    people. It was the last pane of the first run, which charges a System Settings trip up front
+    for a benefit that does not exist yet — there are no rules on a first run — and asks somebody
+    who will only ever block applications to answer for a feature that can never do anything for
+    them. The filter does nothing until some host is blocked, which is the condition `Enforcer`
+    already uses before it reads a browser at all. So: `MacOnboardingView` is two panes, promise
+    and start, with `Continue` now reading "Start with the Anchor"/"Start with Rules" because it
+    is the last button of the first run. `Config.hasAnyHost` (`Shared/Core/ConfigHosts.swift`,
+    tested — a host target, a site linked to an app, or a host on the anchor's list) plus
+    `MacModel.shouldOfferWebFilter` gate a new `WebFilterOfferSheet`, which arrives after a
+    website is added, once every other sheet the add raised has gone (the `onDismiss` chain in
+    `MacHomeView`: add → companion → filter). Named at the top with the site that caused it.
+    Asked once, `furlough.mac.filterOffered`, because Settings > Web has the same buttons for
+    anyone who changes their mind. Anybody who only blocks applications is never asked, and it
+    costs them no question to get that. `WebFilter.explainer` and the sheet's own copy now say
+    the gap is everything off the list rather than naming two examples as if they were all of it.
+
+    Built and tested — 627 Core tests, five new on `hasAnyHost`, both apps warning-free, verified
+    in a worktree at HEAD because another lane was mid-rename in `Shared/Core`. **Neither new
+    screen has been seen on a Mac.** Two instances of one bundle id get no window, and outside
+    `/Applications` the filter reports `.notInApplications`, so the offer sheet renders its wrong
+    branch — a faithful look means replacing the installed copy, which was not worth doing to a
+    Mac that was anchored at the time.
+
 ## Style rules
 
 Swift 6 language mode with approachable concurrency, SwiftUI, `@Observable`, async/await, no
