@@ -221,10 +221,14 @@ struct AnchorSyncMacDropTests {
         #expect(!warning.contains("  "))
         #expect(!warning.contains("\n"))
         #expect(warning.hasSuffix("."))
-        #expect(warning.contains("iCloud Drive"))
         // The harm, said on the device reading it. This bundle is built for macOS.
         #expect(warning.contains("this Mac"))
         #expect(warning.contains("System Settings"))
+        // Says iCloud cannot be reached, and stops there. An earlier version of this named a
+        // signed-out account as the cause, which the probe behind it cannot actually tell:
+        // `isAvailable` reports an unusable store, not an absent account.
+        #expect(warning.contains("cannot reach iCloud"))
+        #expect(!warning.contains("iCloud Drive"))
     }
 
     let decoder: JSONDecoder = {

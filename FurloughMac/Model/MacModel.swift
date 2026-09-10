@@ -84,9 +84,8 @@ final class MacModel {
     @ObservationIgnored private var cloudPolls = 0
 
     /// Whether iCloud can carry the anchor between this Mac and the phone. Kept here rather
-    /// than read in the view: it is a file-system question, the anchor sheet asks it on every
-    /// rebuild of a window that rebuilds every second, and it only ever changes when the
-    /// account does — which iCloud says out loud.
+    /// than read in the view: asking is a round trip to the key-value store, and the anchor
+    /// sheet would ask on every rebuild of a window that rebuilds once a second.
     private(set) var cloudAvailable = AnchorCloud.isAvailable
 
     /// Listens for the phone's writes, once. iCloud posts the change to a running app, which
@@ -585,19 +584,21 @@ final class MacModel {
     /// back to its first run, and enforces the empty state, so the Mac matches a fresh install
     /// the way the phone's reset does.
     ///
-    /// What it does not touch is the line the phone draws too. There, Screen Time access
-    /// survives a reset because the app cannot give it back afterwards and a test pass should
-    /// not have to. Here that is the web filter — a system extension that costs two trips
-    /// through System Settings to approve — and the per-browser Automation permissions, which
-    /// are macOS's to grant and not ours to revoke. Both stay, and the onboarding that follows
-    /// reads the filter's live status rather than a stored flag, so it finds the extension in
-    /// place and says so. The activity log is kept for the same reason it is on the phone: it
-    /// is the record of what just happened, including this.
+    /// What it does not touch is drawn on a different line from the phone's. There the reset
+    /// hands Screen Time access back, because the app can ask for it again with the button on
+    /// its own onboarding screen. Nothing the Mac keeps can be asked for from inside the app:
+    /// the web filter — a system extension that costs two trips through System Settings to
+    /// approve — and the per-browser Automation permissions, which are macOS's to grant and not
+    /// ours to revoke. Both stay, and the onboarding that follows reads the filter's live
+    /// status rather than a stored flag, so it finds the extension in place and says so. The
+    /// activity log is kept for the same reason it is on the phone: it is the record of what
+    /// just happened, including this.
     ///
-    /// The first week is deliberately not started. The phone's reset starts one because a fresh
-    /// install there gets one; nothing grants the Mac a week — see `Forgiveness` and the
-    /// handoff — so granting one here would make the reset the only way to a Mac state that no
-    /// real install can reach.
+    /// The first week is deliberately not started — and the phone's reset no longer starts one
+    /// either: it hands access back, and the grant on the way through onboarding starts the
+    /// week, the way a fresh install does. Nothing grants the Mac a week — see `Forgiveness`
+    /// and the handoff — so starting one here would make the reset the only way to a Mac state
+    /// that no real install can reach.
     ///
     /// Compiled in only when the build asked for the testing tools — see `TestingTools` — so the
     /// shipping build keeps its promise of no unblock button.

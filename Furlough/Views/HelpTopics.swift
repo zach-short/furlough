@@ -319,7 +319,7 @@ struct DevicesHelp: View {
     private var cloudLine: String {
         model.cloudAvailable
             ? "The Anchor stops at the device it was dropped on: a drop here would not lock your Mac, and your tag could not release one. Both apps say so on the Anchor screen if it happens, rather than letting you find out at the tag."
-            : "This is the case right now — Furlough cannot reach your iCloud account, so the Anchor is going no further than this iPhone. Sign in to iCloud in Settings, with iCloud Drive on."
+            : "This is the case right now — Furlough cannot reach iCloud, so the Anchor is going no further than this iPhone. Check that you are signed in to iCloud in Settings."
     }
 }
 

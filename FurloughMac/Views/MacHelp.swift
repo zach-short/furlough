@@ -498,7 +498,7 @@ struct HelpPage: View {
     /// decides them, so the page and the refused button never disagree.
     private var cloudAndPhoneLine: String {
         if !model.cloudAvailable {
-            return "Right now Furlough cannot reach your iCloud account, so this Mac will not drop the anchor at all. Sign in to iCloud in System Settings, with iCloud Drive on."
+            return "Right now Furlough cannot reach iCloud, so this Mac will not drop the anchor at all. Check that you are signed in to iCloud in System Settings."
         }
         if !model.phoneSeen {
             return "This Mac has not heard from your iPhone yet, so Drop anchor is refused here. Drop the anchor once on the phone and it will have — after that this Mac can drop its own whenever you like."

@@ -76,16 +76,16 @@ enum AnchorSync {
     static var cutOffWarning: String {
         #if os(iOS)
         """
-        Furlough cannot reach your iCloud account, so the Anchor stops at this iPhone. \
-        Dropping it here will not lock your Mac, and scanning your tag will not release one. \
-        Sign in to iCloud in Settings, with iCloud Drive on, and the two link themselves.
+        Furlough cannot reach iCloud, so the Anchor stops at this iPhone. Dropping it here \
+        will not lock your Mac, and scanning your tag will not release one. Check that you \
+        are signed in to iCloud in Settings.
         """
         #else
         """
-        Furlough cannot reach your iCloud account, so the Anchor stops at this Mac. Your \
-        iPhone's tag is the only thing that can release an anchor dropped here, and it cannot \
-        reach this Mac — so Furlough will not drop one until iCloud is back. Sign in to iCloud \
-        in System Settings, with iCloud Drive on.
+        Furlough cannot reach iCloud, so the Anchor stops at this Mac. Your iPhone's tag is \
+        the only thing that can release an anchor dropped here, and it cannot reach this Mac \
+        — so Furlough will not drop one until iCloud is back. Check that you are signed in to \
+        iCloud in System Settings.
         """
         #endif
     }
@@ -210,16 +210,22 @@ enum AnchorCloud {
 
     static var changeNotification: Notification.Name { NSUbiquitousKeyValueStore.didChangeExternallyNotification }
 
-    /// Whether iCloud could carry a record at all. Not a question about the network: a device
-    /// with no signal still has a token, and its writes go out when it next has one. A *nil*
-    /// token means signed out of iCloud, or iCloud Drive switched off — the key-value store
-    /// still reads and writes, but only to this device, and nothing will ever leave it.
+    /// Whether the key-value store is usable at all.
     ///
-    /// That distinction is the whole reason this exists. `read()` returning nil looks the same
-    /// whether the other device has said nothing yet or the store is a dead end, and the
-    /// difference is the difference between waiting and being told. Every caller that means
-    /// "can the anchor cross" asks this, and no caller treats a false as temporary.
-    static var isAvailable: Bool { FileManager.default.ubiquityIdentityToken != nil }
+    /// Asked of the store itself, which is the only thing that knows. The obvious-looking probe
+    /// — `FileManager.ubiquityIdentityToken` — answers a different question and is always nil
+    /// here: that token belongs to iCloud Drive's *document containers*, and Furlough has none.
+    /// It asks for `ubiquity-kvstore-identifier` and nothing else, so the token is nil on a
+    /// perfectly healthy install, signed in or out. Using it reported every working Mac as cut
+    /// off, and, because `macDrop` refuses on that, stopped the anchor being dropped at all.
+    ///
+    /// `synchronize()` is narrower than the name of this property suggests, and deliberately so.
+    /// It says the store is configured and reachable — false when the entitlement is missing or
+    /// the store cannot be used — and it does not promise to notice an account signed out from
+    /// Settings. So a false here is trustworthy and worth acting on; a true means "nothing is
+    /// visibly wrong", not "the other device will certainly hear you". The lock-with-no-key
+    /// guard does not rest on this: `phoneSeen` is what actually protects the Mac.
+    static var isAvailable: Bool { NSUbiquitousKeyValueStore.default.synchronize() }
 
     /// Whether a change notification is iCloud saying the account itself moved — signed in,
     /// signed out, or switched. `isAvailable` has to be read again when it does, and the
