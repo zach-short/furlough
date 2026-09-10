@@ -94,13 +94,26 @@ struct LinkTrafficCard: View {
                 ForEach(outgoing) { addition in
                     LinkNudge(
                         symbol: "arrow.up.to.line",
-                        text: "Send \(addition.title) to \(othersDescription)? Each will block what it can find under that name\(addition.rule == nil ? "." : ", on these hours.")",
+                        text: Self.offer(addition, to: othersDescription),
                         primaryTitle: "Send it",
                         onPrimary: { onSend(addition) },
                         onDismiss: { onDeclineSend(addition) }
                     )
                 }
             }
+        }
+    }
+
+    /// What sending one would do, in the words of the half it is on. The anchor's half is not
+    /// "block it": it puts the thing on each device's own anchor list, so it goes away the next
+    /// time any of them drops — and only a tag on an iPhone brings it back. That is worth saying
+    /// before the tap, not after.
+    static func offer(_ addition: SharedAddition, to others: String) -> String {
+        switch addition.half {
+        case .rules:
+            return "Send \(addition.title) to \(others)? Each will block what it can find under that name\(addition.rule == nil ? "." : ", on these hours.")"
+        case .anchor:
+            return "\(addition.title) is on this Anchor's list. Tell \(others)? Each holds what it can find under that name whenever its anchor drops."
         }
     }
 }

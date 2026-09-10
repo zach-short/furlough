@@ -359,7 +359,18 @@ final class MacModel {
     /// Sends what is awaiting, or lines it up to ask about. A Mac app names itself, so this
     /// settles in the same breath as the add.
     func settleLink(reason: String) {
-        outgoing = LinkFlow.settleAwaiting(config: state.config, now: now)
+        outgoing = LinkFlow.settleAwaiting(config: state.config, now: now) {
+            // What this Mac calls the apps its anchor holds and no rule covers. Asked for only
+            // when the walk finds one, because it reads the Applications folders.
+            var names: [TargetKind: String] = [:]
+            let installed = Self.installedByIdentifier()
+            for kind in state.config.anchor.kinds {
+                guard case .macApp(let bundleID) = kind,
+                      let name = installed[Companions.normalize(bundleID: bundleID)] else { continue }
+                names[kind] = name
+            }
+            return names
+        }
         isEnrolled = DeviceLink.isEnrolled
     }
 
@@ -384,6 +395,7 @@ final class MacModel {
         enforce(reason: "link arrival")
         let names = touched.compactMap { state.config.target(id: $0)?.displayName }
         var message = names.isEmpty ? "Nothing new to block." : "\(UtilityText.list(names)) \(names.count == 1 ? "is" : "are") in Furlough now."
+        if landing.anchors { message += " \(names.count == 1 ? "It is" : "They are") on the Anchor's list here too." }
         if landing.rule != nil { message += " The rule came with it, and can be undone for \(Furlough.undoWindowMinutes) minutes." }
         return message
     }
@@ -431,12 +443,6 @@ final class MacModel {
             return anchor.anchorsEverything ? "That already stays open." : "That is already held."
         }
         setAnchorKinds(anchor.kinds + [kind])
-        // Held here is worth holding there. The list is kinds, not targets, so what crosses is
-        // the row covering this one where there is one, under the anchor half.
-        if let target = state.config.target(kind: kind) {
-            LinkFlow.noteAdded([target.id], half: .anchor, config: state.config)
-            settleLink(reason: "anchor edit")
-        }
         return nil
     }
 
@@ -449,6 +455,10 @@ final class MacModel {
         SharedStore.save(current)
         SharedStore.log("anchor: now \(current.config.anchor.anchorsEverything ? "lets through" : "holds") \(kinds.count) item(s)")
         enforce(reason: "anchor edit")
+        // Held here is worth holding there. Every way onto the list comes through here, and the
+        // list is what the link walks, so nothing has to be written down as awaiting — and an
+        // app the anchor holds that has no rule at all crosses exactly like one that has.
+        settleLink(reason: "anchor edit")
     }
 
     /// The phone's `setAnchorScope`, with the same rule: the list does not survive the switch.

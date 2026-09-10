@@ -134,7 +134,7 @@ struct DevicesScreen: View {
             CardDivider()
             LinkChoiceRow(
                 title: "Send what I add",
-                detail: "Tell \(othersDescription) the name of what you add here, so each can block what it finds.",
+                detail: "Tell \(othersDescription) the name of what you add here, or anchor here, so each can block or hold what it finds.",
                 selection: link.sendAdditions
             ) { choice in
                 var copy = link
@@ -144,7 +144,7 @@ struct DevicesScreen: View {
             CardDivider()
             LinkChoiceRow(
                 title: "Take what my other devices add",
-                detail: "Block here what \(othersDescription) add\(model.devices.count == 1 ? "s" : "") there, and the site at once; an app still needs Apple's picker.",
+                detail: "Block here what \(othersDescription) add\(model.devices.count == 1 ? "s" : "") there, and hold what \(model.devices.count == 1 ? "it anchors" : "they anchor"); the site lands at once, an app needs Apple's picker.",
                 selection: link.acceptAdditions
             ) { choice in
                 var copy = link
@@ -153,7 +153,7 @@ struct DevicesScreen: View {
             }
         }
         .emberCard()
-        Footnote(text: "Ask puts a card on the page it is about. A picked app can only be sent, or paired with its site, once Furlough has seen it: right away with Screen Time data access, otherwise the first time the shield covers it. Names cross; rules, lists and tokens never do.")
+        Footnote(text: "Ask puts a card on the page it is about, so what you anchor is asked about on the Anchor screen. A picked app can only be sent, or paired with its site, once Furlough has seen it: right away with Screen Time data access, otherwise the first time the shield covers it. Names cross, and whether a name is anchored; rules of yours and Screen Time tokens never do.")
             .padding(.top, 8)
     }
 

@@ -118,7 +118,7 @@ struct MacDevicesScreen: View {
             CardDivider()
             LinkChoiceRow(
                 title: "Send what I add",
-                detail: "Tell \(othersDescription) the name of what you add here, so each can block what it finds.",
+                detail: "Tell \(othersDescription) the name of what you add here, or anchor here, so each can block or hold what it finds.",
                 selection: link.sendAdditions
             ) { choice in
                 var copy = link
@@ -128,7 +128,7 @@ struct MacDevicesScreen: View {
             CardDivider()
             LinkChoiceRow(
                 title: "Take what my other devices add",
-                detail: "Block here what \(othersDescription) add\(model.devices.count == 1 ? "s" : "") there: the app if this Mac has it, and the site either way.",
+                detail: "Block here what \(othersDescription) add\(model.devices.count == 1 ? "s" : "") there, and hold what \(model.devices.count == 1 ? "it anchors" : "they anchor"): the app if this Mac has it, and the site either way.",
                 selection: link.acceptAdditions
             ) { choice in
                 var copy = link
@@ -137,7 +137,7 @@ struct MacDevicesScreen: View {
             }
         }
         .emberCard()
-        Footnote(text: "Ask puts a card in the sidebar. Names cross; rules, lists and Screen Time tokens never do, so a phone that takes what this Mac adds blocks the site at once and is offered the app in Apple's picker.")
+        Footnote(text: "Ask puts a card in the sidebar, on the half it is about. Names cross, and whether a name is anchored; rules of yours and Screen Time tokens never do, so a phone that takes what this Mac adds blocks the site at once and is offered the app in Apple's picker.")
             .padding(.top, 8)
     }
 

@@ -42,6 +42,17 @@ final class ShieldExtension: ShieldConfigurationDataSource {
             let anchoredDirectly = kind.map { config.anchor.blocks($0, at: now) } ?? false
             let anchoredByCategory = category?.token.map { config.anchor.blocks(.category($0), at: now) } ?? false
             if anchoredDirectly || anchoredByCategory { status = .anchored }
+            // This is the only moment iOS ever says what one of these is called: it is on the
+            // anchor's list, no rule covers it, and so nothing has a `systemName` to learn a
+            // name onto. Write it down against the kind, so the link can tell the other devices
+            // what this phone is holding — until now the anchor's list could not cross at all.
+            // `systemName` rather than `learned`, which by here may have been replaced by the
+            // name of the *category* this thing falls in: that names the category, not the app.
+            if anchoredDirectly, let kind, let name = systemName, !name.isEmpty {
+                if SharedStore.learnAnchorName(name, for: kind) {
+                    SharedStore.log("learned the name of something anchored: \(name)")
+                }
+            }
         }
         let text = ShieldText.text(name: name, status: status, rule: target?.rule)
 

@@ -113,6 +113,109 @@ enum SharedAdditions {
         )
     }
 
+    /// What one thing on the anchor's list can say about itself, or nil while it cannot be
+    /// named. The anchor's half of `describe`, and it goes through the same code: the list is
+    /// kinds rather than targets, so a kind covered by a rules row is described as that row —
+    /// which brings its other doors and its rule with it — and a kind held by the anchor alone
+    /// is described as the one door it is.
+    ///
+    /// A held thing has no target and so no id, and the ring is keyed by id: an addition about
+    /// something already in the ring must replace it rather than pile up beside it. So the id
+    /// is derived from the name (`anchorID`), which is also the only thing that crosses. Adding
+    /// a rule for something already anchored therefore changes the ring entry's id — from the
+    /// derived one to the target's — and the receiver treats it as news, which it is.
+    ///
+    /// `name` is what this device has learned the kind is called, where it has learned
+    /// anything: on the Mac the name off the bundle, on the phone what the shield or Screen
+    /// Time's tables taught (`SharedStore.anchorNames`). Nil is not a failure — a Mac app and a
+    /// typed host both name themselves — but a picked app or site with no name yet cannot
+    /// cross, and waits for one.
+    static func describe(
+        anchorKind kind: TargetKind,
+        name: String?,
+        in config: Config,
+        origin: String,
+        platform: AnchorRecord.Platform,
+        now: Date
+    ) -> SharedAddition? {
+        if let target = config.target(kind: kind) {
+            return describe(target, half: .anchor, origin: origin, platform: platform, sequence: 0, now: now)
+        }
+        var standIn = Target(kind: kind)
+        standIn.systemName = name
+        guard var addition = describe(standIn, half: .anchor, origin: origin, platform: platform, sequence: 0, now: now)
+        else { return nil }
+        addition.id = anchorID(forTitle: addition.title)
+        return addition
+    }
+
+    /// Everything on the anchor's list this device can describe and has not settled, in the
+    /// list's own order. `LinkFlow.anchorAdditions` is this with the link's settings around it.
+    ///
+    /// `settled` is the normalized names already sent or declined. Names, because a name is
+    /// what crosses: two things on the list that go by the same one are one question, asked
+    /// once, and the answer to it holds for both.
+    static func anchorList(
+        in config: Config,
+        names: () -> [TargetKind: String],
+        settled: Set<String>,
+        origin: String,
+        platform: AnchorRecord.Platform,
+        now: Date
+    ) -> [SharedAddition] {
+        // Under everything-except the list is what stays *open*, so sending it would tell the
+        // other devices to block exactly what this one keeps reachable.
+        guard !config.anchor.anchorsEverything, !config.anchor.kinds.isEmpty else { return [] }
+        // Asked for once, and only when the list holds something no rule covers: on the Mac it
+        // walks the Applications folders, and this runs on every settle.
+        var learned: [TargetKind: String]?
+        var offers: [SharedAddition] = []
+        var seen = settled
+        for kind in config.anchor.kinds {
+            if learned == nil, config.target(kind: kind) == nil { learned = names() }
+            guard let addition = describe(
+                anchorKind: kind, name: learned?[kind], in: config,
+                origin: origin, platform: platform, now: now
+            ) else { continue }
+            guard seen.insert(Companions.normalize(name: addition.title)).inserted else { continue }
+            offers.append(addition)
+        }
+        return offers
+    }
+
+    /// The id an addition about something the anchor holds and no rule covers goes out under:
+    /// the same one every time, on this device and on the next, so the ring replaces rather
+    /// than repeats and a receiver's watermark means what it says.
+    ///
+    /// Derived rather than stored, and derived with a hash written down here rather than with
+    /// `hashValue`, which Swift seeds per process and which would therefore give a different
+    /// answer on every launch. FNV-1a twice over, once salted, for the sixteen bytes; the
+    /// version and variant nibbles are set so what comes out is a well-formed UUID.
+    static func anchorID(forTitle title: String) -> UUID {
+        let key = Companions.normalize(name: title)
+        var bytes = octets(fnv1a(key, seed: 0xcbf2_9ce4_8422_2325))
+            + octets(fnv1a(key, seed: 0x9e37_79b9_7f4a_7c15))
+        bytes[6] = (bytes[6] & 0x0F) | 0x40
+        bytes[8] = (bytes[8] & 0x3F) | 0x80
+        return UUID(uuid: (
+            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+            bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
+        ))
+    }
+
+    private static func fnv1a(_ string: String, seed: UInt64) -> UInt64 {
+        var hash = seed
+        for byte in Array(string.utf8) {
+            hash ^= UInt64(byte)
+            hash = hash &* 0x0000_0100_0000_01B3
+        }
+        return hash
+    }
+
+    private static func octets(_ value: UInt64) -> [UInt8] {
+        (0..<8).map { UInt8(truncatingIfNeeded: value >> (56 - $0 * 8)) }
+    }
+
     /// In first-seen order, each once.
     static func unique(_ items: [String]) -> [String] {
         var seen = Set<String>()
@@ -165,22 +268,54 @@ enum SharedAdditions {
         var appNeedsPicker: Bool
         /// The rule to give the row, where it has none.
         var rule: Rule?
+        /// Whether landing this would put something on *this* device's anchor list: the
+        /// addition was made to the anchor's half, and this anchor can take one — it is not
+        /// down, and its scope is not everything-except, where the list is what stays open.
+        ///
+        /// Its own field because it is the one thing an addition can do when it brings nothing
+        /// new to block. A Mac that already has a YouTube rule hears that the phone anchored
+        /// YouTube: no app to add, no host to add, no rule to take, and yet the whole point of
+        /// the message is that YouTube should be held here too. Without this the landing read
+        /// as nothing and was thrown away.
+        var anchors: Bool
 
-        /// True when everything it names is already here and there is no rule to give.
-        var isNothing: Bool { appBundleID == nil && hosts.isEmpty && rule == nil }
+        /// A phone hearing that another device anchored an app. There is nothing it can block
+        /// by name — only Apple's picker mints a token — and the app may go by no website at
+        /// all, so by every other measure this says nothing. It is still owed: Screen Time's
+        /// tables can match the name to a token where data access exists
+        /// (`AppModel.anchorArrivalsFromTheTables`), and where it does not, the offer is how a
+        /// person hears that the picker is the way in. Dropping it would be the one arrival the
+        /// anchor half exists for going quietly missing.
+        var owesAnchoredApp: Bool { appNeedsPicker && addition.half == .anchor }
+
+        /// True when everything it names is already here, there is no rule to give, the
+        /// anchor's list would not change, and no app is owed.
+        var isNothing: Bool {
+            appBundleID == nil && hosts.isEmpty && rule == nil && !anchors && !owesAnchoredApp
+        }
 
         /// What would happen, in a sentence, for the offer under Ask.
         func summary(from device: String) -> String {
+            let act = addition.half == .anchor ? "anchored" : "added"
             var parts: [String] = []
             if let appName { parts.append("the \(appName) app") }
             if !hosts.isEmpty { parts.append(UtilityText.list(hosts)) }
-            let picker = appNeedsPicker ? " The \(addition.title) app itself needs Apple's picker; Furlough will offer it." : ""
+            let picker: String
+            switch (appNeedsPicker, addition.half) {
+            case (false, _): picker = ""
+            case (true, .rules): picker = " The \(addition.title) app itself needs Apple's picker; Furlough will offer it."
+            case (true, .anchor): picker = " Furlough adds the \(addition.title) app itself if Screen Time will name it; otherwise Change apps here is the way in."
+            }
             let ruled = rule == nil ? "" : " It brings \(LinkedDevice.defaultName(for: addition.platform) == "Mac" ? "your Mac's" : "your \(LinkedDevice.defaultName(for: addition.platform))'s") rule for it."
             guard !parts.isEmpty else {
-                return "\(device) added \(addition.title).\(ruled)\(picker)"
+                // Nothing new to block, so the anchor is the whole of the offer — and it is the
+                // only case that reaches here with something to do at all.
+                let held = anchors ? " Hold it here too?" : ""
+                return "\(device) \(act) \(addition.title).\(held)\(ruled)\(picker)"
             }
             let onto = existing == nil ? "" : " — beside what already covers it"
-            return "\(device) added \(addition.title). Block \(UtilityText.list(parts)) here\(onto)?\(picker)\(ruled)"
+            let held = anchors ? " It goes on the Anchor's list here too." : ""
+            return "\(device) \(act) \(addition.title). Block \(UtilityText.list(parts)) here\(onto)?\(held)\(picker)\(ruled)"
         }
     }
 
@@ -195,7 +330,8 @@ enum SharedAdditions {
         for addition: SharedAddition,
         in config: Config,
         installed: [String: String],
-        companion: LinkChoice
+        companion: LinkChoice,
+        now: Date
     ) -> Landing {
         // The row already covering any door of it. By host first, which both platforms can
         // answer exactly; then by identifier on the Mac; then by learned name on the phone,
@@ -252,6 +388,16 @@ enum SharedAdditions {
         hosts = unique(hosts).filter { config.target(host: $0) == nil }
 
         let rule = (existing?.rule == nil) ? addition.rule : nil
+
+        // The anchor takes it in when that is where it was added and this anchor can take one.
+        // Something new to block is always something new to hold; a row already here is only
+        // worth landing for the anchor's sake while the anchor does not hold every door of it
+        // already, which is the same question `Config.anchorCandidates` asks.
+        var anchors = false
+        if addition.half == .anchor, !config.anchor.isHolding(at: now), !config.anchor.anchorsEverything {
+            let arriving = appBundleID != nil || !hosts.isEmpty
+            anchors = arriving || !(existing.map(config.anchor.lists) ?? true)
+        }
         return Landing(
             addition: addition,
             existing: existing?.id,
@@ -259,7 +405,8 @@ enum SharedAdditions {
             appName: appName,
             hosts: hosts,
             appNeedsPicker: appNeedsPicker,
-            rule: rule
+            rule: rule,
+            anchors: anchors
         )
     }
 
@@ -327,7 +474,11 @@ enum SharedAdditions {
         }
         #endif
 
-        if landing.addition.half == .anchor, !config.anchor.isHolding(at: now), !config.anchor.anchorsEverything {
+        // Asked again here rather than trusted from `landing.anchors`: under Ask the landing is
+        // worked out when the addition arrives and answered whenever the person gets to the
+        // card, and the anchor may have dropped in between. Nothing changes the list under a
+        // lock, however long ago the offer was made.
+        if landing.anchors, !config.anchor.isHolding(at: now), !config.anchor.anchorsEverything {
             config.anchor.add(touched.compactMap { config.target(id: $0) })
         }
         return touched

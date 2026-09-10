@@ -6,6 +6,7 @@ enum SharedStore {
     private static let stateKey = "furlough.state.v1"
     private static let namesKey = "furlough.names.v1"
     private static let tokensKey = "furlough.tokens.v1"
+    private static let anchorNamesKey = "furlough.anchorNames.v1"
     private static let logKey = "furlough.log.v1"
     private static let maxLogEntries = 300
     private static let logger = Logger(subsystem: Furlough.bundleID, category: "shared")
@@ -73,6 +74,55 @@ enum SharedStore {
         return true
     }
 
+    #if os(iOS)
+    /// What the anchor holds that no rule covers, by the name iOS gave it, against the kind it
+    /// is. The anchor's own half of `learnedNames`, and it exists for the same reason: a Screen
+    /// Time token says nothing about what it is, so a thing on the anchor's list and in no rule
+    /// has no name to send to the other devices until something teaches it one.
+    ///
+    /// Keyed by name rather than by kind, because a token cannot be a defaults key and its
+    /// encoded bytes are no promise; the kind is the value, so the walk can check that what was
+    /// named is still on the list and drop it when it is not. The Mac needs none of this — a
+    /// bundle identifier and a host both name themselves.
+    ///
+    /// Two things write it: the shield, the first time it covers something the anchor holds
+    /// (`ShieldExtension`), and Screen Time's own tables where data access exists
+    /// (`AppModel.nameAnchoredKinds`). Never the state, which the shield must not touch.
+    static func anchorNames() -> [TargetKind: String] {
+        guard let stored = defaults.dictionary(forKey: anchorNamesKey) as? [String: Data] else { return [:] }
+        var names: [TargetKind: String] = [:]
+        for (name, encoded) in stored {
+            guard let kind = try? decoder.decode(TargetKind.self, from: encoded) else { continue }
+            names[kind] = name
+        }
+        return names
+    }
+
+    /// Writes down what `kind` on the anchor's list is called. Returns true when this is news.
+    @discardableResult
+    static func learnAnchorName(_ name: String, for kind: TargetKind) -> Bool {
+        guard !name.isEmpty, let encoded = try? encoder.encode(kind) else { return false }
+        var stored = defaults.dictionary(forKey: anchorNamesKey) as? [String: Data] ?? [:]
+        guard stored[name] != encoded else { return false }
+        stored[name] = encoded
+        defaults.set(stored, forKey: anchorNamesKey)
+        return true
+    }
+
+    /// Forgets every name for a kind the anchor no longer holds. Called on the settle that
+    /// reads them, so the map stays the length of the list rather than of everything ever
+    /// anchored.
+    static func pruneAnchorNames(keeping kinds: [TargetKind]) {
+        guard let stored = defaults.dictionary(forKey: anchorNamesKey) as? [String: Data] else { return }
+        let held = Set(kinds)
+        let kept = stored.filter { _, encoded in
+            (try? decoder.decode(TargetKind.self, from: encoded)).map(held.contains) ?? false
+        }
+        guard kept.count != stored.count else { return }
+        defaults.set(kept, forKey: anchorNamesKey)
+    }
+    #endif
+
     /// What Screen Time last said is installed on this phone, keyed the way a usage entry is.
     /// The usage page opens on this so Apple's icons are there in the same instant as the cards;
     /// see `TokenCache` for why it is kept and why it is replaced whole. Nil before the first
@@ -121,6 +171,7 @@ enum SharedStore {
         defaults.removeObject(forKey: stateKey)
         defaults.removeObject(forKey: namesKey)
         defaults.removeObject(forKey: tokensKey)
+        defaults.removeObject(forKey: anchorNamesKey)
     }
 
     @discardableResult

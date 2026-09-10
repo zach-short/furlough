@@ -264,9 +264,14 @@ final class AppModel {
         seedFinishedGuides()
         considerUsageStep()
         Task { await refreshNotificationStatus() }
-        // Names for anything the shield has not covered yet, where this phone can read them.
-        // Off the critical path: it needs a Screen Time query, and nothing waits on the answer.
-        Task { await nameUnnamedTargets() }
+        // Names for anything the shield has not covered yet, where this phone can read them —
+        // among the rules, and on the anchor's list, which has its own names key. Off the
+        // critical path: both need a Screen Time query, and nothing waits on the answer.
+        Task {
+            await nameUnnamedTargets()
+            await nameAnchoredKinds()
+            await anchorArrivalsFromTheTables()
+        }
         // Before the authorization guard: a tag scan is how the anchor is lifted, and it has
         // to work even on a launch where FamilyControls has not answered yet.
         weighAnchorIfInFront()
@@ -998,6 +1003,82 @@ final class AppModel {
         settleLink(reason: "named from the tables")
     }
 
+    /// The same, for what the anchor holds and no rule covers.
+    ///
+    /// Those have no target and so no `systemName` to fill in, and until one of them is named
+    /// this phone cannot tell the other devices what it is holding — a token means nothing off
+    /// the phone that minted it. The shield names them as it covers them, which may be days
+    /// after they went on the list; this names them from the tables the moment they do, where
+    /// Screen Time data access exists to ask.
+    ///
+    /// Written to the anchor's names key, beside the shield's, for the same reasons that one is
+    /// not the config: no rule changes, nothing queues, and an export does not carry it.
+    func nameAnchoredKinds() async {
+        guard #available(iOS 26.4, *), UsageReader.hasDataAccess else { return }
+        let held = state.config.anchor.kinds
+        guard !state.config.anchor.anchorsEverything else { return }
+        let known = SharedStore.anchorNames()
+        let unnamed = held.filter { state.config.target(kind: $0) == nil && known[$0] == nil }
+        guard !unnamed.isEmpty else { return }
+        let identities: [TargetKind: String]
+        do {
+            identities = try await UsageReader.identities()
+        } catch {
+            // Screen Time did not answer. The shield is still coming, and nothing is worse off.
+            return
+        }
+        var learned = 0
+        for kind in unnamed {
+            guard let key = identities[kind], let name = Self.nameFromTables(key) else { continue }
+            if SharedStore.learnAnchorName(name, for: kind) { learned += 1 }
+        }
+        guard learned > 0 else { return }
+        SharedStore.log("named \(learned) anchored item(s) from the tables")
+        settleLink(reason: "anchor named from the tables")
+    }
+
+    /// Puts an app another device anchored onto this phone's anchor list, where Screen Time's
+    /// tables can find it.
+    ///
+    /// The one thing the phone genuinely could not do with a name. Only Apple's picker mints an
+    /// application token, so an app the Mac anchors arrives here as a name and a bundle
+    /// identifier and nothing this phone can block — the site half lands and the app half is a
+    /// trip to the picker. With data access the tables match that bundle identifier to the
+    /// token for it, and the app goes on the list with no picker at all.
+    ///
+    /// Without data access `LinkFlow.anchorOwed` simply keeps its queue and the arrival's own
+    /// sentence stands: the app needs the picker. Nothing here fails; it only does not happen.
+    func anchorArrivalsFromTheTables() async {
+        guard #available(iOS 26.4, *), UsageReader.hasDataAccess else { return }
+        let owed = LinkFlow.anchorOwed
+        guard !owed.isEmpty else { return }
+        // Nothing changes the list under a lock, and under everything-except the list is what
+        // stays open — adding to it there would let the app through rather than hold it. Kept
+        // in the queue either way: the anchor lifts, and the scope can be switched back.
+        let anchor = state.config.anchor
+        guard !anchor.isHolding(at: state.now), !anchor.anchorsEverything else { return }
+        var found: [String: TargetKind] = [:]
+        for bundleID in owed {
+            guard let kind = try? await UsageReader.kind(forKey: bundleID) else { continue }
+            found[bundleID] = kind
+        }
+        guard !found.isEmpty else { return }
+        var current = SharedStore.load()
+        // Asked again on the store this is about to write: the anchor may have dropped while
+        // the tables were being read, and a drop is exactly the moment the list must not move.
+        guard !current.config.anchor.isHolding(at: current.now), !current.config.anchor.anchorsEverything else { return }
+        var added = 0
+        for kind in found.values where !current.config.anchor.contains(kind) {
+            current.config.anchor.kinds.append(kind)
+            added += 1
+        }
+        LinkFlow.anchorOwed = owed.filter { found[$0] == nil }
+        guard added > 0 else { return }
+        SharedStore.save(current)
+        SharedStore.log("link: the tables found \(added) anchored app(s) another device sent; now holds \(current.config.anchor.count) item(s)")
+        enforce(reason: "link arrival, anchor")
+    }
+
     /// What the tables call the thing behind a usage key: a bundle identifier, or "web:" and a
     /// domain. `Companions` first, because its names are the ones written to be shown; then
     /// `AppUtility`, which knows many more apps than are also websites. A domain is its own name.
@@ -1194,6 +1275,12 @@ final class AppModel {
         SharedStore.save(current)
         SharedStore.log("anchor: now \(current.config.anchor.anchorsEverything ? "lets through" : "holds") \(kinds.count) item(s)")
         enforce(reason: "anchor edit")
+        // Held here is worth holding there. Apple's picker is the main way onto this list and
+        // it speaks only in tokens, so most of what it just added has no name yet and cannot
+        // cross today; the settle offers whatever can be named, and the ones that cannot are
+        // offered by the next settle after the shield or the tables name them.
+        settleLink(reason: "anchor edit")
+        Task { await nameAnchoredKinds() }
     }
 
     /// Takes what `targetIDs` cover into the anchor, on top of what it holds. This is the
@@ -1210,9 +1297,8 @@ final class AppModel {
         SharedStore.save(current)
         SharedStore.log("anchor: took in \(chosen.count) of the rules; now holds \(current.config.anchor.count) item(s)")
         enforce(reason: "anchor edit")
-        // Held here is worth holding there: the other devices are told, under the anchor half,
-        // so what lands on them goes onto their anchor's list too.
-        LinkFlow.noteAdded(chosen.map(\.id), half: .anchor, config: current.config)
+        // Held here is worth holding there. Nothing is written down as awaiting: the list these
+        // just went on is what `LinkFlow.anchorAdditions` walks.
         settleLink(reason: "anchor edit")
     }
 
@@ -1467,6 +1553,9 @@ final class AppModel {
         let note = AnchorSync.pull(into: &current.config, now: current.now)
         let arrivals = LinkFlow.takeArrivals(&current, installed: { [:] })
         self.arrivals = arrivals.asks
+        // An app another device anchored that landed here under Always still needs a token; the
+        // tables are the one place to get one without the picker.
+        if !LinkFlow.anchorOwed.isEmpty { Task { await anchorArrivalsFromTheTables() } }
         guard note != nil || !arrivals.landed.isEmpty else { return }
         SharedStore.save(current)
         if let note { SharedStore.log("iCloud anchor (\(reason)): \(note)") }
@@ -1544,7 +1633,12 @@ final class AppModel {
     /// which is nearly always, since it is called from every place a name can arrive.
     func settleLink(reason: String) {
         autoLinkCompanions(reason: reason)
-        outgoing = LinkFlow.settleAwaiting(config: state.config, now: state.now)
+        outgoing = LinkFlow.settleAwaiting(config: state.config, now: state.now) {
+            // Only what the anchor still holds, so a name learned for something since taken off
+            // the list cannot send it. Read once per settle, and only when the walk asks.
+            SharedStore.pruneAnchorNames(keeping: state.config.anchor.kinds)
+            return SharedStore.anchorNames()
+        }
         isEnrolled = DeviceLink.isEnrolled
     }
 
@@ -1601,8 +1695,18 @@ final class AppModel {
         enforce(reason: "link arrival")
         let names = touched.compactMap { state.config.target(id: $0)?.displayName }
         var message = names.isEmpty ? "Nothing new to block." : "\(UtilityText.list(names)) \(names.count == 1 ? "is" : "are") in Furlough now."
+        if landing.anchors { message += " \(names.count == 1 ? "It is" : "They are") on the Anchor's list here too." }
         if landing.rule != nil { message += " The rule came with it, and can be undone for \(Furlough.undoWindowMinutes) minutes." }
-        if landing.appNeedsPicker { message += " The \(landing.addition.title) app needs Apple's picker; its row offers it." }
+        if landing.appNeedsPicker {
+            message += landing.addition.half == .anchor
+                ? " Only Apple's picker can add the \(landing.addition.title) app itself: Change apps on this screen. Furlough adds it without asking where Screen Time data access lets it match the name."
+                : " The \(landing.addition.title) app needs Apple's picker; its row offers it."
+        }
+        // The app half of an anchored arrival, where the tables can find it. Off the critical
+        // path: it needs a Screen Time query, and the sentence above is already honest without it.
+        if landing.appNeedsPicker, landing.addition.half == .anchor {
+            Task { await anchorArrivalsFromTheTables() }
+        }
         return message
     }
 
