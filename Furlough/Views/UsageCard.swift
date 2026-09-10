@@ -7,8 +7,10 @@ import SwiftUI
 enum UsageCardState: Equatable {
     case offered
     /// The rule is written. `fresh` is true when the flow added the app itself, which is the
-    /// only case it may take straight back; see `AppModel.undoFreshTarget`.
-    case applied(targetID: UUID, fresh: Bool, message: String)
+    /// only case it may take straight back; see `AppModel.undoFreshTarget`. `waiting` is true
+    /// when the rule loosened what was there and so has to sit out the delay, which is the one
+    /// thing the collapsed line says for itself rather than keep behind a tap: it names a time.
+    case applied(targetID: UUID, fresh: Bool, message: String, waiting: Bool)
     case skipped
     case failed(String)
 }
@@ -27,6 +29,7 @@ struct UsageSuggestionCard: View {
     let apply: () -> Void
     let skip: () -> Void
     let undo: () -> Void
+    let collapse: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -114,7 +117,7 @@ struct UsageSuggestionCard: View {
                 GhostButton(title: "Skip", color: Ember.muted, action: skip)
                     .frame(width: 78)
             }
-        case .applied(let targetID, let fresh, let message):
+        case .applied(let targetID, let fresh, let message, _):
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 7) {
                     Image(systemName: "checkmark.circle.fill")
@@ -122,25 +125,17 @@ struct UsageSuggestionCard: View {
                         .foregroundStyle(Ember.moss)
                     Eyebrow(text: "Applied", color: Ember.moss)
                     Spacer()
-                    if fresh {
-                        Button("Undo", action: undo)
-                            .emberBody(13, .semibold)
-                            .foregroundStyle(Ember.ember)
-                            .buttonStyle(.plain)
-                    }
+                    if fresh { UsageUndoButton(action: undo) }
                 }
                 Text(message)
                     .emberBody(12)
                     .foregroundStyle(Ember.muted)
                     .fixedSize(horizontal: false, vertical: true)
-                NavigationLink { RuleEditorView(targetID: targetID) } label: {
-                    HStack(spacing: 4) {
-                        Text("Edit rule").emberBody(13, .semibold)
-                        Image(systemName: "chevron.right").font(.system(size: 10, weight: .semibold))
-                    }
-                    .foregroundStyle(Ember.amber)
+                HStack(spacing: 16) {
+                    UsageEditRuleLink(targetID: targetID)
+                    Spacer(minLength: 8)
+                    UsageFoldButton(title: "Collapse", symbol: "chevron.up", action: collapse)
                 }
-                .buttonStyle(.plain)
             }
         case .failed(let message):
             VStack(alignment: .leading, spacing: 10) {
@@ -154,6 +149,60 @@ struct UsageSuggestionCard: View {
             // The flow collapses a skipped card to `UsageSkippedLine` instead of drawing this.
             EmptyView()
         }
+    }
+}
+
+/// An applied card, collapsed to its verdict: the app, what the rule now does, and the three
+/// things left to do about it — take it back, open the rule, or put the whole card back. Applying
+/// folds the card straight away, because a card that has been decided has stopped being a
+/// question and the ones still waiting to be read should not be pushed down the page by it.
+struct UsageAppliedLine: View {
+    let item: Recommendation
+    let entry: UsageEntry
+    let targetID: UUID
+    let fresh: Bool
+    /// What `AppModel.ApplyOutcome` said, which is only worth the line when it names a time.
+    let message: String
+    let waiting: Bool
+    let undo: () -> Void
+    let expand: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 11) {
+                if let kind = entry.targetKind {
+                    TokenTile(kind: kind, size: 24)
+                } else {
+                    PlainTile(isSite: entry.key.hasPrefix("web:"), size: 24)
+                }
+                if let kind = entry.targetKind {
+                    TokenName(kind: kind).foregroundStyle(Ember.cream)
+                } else {
+                    Text(entry.plainName).emberBody(13).foregroundStyle(Ember.cream).lineLimit(1)
+                }
+                Spacer(minLength: 8)
+                HStack(spacing: 5) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Ember.moss)
+                    Eyebrow(text: "Applied", color: Ember.moss)
+                }
+            }
+            // The rule, said in one line, so folding the card does not hide what was agreed to.
+            Text(waiting ? message : item.consequence())
+                .emberBody(11.5)
+                .foregroundStyle(Ember.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 16) {
+                if fresh { UsageUndoButton(action: undo) }
+                UsageEditRuleLink(targetID: targetID)
+                Spacer(minLength: 8)
+                UsageFoldButton(title: "Expand", symbol: "chevron.down", action: expand)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 13)
+        .emberCard()
     }
 }
 
@@ -189,6 +238,54 @@ struct UsageSkippedLine: View {
         }
         .buttonStyle(.plain)
         .emberCard()
+    }
+}
+
+/// Takes the rule straight back off an app this run added. Ember, because it undoes rather
+/// than does; the same words whether the card is folded or open.
+struct UsageUndoButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button("Undo", action: action)
+            .emberBody(13, .semibold)
+            .foregroundStyle(Ember.ember)
+            .buttonStyle(.plain)
+    }
+}
+
+/// The way from an applied card into the rule it wrote.
+struct UsageEditRuleLink: View {
+    let targetID: UUID
+
+    var body: some View {
+        NavigationLink { RuleEditorView(targetID: targetID) } label: {
+            HStack(spacing: 4) {
+                Text("Edit rule").emberBody(13, .semibold)
+                Image(systemName: "chevron.right").font(.system(size: 10, weight: .semibold))
+            }
+            .foregroundStyle(Ember.amber)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// Expand and Collapse: the quietest thing on the card, because it changes nothing but the view.
+struct UsageFoldButton: View {
+    let title: String
+    let symbol: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Text(title).emberBody(13, .semibold)
+                Image(systemName: symbol).font(.system(size: 10, weight: .semibold))
+            }
+            .foregroundStyle(Ember.muted)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 

@@ -30,6 +30,9 @@ struct UsageView: View {
     /// Keyed by `Recommendation.key`, which is stable across a reload, so an applied card keeps
     /// its mark even if the fortnight is fetched again underneath it.
     @State private var states: [String: UsageCardState] = [:]
+    /// Applied cards asked to open back up, by `Recommendation.key`. Applying folds a card, so
+    /// this is the set that overrides that — empty is the ordinary case.
+    @State private var expanded: Set<String> = []
     @State private var busy: String?
     /// Where Path A has got to; see `Phase`.
     @State private var phase = Phase.reading
@@ -211,11 +214,23 @@ struct UsageView: View {
     @ViewBuilder
     private func card(_ item: Recommendation, _ entry: UsageEntry, days: Int) -> some View {
         let state = states[item.key] ?? .offered
-        if state == .skipped {
+        switch state {
+        case .skipped:
             UsageSkippedLine(item: item, entry: entry) {
                 withAnimation(.easeInOut(duration: 0.2)) { states[item.key] = .offered }
             }
-        } else {
+        case .applied(let targetID, let fresh, let message, let waiting) where !expanded.contains(item.key):
+            UsageAppliedLine(
+                item: item,
+                entry: entry,
+                targetID: targetID,
+                fresh: fresh,
+                message: message,
+                waiting: waiting,
+                undo: { undo(item) },
+                expand: { withAnimation(.easeInOut(duration: 0.2)) { _ = expanded.insert(item.key) } }
+            )
+        default:
             UsageSuggestionCard(
                 item: item,
                 entry: entry,
@@ -224,7 +239,8 @@ struct UsageView: View {
                 isBusy: busy == item.key,
                 apply: { Task { await apply(item, entry) } },
                 skip: { withAnimation(.easeInOut(duration: 0.2)) { states[item.key] = .skipped } },
-                undo: { undo(item) }
+                undo: { undo(item) },
+                collapse: { withAnimation(.easeInOut(duration: 0.2)) { _ = expanded.remove(item.key) } }
             )
         }
     }
@@ -476,16 +492,27 @@ struct UsageView: View {
         }
         let outcome = model.apply(rule: item.rule, nickname: target.nickname, for: target.id, andTo: [])
         withAnimation(.easeInOut(duration: 0.2)) {
-            states[item.key] = .applied(targetID: target.id, fresh: fresh, message: outcome.message)
+            // Folded, whatever the card was doing before: this is the answer to the question the
+            // card was asking, and the rest of it has been read by the time Apply is pressed.
+            expanded.remove(item.key)
+            states[item.key] = .applied(
+                targetID: target.id,
+                fresh: fresh,
+                message: outcome.message,
+                waiting: outcome.scheduled > 0
+            )
         }
     }
 
     /// Takes back a rule this run wrote on an app this run added. Anything else is a loosening
     /// like any other, and belongs in the rule editor where the delay is explained.
     private func undo(_ item: Recommendation) {
-        guard case .applied(let targetID, true, _) = states[item.key] else { return }
+        guard case .applied(let targetID, true, _, _) = states[item.key] else { return }
         if model.undoFreshTarget(targetID) {
-            withAnimation(.easeInOut(duration: 0.2)) { states[item.key] = .offered }
+            withAnimation(.easeInOut(duration: 0.2)) {
+                expanded.remove(item.key)
+                states[item.key] = .offered
+            }
         } else {
             states[item.key] = .failed("Furlough has held this rule too long to take it straight back. Loosen it from the rule editor instead.")
         }
