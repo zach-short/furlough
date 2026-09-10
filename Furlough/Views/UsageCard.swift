@@ -211,15 +211,19 @@ struct UsageAppliedLine: View {
     }
 }
 
-/// A skipped card, collapsed to a line. Tapping it offers the suggestion again; nothing about
-/// the skip is stored, so this run of the flow is the whole of its life.
+/// A skipped card, folded the way an applied one is: the app, what the suggestion would have
+/// done, and the way back to the card — the whole line, or the word. Dimmer than the applied
+/// line throughout, because nothing was decided here.
+///
+/// Opening it opens the question again, so the card comes back offered rather than marked:
+/// nothing about a skip is stored, and this run of the flow is the whole of its life.
 struct UsageSkippedLine: View {
     let item: Recommendation
     let entry: UsageEntry
     let reopen: () -> Void
 
     var body: some View {
-        Button(action: reopen) {
+        VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 11) {
                 if let kind = entry.targetKind {
                     TokenTile(kind: kind, size: 24).opacity(0.55)
@@ -232,16 +236,23 @@ struct UsageSkippedLine: View {
                     Text(entry.plainName).emberBody(13).foregroundStyle(Ember.muted).lineLimit(1)
                 }
                 Spacer(minLength: 8)
-                Text("Skipped").emberBody(11.5).foregroundStyle(Ember.faint)
-                Image(systemName: "arrow.counterclockwise")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Ember.faint)
+                Eyebrow(text: "Skipped", color: Ember.faint)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .contentShape(Rectangle())
+            // The rule that was on offer, so what was passed on is still on the page.
+            Text(item.consequence())
+                .emberBody(11.5)
+                .foregroundStyle(Ember.faint)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 16) {
+                Spacer(minLength: 8)
+                UsageFoldButton(title: "Expand", symbol: "chevron.down", action: reopen)
+            }
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 13)
+        .contentShape(Rectangle())
+        // Anywhere at all: there is no other button on this line to take a tap first.
+        .onTapGesture(perform: reopen)
         .emberCard()
     }
 }
