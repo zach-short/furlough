@@ -61,4 +61,66 @@ struct AnchorCandidatesTests {
         #expect(!addedNothing)
         #expect(anchor.kinds == [tiktok.kind])
     }
+
+    @Test("Removing takes every door and leaves the rest alone")
+    func removingTakesEveryDoor() {
+        let tiktok = makeTarget("TikTok", rule: .alwaysBlocked)
+        let pair = youtube()
+        var anchor = AnchorProfile()
+        anchor.kinds = [tiktok.kind, pair.kind, .host("youtube.com"), .host("reddit.com")]
+        let removed = anchor.remove([pair])
+        #expect(removed)
+        #expect(anchor.kinds == [tiktok.kind, .host("reddit.com")])
+    }
+
+    @Test("Removing what is not held is no change")
+    func removingUnheldIsNoChange() {
+        let tiktok = makeTarget("TikTok", rule: .alwaysBlocked)
+        let pair = youtube()
+        var anchor = AnchorProfile()
+        anchor.kinds = [tiktok.kind]
+        let removedOther = anchor.remove([pair])
+        let removedNothing = anchor.remove([])
+        #expect(!removedOther)
+        #expect(!removedNothing)
+        #expect(anchor.kinds == [tiktok.kind])
+    }
+
+    /// The rule editor's Anchor row: a target the anchor holds by one door and not the other
+    /// reads as off, and turning it on is what closes the second one.
+    @Test("A target is listed only once every door is on the list")
+    func listedMeansEveryDoor() {
+        let pair = youtube()
+        var anchor = AnchorProfile()
+        anchor.kinds = [pair.kind]
+        #expect(!anchor.lists(pair))
+        anchor.add([pair])
+        #expect(anchor.lists(pair))
+    }
+
+    /// The small anchor on a rules row, which has to be right under both scopes: the list is
+    /// what is held under one and what is spared under the other.
+    @Test("What a drop would hold is read the right way round under either scope")
+    func willHoldFollowsTheScope() {
+        let tiktok = makeTarget("TikTok", rule: .alwaysBlocked)
+        let messages = makeTarget("Messages", rule: .unrestricted)
+        var anchor = AnchorProfile()
+        anchor.kinds = [tiktok.kind]
+        #expect(anchor.willHold(tiktok))
+        #expect(!anchor.willHold(messages))
+        anchor.scope = .everythingExcept
+        #expect(!anchor.willHold(tiktok))
+        #expect(anchor.willHold(messages))
+    }
+
+    /// A linked target is held when either door is: the halves are one thing, and one of them
+    /// shut is the whole of it shut.
+    @Test("One held door holds the whole target")
+    func oneDoorHoldsTheTarget() {
+        let pair = youtube()
+        var anchor = AnchorProfile()
+        anchor.kinds = [.host("youtube.com")]
+        #expect(anchor.willHold(pair))
+        #expect(!anchor.lists(pair))
+    }
 }

@@ -2113,6 +2113,63 @@ The plan for this stretch. Tick each phase off here as it lands.
     behaviour changed, so no new tests; iOS Debug, Release and Release + `TESTING_TOOLS` all
     build warning-free. Not yet run on the phone.
 
+33. **The + gets a destination, and the halves get marks (the two-halves pass, item 4).**
+    Done 2026-09-10. Context, because HANDOFF has no note on the three items before it: on
+    2026-09-09 Zach asked for a pass over both apps to simplify what a person sees, and said
+    mid-pass that Rules and the Anchor should be two pages a person swipes between. The audit
+    and the seven-part proposal are the "Which half first" artifact
+    (`claude.ai/code/artifact/7019259f-85bd-40fa-8bc8-da78fe3b58f4`), which a session picking
+    this up should read rather than redo. Items 1–3 landed the same day: `Shared/Core/Half.swift`
+    and `HomeView` as a paged `TabView` under a `HalfSegment`; `Furlough/Views/Guides.swift`, a
+    three-step checklist per half; and the Anchor page rebuilt as a state card, a Held grid and
+    four rows into `Furlough/Views/AnchorScreens.swift`, with `RuleEditorView`'s first-rule card.
+    This is item 4, the last thing that made the two pages two apps: the + acted on one half
+    only, and neither half said anything about the other.
+
+    **One add flow with a destination.** `AddRequest` gains `destination: Half`, and
+    `AddTargetsFlow` grew the anchor's branch: the already-blocked offer where the list is empty
+    and something has a rule, Apple's picker otherwise, landing in `setAnchorSelection` instead
+    of `applyPicker`. The picker's header and footer follow the destination, and under the
+    anchor's everything-except scope they say "stays open" rather than "holds". `AnchorPage` no
+    longer owns a picker at all: its Choose apps row and its guide's second step call up to
+    Home, which is why the row and the + button cannot drift apart. The anchor destination asks
+    no Application-or-Website question — both are picked in the one picker, and a typed host is
+    a target, so it reaches the anchor by being taken in.
+
+    **What + adds over the Anchor page** is `AppModel.anchorPageAdds`, the anchor by default,
+    changed in Settings under "The + button" — Zach's call: the + acts on the page it is over,
+    and the person that fails is the one who set the anchor up months ago and has read + as
+    "give an app hours" ever since. In the app's own defaults beside `startHalf` and the guide
+    flags, for the same reason: it records what was asked for, not what is blocked, so it must
+    not travel in an exported setup or wait out a delay. Over Rules the + is not asked.
+
+    **The cross-links.** The rule editor gains one row, "Also hold it in the Anchor", calling
+    the same `addToAnchor` the already-blocked sheet calls and the new `removeFromAnchor` beside
+    it; it acts at once rather than on Save, because the anchor's list is not a rule and nothing
+    about it is delayed. It reads on only when *every* door is on the list, so a row whose site
+    was linked on after it was anchored reads off until the second door is closed. Under
+    everything-except it is a statement, not a control ("Held while anchored" / "Stays open
+    while anchored"), because there the list is what is spared and a toggle would be editing it
+    by its opposite. The anchor grid gains a long press: "Give it hours too" where nothing has a
+    rule yet — `AppModel.targetForRule` makes the target and Home pushes the editor on a new
+    `path` — and "Open its rule" where one does. And two marks rather than two lists: a rules
+    row wears a small `AnchorShape` when a drop would take it (`AnchorProfile.willHold`, read
+    through `holds`, so it is right under both scopes), and an anchor tile wears an hourglass
+    badge when the thing it holds also has a rule. Neither half grows a copy of the other.
+
+    `Shared/Core/AnchorCandidates.swift` gained `remove`, `lists` and `willHold`, all four
+    tested in `AnchorCandidatesTests` — 595 Core tests pass. iOS builds warning-free.
+
+    **Verified in the simulator** with the harness of the item-3 session (a scratch rsync with
+    `RootView` replaced; see the memory note): the marks with a present and an absent case each,
+    both long-press branches, the + landing on the already-blocked sheet and adding, the
+    preference flipping the + back to the popover, and the editor row in both scopes. The one
+    thing the harness cannot do is press a `UISwitch` — the tool's synthesized tap does not move
+    the app's existing toggles either — so the Anchor row was driven through its own binding
+    instead, which logged `anchor: let go of 1` and back. Not yet run on the phone.
+    **Still open in the build order: item 5, Settings on a diet; item 6, the Mac, which follows
+    the phone file for file.**
+
 ## Style rules
 
 Swift 6 language mode with approachable concurrency, SwiftUI, `@Observable`, async/await, no

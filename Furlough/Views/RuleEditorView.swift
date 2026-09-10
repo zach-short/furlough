@@ -443,6 +443,7 @@ struct RuleEditorView: View {
         }
         budgetSection(target)
         halves(target)
+        anchorSection(target)
         SectionLabel(text: "How much it is worth")
         UtilityPicker(
             selection: tierBinding,
@@ -536,6 +537,79 @@ struct RuleEditorView: View {
     /// judgement about two specific rows, and offering three at once would be a list to work
     /// through rather than a question to answer.
     private func mergeCandidate(_ target: Target) -> Target? { model.mergeable(with: target).first }
+
+    // MARK: The other half
+
+    /// The Anchor, as one row on the rule that is already open: hold this too, or stop holding
+    /// it.
+    ///
+    /// A row rather than a trip to the other page, because the halves are one app and the
+    /// moment somebody is deciding what an app is allowed is the moment they know whether it
+    /// belongs behind the tag. It calls the same path the Already blocked sheet calls, so there
+    /// is one way in and one way out, and it acts at once rather than on Save: the anchor's list
+    /// is not a rule, nothing about it waits out a delay, and Save is for hours.
+    @ViewBuilder
+    private func anchorSection(_ target: Target) -> some View {
+        let anchor = model.state.config.anchor
+        SectionLabel(text: "The Anchor")
+        HStack(spacing: 12) {
+            if anchor.anchorsEverything {
+                // Under everything-except the list is what stays open, so there is nothing to
+                // add here: this is held unless somebody put it on that list. Said, not offered
+                // — the list itself is the Anchor page's, and a control here would be editing
+                // the other scope's list by its opposite.
+                Text(anchor.willHold(target) ? "Held while anchored" : "Stays open while anchored")
+                    .emberBody(13)
+                    .foregroundStyle(Ember.cream)
+                Spacer(minLength: 8)
+                AnchorShape()
+                    .fill(anchor.willHold(target) ? Ember.ember : Ember.faint)
+                    .frame(width: 11, height: 14)
+            } else {
+                Text("Also hold it in the Anchor")
+                    .emberBody(13)
+                    .foregroundStyle(Ember.cream)
+                Spacer(minLength: 8)
+                Toggle("Also hold it in the Anchor", isOn: heldBinding(target))
+                    .labelsHidden()
+                    .tint(Ember.ember)
+                    .disabled(anchor.isAnchored)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .emberCard()
+        Footnote(text: anchorNote(target))
+            .padding(.top, 8)
+    }
+
+    /// On when every door of this target is on the anchor's list, so a row whose site was
+    /// linked on after it was anchored reads as off until the second door is closed too —
+    /// which is exactly what turning it on then does.
+    private func heldBinding(_ target: Target) -> Binding<Bool> {
+        Binding(
+            get: { model.state.config.anchor.lists(target) },
+            set: { on in
+                if on {
+                    model.addToAnchor(targetIDs: [target.id])
+                } else {
+                    model.removeFromAnchor(targetIDs: [target.id])
+                }
+            }
+        )
+    }
+
+    private func anchorNote(_ target: Target) -> String {
+        let anchor = model.state.config.anchor
+        if anchor.isAnchored { return "Unanchor with your tag to change what it holds." }
+        if anchor.anchorsEverything {
+            return "The anchor holds everything except a short list. Change that list on the Anchor page."
+        }
+        if anchor.lists(target) {
+            return "Shut at any hour while the anchor is down, and only your tag lifts it. Free, the hours above apply as ever."
+        }
+        return "The anchor holds only what it has been given. This changes nothing until it is dropped."
+    }
 
     /// Every half beside the face, each with a way off. Taking one off is a loosening, so it goes
     /// through the delay — the footnote says so before the button is touched, not after.

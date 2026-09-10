@@ -17,6 +17,10 @@ struct HomeView: View {
     @State private var showAddChoice = false
     /// What the popover asked for; `addTargetsFlow` takes it from here to Apple's picker.
     @State private var addRequest: AddRequest?
+    /// The rule editors pushed on top of the pages. Held here rather than left to the links,
+    /// because the anchor grid's "Give it hours too" pushes one from a context menu, where
+    /// there is no link to tap.
+    @State private var path: [UUID] = []
     @State private var showSettings = false
     @State private var showHelp = false
     @State private var showPending = false
@@ -24,7 +28,7 @@ struct HomeView: View {
     init(start: Half) { _half = State(initialValue: start) }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             // A pager rather than a switch, so the two halves can be swiped between as well as
             // tapped. Selection is the same `half` the segment reads, so the two ways of moving
             // cannot disagree.
@@ -36,8 +40,15 @@ struct HomeView: View {
                 // The Anchor arms an NFC reader on sight, and a pager builds the page beside the
                 // one you are looking at. So it is told whether it is the page in front, and
                 // only the page in front listens.
-                AnchorPage(isCurrent: half == .anchor)
-                    .tag(Half.anchor)
+                //
+                // Its Choose apps row and its grid's "Give it hours too" both come back up here:
+                // one add flow for both halves, and one navigation stack for both pages.
+                AnchorPage(
+                    isCurrent: half == .anchor,
+                    onChooseApps: { addRequest = .anchor },
+                    onOpenRule: { path.append($0) }
+                )
+                .tag(Half.anchor)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
             .background(EmberWall())
@@ -68,23 +79,31 @@ struct HomeView: View {
                     }
                     ToolbarSpacer(.fixed, placement: .topBarTrailing)
                 }
-                // The + acts on the page it is over. The Anchor page chooses what it holds from
-                // its own row, so until that + has an anchor destination of its own it is not
-                // drawn over a page it cannot add to.
-                if half == .rules {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("Add", systemImage: "plus") { showAddChoice = true }
-                            .tint(Ember.cream)
-                            .popover(isPresented: $showAddChoice, arrowEdge: .top) {
-                                AddChoicePopover(
-                                    applicationCaption: "Apps and categories, from Apple's picker",
-                                    websiteCaption: "Type the address. Hours, but no daily limit"
-                                ) { choice in
-                                    showAddChoice = false
-                                    addRequest = .plain(choice)
-                                }
-                                .presentationCompactAdaptation(.popover)
-                            }
+                // The + acts on the page it is over: a rule over Rules, the anchor's list over
+                // the Anchor — unless Settings has been told otherwise, for the person who set
+                // the anchor up once and reads + as "give an app hours" wherever it is.
+                //
+                // Adding to the anchor asks no Application-or-Website question: both are picked
+                // in the one picker, and a site typed by name is a target, so it reaches the
+                // anchor by being taken in rather than by being added here.
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Add", systemImage: "plus") {
+                        if model.addDestination(on: half) == .anchor {
+                            addRequest = .anchor
+                        } else {
+                            showAddChoice = true
+                        }
+                    }
+                    .tint(Ember.cream)
+                    .popover(isPresented: $showAddChoice, arrowEdge: .top) {
+                        AddChoicePopover(
+                            applicationCaption: "Apps and categories, from Apple's picker",
+                            websiteCaption: "Type the address. Hours, but no daily limit"
+                        ) { choice in
+                            showAddChoice = false
+                            addRequest = .plain(choice)
+                        }
+                        .presentationCompactAdaptation(.popover)
                     }
                 }
             }
@@ -231,6 +250,7 @@ struct HomeContent: View {
                                 status: statuses[target.id] ?? .unconfigured,
                                 glass: glasses[target.id] ?? .unconfigured,
                                 pending: state.pending.first { $0.targetID == target.id },
+                                held: config.anchor.willHold(target),
                                 now: now
                             )
                         }
@@ -538,6 +558,10 @@ struct TargetRow: View {
     let status: TargetStatus
     let glass: HourglassState
     let pending: PendingChange?
+    /// The anchor would take this row away if it dropped. A mark, not a row: the other half
+    /// says so in four points of ink beside the rule, and neither list grows a copy of the
+    /// other.
+    var held = false
     var now: Date = .now
 
     var body: some View {
@@ -559,6 +583,8 @@ struct TargetRow: View {
                         .emberBody(11.5)
                         .foregroundStyle(Ember.muted)
                         .lineLimit(1)
+                    // The other half, in one mark: this row is on the anchor's list too.
+                    if held { HeldMark() }
                     // One row for one habit, and one small mark to say the row is two doors. A
                     // second row would be the bug this feature exists to remove.
                     if target.isLinked {

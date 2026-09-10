@@ -30,6 +30,8 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     RecordCard()
 
+                    addCard
+
                     delayCard
 
                     enforcementCard
@@ -142,6 +144,57 @@ struct SettingsView: View {
             #endif
         }
         .presentationBackground(Ember.ground)
+    }
+
+    /// What + does over the Anchor page.
+    ///
+    /// The + acts on the page it is over, which over the Anchor page means its list — and the
+    /// one person that reading fails is the one who set the anchor up months ago and has read +
+    /// as "give an app hours" ever since. So it is a preference rather than a rule, and only
+    /// about the Anchor page: over Rules the button has no second reading to choose between.
+    @ViewBuilder
+    private var addCard: some View {
+        SectionLabel(text: "The + button")
+        VStack(alignment: .leading, spacing: 0) {
+            Text("On the Anchor page, + adds")
+                .emberBody(13)
+                .foregroundStyle(Ember.cream)
+                .padding(.horizontal, 12)
+                .padding(.top, 12)
+            HStack(spacing: 6) {
+                addChip(.anchor, "To the anchor")
+                addChip(.rules, "A new rule")
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 10)
+            .padding(.bottom, 14)
+        }
+        .emberCard()
+        Footnote(text: "Over the Rules page + always makes a rule.")
+            .padding(.top, 8)
+    }
+
+    private func addChip(_ half: Half, _ title: String) -> some View {
+        let isOn = model.anchorPageAdds == half
+        return Button {
+            model.setAnchorPageAdds(half)
+        } label: {
+            Text(title)
+                .emberBody(12, .semibold)
+                .foregroundStyle(isOn ? Ember.ground : Ember.muted)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(isOn ? Ember.amber : Color.white.opacity(0.06))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(isOn ? .clear : Ember.cardBorder, lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 
     @ViewBuilder

@@ -33,6 +33,30 @@ extension AnchorProfile {
         }
         return added
     }
+
+    /// Takes every door of `targets` back off the list, in place. The other way round from
+    /// `add`, and the same rule about halves: a linked target goes on as one thing, so it comes
+    /// off as one thing rather than leaving the site behind when the app is let go. Returns
+    /// whether anything was removed. Nothing here checks the lock either —
+    /// `AppModel.removeFromAnchor` refuses before it gets this far.
+    @discardableResult
+    mutating func remove(_ targets: [Target]) -> Bool {
+        let going = Set(targets.flatMap(\.kinds))
+        guard kinds.contains(where: going.contains) else { return false }
+        kinds.removeAll(where: going.contains)
+        return true
+    }
+
+    /// Whether every door of `target` is on the list. What the rule editor's Anchor row reads:
+    /// a target the anchor holds by the app but not by the site it is also at is not yet held,
+    /// and turning the row on is what closes the second door. The mirror of `anchorCandidates`,
+    /// which offers exactly the targets this is false for.
+    func lists(_ target: Target) -> Bool { target.kinds.allSatisfy(contains) }
+
+    /// Whether dropping the anchor would take `target` away by any of its doors. Read through
+    /// `holds`, so it is right under both scopes: on the list under the chosen one, off the
+    /// list under everything-except. What the small anchor on a rules row says.
+    func willHold(_ target: Target) -> Bool { target.kinds.contains { holds($0) } }
 }
 
 extension Config {

@@ -35,6 +35,12 @@ enum PickerCopy {
 /// who wants a daily limit on a site goes on from there to `AddWebsiteGuideView` and the
 /// picker, which keeps sites three steps in where the footer alone read as a broken button.
 ///
+/// Since the two halves became two pages, the same flow also adds to the anchor: a request
+/// with `destination == .anchor` shows what Furlough already blocks — one tap for the list a
+/// person most wants held — and goes on to Apple's picker from there, landing in
+/// `setAnchorSelection` rather than in a target. One pipeline with a destination, so the +
+/// button in the toolbar is one button whichever page it is over.
+///
 /// Everything is presented after a short wait: a sheet raised while a popover or the previous
 /// sheet is still leaving is dropped. Set `request` to start it; it is put back to nil as soon
 /// as it is read, so the same screen can ask again.
@@ -43,6 +49,13 @@ struct AddTargetsFlow: ViewModifier {
     @Binding var request: AddRequest?
     /// Which of the two the picker was opened for; it wears a matching header and footer.
     @State private var pickerFor: AddChoice = .application
+    /// Where what comes back from the picker lands: a new target, or the anchor's list. The
+    /// picker's own words change with it, because under the anchor's everything-except scope
+    /// the same picker is choosing what stays open.
+    @State private var pickerDestination: Half = .rules
+    /// The already-blocked offer, and whether it was left for Apple's picker.
+    @State private var showFromRules = false
+    @State private var pickerAfterFromRules = false
     /// Set when the trip was the companion nudge's, so the answer is added beside that target
     /// rather than read as the whole selection.
     @State private var pickerCompanion: AddRequest.Companion?
@@ -62,14 +75,17 @@ struct AddTargetsFlow: ViewModifier {
     func body(content: Content) -> some View {
         content
             .familyActivityPicker(
-                headerText: pickerCompanion.map { PickerCopy.companionHeader($0.title) }
-                    ?? PickerCopy.header(for: pickerFor),
-                footerText: pickerCompanion == nil ? PickerCopy.footer(for: pickerFor) : PickerCopy.companionFooter,
+                headerText: pickerHeader,
+                footerText: pickerFooter,
                 isPresented: $showPicker,
                 selection: $selection
             )
             .onChange(of: showPicker) { _, presented in
                 guard !presented else { return }
+                if pickerDestination == .anchor {
+                    model.setAnchorSelection(selection)
+                    return
+                }
                 if let companion = pickerCompanion {
                     pickerCompanion = nil
                     companionOutcome = model.addCompanionApps(selection, for: companion).message
@@ -78,6 +94,17 @@ struct AddTargetsFlow: ViewModifier {
                 let result = model.applyPicker(selection)
                 if result.added > 0 || result.removalsScheduled > 0 {
                     outcome = result
+                }
+            }
+            .sheet(isPresented: $showFromRules, onDismiss: {
+                guard pickerAfterFromRules else { return }
+                pickerAfterFromRules = false
+                openAnchorPicker()
+            }) {
+                AnchorFromRulesSheet(candidates: model.state.config.anchorCandidates) { ids in
+                    model.addToAnchor(targetIDs: ids)
+                } onPickOthers: {
+                    pickerAfterFromRules = true
                 }
             }
             .alert(
@@ -121,6 +148,10 @@ struct AddTargetsFlow: ViewModifier {
             .onChange(of: request) { _, asked in
                 guard let asked else { return }
                 request = nil
+                if asked.destination == .anchor {
+                    chooseForAnchor()
+                    return
+                }
                 if let companion = asked.companion {
                     openPicker(for: asked.choice, companion: companion)
                     return
@@ -132,6 +163,51 @@ struct AddTargetsFlow: ViewModifier {
             }
     }
 
+    /// What the picker says on the way in. The anchor asks its own question, and asks it two
+    /// ways: under the everything-except scope the list is what stays open, so the picker is
+    /// choosing the exceptions rather than the prisoners.
+    private var pickerHeader: String {
+        if pickerDestination == .anchor {
+            return model.state.config.anchor.anchorsEverything
+                ? "Choose what stays open while anchored"
+                : "Choose what the anchor holds"
+        }
+        return pickerCompanion.map { PickerCopy.companionHeader($0.title) } ?? PickerCopy.header(for: pickerFor)
+    }
+
+    private var pickerFooter: String {
+        if pickerDestination == .anchor {
+            return model.state.config.anchor.anchorsEverything
+                ? "Picking a category keeps every app in it open."
+                : "Picking a category locks every app in it."
+        }
+        return pickerCompanion == nil ? PickerCopy.footer(for: pickerFor) : PickerCopy.companionFooter
+    }
+
+    /// The anchor's way in, from the + button over its page and from its own Choose apps row.
+    ///
+    /// An empty list starts from the rules: what Furlough already blocks is offered first, and
+    /// Apple's picker, which lists every app on the phone, is one tap further on. Once the
+    /// anchor holds anything, straight to the picker, filled in with the list. The offer is for
+    /// the chosen scope only — under everything-except what is already blocked is already held,
+    /// and the list is what stays open, so that goes straight to the picker too.
+    private func chooseForAnchor() {
+        let anchor = model.state.config.anchor
+        if anchor.scope == .chosen, anchor.kinds.isEmpty, !model.state.config.anchorCandidates.isEmpty {
+            afterDismissal { showFromRules = true }
+        } else {
+            openAnchorPicker()
+        }
+    }
+
+    private func openAnchorPicker() {
+        pickerFor = .application
+        pickerCompanion = nil
+        pickerDestination = .anchor
+        selection = model.anchorSelection
+        afterDismissal { showPicker = true }
+    }
+
     /// Opens the picker once whatever came before it has gone.
     ///
     /// Seeded with everything Furlough manages for the + button, because there the selection is
@@ -140,6 +216,7 @@ struct AddTargetsFlow: ViewModifier {
     private func openPicker(for choice: AddChoice, companion: AddRequest.Companion? = nil) {
         pickerFor = choice
         pickerCompanion = companion
+        pickerDestination = .rules
         selection = companion == nil ? model.pickerSelection : FamilyActivitySelection()
         afterDismissal { showPicker = true }
     }

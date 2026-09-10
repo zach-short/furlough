@@ -110,6 +110,40 @@ struct TokenTile: View {
     }
 }
 
+/// The anchor, small enough to sit inside a line of a rules row: this one is on the anchor's
+/// list too.
+///
+/// A mark rather than a row, and rather than a section of its own. The two halves are one app,
+/// so a target that is in both should say so where it already is — the moment either half grows
+/// a second list of the other's contents, they are two apps again with a copy between them.
+struct HeldMark: View {
+    var size: CGFloat = 9
+
+    var body: some View {
+        AnchorShape()
+            .fill(Ember.faint)
+            .frame(width: size * 0.8, height: size)
+            .accessibilityLabel("Held by the anchor")
+    }
+}
+
+/// The mirror of `HeldMark`, in the corner of a tile in the anchor's grid: this app has hours
+/// in the other half. Apple's artwork fills its tile edge to edge, so the badge sits on the
+/// corner in a disc of the page's own colour rather than trying to share the square.
+struct RuledBadge: View {
+    var size: CGFloat = 15
+
+    var body: some View {
+        Image(systemName: "hourglass")
+            .font(.system(size: size * 0.62, weight: .bold))
+            .foregroundStyle(Ember.amber)
+            .frame(width: size, height: size)
+            .background(Ember.ground, in: Circle())
+            .overlay(Circle().strokeBorder(Ember.cardBorder, lineWidth: 1))
+            .accessibilityLabel("Has a rule")
+    }
+}
+
 /// The 12 pt status hourglass and the next time on the right of a home row.
 struct StatusChip: View {
     let status: TargetStatus

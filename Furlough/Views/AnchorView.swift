@@ -1,4 +1,3 @@
-import FamilyControls
 import SwiftUI
 
 /// The Anchor: apps locked behind a physical tag. One of Home's two pages, beside Rules, rather
@@ -11,13 +10,13 @@ import SwiftUI
 struct AnchorPage: View {
     /// Whether this is the half on screen. See above.
     let isCurrent: Bool
+    /// Asks Home's add flow for this page's list — the already-blocked offer, then Apple's
+    /// picker. The same call the + button over this page makes, because it is the same act.
+    let onChooseApps: () -> Void
+    /// Opens a rule editor on the stack this page is in: the grid's way into the other half.
+    let onOpenRule: (UUID) -> Void
 
     @Environment(AppModel.self) private var model
-    @State private var showPicker = false
-    @State private var selection = FamilyActivitySelection(includeEntireCategory: true)
-    @State private var showFromRules = false
-    /// The rules sheet was left for Apple's picker, which opens once the sheet is gone.
-    @State private var pickerAfterSheet = false
     @State private var message: String?
     /// The name typed into the pairing alert, for a tag the reader found and did not know.
     @State private var draftName = ""
@@ -160,29 +159,8 @@ struct AnchorPage: View {
     /// row does.
     private func withPresentations(_ content: some View) -> some View {
         content
-            .familyActivityPicker(
-                headerText: anchor.anchorsEverything ? "Choose what stays open while anchored" : "Choose what the anchor holds",
-                footerText: anchor.anchorsEverything ? "Picking a category keeps every app in it open." : "Picking a category locks every app in it.",
-                isPresented: $showPicker,
-                selection: $selection
-            )
-            .onChange(of: showPicker) { _, presented in
-                guard !presented else { return }
-                model.setAnchorSelection(selection)
-            }
             .sheet(isPresented: $pickingLift) {
                 TimePickerSheet(title: "Lifts at", minute: $liftMinute)
-            }
-            .sheet(isPresented: $showFromRules, onDismiss: {
-                guard pickerAfterSheet else { return }
-                pickerAfterSheet = false
-                openPicker()
-            }) {
-                AnchorFromRulesSheet(candidates: model.state.config.anchorCandidates) { ids in
-                    model.addToAnchor(targetIDs: ids)
-                } onPickOthers: {
-                    pickerAfterSheet = true
-                }
             }
             .alert("Anchor", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
                 Button("OK") { message = nil }
@@ -560,6 +538,14 @@ struct AnchorPage: View {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 6), spacing: 10) {
                     ForEach(Array(anchor.kinds.enumerated()), id: \.offset) { _, kind in
                         TokenTile(kind: kind, size: 44)
+                            // The mirror of the anchor on a rules row: this one has hours in
+                            // the other half. Overlaid rather than listed, for the same reason.
+                            .overlay(alignment: .bottomTrailing) {
+                                if model.state.config.target(kind: kind)?.rule != nil {
+                                    RuledBadge().offset(x: 4, y: 4)
+                                }
+                            }
+                            .contextMenu { gridMenu(for: kind) }
                     }
                 }
                 .padding(12)
@@ -599,23 +585,26 @@ struct AnchorPage: View {
     }
 
     /// The way in to what the anchor holds, from the card and from the guide's second step.
-    ///
-    /// An empty list starts from the rules: what Furlough already blocks is offered first, and
-    /// Apple's picker, which lists every app on the phone, is one tap further on. Once the
-    /// anchor holds anything, straight to the picker, filled in with the list. The offer is for
-    /// the chosen scope only: under everything-except what is already blocked is already held,
-    /// and the list is what stays open, so that goes straight to the picker too.
-    private func chooseApps() {
-        if anchor.scope == .chosen, anchor.kinds.isEmpty, !model.state.config.anchorCandidates.isEmpty {
-            showFromRules = true
-        } else {
-            openPicker()
-        }
-    }
+    /// Home's add flow owns the sheet and the picker now — the same pipeline the + button uses,
+    /// so this page's own row and the button above it cannot drift apart.
+    private func chooseApps() { onChooseApps() }
 
-    private func openPicker() {
-        selection = model.anchorSelection
-        showPicker = true
+    /// The other half, from a tile: hours for something the anchor already holds.
+    ///
+    /// A long press rather than a row, for the same reason the rules row wears a mark rather
+    /// than a section: the grid is the anchor's list, and a way into the rules half must not
+    /// turn it into a list of rules as well.
+    @ViewBuilder
+    private func gridMenu(for kind: TargetKind) -> some View {
+        if let target = model.state.config.target(kind: kind) {
+            Button(target.rule == nil ? "Give it hours too" : "Open its rule", systemImage: "hourglass") {
+                onOpenRule(target.id)
+            }
+        } else {
+            Button("Give it hours too", systemImage: "hourglass") {
+                onOpenRule(model.targetForRule(kind))
+            }
+        }
     }
 }
 

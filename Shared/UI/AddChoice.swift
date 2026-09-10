@@ -15,6 +15,14 @@ enum AddChoice: Hashable, CaseIterable {
 /// target that asked, wearing that target's rule.
 struct AddRequest: Hashable {
     var choice: AddChoice
+    /// Which half the answer lands in: a target with hours, or the anchor's list.
+    ///
+    /// The + button is over two pages now, and it adds to the page it is over. One pipeline
+    /// rather than two, because the trip is the same trip — a sheet, then Apple's picker — and
+    /// only the landing differs. Under `.anchor` the choice above is not asked: an app and a
+    /// site with a token are both picked in the one picker, and a site typed by name is a
+    /// target, so it reaches the anchor by being taken in rather than by being added here.
+    var destination: Half = .rules
     /// Set when the nudge on a target asked, rather than the + button.
     var companion: Companion?
 
@@ -27,6 +35,10 @@ struct AddRequest: Hashable {
     }
 
     static func plain(_ choice: AddChoice) -> AddRequest { AddRequest(choice: choice) }
+
+    /// Add to the anchor's list: the already-blocked sheet where there is anything to offer,
+    /// Apple's picker where there is not.
+    static let anchor = AddRequest(choice: .application, destination: .anchor)
 
     static func companion(_ choice: AddChoice, of targetID: UUID, titled title: String) -> AddRequest {
         AddRequest(choice: choice, companion: Companion(targetID: targetID, title: title))

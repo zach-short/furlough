@@ -77,6 +77,19 @@ final class AppModel {
     /// leaves the other half's guide running too. Stored beside it and for the same reason.
     private(set) var wantsBothHalves = UserDefaults.standard.bool(forKey: AppModel.bothHalvesKey)
     private static let bothHalvesKey = "furlough.bothHalves"
+    /// What the + button adds while the Anchor page is the one in front.
+    ///
+    /// The anchor, because the + acts on the page it is over and that is the page's own list —
+    /// Zach's call on 2026-09-10, with a way to change it, because somebody who set the anchor
+    /// up once and lives in the rules half reads + as "give an app hours" wherever it is. The
+    /// + over the Rules page is not asked: that page has no second reading. Stored beside the
+    /// rest in the app's own defaults, for the same reason — a preference about a button is
+    /// not a rule, so it must not travel in an exported setup or wait out a delay.
+    private(set) var anchorPageAdds = AppModel.storedAnchorPageAdds
+    private static let anchorPageAddsKey = "furlough.anchorPageAdds"
+    private static var storedAnchorPageAdds: Half {
+        UserDefaults.standard.string(forKey: anchorPageAddsKey).flatMap(Half.init(rawValue:)) ?? .anchor
+    }
     /// The halves whose three-step guide has been walked to the end. Beside the rest in the
     /// app's own defaults, for the same reason.
     ///
@@ -149,6 +162,19 @@ final class AppModel {
         UserDefaults.standard.set(both, forKey: Self.bothHalvesKey)
         startHalf = half
         wantsBothHalves = both
+    }
+
+    /// Which half the + adds to over the Anchor page. See `anchorPageAdds`.
+    func setAnchorPageAdds(_ half: Half) {
+        guard half != anchorPageAdds else { return }
+        UserDefaults.standard.set(half.rawValue, forKey: Self.anchorPageAddsKey)
+        anchorPageAdds = half
+    }
+
+    /// Where a + press lands, given the page it was pressed over. Rules always adds a rule;
+    /// the Anchor page asks the preference.
+    func addDestination(on half: Half) -> Half {
+        half == .rules ? .rules : anchorPageAdds
     }
 
     /// One half's guide is done with: its last step was pressed, or the anchor it was walking
@@ -1124,6 +1150,43 @@ final class AppModel {
         enforce(reason: "anchor edit")
     }
 
+    /// Takes what `targetIDs` cover back off the anchor's list. The other way round from
+    /// `addToAnchor`, and the same two refusals: nothing changes under a lock, and under the
+    /// everything-except scope the list is what stays open, where taking a row off would be
+    /// holding it rather than letting it go.
+    ///
+    /// No delay, because nothing about the anchor's list is delayed: it is not a rule, and the
+    /// tag is what makes it hard to undo. `setAnchorSelection` unpicks in the same breath and
+    /// waits for nothing either.
+    func removeFromAnchor(targetIDs: [UUID]) {
+        var current = SharedStore.load()
+        guard !current.config.anchor.isAnchored, !current.config.anchor.anchorsEverything else { return }
+        let going = current.config.targets.filter { targetIDs.contains($0.id) }
+        guard current.config.anchor.remove(going) else { return }
+        SharedStore.save(current)
+        SharedStore.log("anchor: let go of \(going.count); now holds \(current.config.anchor.count) item(s)")
+        enforce(reason: "anchor edit")
+    }
+
+    /// The rules half's row for `kind`, made if there is not one yet: the landing for the
+    /// anchor grid's "Give it hours too", which is the one place a thing can already be held
+    /// and not yet be a target at all.
+    ///
+    /// A target with no rule enforces nothing — that is the fact the first-rule card exists to
+    /// say — so this only opens the door; the editor writes the rule. A category is the one
+    /// kind that arrives with one, exactly as the picker gives it, because a category has no
+    /// hours to give. Returns the id to open the editor on.
+    func targetForRule(_ kind: TargetKind) -> UUID {
+        var current = SharedStore.load()
+        if let existing = current.config.target(kind: kind) { return existing.id }
+        let target = Target(kind: kind, rule: kind.isCategory ? .alwaysBlocked : nil)
+        current.config.targets.append(target)
+        SharedStore.save(current)
+        SharedStore.log("added a target from the anchor's grid")
+        enforce(reason: "add target")
+        return target.id
+    }
+
     /// Chooses how far the anchor reaches: its list, or the whole phone except its list.
     /// Refused while anchored, like every other change to it.
     ///
@@ -1561,6 +1624,8 @@ final class AppModel {
         UserDefaults.standard.removeObject(forKey: Self.bothHalvesKey)
         startHalf = .rules
         wantsBothHalves = false
+        UserDefaults.standard.removeObject(forKey: Self.anchorPageAddsKey)
+        anchorPageAdds = .anchor
         // Removed rather than emptied: absent is what "never asked" means, so the next launch
         // seeds from a config that a reset has just emptied and both guides come round again.
         UserDefaults.standard.removeObject(forKey: Self.finishedGuidesKey)
