@@ -280,16 +280,17 @@ struct DevicesHelp: View {
         HelpPage(
             title: "Across your devices",
             heading: "One Anchor, both devices",
-            lead: "Furlough on your Mac and Furlough on this iPhone share one Anchor. There is nothing to pair and nothing to switch on: both are signed into your Apple Account, and that is the whole of the link."
+            lead: "Furlough on your other devices can share one Anchor with this iPhone, and be told what you add here. Each device joins the link from its own Devices screen, and nothing crosses to or from one that has not."
         ) {
-            HelpProse("No account of Furlough's, no server of Furlough's, no code to type and no list of devices to manage. Install it on the Mac, and if that Mac is signed into the same Apple Account with iCloud Drive on, the two are already linked.")
+            HelpProse("No account of Furlough's and no server of Furlough's: the link rides on your own iCloud, under your Apple Account. What there is to manage is a roster — every device that has joined, by the name you gave it — and any device can be taken off it from any other, except while the anchor is down.")
                 .padding(.top, 12)
 
             SectionLabel(text: "What crosses")
             HelpPoints([
-                .init("The Anchor's state", "Whether it is down, since when, and until when. That is the entire message, and Furlough writes it to your own iCloud, where only your devices can read it."),
-                .init("Not your rules", "Screen Time names an app with a token that means nothing off the iPhone that minted it, and the Mac names one with a bundle identifier that means nothing on a phone. So each device keeps its own list, on purpose — see Moving a setup across below."),
-                .init("Not your tags", "A tag is a physical key, read over NFC. Macs have no reader, so every tag is paired here, and this phone is the only place one can be read."),
+                .init("The Anchor's state", "Whether it is down, since when, and until when. Furlough writes it to your own iCloud, where only your devices can read it."),
+                .init("The names of what you add", "If you let it — Settings > Devices, Always, Ask or Never — adding YouTube here tells your Mac, which blocks the YouTube app if it has one and youtube.com either way. Its first rule follows. What comes the other way lands here as the site at once, and the app is offered in Apple's picker, because only the picker can add one."),
+                .init("Not your rules or your list", "Screen Time names an app with a token that means nothing off the iPhone that minted it, and the Mac names one with a bundle identifier that means nothing on a phone. So each device keeps its own list — see Moving a setup across below."),
+                .init("Not your tags", "A tag is a physical key, read over NFC. Macs and iPads have no reader, so every tag is paired here, and an iPhone is the only place one can be read."),
             ])
 
             SectionLabel(text: "Which way it goes")
@@ -297,9 +298,9 @@ struct DevicesHelp: View {
                 .init("Drop here, and the Mac locks", "Whatever the Mac's own Anchor list holds is shielded there too — its list, not this one, because the lists cannot travel."),
                 .init("Drop on the Mac, and this iPhone locks", "The same, the other way round. Either device can start it."),
                 .init("Your tag releases both", "The one release either device will take. Scan it here and the anchor lifts on the phone and on the Mac together."),
-                .init("The Mac can lock but never unlock", "With no reader it has no key of its own, so an anchor dropped on the Mac waits for a scan on this phone. That is why it will not drop until it has heard from you: a Mac that locked itself before this phone had ever spoken to it would be a lock with nothing to open it."),
+                .init("The Mac can lock but never unlock", "With no reader it has no key of its own, so an anchor dropped on the Mac waits for a scan on an iPhone. That is why it will not drop until an iPhone is on the link with it: a Mac that locked itself with no phone to unlock it would be a lock with nothing to open it."),
             ])
-            Footnote(text: "So the first drop is worth making here. Once this iPhone has dropped the anchor even once, the Mac has heard from it and will drop its own from then on.")
+            Footnote(text: "The same holds for an iPad: it can be anchored from here and never releases anything.")
                 .padding(.top, 10)
 
             SectionLabel(text: "When it does not cross")
@@ -319,7 +320,7 @@ struct DevicesHelp: View {
             ])
 
             SectionLabel(text: "Turning it off")
-            HelpProse("There is no switch for it, because the link is your Apple Account rather than anything Furlough runs. Signing out of iCloud, or turning off iCloud Drive, stops the Anchor crossing — and then the Mac refuses to drop one at all, since your tag could not reach it. Nothing already anchored is released by any of that.")
+            HelpProse("Settings > Devices takes this iPhone off the link, or any other device off it from here. Refused while the anchor is down, on any device: taking one off then would either leave it locked with no key or let it go, and both are the thing the Anchor exists to make impossible. Signing out of iCloud, or turning off iCloud Drive, stops everything crossing too, and then the Mac refuses to drop at all. Nothing already anchored is released by any of that.")
                 .padding(.top, 2)
         }
     }

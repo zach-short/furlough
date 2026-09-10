@@ -746,6 +746,9 @@ struct Config: Codable, Equatable {
     /// and `Policy.applyDuePending` — which every enforce, every widget read and every
     /// `effectiveConfig` goes through — is the one place that moves the clock forward.
     var isInTrial = false
+    /// What crosses to and from other devices, and whether an app's site is blocked beside it.
+    /// Since 2026-09-10; a state without it gets the defaults.
+    var link = LinkPreferences()
     var schemaVersion = 1
 
     init() {}
@@ -767,6 +770,7 @@ struct Config: Codable, Equatable {
         trialStartedAt = try container.decodeIfPresent(Date.self, forKey: .trialStartedAt)
         trialEndsAt = try container.decodeIfPresent(Date.self, forKey: .trialEndsAt)
         isInTrial = try container.decodeIfPresent(Bool.self, forKey: .isInTrial) ?? false
+        link = try container.decodeIfPresent(LinkPreferences.self, forKey: .link) ?? LinkPreferences()
     }
 
     private enum LegacyKeys: String, CodingKey { case brick }

@@ -134,20 +134,20 @@ struct AnchorSyncMacDropTests {
     @Test("the Mac drops only with something to hold, iCloud, and a phone that has been heard from")
     func refusals() {
         var config = makeConfig([])
-        #expect(AnchorSync.macDrop(&config, now: noon, phoneSeen: true, cloudAvailable: true) == .noList)
+        #expect(AnchorSync.macDrop(&config, now: noon, hasKey: true, cloudAvailable: true) == .noList)
         config.anchor.kinds = [.macApp(bundleID: "com.google.Chrome")]
-        #expect(AnchorSync.macDrop(&config, now: noon, phoneSeen: false, cloudAvailable: true) == .noPhone)
+        #expect(AnchorSync.macDrop(&config, now: noon, hasKey: false, cloudAvailable: true) == .noPhone)
         #expect(!config.anchor.isAnchored)
-        #expect(AnchorSync.macDrop(&config, now: noon, phoneSeen: true, cloudAvailable: true) == nil)
+        #expect(AnchorSync.macDrop(&config, now: noon, hasKey: true, cloudAvailable: true) == nil)
         #expect(config.anchor.isAnchored)
         #expect(config.anchor.anchoredAt == noon)
         #expect(config.anchor.until == nil)
         #expect(config.anchor.sequence == 1)
-        #expect(AnchorSync.macDrop(&config, now: noon, phoneSeen: true, cloudAvailable: true) == .alreadyAnchored)
+        #expect(AnchorSync.macDrop(&config, now: noon, hasKey: true, cloudAvailable: true) == .alreadyAnchored)
         // An empty allowlist is the whole Mac, which is something to hold.
         var everything = makeConfig([])
         everything.anchor.scope = .everythingExcept
-        #expect(AnchorSync.macDrop(&everything, now: noon, phoneSeen: true, cloudAvailable: true) == nil)
+        #expect(AnchorSync.macDrop(&everything, now: noon, hasKey: true, cloudAvailable: true) == nil)
     }
 
     /// The lock-with-no-key guard, in the case `phoneSeen` alone cannot see: the latch is set
@@ -157,15 +157,15 @@ struct AnchorSyncMacDropTests {
     func refusesWithoutCloud() {
         var config = makeConfig([])
         config.anchor.kinds = [.macApp(bundleID: "com.google.Chrome")]
-        #expect(AnchorSync.macDrop(&config, now: noon, phoneSeen: true, cloudAvailable: false) == .noCloud)
+        #expect(AnchorSync.macDrop(&config, now: noon, hasKey: true, cloudAvailable: false) == .noCloud)
         #expect(!config.anchor.isAnchored)
         #expect(config.anchor.sequence == 0)
         // Ahead of the phone: signed out, whether a phone has ever been heard from is moot,
         // and the account is the thing to go and fix.
-        #expect(AnchorSync.macDrop(&config, now: noon, phoneSeen: false, cloudAvailable: false) == .noCloud)
+        #expect(AnchorSync.macDrop(&config, now: noon, hasKey: false, cloudAvailable: false) == .noCloud)
         // Behind the list, which is on this screen and fixable without leaving it.
         var empty = makeConfig([])
-        #expect(AnchorSync.macDrop(&empty, now: noon, phoneSeen: true, cloudAvailable: false) == .noList)
+        #expect(AnchorSync.macDrop(&empty, now: noon, hasKey: true, cloudAvailable: false) == .noList)
     }
 
     /// An anchor already down is not touched by the account going away. Only dropping is
@@ -174,9 +174,9 @@ struct AnchorSyncMacDropTests {
     func cutOffLeavesAHoldAlone() {
         var config = makeConfig([])
         config.anchor.kinds = [.macApp(bundleID: "com.google.Chrome")]
-        #expect(AnchorSync.macDrop(&config, now: noon, phoneSeen: true, cloudAvailable: true) == nil)
+        #expect(AnchorSync.macDrop(&config, now: noon, hasKey: true, cloudAvailable: true) == nil)
         #expect(config.anchor.isHolding(at: noon))
-        #expect(AnchorSync.macDrop(&config, now: noon, phoneSeen: true, cloudAvailable: false) == .noCloud)
+        #expect(AnchorSync.macDrop(&config, now: noon, hasKey: true, cloudAvailable: false) == .noCloud)
         #expect(config.anchor.isHolding(at: noon))
     }
 

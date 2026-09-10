@@ -55,13 +55,13 @@ struct MacGuideTests {
     /// place is the latch that says a phone has written the shared record — the same fact from
     /// the other end, and the thing `AnchorSync.macDrop` refuses a drop without.
     @Test func theAnchorStartsByWaitingForThePhone() {
-        let guide = HalfGuide.macAnchor(config: Config(), finished: false, phoneSeen: false)
+        let guide = HalfGuide.macAnchor(config: Config(), finished: false, hasKey: false)
         #expect(guide.live == 0)
-        #expect(guide.steps[0].title == "Drop it once from your iPhone")
+        #expect(guide.steps[0].title == "Link this Mac and your iPhone")
     }
 
     @Test func hearingFromThePhoneMovesTheAnchorToTheList() {
-        let guide = HalfGuide.macAnchor(config: Config(), finished: false, phoneSeen: true)
+        let guide = HalfGuide.macAnchor(config: Config(), finished: false, hasKey: true)
         #expect(guide.steps[0].isDone)
         #expect(guide.live == 1)
     }
@@ -69,7 +69,7 @@ struct MacGuideTests {
     @Test func somethingToHoldMovesTheAnchorToTheDrop() {
         var config = Config()
         config.anchor.kinds = [.macApp(bundleID: "com.apple.Safari")]
-        let guide = HalfGuide.macAnchor(config: config, finished: false, phoneSeen: true)
+        let guide = HalfGuide.macAnchor(config: config, finished: false, hasKey: true)
         #expect(guide.steps[1].isDone)
         #expect(guide.live == 2)
     }
@@ -79,7 +79,7 @@ struct MacGuideTests {
     @Test func theEverythingExceptScopeIsSomethingToHoldWhileEmpty() {
         var config = Config()
         config.anchor.scope = .everythingExcept
-        let guide = HalfGuide.macAnchor(config: config, finished: false, phoneSeen: true)
+        let guide = HalfGuide.macAnchor(config: config, finished: false, hasKey: true)
         #expect(guide.steps[1].isDone)
         #expect(guide.live == 2)
     }
@@ -87,19 +87,19 @@ struct MacGuideTests {
     @Test func theAnchorFoldsAwayOnceItHasBeenDropped() {
         var config = Config()
         config.anchor.kinds = [.macApp(bundleID: "com.apple.Safari")]
-        #expect(HalfGuide.macAnchor(config: config, finished: false, phoneSeen: true).isRunning)
-        #expect(!HalfGuide.macAnchor(config: config, finished: true, phoneSeen: true).isRunning)
+        #expect(HalfGuide.macAnchor(config: config, finished: false, hasKey: true).isRunning)
+        #expect(!HalfGuide.macAnchor(config: config, finished: true, hasKey: true).isRunning)
     }
 
     /// The last step counts what is held. Before anything is chosen that count is zero, which is
     /// a true sentence about a step that has not happened and a poor one to read two ahead of it.
     @Test func theDropStepDoesNotCountAnEmptyList() {
-        let empty = HalfGuide.macAnchor(config: Config(), finished: false, phoneSeen: true)
+        let empty = HalfGuide.macAnchor(config: Config(), finished: false, hasKey: true)
         #expect(!empty.steps[2].detail.contains("0 items"))
 
         var config = Config()
         config.anchor.kinds = [.macApp(bundleID: "com.apple.Safari"), .host("youtube.com")]
-        let held = HalfGuide.macAnchor(config: config, finished: false, phoneSeen: true)
+        let held = HalfGuide.macAnchor(config: config, finished: false, hasKey: true)
         #expect(held.steps[2].detail.contains("2 items"))
     }
 
@@ -108,7 +108,7 @@ struct MacGuideTests {
     /// The footnote belongs to the live step, so the fact arrives with the step rather than
     /// three screens earlier.
     @Test func theCardShowsTheLiveStepsFootnote() {
-        let guide = HalfGuide.macAnchor(config: Config(), finished: false, phoneSeen: false)
+        let guide = HalfGuide.macAnchor(config: Config(), finished: false, hasKey: false)
         #expect(guide.footnote == guide.steps[0].footnote)
         #expect(guide.title == "Setting up the Anchor")
     }

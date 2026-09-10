@@ -405,13 +405,11 @@ struct AnchorScopeScreen: View {
     }
 }
 
-// MARK: Your Mac
+// MARK: Devices
 
-/// Whether the two devices are actually talking, and a button that asks.
-///
-/// Nothing else on this phone says the Anchor reaches the Mac at all, and there is no screen
-/// where the link could be set up, because there is nothing to set up. So the Anchor — the one
-/// half it is about — carries the way in.
+/// The link to the other devices, from the Anchor page: joining it, who is on it, and what
+/// crosses. `DevicesScreen` is the content; Settings hosts the same screen under its own row,
+/// so the Anchor — the half the link is mostly about — carries a way in of its own.
 ///
 /// The severe warning is the lead here rather than a banner on the page in front. A phone that
 /// cannot reach iCloud cannot release an anchor it drops on a Mac, which is the one failure
@@ -421,69 +419,15 @@ struct AnchorMacScreen: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        AnchorSettingScreen(title: "Your Mac", lead: lead) {
-            linkCard
-            devicesRow
-                .padding(.top, 10)
+        AnchorSettingScreen(title: "Devices", lead: lead) {
+            DevicesScreen()
         }
     }
 
     private var lead: String {
-        model.cloudAvailable
-            ? "One Anchor across both devices, carried on your own iCloud. Nothing to pair and nothing to switch on."
-            : AnchorSync.cutOffWarning
-    }
-
-    /// The Mac draws the same card from the same `LinkStatus`, so both ends describe one link in
-    /// one set of words.
-    private var linkCard: some View {
-        let status = model.link
-        return VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(status.isLinked ? Ember.moss : (status.cloudAvailable ? Ember.amber : Ember.ember))
-                    .frame(width: 8, height: 8)
-                Text(status.headline)
-                    .emberDisplaySmall(14)
-                    .foregroundStyle(Ember.cream)
-                Spacer(minLength: 8)
-                Button("Check now") { model.checkLink() }
-                    .buttonStyle(.plain)
-                    .emberBody(12.5, .semibold)
-                    .foregroundStyle(Ember.ember)
-            }
-            .padding(.horizontal, 14)
-            .padding(.top, 13)
-            // Not when iCloud is unreachable: the lead above is that case said in full, and this
-            // line is its first clause over again. Every other state the lead cannot know.
-            if status.cloudAvailable {
-                Text(status.detail(now: model.clock.now))
-                    .emberBody(12)
-                    .foregroundStyle(Ember.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 14)
-                    .padding(.top, 6)
-                    .padding(.bottom, 13)
-            } else {
-                Color.clear.frame(height: 13)
-            }
-        }
-        .emberCard()
-        // Asked when the screen opens, so the status is about now rather than about whenever
-        // the app last happened to hear something.
-        .task { model.checkLink() }
-    }
-
-    /// The row into Help's page about the two devices — the same row Help's own hub draws,
-    /// because that is what it is.
-    private var devicesRow: some View {
-        NavigationLink { DevicesHelp() } label: {
-            HelpRow(title: "Across your devices", detail: "What the Anchor carries to your Mac") {
-                HelpTile(symbol: "laptopcomputer.and.iphone")
-            }
-        }
-        .buttonStyle(.plain)
-        .emberCard()
+        guard model.cloudAvailable else { return AnchorSync.cutOffWarning }
+        return model.isEnrolled
+            ? "This iPhone is on the link. Drop the anchor on any device here and every one of them locks; only a tag scanned on an iPhone releases them."
+            : "Furlough on your Mac or iPad can be locked by this iPhone's anchor and released by its tag, once both are on the link. Nothing crosses until you link this one."
     }
 }

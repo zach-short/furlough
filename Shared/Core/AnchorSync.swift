@@ -5,8 +5,12 @@ import Foundation
 /// minted it, a bundle identifier nothing on it), so each device keeps its own list and this
 /// carries only whether the anchor is down, since when, until when, who wrote that, and how.
 struct AnchorRecord: Codable, Equatable {
-    enum Platform: String, Codable {
+    /// What wrote it. An iPad is its own case since the roster (2026-09-10): it runs the phone
+    /// app but has no tag reader, so it can be anchored and can never release, which is the
+    /// Mac's position, and `merge` must not take a release from it.
+    enum Platform: String, Codable, Sendable {
         case phone
+        case pad
         case mac
     }
 
@@ -57,12 +61,23 @@ enum AnchorSync {
         return id
     }
 
+    /// What this device is. An iPad runs the phone build, and Core has no UIKit to ask which
+    /// it is on, so the app notes it at launch (`notePlatform`) and every process reads the
+    /// note; a phone is what an iOS build is until told otherwise.
     static var platform: AnchorRecord.Platform {
         #if os(iOS)
-        .phone
+        SharedStore.defaults.string(forKey: platformKey) == AnchorRecord.Platform.pad.rawValue ? .pad : .phone
         #else
         .mac
         #endif
+    }
+
+    private static let platformKey = "furlough.link.platform"
+
+    /// Writes down whether this iOS device is an iPad. Called once at launch by the app, the
+    /// one process that can ask.
+    static func notePlatform(isPad: Bool) {
+        SharedStore.defaults.set((isPad ? AnchorRecord.Platform.pad : .phone).rawValue, forKey: platformKey)
     }
 
     /// Whether a phone has ever written the record this device reads. The Mac's anchor can be
@@ -122,6 +137,9 @@ enum AnchorSync {
     struct LinkStatus: Equatable {
         /// Whether the key-value store answered at all — `AnchorCloud.isAvailable`.
         var cloudAvailable: Bool
+        /// Whether this device is on the link at all. Off it, nothing below is asked: the
+        /// record may well be there, and it is deliberately not read.
+        var enrolled = true
         /// What is in the shared record right now, if anything.
         var record: AnchorRecord?
         /// This device's `deviceID`, to tell its own writes from the other device's.
@@ -144,13 +162,14 @@ enum AnchorSync {
         /// again for days. The row was saying "no proof" about a link proven minutes earlier,
         /// which is the opposite of what a row that exists to answer "is this working" is for.
         var isLinked: Bool {
-            guard cloudAvailable, let record else { return false }
+            guard cloudAvailable, enrolled, let record else { return false }
             return record.writer != thisDevice || lastHeard != nil
         }
 
         /// The short verdict, for a status line.
         var headline: String {
             guard cloudAvailable else { return "Not linked" }
+            guard enrolled else { return "Off the link" }
             guard let record else { return "Nothing shared yet" }
             guard record.writer == thisDevice else { return "Linked" }
             // Ours is the newest write, so whether this is a link still waiting on the other
@@ -165,6 +184,9 @@ enum AnchorSync {
         func detail(now: Date) -> String {
             guard cloudAvailable else {
                 return "Furlough cannot reach iCloud, so nothing can cross between this device and your \(otherName)."
+            }
+            guard enrolled else {
+                return "This device is not on the link, so the Anchor stops here. Link it under Settings > Devices."
             }
             guard let record else {
                 return "iCloud is reachable, but neither device has written the Anchor yet. Drop the anchor on either one and it will appear here."
@@ -189,6 +211,7 @@ enum AnchorSync {
     static func linkStatus() -> LinkStatus {
         LinkStatus(
             cloudAvailable: AnchorCloud.isAvailable,
+            enrolled: DeviceLink.isEnrolled,
             record: AnchorCloud.read(),
             thisDevice: deviceID,
             platform: platform,
@@ -220,7 +243,15 @@ enum AnchorSync {
     /// anchor changed, nil when there was nothing to read or nothing new in it.
     @discardableResult
     static func pull(into config: inout Config, now: Date) -> String? {
-        guard let remote = AnchorCloud.read() else { return nil }
+        // Off the link, the record is not read at all — not merged and refused, not read and
+        // ignored. A device that opted out has said the Anchor stops at its edge. The roster
+        // is read first because another device may have taken this one off since it last
+        // looked, and that has to land before the record does.
+        DeviceLink.obeyRevocation()
+        guard DeviceLink.isEnrolled, let remote = AnchorCloud.read() else { return nil }
+        // Only a device on the link can lock this one. A record left behind by a device that
+        // has since left is a lock with no owner, and a device never enrolled has no say.
+        guard remote.writer == deviceID || DeviceLink.roster().isLinked(remote.writer) else { return nil }
         if remote.platform == .phone, !phoneSeen {
             SharedStore.defaults.set(true, forKey: phoneSeenKey)
         }
@@ -283,20 +314,22 @@ enum AnchorSync {
     }
 
     /// The Mac's drop. No tag here, so no `until` and no `canAnchor`: it needs something to
-    /// hold, an iCloud account a release could arrive through, and a phone that has been heard
-    /// from, since only that phone's tag can ever lift it.
+    /// hold, an iCloud account a release could arrive through, and a phone on the link, since
+    /// only that phone's tag can ever lift it.
     ///
     /// Both of those last two are the same guard wearing two faces — a Mac must never hold an
     /// anchor whose key cannot reach it — and they are checked in the order they can be fixed
     /// in. A signed-out account is refused first because it is the one that makes the other
-    /// unanswerable: `phoneSeen` is a latch that stays true from an account the Mac may no
-    /// longer be signed in to, so trusting it alone would let exactly the lock-with-no-key
-    /// through that it exists to stop.
-    static func macDrop(_ config: inout Config, now: Date, phoneSeen: Bool, cloudAvailable: Bool) -> Policy.DropRefusal? {
+    /// unanswerable: what the roster says was read from an account the Mac may no longer be
+    /// signed in to, so trusting it alone would let exactly the lock-with-no-key through that
+    /// it exists to stop. `hasKey` is the roster's answer — this Mac on the link, and an
+    /// iPhone on it besides — where it used to be a latch set the first time a phone was ever
+    /// heard from; the latch stayed true after that phone left.
+    static func macDrop(_ config: inout Config, now: Date, hasKey: Bool, cloudAvailable: Bool) -> Policy.DropRefusal? {
         Policy.liftExpiredAnchor(&config, now: now)
         guard config.anchor.hasSomethingToHold else { return .noList }
         guard cloudAvailable else { return .noCloud }
-        guard phoneSeen else { return .noPhone }
+        guard hasKey else { return .noPhone }
         guard !config.anchor.isAnchored else { return .alreadyAnchored }
         config.anchor.isAnchored = true
         config.anchor.anchoredAt = now
@@ -339,15 +372,32 @@ enum AnchorCloud {
         return reason == NSUbiquitousKeyValueStoreAccountChange
     }
 
-    static func read() -> AnchorRecord? {
+    static func read() -> AnchorRecord? { read(key: key) }
+
+    static func write(_ record: AnchorRecord) { write(record, key: key) }
+
+    /// Any record under any key: the roster's entries and each device's additions live beside
+    /// the anchor under their own keys (`DeviceLink`), one JSON value each.
+    static func read<Value: Decodable>(key: String) -> Value? {
         guard let data = NSUbiquitousKeyValueStore.default.data(forKey: key) else { return nil }
-        return try? decoder.decode(AnchorRecord.self, from: data)
+        return try? decoder.decode(Value.self, from: data)
     }
 
-    static func write(_ record: AnchorRecord) {
-        guard let data = try? encoder.encode(record) else { return }
+    static func write<Value: Encodable>(_ value: Value, key: String) {
+        guard let data = try? encoder.encode(value) else { return }
         NSUbiquitousKeyValueStore.default.set(data, forKey: key)
         NSUbiquitousKeyValueStore.default.synchronize()
+    }
+
+    static func remove(key: String) {
+        NSUbiquitousKeyValueStore.default.removeObject(forKey: key)
+        NSUbiquitousKeyValueStore.default.synchronize()
+    }
+
+    /// Every key in the store starting with `prefix`, which is how the roster is enumerated
+    /// without a list that two devices would have to agree on.
+    static func keys(withPrefix prefix: String) -> [String] {
+        NSUbiquitousKeyValueStore.default.dictionaryRepresentation.keys.filter { $0.hasPrefix(prefix) }.sorted()
     }
 
     /// Asks iCloud for whatever it has. Called at launch and on activation; changes that arrive

@@ -487,6 +487,12 @@ struct RuleEditorView: View {
                 model.dismissCompanion(for: target.id)
             }
             .padding(.bottom, 14)
+        } else if model.awaitsName(target) {
+            // Told Always, and nothing to act on yet: a picked app has no name until Furlough has
+            // seen it, and the site follows the name. Said here so the row that seems to be
+            // missing its site is not read as the setting being ignored.
+            Footnote(text: "The website this app is also at follows once Furlough has seen the app — right away with Screen Time data access, otherwise the first time the shield covers it.")
+                .padding(.bottom, 14)
         }
     }
 

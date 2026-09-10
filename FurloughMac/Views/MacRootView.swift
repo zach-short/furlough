@@ -127,7 +127,9 @@ struct MacHomeView: View {
             let isNew = model.state.config.target(bundleID: app.bundleID) == nil
             let outcome = model.addApp(bundleID: app.bundleID, name: app.name)
             selection = outcome.added?.id
-            guard isNew, let added = outcome.added else { return }
+            // The sheet is the Ask. Told Always, the model has added the sites already and the
+            // filter below finds nothing; told Never, it is not asked.
+            guard isNew, let added = outcome.added, model.state.config.link.companionSite != .never else { return }
             pendingCompanion = CompanionPrompt(added: added, items: companionSites(for: app))
         }
     }
@@ -145,7 +147,9 @@ struct MacHomeView: View {
             guard let added = outcome.added else { return outcome.message }
             selection = added.id
             if isNew, case .host(let host) = added.kind {
-                pendingCompanion = CompanionPrompt(added: added, items: companionApps(for: host))
+                if model.state.config.link.companionSite != .never {
+                    pendingCompanion = CompanionPrompt(added: added, items: companionApps(for: host))
+                }
                 pendingFilterHost = host
             }
             return nil
@@ -296,6 +300,9 @@ struct MacHomeView: View {
                 .padding(.top, 12)
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
+                    // What the link is asking about on this half, when it is asking anything.
+                    MacLinkTraffic(half: half)
+                        .padding(.bottom, 8)
                     switch half {
                     case .rules: rulesList
                     case .anchor: heldList
@@ -357,7 +364,7 @@ struct MacHomeView: View {
             return "since \(since.formatted(date: .omitted, time: .shortened)) · your iPhone's tag lifts it"
         }
         if !model.cloudAvailable { return "iCloud unreachable · nothing can be released" }
-        if !model.phoneSeen { return "waiting to hear from your iPhone" }
+        if !model.hasKey { return "no iPhone on the link" }
         if !anchor.hasSomethingToHold { return "choose what it holds" }
         return "ready to drop"
     }

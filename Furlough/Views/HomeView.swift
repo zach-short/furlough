@@ -177,6 +177,9 @@ private struct RulesPage: View {
                         GuideCard(guide: guide) { button(at: guide.live, config: config) }
                             .padding(.bottom, 6)
                     }
+                    // What the link is asking about on this half, when it is asking anything.
+                    LinkTraffic(half: .rules)
+                        .padding(.bottom, 6)
                     HomeContent(now: model.clock.honest(context.date), showsEmptyHero: !guide.isRunning)
                 }
                 .padding(.horizontal, 16)

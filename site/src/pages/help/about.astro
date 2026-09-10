@@ -22,13 +22,13 @@ import { site } from '../../site';
 
     <article class="card prose body" data-reveal style="--d: .1s">
       <p>An app blocker with no unblock button, and two ways to use it. <strong>Rules</strong> give an app the hours it is allowed and a daily budget, and only ever loosen after a delay you set in advance. <strong>The Anchor</strong> locks a list — or the whole phone — in one tap, and lifts only when you hold the phone to an NFC tag you paired. Either works on its own.</p>
-      <p>Both are built on Apple's Screen Time API. There is no account, no server and no analytics. The one thing Furlough writes off the device is the Anchor's state, to your own iCloud, so the Mac and the iPhone lock together.</p>
+      <p>Both are built on Apple's Screen Time API. There is no account, no server and no analytics. Furlough writes off the device only to your own iCloud, and only once you have linked your devices: the Anchor's state, so the Mac and the iPhone lock together, and, if you let it, the names of what you add.</p>
       <p>Swift and SwiftUI, no third-party code. Built on FamilyControls, ManagedSettings, DeviceActivity and Core NFC. The three typefaces — Bricolage Grotesque, Onest and Geist Mono — are used under the SIL Open Font License. The Mac app is <a href={site.githubURL} rel="noopener">open source</a>.</p>
 
       <h2>What stays on the phone</h2>
       <ul>
         <li><strong>Which apps you picked.</strong> iOS never tells Furlough. An app is an opaque token that means nothing off this phone; the icon and the name beside it are drawn by iOS itself.</li>
-        <li><strong>Your rules,</strong> in a container shared by the app and its extensions, so all of them read the same state. Rules never sync and are never uploaded; only the Anchor's state — down or not, since when, until when — goes to your own iCloud, and only so your other device can follow it.</li>
+        <li><strong>Your rules,</strong> in a container shared by the app and its extensions, so all of them read the same state. Rules never sync and are never uploaded; what goes to your own iCloud, once you link your devices, is the Anchor's state — down or not, since when, until when — the roster of linked devices, and, if you turn it on, the names of what you add, so your other devices can follow.</li>
         <li><strong>Your usage.</strong> Screen Time hands the hours to a report extension with no network of its own and nowhere to write. Only the picture reaches the app.</li>
       </ul>
       <p>The formal version of all of this is the <a href="/privacy/">privacy policy</a>.</p>

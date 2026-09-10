@@ -73,21 +73,21 @@ extension HalfGuide {
         ])
     }
 
-    /// Hear from the phone, choose what it holds, drop it.
+    /// Link an iPhone, choose what it holds, drop it.
     ///
     /// The phone's first step is *Pair a tag*, and this Mac has no reader to pair one with. What
     /// stands in its place is the same fact from the other end: the only thing that can release
-    /// an anchor dropped here is a tag scanned on the phone, arriving through iCloud, so this Mac
-    /// will not drop one until a phone has written the shared record once — see
-    /// `AnchorSync.macDrop`. `phoneSeen` is that latch.
-    static func macAnchor(config: Config, finished: Bool, phoneSeen: Bool) -> HalfGuide {
+    /// an anchor dropped here is a tag scanned on an iPhone, arriving through iCloud, so this Mac
+    /// will not drop one until it and an iPhone are both on the link — see `AnchorSync.macDrop`.
+    /// `hasKey` is the roster's answer to that.
+    static func macAnchor(config: Config, finished: Bool, hasKey: Bool) -> HalfGuide {
         let anchor = config.anchor
         return HalfGuide(half: .anchor, steps: [
             Step(
-                title: "Drop it once from your iPhone",
-                detail: "This Mac has no tag reader, so your iPhone's tag is the only key. Drop the anchor there once and this Mac will have heard from it.",
-                footnote: "Both devices signed into the same Apple Account is the whole of the link. There is nothing to pair here and nothing to switch on.",
-                isDone: phoneSeen
+                title: "Link this Mac and your iPhone",
+                detail: "This Mac has no tag reader, so an iPhone's tag is the only key. Put both on the link under Settings > Devices, and a drop here locks there too.",
+                footnote: "The link rides on your own iCloud. Each device is asked before it joins, and any can be taken off — except while the anchor is down.",
+                isDone: hasKey
             ),
             Step(
                 title: "Choose what it holds",

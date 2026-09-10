@@ -502,14 +502,15 @@ struct HelpPage: View {
     /// about it, and both of these can change while the sheet is open.
     @ViewBuilder
     private var devices: some View {
-        HelpProse("No account of Furlough's, no server of Furlough's, no code to type and no list of devices to manage. If this Mac and your iPhone are signed into the same Apple Account with iCloud Drive on, they are already linked.")
+        HelpProse("No account of Furlough's and no server of Furlough's: the link rides on your own iCloud, under your Apple Account. Each device joins from its own Devices screen — Settings > Devices here — and nothing crosses to or from one that has not. What there is to manage is the roster: every device that has joined, by the name you gave it, and any can be taken off from any other, except while the anchor is down.")
             .padding(.top, 12)
 
         SectionLabel(text: "What crosses")
         HelpPoints([
-            .init("The Anchor's state", "Whether it is down, since when, and until when. That is the entire message, and Furlough writes it to your own iCloud, where only your devices can read it."),
-            .init("Not your rules", "This Mac names an app with a bundle identifier, which means nothing on a phone, and Screen Time names one with a token, which means nothing off the phone that minted it. So each device keeps its own list — see Moving a setup across below."),
-            .init("Not your tags", "A tag is a physical key, read over NFC. This Mac has no reader, so every tag is paired on the phone, and the phone is the only place one can be read."),
+            .init("The Anchor's state", "Whether it is down, since when, and until when. Furlough writes it to your own iCloud, where only your devices can read it."),
+            .init("The names of what you add", "If you let it — Settings > Devices, Always, Ask or Never — adding something here tells the other devices its name, and each blocks what it can find: an iPhone blocks the site at once and is offered the app in Apple's picker. What comes the other way lands here as the app if this Mac has it, and the site either way. A first rule follows the name."),
+            .init("Not your rules or your list", "This Mac names an app with a bundle identifier, which means nothing on a phone, and Screen Time names one with a token, which means nothing off the phone that minted it. So each device keeps its own list — see Moving a setup across below."),
+            .init("Not your tags", "A tag is a physical key, read over NFC. This Mac has no reader, so every tag is paired on an iPhone, and an iPhone is the only place one can be read."),
         ])
 
         SectionLabel(text: "Which way it goes")
@@ -537,21 +538,24 @@ struct HelpPage: View {
         ])
 
         SectionLabel(text: "Turning it off")
-        HelpProse("There is no switch for it, because the link is your Apple Account rather than anything Furlough runs. Signing out of iCloud, or turning off iCloud Drive in System Settings, stops the Anchor crossing — and stops this Mac dropping one. Nothing already anchored is released by any of that.")
+        HelpProse("Settings > Devices takes this Mac off the link, or any other device off it from here. Refused while the anchor is down, on any device: taking one off then would either leave it locked with no key or let it go, and both are the thing the Anchor exists to make impossible. Signing out of iCloud, or turning off iCloud Drive in System Settings, stops everything crossing too — and stops this Mac dropping one. Nothing already anchored is released by any of that.")
             .padding(.top, 2)
     }
 
-    /// Where this Mac actually stands: cut off, still waiting for its first word from a phone,
-    /// or linked. The three states `AnchorSync.macDrop` decides between, said in the order it
-    /// decides them, so the page and the refused button never disagree.
+    /// Where this Mac actually stands: cut off, off the link, on it with no iPhone, or ready.
+    /// The states `AnchorSync.macDrop` decides between, said in the order it decides them, so
+    /// the page and the refused button never disagree.
     private var cloudAndPhoneLine: String {
         if !model.cloudAvailable {
             return "Right now Furlough cannot reach iCloud, so this Mac will not drop the anchor at all. Turn on iCloud Drive in System Settings > your name > iCloud."
         }
-        if !model.phoneSeen {
-            return "This Mac has not heard from your iPhone yet, so Drop anchor is refused here. Drop the anchor once on the phone and it will have — after that this Mac can drop its own whenever you like."
+        if !model.isEnrolled {
+            return "This Mac is not on the link, so Drop anchor is refused here and nothing crosses either way. Settings > Devices puts it on."
         }
-        return "This Mac has heard from your iPhone, so Drop anchor works here. Before that first word it is refused, because a Mac that locked itself with no phone to unlock it would be a lock with nothing to open it."
+        if !model.hasKey {
+            return "This Mac is on the link, but no iPhone is, so Drop anchor is refused here: only an iPhone's tag could release it. Link your iPhone from its own Devices screen and this Mac can drop whenever you like."
+        }
+        return "This Mac and an iPhone are both on the link, so Drop anchor works here. Without the iPhone it is refused, because a Mac that locked itself with no phone to unlock it would be a lock with nothing to open it."
     }
 
     // MARK: Outside the window

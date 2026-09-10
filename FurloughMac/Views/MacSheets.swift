@@ -491,6 +491,8 @@ struct SettingsSheet: View {
     /// this is a sheet, and a sheet that grew a navigation stack for two pushes would be
     /// carrying a bar it has no use for.
     @State private var showDiagnostics = false
+    /// The Devices screen behind the one Devices row, in place like the two above.
+    @State private var showDevices = false
     @State private var confirmReset = false
     @State private var confirmRemoveFilter = false
     /// Two seconds of "Copied" after the diagnostics go to the pasteboard.
@@ -511,6 +513,7 @@ struct SettingsSheet: View {
     private var title: String {
         if showLog { return "Activity log" }
         if showDiagnostics { return "Diagnostics" }
+        if showDevices { return "Devices" }
         return review == nil ? "Settings" : "Restore from a file"
     }
 
@@ -520,6 +523,8 @@ struct SettingsSheet: View {
                 LogView(backTitle: showDiagnostics ? "Diagnostics" : "Settings") { showLog = false }
             } else if showDiagnostics {
                 MacDiagnosticsView(onBack: { showDiagnostics = false }, onOpenLog: { showLog = true })
+            } else if showDevices {
+                MacDevicesSettingsView(onBack: { showDevices = false })
             } else if let review {
                 MacImportReview(plan: review, onBack: { self.review = nil }) {
                     imported = model.applyImport(review)
@@ -612,6 +617,8 @@ struct SettingsSheet: View {
 
                 delayCard
 
+                devicesCard
+
                 webCard
 
                 browsersCard
@@ -652,6 +659,28 @@ struct SettingsSheet: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 24)
         }
+    }
+
+    // MARK: Devices
+
+    /// The link to the other devices: one row into the screen that joins, lists and settles
+    /// it, with the state on the row so a person who only wants to know reads it here.
+    @ViewBuilder
+    private var devicesCard: some View {
+        SectionLabel(text: "Devices")
+        VStack(spacing: 0) {
+            CardAction(title: "Devices", detail: devicesDetail, color: Ember.cream) { showDevices = true }
+        }
+        .emberCard()
+        .task { model.refreshLink() }
+    }
+
+    private var devicesDetail: String {
+        guard model.cloudAvailable else { return "Not linked · iCloud Drive is off." }
+        guard model.isEnrolled else { return "Off the link. Link this Mac to be anchored with your iPhone and told what you add there." }
+        guard model.hasKey else { return "On the link, with no iPhone on it yet." }
+        let others = model.devices.count
+        return "On the link with \(others) other\(others == 1 ? "" : "s")."
     }
 
     // MARK: Start

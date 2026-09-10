@@ -3,7 +3,7 @@ import Base from '../layouts/Base.astro';
 import { site } from '../site';
 ---
 
-<Base title="Privacy Policy" description="Furlough collects nothing. No account, no server, no analytics. The one thing that leaves your iPhone is the Anchor's state, to your own iCloud.">
+<Base title="Privacy Policy" description="Furlough collects nothing. No account, no server, no analytics. What leaves your iPhone goes only to your own iCloud, and only once you link your devices.">
   <section class="wrap page">
     <header class="head" data-reveal>
       <div class="eyebrow moss">Privacy policy</div>
@@ -16,7 +16,7 @@ import { site } from '../site';
 
       <h2>There is no server</h2>
       <p>Furlough has no server of its own, no third-party SDKs, and no analytics or crash-reporting library. Nothing it knows is sent to anyone.</p>
-      <p>One thing leaves your device, and only if you use the Anchor on more than one: the Anchor's <em>state</em> — whether it is down, since when, and until when — which Furlough writes to your own iCloud key-value store so that Furlough on your Mac and on your iPhone lock and unlock together. That store belongs to your Apple Account and is kept by Apple; Furlough has no server that could read it, and there is nothing in it but those three facts. No rule, no app, no website, and no tag identifier is ever written there. If your devices are not signed in to iCloud, the Anchor simply stays per device.</p>
+      <p>Things leave your device only if you link it to another, from Settings &gt; Devices, and only to your own iCloud key-value store — which belongs to your Apple Account and is kept by Apple; Furlough has no server that could read it. What goes there: the Anchor's <em>state</em> — whether it is down, since when, and until when — so that Furlough on your Mac and on your iPhone lock and unlock together; one small entry per linked device, carrying the name you gave it and what kind of device it is; and, if you turn it on, the <em>names</em> of the things you add — "YouTube", "youtube.com" — with their first rule, so your other devices can block the same things. No Screen Time token, no tag identifier and no list is ever written there, and a device that has not been linked writes nothing at all. If your devices are not signed in to iCloud, the Anchor simply stays per device.</p>
 
       <h2>What stays on your iPhone</h2>
       <p>Everything else Furlough knows lives in its own storage container on your device:</p>
@@ -36,7 +36,7 @@ import { site } from '../site';
         <li>Usually, only Furlough's report extension ever sees a number. Apple runs it in a sandbox isolated from the rest of the app, and nothing can be passed back out of it: not the hours, not which app they belong to, not even that you tapped a button.</li>
         <li>Where Apple makes that history available to apps directly, and only if you approve it when iOS asks, Furlough reads the fourteen days itself and draws the cards without the extension.</li>
       </ul>
-      <p>Either way the reading happens on your iPhone, is used only to draw that screen, and is not kept afterwards or sent anywhere. Nothing in Furlough writes anywhere but your device and, for the Anchor's state alone, your own iCloud.</p>
+      <p>Either way the reading happens on your iPhone, is used only to draw that screen, and is not kept afterwards or sent anywhere. Nothing in Furlough writes anywhere but your device and, for the link between your own devices, your own iCloud.</p>
 
       <h2>Children</h2>
       <p>Furlough is a tool for restricting your own device and asks for individual Screen Time authorization, which iOS grants only to an adult account. It is not a parental-control product and does not monitor anyone else.</p>

@@ -37,7 +37,7 @@ struct MacAnchorPane: View {
         HalfGuide.macAnchor(
             config: model.state.config,
             finished: model.finishedGuides.contains(.anchor),
-            phoneSeen: model.phoneSeen
+            hasKey: model.hasKey
         )
     }
 
@@ -134,6 +134,9 @@ struct MacAnchorPane: View {
     /// keeps this pane down to the drop and the two things that are settings rather than acts.
     private var setUpPane: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // What the link is asking about on this half, when it is asking anything.
+            MacLinkTraffic(half: .anchor)
+                .padding(.bottom, 8)
             stateCard
             SectionLabel(text: "Settings")
             settingsCard
@@ -187,7 +190,7 @@ struct MacAnchorPane: View {
         // Ahead of `phoneSeen`, and for the same reason `macDrop` checks it first: a latch set
         // by some earlier account says nothing about whether a phone can be heard from now.
         if !model.cloudAvailable { return "\(held) · iCloud unreachable" }
-        if !model.phoneSeen { return "\(held) · waiting to hear from your iPhone" }
+        if !model.hasKey { return "\(held) · no iPhone on the link" }
         return "\(held) · ready"
     }
 
@@ -201,7 +204,7 @@ struct MacAnchorPane: View {
             // The dot, and the iCloud warning folded into the words beside it. It used to be a
             // severe banner at the top of the sheet; it belongs on the one row it is about,
             // which is also the only row that can be wrong without anybody having done anything.
-            settingsRow(title: "Your iPhone", detail: phoneSummary, dot: phoneDot) { screen = .phone }
+            settingsRow(title: "Devices", detail: phoneSummary, dot: phoneDot) { screen = .phone }
         }
         .emberCard()
     }
@@ -241,7 +244,10 @@ struct MacAnchorPane: View {
     private var phoneSummary: String {
         let status = model.link
         guard status.cloudAvailable else { return "Not linked · iCloud Drive is off" }
-        return status.headline
+        guard status.enrolled else { return "Off the link · link this Mac to be locked with your iPhone" }
+        guard model.hasKey else { return "\(status.headline) · no iPhone on it yet" }
+        let others = model.devices.count
+        return "\(status.headline) · \(others) other\(others == 1 ? "" : "s")"
     }
 
     private var phoneDot: Color {
@@ -394,49 +400,20 @@ private struct MacAnchorPhoneScreen: View {
     let onExplainDevices: () -> Void
 
     var body: some View {
-        MacAnchorScreen(title: "Your iPhone", lead: lead, onBack: onBack) {
+        MacAnchorScreen(title: "Devices", lead: lead, onBack: onBack) {
             VStack(alignment: .leading, spacing: 0) {
-                linkCard
+                MacDevicesScreen()
                 helpCard
                     .padding(.top, 10)
             }
         }
-        .task { model.checkLink() }
     }
 
     private var lead: String {
         guard model.cloudAvailable else { return AnchorSync.cutOffWarning }
-        return "Your iPhone's tag is the only thing that lifts an anchor, here or there. Both devices signed into the same Apple Account is the whole of the link — there is nothing to pair and nothing to switch on."
-    }
-
-    private var linkCard: some View {
-        let status = model.link
-        return VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(status.isLinked ? Ember.moss : (status.cloudAvailable ? Ember.amber : Ember.ember))
-                    .frame(width: 8, height: 8)
-                Text(status.headline)
-                    .emberDisplaySmall(13.5)
-                    .foregroundStyle(Ember.cream)
-                Spacer(minLength: 8)
-                Button("Check now") { model.checkLink() }
-                    .buttonStyle(.plain)
-                    .emberBody(12, .semibold)
-                    .foregroundStyle(Ember.ember)
-            }
-            .padding(.horizontal, 12)
-            .padding(.top, 12)
-            Text(status.detail(now: model.now))
-                .emberBody(12)
-                .foregroundStyle(Ember.muted)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 12)
-                .padding(.top, 6)
-                .padding(.bottom, 12)
-        }
-        .emberCard()
+        return model.isEnrolled
+            ? "An iPhone's tag is the only thing that lifts an anchor, here or there. This Mac is on the link: a drop on any device here locks it, and what you add can cross too."
+            : "An iPhone's tag is the only thing that lifts an anchor, here or there. Link this Mac to your iPhone and a drop on either locks both; nothing crosses until you do."
     }
 
     /// The same row Help's own hub draws, so it is plainly a link into Help rather than a

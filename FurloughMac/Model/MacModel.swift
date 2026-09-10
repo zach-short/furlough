@@ -117,7 +117,12 @@ final class MacModel {
         observeCloud()
         AnchorCloud.synchronize()
         SharedStore.log("iCloud at launch: \(cloudAvailable ? "reachable" : "unreachable; the anchor cannot cross")")
+        // Once, on the first launch of a build that has the roster: a Mac that was already
+        // talking to its phone stays on the link, and one that was not starts off it.
+        DeviceLink.decideGrandfathering(now: state.now)
         enforce(reason: "launch")
+        refreshLink()
+        settleLink(reason: "launch")
     }
 
     // MARK: The two halves
@@ -177,7 +182,7 @@ final class MacModel {
         var seeded: Set<Half> = []
         let config = state.config
         if config.targets.contains(where: { $0.rule != nil }) { seeded.insert(.rules) }
-        if phoneSeen, config.anchor.hasSomethingToHold { seeded.insert(.anchor) }
+        if hasKey, config.anchor.hasSomethingToHold { seeded.insert(.anchor) }
         write(finishedGuides: seeded)
     }
 
@@ -260,24 +265,133 @@ final class MacModel {
         AnchorCloud.synchronize()
         refreshCloudAvailability(reason: "check link")
         applyRemoteAnchor(reason: "check link")
-        link = AnchorSync.linkStatus()
+        refreshLink()
         SharedStore.log("link check: \(link.headline) — \(link.detail(now: now))")
     }
 
-    /// Merges what the phone wrote, through `AnchorSync.merge`, and enforces if it changed
-    /// anything.
+    /// Merges what the other devices wrote — the anchor through `AnchorSync.merge`, and what
+    /// they added through `LinkFlow.takeArrivals` — and enforces if any of it changed anything.
     func applyRemoteAnchor(reason: String) {
         var current = SharedStore.load()
-        guard let note = AnchorSync.pull(into: &current.config, now: current.now) else { return }
+        let note = AnchorSync.pull(into: &current.config, now: current.now)
+        let arrivals = LinkFlow.takeArrivals(&current, installed: { Self.installedByIdentifier() })
+        self.arrivals = arrivals.asks
+        guard note != nil || !arrivals.landed.isEmpty else { return }
         SharedStore.save(current)
-        SharedStore.log("iCloud anchor (\(reason)): \(note)")
-        link = AnchorSync.linkStatus()
-        enforce(reason: "iCloud anchor")
+        if let note { SharedStore.log("iCloud anchor (\(reason)): \(note)") }
+        for landed in arrivals.landed { SharedStore.log("link: landed \(landed) (\(reason))") }
+        refreshLink()
+        enforce(reason: "iCloud")
     }
 
-    /// Whether a phone has written the record this Mac reads: the one thing that could ever
-    /// release an anchor dropped here.
-    var phoneSeen: Bool { AnchorSync.phoneSeen }
+    // MARK: The link
+
+    /// Whether this Mac is on the link, as the screens read it.
+    private(set) var isEnrolled = DeviceLink.isEnrolled
+    /// The other devices on the link, for the Devices screen. Read with the link status.
+    private(set) var devices: [LinkedDevice] = []
+    /// Whether an iPhone is on the link with this Mac: the one thing that could ever release an
+    /// anchor dropped here. Cached with the roster for the window's sublines; `dropAnchor`
+    /// asks the store afresh.
+    private(set) var hasKey = false
+    /// What the other devices added and this Mac is asking about, oldest first.
+    private(set) var arrivals: [SharedAdditions.Landing] = []
+    /// What this Mac added and is asking whether to send.
+    private(set) var outgoing: [SharedAddition] = []
+
+    /// Re-reads everything the Devices screen shows.
+    func refreshLink() {
+        link = AnchorSync.linkStatus()
+        isEnrolled = DeviceLink.isEnrolled
+        let roster = DeviceLink.roster()
+        devices = roster.others(than: AnchorSync.deviceID)
+        hasKey = isEnrolled && roster.hasKey(besides: AnchorSync.deviceID)
+    }
+
+    /// What this Mac has, normalized identifier to name, for landing what a phone added.
+    private static func installedByIdentifier() -> [String: String] {
+        Dictionary(
+            AppCatalog.installed().map { (Companions.normalize(bundleID: $0.bundleID), $0.name) },
+            uniquingKeysWith: { first, _ in first }
+        )
+    }
+
+    /// The settings the Devices screen changes. Saved and nothing enforced: turning any of them
+    /// down blocks nothing that was blocked.
+    func setLinkPreferences(_ preferences: LinkPreferences) {
+        guard preferences != state.config.link else { return }
+        SharedStore.mutate { $0.config.link = preferences }
+        SharedStore.log("link settings: site \(preferences.companionSite.rawValue), send \(preferences.sendAdditions.rawValue), accept \(preferences.acceptAdditions.rawValue)")
+        reload()
+        settleLink(reason: "link settings")
+        applyRemoteAnchor(reason: "link settings")
+    }
+
+    /// Puts this Mac on the link under `name`, or renames it there.
+    func enrollDevice(name: String) {
+        DeviceLink.enroll(name: name, now: now)
+        SharedStore.log("link: joined as \(DeviceLink.name)")
+        refreshLink()
+        applyRemoteAnchor(reason: "joined the link")
+        settleLink(reason: "joined the link")
+    }
+
+    /// Takes this Mac off the link. Why not, or nil.
+    func leaveLink() -> String? {
+        if let refusal = DeviceLink.leave(anchorHoldsHere: state.config.anchor.isHolding(at: now), now: now) {
+            return refusal.message
+        }
+        outgoing = []
+        arrivals = []
+        refreshLink()
+        return nil
+    }
+
+    /// Takes another device off the link from here. Why not, or nil.
+    func revokeDevice(_ id: String) -> String? {
+        if let refusal = DeviceLink.revoke(id, anchorHoldsHere: state.config.anchor.isHolding(at: now), now: now) {
+            return refusal.message
+        }
+        refreshLink()
+        return nil
+    }
+
+    /// Sends what is awaiting, or lines it up to ask about. A Mac app names itself, so this
+    /// settles in the same breath as the add.
+    func settleLink(reason: String) {
+        outgoing = LinkFlow.settleAwaiting(config: state.config, now: now)
+        isEnrolled = DeviceLink.isEnrolled
+    }
+
+    func sendOutgoing(_ addition: SharedAddition) {
+        LinkFlow.send(addition, now: now)
+        outgoing.removeAll { $0.id == addition.id }
+    }
+
+    func declineOutgoing(_ addition: SharedAddition) {
+        LinkFlow.decline(addition)
+        outgoing.removeAll { $0.id == addition.id }
+    }
+
+    /// Lands one the person said yes to. What it did, for the alert.
+    @discardableResult
+    func acceptArrival(_ landing: SharedAdditions.Landing) -> String {
+        var current = SharedStore.load()
+        let touched = LinkFlow.accept(landing, in: &current)
+        SharedStore.save(current)
+        SharedStore.log("link: took \(landing.addition.title) from \(landing.addition.origin.prefix(8))")
+        arrivals.removeAll { $0.addition.id == landing.addition.id }
+        enforce(reason: "link arrival")
+        let names = touched.compactMap { state.config.target(id: $0)?.displayName }
+        var message = names.isEmpty ? "Nothing new to block." : "\(UtilityText.list(names)) \(names.count == 1 ? "is" : "are") in Furlough now."
+        if landing.rule != nil { message += " The rule came with it, and can be undone for \(Furlough.undoWindowMinutes) minutes." }
+        return message
+    }
+
+    func declineArrival(_ landing: SharedAdditions.Landing) {
+        SharedAdditions.decline(landing.addition)
+        arrivals.removeAll { $0.addition.id == landing.addition.id }
+    }
 
     /// Drops the anchor on this Mac and tells the phone. No tag here, so no timed drop and no
     /// release: only the phone's tag, arriving through iCloud, lifts it. Returns why not.
@@ -287,9 +401,11 @@ final class MacModel {
         // Asked afresh, not read from the cache the banner draws from. The cache is refreshed
         // when iCloud says the account moved and on the half-minute poll, and this is the one
         // decision where being a poll behind is unrecoverable: an account signed out in System
-        // Settings a moment ago would otherwise buy a lock with no key.
+        // Settings a moment ago would otherwise buy a lock with no key. The roster likewise —
+        // the phone may have left the link since the subline last read it.
         refreshCloudAvailability(reason: "about to drop")
-        if let refusal = AnchorSync.macDrop(&current.config, now: now, phoneSeen: phoneSeen, cloudAvailable: cloudAvailable) {
+        refreshLink()
+        if let refusal = AnchorSync.macDrop(&current.config, now: now, hasKey: hasKey, cloudAvailable: cloudAvailable) {
             return refusal.message
         }
         SharedStore.save(current)
@@ -315,6 +431,12 @@ final class MacModel {
             return anchor.anchorsEverything ? "That already stays open." : "That is already held."
         }
         setAnchorKinds(anchor.kinds + [kind])
+        // Held here is worth holding there. The list is kinds, not targets, so what crosses is
+        // the row covering this one where there is one, under the anchor half.
+        if let target = state.config.target(kind: kind) {
+            LinkFlow.noteAdded([target.id], half: .anchor, config: state.config)
+            settleLink(reason: "anchor edit")
+        }
         return nil
     }
 
@@ -496,6 +618,14 @@ final class MacModel {
         SharedStore.save(current)
         SharedStore.log("added app \(bundleID)")
         enforce(reason: "add app")
+        // The site it is also at, under Always: rows of their own, as the companion sheet
+        // would have added them, without the sheet. Under Ask the sheet still asks.
+        if current.config.link.companionSite == .always {
+            let hosts = Companions.hosts(forBundleID: bundleID, name: name).filter { current.config.target(host: $0) == nil }
+            if !hosts.isEmpty { addHosts(hosts) }
+        }
+        LinkFlow.noteAdded([target.id], half: .rules, config: current.config)
+        settleLink(reason: "add app")
         return AddOutcome(added: target, message: "Added. Set a schedule; nothing is enforced until you do.")
     }
 
@@ -514,6 +644,8 @@ final class MacModel {
         SharedStore.save(current)
         SharedStore.log("added site \(host)")
         enforce(reason: "add site")
+        LinkFlow.noteAdded([target.id], half: .rules, config: current.config)
+        settleLink(reason: "add site")
         return AddOutcome(added: target, message: "Added. Set a schedule; nothing is enforced until you do.")
     }
 
@@ -534,6 +666,8 @@ final class MacModel {
         SharedStore.save(current)
         SharedStore.log("added companion site(s) \(added.map(\.displayName).joined(separator: ", "))")
         enforce(reason: "add companion sites")
+        LinkFlow.noteAdded(added.map(\.id), half: .rules, config: current.config)
+        settleLink(reason: "add companion sites")
         return added
     }
 
@@ -551,6 +685,8 @@ final class MacModel {
         SharedStore.save(current)
         SharedStore.log("added companion app(s) \(added.map(\.displayName).joined(separator: ", "))")
         enforce(reason: "add companion apps")
+        LinkFlow.noteAdded(added.map(\.id), half: .rules, config: current.config)
+        settleLink(reason: "add companion apps")
         return added
     }
 
@@ -607,6 +743,11 @@ final class MacModel {
         SharedStore.save(current)
         SharedStore.log("rule edit for \(current.config.targets[index].displayName): \(result)")
         enforce(reason: "rule edit")
+        // A rule landing on something already sent goes out too, so the other devices get
+        // the hours as well as the name.
+        if result == .appliedNow, let target = state.config.target(id: id) {
+            LinkFlow.resendIfSent(target, config: state.config, now: now)
+        }
         return result
     }
 
@@ -657,6 +798,9 @@ final class MacModel {
         SharedStore.save(current)
         SharedStore.log("rule applied to \(1 + others.count) target(s): \(outcome.appliedNow) now, \(outcome.scheduled) scheduled")
         enforce(reason: "rule apply")
+        for target in state.config.targets where ([id] + others).contains(target.id) {
+            LinkFlow.resendIfSent(target, config: state.config, now: now)
+        }
         return outcome
     }
 
@@ -805,6 +949,13 @@ final class MacModel {
         enforcer.resetUsage()
         AnchorCloud.clear()
         AnchorSync.forgetPhone()
+        // Off the link, with its entry and its additions out of iCloud: a fresh install has
+        // never joined, and the grandfather question is open again.
+        DeviceLink.forget()
+        LinkFlow.forget()
+        outgoing = []
+        arrivals = []
+        refreshLink()
         // Everything `finishOnboarding` switches on, switched back off: a fresh install has
         // neither, and onboarding is about to be run again and will turn them both on. Neither
         // is asked unless it is actually on — the login item here, the watchdog inside

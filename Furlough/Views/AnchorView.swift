@@ -143,6 +143,9 @@ struct AnchorPage: View {
     /// row's status, where the thing it is about is.
     private var setUpPane: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // What the link is asking about on this half, when it is asking anything.
+            LinkTraffic(half: .anchor)
+                .padding(.bottom, 6)
             stateCard
             SectionLabel(text: anchor.anchorsEverything ? "Stays open" : "Held")
             appsCard
@@ -264,7 +267,7 @@ struct AnchorPage: View {
             // The dot, and the iCloud warning folded into the words beside it. It used to be a
             // severe banner at the top of the page; it belongs on the one row it is about, which
             // is also the only row that can be wrong without anybody having done anything.
-            settingsRow(title: "Your Mac", detail: macSummary, dot: macDot) { AnchorMacScreen() }
+            settingsRow(title: "Devices", detail: macSummary, dot: macDot) { AnchorMacScreen() }
         }
         .emberCard()
         // Asked when the page opens, so the row is about now rather than about whenever the app
@@ -331,7 +334,9 @@ struct AnchorPage: View {
     private var macSummary: String {
         let status = model.link
         guard status.cloudAvailable else { return "Not linked · iCloud Drive is off" }
-        return status.headline
+        guard status.enrolled else { return "Off the link · link this iPhone to lock your Mac too" }
+        let others = model.devices.count
+        return others == 0 ? "\(status.headline) · nothing else on the link yet" : "\(status.headline) · \(others) other\(others == 1 ? "" : "s")"
     }
 
     private var macDot: Color {

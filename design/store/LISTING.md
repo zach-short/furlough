@@ -138,7 +138,7 @@ A home screen widget and a Live Activity counting down the open window. Notifica
 
 PRIVACY
 
-No account, no server, no analytics, no third-party code. Apple's Screen Time API is built so Furlough is never told which apps you picked. Rules stay on the iPhone that made them; the one thing that leaves it is the Anchor's state, to your own iCloud, so Furlough on your Mac locks with it.
+No account, no server, no analytics, no third-party code. Apple's Screen Time API is built so Furlough is never told which apps you picked. Rules stay on the iPhone that made them; what leaves it, once you link your devices, goes to your own iCloud alone — the Anchor's state, so Furlough on your Mac locks with it, and the names of what you add if you let it.
 
 REQUIREMENTS
 
@@ -455,7 +455,7 @@ A website chosen from Apple's picker is shielded like an app. A website typed in
 
 NO ACCOUNT, NO NETWORK, NO DATA COLLECTION
 
-Furlough has no server, no accounts, no analytics and no third-party SDKs. Rules and the opaque activity tokens never leave the device. The one thing written off the device is the Anchor's state (down or not, since when, until when), to the user's own iCloud key-value store, so Furlough on the user's Mac can lock and unlock with the iPhone; Furlough has no server that could read it. The privacy answer is Data Not Collected, since private iCloud storage under the user's own account is not collected by us. There are no demo credentials because there is nothing to sign in to.
+Furlough has no server, no accounts, no analytics and no third-party SDKs. Rules and the opaque activity tokens never leave the device. What is written off the device goes to the user's own iCloud key-value store, and only once they have linked their devices from Settings > Devices: the Anchor's state (down or not, since when, until when), so Furlough on the user's Mac can lock and unlock with the iPhone; one entry per linked device with the name the user gave it; and, at the user's option, the names of the apps and sites they add, so their other devices can block the same things. Furlough has no server that could read any of it. The privacy answer is Data Not Collected, since private iCloud storage under the user's own account is not collected by us. There are no demo credentials because there is nothing to sign in to.
 ```
 
 **Sign-in required: No.** There is no account, so leave the demo account fields empty.

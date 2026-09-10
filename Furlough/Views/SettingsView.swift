@@ -46,6 +46,8 @@ struct SettingsView: View {
 
                     delayCard
 
+                    devicesCard
+
                     RecordCard()
 
                     setupCard
@@ -278,6 +280,41 @@ struct SettingsView: View {
         }
         Footnote(text: "Raising the delay applies immediately. Lowering it waits out the current delay.")
             .padding(.top, 8)
+    }
+
+    // MARK: Devices
+
+    /// The link to the other devices: one row into the screen that joins, lists and settles
+    /// it, with the state on the row so a person who only wants to know reads it here.
+    @ViewBuilder
+    private var devicesCard: some View {
+        SectionLabel(text: "Devices")
+        VStack(spacing: 0) {
+            navRow("Devices", detail: devicesDetail, dot: devicesDot) {
+                AnchorSettingScreen(title: "Devices", lead: devicesLead) { DevicesScreen() }
+            }
+        }
+        .emberCard()
+        .task { model.refreshLink() }
+    }
+
+    private var devicesDetail: String {
+        guard model.cloudAvailable else { return "Not linked · iCloud Drive is off" }
+        guard model.isEnrolled else { return "Off the link. Link this iPhone to share the Anchor and what you add." }
+        let others = model.devices.count
+        return others == 0 ? "On the link · nothing else on it yet" : "On the link with \(others) other\(others == 1 ? "" : "s")"
+    }
+
+    private var devicesDot: Color {
+        guard model.cloudAvailable else { return Ember.ember }
+        return model.isEnrolled && !model.devices.isEmpty ? Ember.moss : Ember.amber
+    }
+
+    private var devicesLead: String {
+        guard model.cloudAvailable else { return AnchorSync.cutOffWarning }
+        return model.isEnrolled
+            ? "This iPhone is on the link. The Anchor crosses to every device here, and what you add can too."
+            : "Furlough on your other devices can share the Anchor with this iPhone, and be told what you add here. Nothing crosses until you link it."
     }
 
     // MARK: Your setup

@@ -263,6 +263,12 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   `AnchorDrop.swift` (iOS only: the one function that drops the anchor from any process),
   `AnchorSync.swift` (the anchor across devices: `AnchorRecord`, the pure `merge` and
   `macDrop`, and `AnchorCloud`, the iCloud key-value store; step 18),
+  `DeviceLink.swift` (the roster: `LinkChoice`, `LinkPreferences`, `LinkedDevice`,
+  `Revocation`, the pure `Roster`, joining, leaving, revoking and the grandfather rule; step 37),
+  `SharedAdditions.swift` (what crosses when a linked device adds something: `SharedAddition`,
+  `describe`, the ring, `unseen`, `landing` and `land`; step 37),
+  `LinkFlow.swift` (the I/O around those from a model's side: awaiting, sending, resending on
+  the first rule, and `takeArrivals`; step 37),
   `Record.swift` (the record of the contract: `accumulate` counts minutes into
   `RuntimeState.days`, `markSpent`/`markWarned`/`queue`/`noteCancelled`/`noteLanded`/
   `noteAnchorReleased` write the events, `card` and the copy functions are what the two screens
@@ -279,7 +285,8 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   `QuitGraceTests`, `PendingNotificationTests`, `UtilityTests`, `UtilityPlanTests`,
   `ActivityLimitTests`, `PendingTextTests`, `CompanionsTests`, `ConfigImportTests`,
   `HostTargetTests`, `HostImportTests`, `AnchorCandidatesTests`, `AnchorScopeTests`,
-  `AnchorScheduleTests`, `AnchorSyncTests`. 429 tests in 66 suites. It builds for **macOS**, so it
+  `AnchorScheduleTests`, `AnchorSyncTests`, `DeviceLinkTests`, `SharedAdditionsTests`. 652 tests
+  in 92 suites. It builds for **macOS**, so it
   reads the Mac's `TargetKind` and the Mac's `Decision`: the iOS `Decision.filteredHosts` and
   `ShieldReconciler.apply` cannot be reached from any test, which is why the nil-when-empty
   filter policy is a property of `Decision` rather than a line inside the reconciler.
@@ -2350,6 +2357,112 @@ The plan for this stretch. Tick each phase off here as it lands.
     `/Applications` the filter reports `.notInApplications`, so the offer sheet renders its wrong
     branch — a faithful look means replacing the installed copy, which was not worth doing to a
     Mac that was anchored at the time.
+
+37. **The link is opted into, per device, and what you add can cross it.** Done 2026-09-10.
+    Zach, having seen the anchor cross for the first time, did not want the default to be
+    "anchor everything on both devices": a person should opt each device in, be told in steps
+    how it works, choose which of several phones, iPads and Macs are on it, and — with the same
+    three-way setting he asked for — have what they add on one device land on the others. And
+    adding an app should block its website by default, with the site taken off by hand.
+
+    **His four calls, asked before any of it was built:** the opt-in gates *everything*, the
+    Anchor included, and the two devices he had linked that day are grandfathered — an install
+    that has already heard the other (`lastHeard`, or the Mac's `phoneSeen` latch) enrolls
+    itself on first launch and one that has not starts off the link
+    (`DeviceLink.decideGrandfathering`, once, keyed `furlough.link.decided`); any device can be
+    taken off from any other, refused while an anchor holds anywhere; on the phone, the site and
+    the send both wait for the name to arrive rather than asking after the picker; and sending
+    and accepting both default to Ask.
+
+    **The roster.** `Shared/Core/DeviceLink.swift`. Each device writes its own entry to the
+    key-value store under `furlough.device.<id>` (`LinkedDevice`: name, `platform`, `enrolledAt`,
+    `lastSeen`, `canRelease`) and deletes it on leaving, so the roster is the set of entries and
+    no blob is ever fought over. Revoking another device writes `furlough.revoke.<id>`; the named
+    device un-enrolls on its next read (`obeyRevocation`, called from `AnchorSync.pull`, so it
+    lands in whichever process reads first), and a revocation older than an entry's `enrolledAt`
+    is spent, so a device can come back. `Roster.linked`, `hasKey(besides:)`,
+    `othersDescription` are pure. Enrollment is App Group defaults (`furlough.link.enrolled`),
+    read by every process. `AnchorRecord.Platform` gained `.pad` — an iPad runs the phone build
+    and has no reader, so it is anchored and never releases; Core has no UIKit, so the app notes
+    the idiom at launch (`AnchorSync.notePlatform`) and `platform` reads the note.
+
+    **What the gate changes.** `AnchorSync.pull` reads nothing while off the link and refuses a
+    record whose writer is not on it. `macDrop` takes `hasKey:` — an iPhone on the roster
+    besides this Mac — where it took the `phoneSeen` latch, which stayed true after the phone
+    left; `DropRefusal.noPhone` now says to link both. `LinkStatus` gained `enrolled`, with
+    "Off the link" as its headline. `HalfGuide.macAnchor`'s first step is *Link this Mac and
+    your iPhone*. Leaving or revoking is `DeviceLink.leaveRefusal(anchorHoldsHere:
+    anchorHoldsOnLink:)` — the local profile or the shared record holding — and is otherwise
+    instant, because with no anchor down the link holds nothing that leaving would let go of.
+
+    **What crosses.** `Shared/Core/SharedAdditions.swift`. A `SharedAddition` is a *name* and
+    every identifier and host a thing goes by — never a token — with `isApp`, the hosts the sender
+    actually blocks, its `rule` if it has one, and the `half` it was added to. Each device
+    publishes to its own ring `furlough.adds.<id>` (last 20, `id` = the sender's target id so a
+    second write about the same thing replaces the first); receivers keep a watermark per source
+    (`DeviceLink.watermarks`) and a declined set. `landing(for:in:installed:companion:)` is what
+    an arrival would do here — a row already covering a door, the app this Mac has installed, the
+    hosts not yet here (the table's too under Always), the rule where the row has none — and
+    `land` does it as a tightening, the rule wearing the undo window like one saved by hand, and
+    taken into the anchor's list when that is where it was added, unless the anchor is down or
+    the scope is everything-except. **The shape differs by platform on purpose:** the phone
+    links hosts onto the row (one habit, one row, step 22); the Mac has never drawn a linked
+    half, so there each host is a row of its own and the app another, as its companion sheet adds
+    them. A linked half the Mac's editor cannot show would be a block with no handle.
+
+    **The phone's step later.** A picked app has no name until the tables (`nameUnnamedTargets`,
+    data access) or the shield teach it one, so `LinkFlow.noteAdded` writes the target down as
+    awaiting at the picker and `settleLink` — called from activation, `changedElsewhere`, the
+    naming and every add — settles what it can: first `autoLinkCompanions` under Always (the
+    site onto the app's row, one save), *then* the sends, so YouTube goes out with youtube.com
+    beside it. Typed hosts and Mac apps name themselves and settle in the same breath. A rule
+    landing on something already sent goes out again without asking (`resendIfSent`, from
+    `propose`/`apply`); a target never sent is `settleAwaiting`'s question, not the rule's.
+    Arrivals are taken in `applyRemoteAnchor` on both platforms (`LinkFlow.takeArrivals`; the
+    Mac's `installed` closure walks Applications only when something is actually waiting):
+    Always lands and enforces, Ask holds a `Landing` for a card, Never marks it seen. The phone
+    lands the site at once and its editor's existing nudge offers the app through the picker.
+
+    **The three settings**, `Config.link: LinkPreferences` (per device, `decodeIfPresent`, not
+    exported): `companionSite` (Always), `sendAdditions` (Ask), `acceptAdditions` (Ask). None
+    waits out a delay: turning one down blocks nothing that was blocked. Under Never the phone's
+    site nudge is not shown either — a nudge is the Ask it was told not to make — and the Mac's
+    `CompanionSheet` is skipped; under Always the Mac adds the sites inline in `addApp`.
+
+    **Screens.** `Shared/UI/LinkCards.swift` (self-contained like `CompanionNudge`, because the
+    widget extension compiles Shared/UI): `LinkNudge`, `LinkTrafficCard`, `LinkChoiceRow`,
+    `LinkStepsCard` (the four things to know, from `DeviceLink.steps`), `LinkedDeviceRow`.
+    Phone: `Furlough/Views/DevicesView.swift` — `DevicesScreen` (off the link: the four steps, a
+    name, Link this iPhone; on it: the status card, the roster with Leave/Remove and their
+    confirmations, the three settings) hosted by the Anchor page's row, now called **Devices**
+    (`AnchorMacScreen` is a shell), and by a new Settings > Devices card; `LinkTraffic(half:)`
+    on both pages. The editor says why an unnamed app has no site yet (`AppModel.awaitsName`).
+    Mac: `FurloughMac/Views/MacDevices.swift` — `MacDevicesScreen`, hosted by the Anchor half's
+    **Devices** row and by Settings' new Devices row (`MacDevicesSettingsView`, in place with a
+    Back link like Diagnostics); `MacLinkTraffic(half:)` at the top of the sidebar. `MacHelp`
+    and `HelpTopics` say the link is opted into and what the names carry; README, the site's
+    privacy and about pages, `index.astro` and `LISTING.md` no longer say the Anchor's state is
+    the one thing that leaves the device. Both resets (`DeviceLink.forget`, `LinkFlow.forget`)
+    take the device off the link and its entry and ring out of iCloud.
+
+    Tests: `Tests/Core/DeviceLinkTests.swift` (the roster, revocation, keys, entries,
+    grandfathering, leaving, the guide, the defaults, the status off the link) and
+    `SharedAdditionsTests.swift` (describing, the ring, unseen, the Mac's landings, the
+    existing row, rules and undo, found by name, the anchor half, the offer's sentence). 652
+    tests in 92 suites; both apps build warning-free in our own code.
+
+    **Not seen on either device.** What to look at first: both devices should come up *on* the
+    link (grandfathered — the phone only if it has ever read a Mac write; if not, its Devices
+    row shows the guide and one tap links it) with the Devices row green and each other on the
+    roster, and the Mac's Drop anchor still working. Then add an app on the phone with data
+    access: youtube.com should appear on its row without asking and, since Send is Ask, a card
+    on the Rules page offers to send it; taking it puts a card in the Mac's sidebar, and taking
+    *that* lands youtube.com there with the phone's rule, undoable for a quarter of an hour.
+    Then Leave on one device while the anchor is down, which should refuse with the tag
+    sentence. Until both builds are installed the old build's writes are ignored by the new one
+    (its writer is not on the roster), so update both before judging the crossing. Whether the
+    extensions can write the store is still the open question from step 18; the roster and the
+    rings are only ever written by the apps.
 
 ## Style rules
 
