@@ -32,6 +32,7 @@ on 1. Read the Done prompts only as history, or where one says a later item shou
 | 11 | More companion pairs, every one confirmed | Done — HANDOFF 30 | **Sonnet** | F | nothing | `Companions.swift`, `CompanionsTests.swift`, new `design/companions-sources.md` |
 | 12 | Suggested rules by hazard tier, and an audit for quality-of-life defaults like it | Done — HANDOFF 28 | Opus | G | nothing | new `Shared/Core/RuleSuggestion.swift`, `RuleEditorView`, `Tests/Core` |
 | 13 | The link contract: schemas, test vectors and tables a port can be built against | **Open** — added 2026-09-10 | Opus | H | nothing; HANDOFF 37 landed | new `protocol/`, new `Tests/Core/ProtocolFixturesTests.swift`, `HANDOFF.md` |
+| 14 | Cache the token map, so the usage page's icons are instant on later visits | **Open** — added 2026-09-10 | Opus | I | the tables-and-monograms commit on main | new `Shared/Core/TokenCache.swift`, `SharedStore`, `UsageReader`, `UsageView.load`, `AppModel.nameUnnamedTargets`, new `Tests/Core/TokenCacheTests.swift`, `HANDOFF.md` |
 
 **Two things landed that this board never planned**, so look for them in HANDOFF rather than
 here: the first week with capped delays and the 15-minute undo (HANDOFF 27, the lane-f
@@ -39,6 +40,8 @@ session — it is why item 10's prompt carries a correction), and the Mac's Rese
 going all the way back to a first run (HANDOFF 31, with the detail in its "The Mac" section).
 
 **Item 13 was added 2026-09-10**, after HANDOFF 37 landed: the link contract as data, so a port on another platform can be built against the real record shapes and the real merge rules. It is the one open item not gated on Apple, and it is parallel-safe with everything.
+
+**Item 14 was added 2026-09-10**, the third step of the usage-page speed-up whose first two (cards drawn from the tables, letters for icons, a deadline on the token query) landed the same day: keep Screen Time's answer in the App Group store so the next visit opens on it. Small, iOS only, and it waits only on that commit being on main.
 
 **Lanes run in parallel with each other; tasks inside a lane run one after another.**
 A, B, C, D and E can all be open at once, each in its own worktree. Inside A the order is
@@ -896,3 +899,121 @@ Hand back: `xcodebuild test -project Furlough.xcodeproj -scheme FurloughCoreTest
 'platform=macOS,arch=arm64'` green, with the fixture count; the README; the two git blocks.
 Nothing to tap. What Zach should do is read `protocol/README.md` once as if he were the
 Android engineer and say what he could not build from it.
+
+---
+
+## 14. Cache the token map, so the usage page's icons are instant on later visits
+
+**Model: Opus. Lane I. Waits on the commit "draw the usage cards from the tables and let screen
+time's icons catch up" being on main — check `git log --oneline -8` first. Parallel-safe: it
+adds one Core file and one test file, and touches `SharedStore`, `UsageReader`, `UsageView.load`
+and one function in `AppModel`.**
+
+You are picking up Furlough, Zach's iOS and Mac app blocker. Read `HANDOFF.md`, then
+`README.md`, then the memory note "iOS 26.4 Screen Time data access". Session rules: never
+commit or push; when done, print `git add <your files>` and a lowercase `git commit -m "..."`
+for Zach, with no Co-Authored-By; run `xcodegen generate` after adding a file; keep the build
+warning-free; every `Shared/Core` change gets tests in `Tests/Core`; you cannot see the phone,
+so end with what Zach should tap and see. Another session is usually mid-edit in this tree, so
+work in a throwaway worktree (`git worktree add --detach <your scratchpad>/wt-tokens HEAD`,
+`xcodegen generate` there, build with `-derivedDataPath` under your scratchpad, log there too),
+and copy only your own files back once green — check `git status --short` on each of them
+first, and remove the worktree after.
+
+**Why this exists.** With data access (iOS 26.4; development builds anywhere, App Store
+customers in the EU only — the memory note has the detail) the usage page (`UsageView`, Path A)
+reads the fortnight itself, but Screen Time names an app there by bundle identifier alone.
+Apple's icon, and the token a rule is written on, come from a second query —
+`FamilyActivityData.shared.installedApplications` and `visitedWebDomains`, wrapped by
+`UsageReader.encodedKinds` — that enumerates every app on the phone, takes seconds when it
+answers, and sometimes never does. The previous session stopped the page waiting on it: cards
+draw at once from the tables (`Brand`, `UsageEntry.isNamed`), a letter on the brand's colour
+stands in for the icon (`MonogramTile`), and each ask has a deadline (`UsageReader.patience`).
+What is left is that every visit still pays for the query before the real icons appear, and an
+app the tables do not know is held back until it answers. The answer barely changes between
+visits — a token is stable for as long as the app is installed, and Furlough already persists
+tokens inside every target — so it should be kept, and the page should open on it.
+
+**What is fixed.** Read these in the code before changing anything; do not relitigate them.
+
+- `UsageReader.fillingTokens(in:)` walks the summary once against the map from
+  `encodedKinds()`. `Naming.answered` is false for an empty answer, which the caller treats as
+  a failed query and retries. `fillingTokens(in:within:)` and `kind(forKey:within:)` race the
+  query against `patience`.
+- `UsageView.load()` draws as soon as the fortnight is read and folded; `nameApps()` runs
+  behind it, retries `namingAttempts` times, folds linked pairs once the tokens are in, and
+  drops what neither the tables nor Screen Time named. `apply()` waits on `naming` rather than
+  asking the same question twice.
+- `AppModel.nameUnnamedTargets()` runs the same query on activation, through
+  `UsageReader.identities()`, to name fresh targets from the tables.
+- `SharedStore` is the App Group store. `learnedNames`/`learnName` under `furlough.names.v1`
+  is the pattern for a side table that is not the config; `reset()` is what Reset everything
+  calls, and it must forget whatever you add.
+- `TargetKind` is Codable, and its encoded form is what crosses out of the `@concurrent`
+  functions, because tokens are not Sendable. `TargetKind.application` exists only under
+  `#if os(iOS)`, so the Core test bundle on macOS cannot make one: the cache has to be generic
+  over `[String: Data]`, which is exactly what `encodedKinds()` returns.
+
+Do these, in order:
+
+1. **`Shared/Core/TokenCache.swift`**, a Codable value: `entries: [String: Data]`, keyed the
+   way `UsageCollector` keys an entry (a bundle identifier, or `web:` and a domain), and
+   `savedAt: Date`. One pure function, `refreshed(with answer: [String: Data], now: Date) ->
+   TokenCache?`: a cache holding exactly `answer` — replaced, never merged, so an app deleted
+   since the last visit falls out — and nil for an empty answer, because an empty answer is a
+   failed query (see `Naming.answered`) and must not wipe a good cache.
+   `Tests/Core/TokenCacheTests.swift`: a round trip through JSON; replace, not merge; an empty
+   answer keeps the old cache; a hand-written older shape decodes without crashing (follow
+   `DecodingTests`).
+
+2. **`SharedStore`**: `tokenCache() -> TokenCache?` and `save(_ cache: TokenCache)` under
+   `furlough.tokens.v1` in `defaults`, and `reset()` removes the key beside the two it already
+   removes. Log the entry count and byte size once per save. `identities()` needs the whole
+   map, not only the ranked five, so do not trim it; if a phone with a few hundred apps comes
+   out over about a megabyte, say so in HANDOFF rather than trimming silently.
+
+3. **`UsageReader`**: `encodedKinds()` saves the cache after every answered query, through
+   `TokenCache.refreshed`. Add `cachedKinds() -> [String: Data]?`. Change
+   `fillingTokens(in:)` so a fresh answer re-resolves **every** entry from the map, not only
+   the tokenless ones: today it skips an entry that already has a token, and a token filled
+   from the cache must be able to be taken away again when the fresh answer no longer lists
+   its key. Add a way to fill from a map without querying — `fillingTokens(in:from:)` or a
+   parameter. `identities()` reads the cache first and queries only when there is none, so
+   `nameUnnamedTargets` costs nothing on most activations.
+
+4. **`UsageView.load()`**: after the fortnight is read and folded, and before `phase = .ready`,
+   fill from the cache when there is one, then fold again (an app's half can now pair with its
+   site's) and rank. Log `usage: N of M tokens from the cache, written <age> ago`. `nameApps()`
+   runs exactly as now behind the cards; when its answer lands, `fillingTokens` re-resolves, a
+   cached token whose key is gone loses its token, and the card is dropped by the rule that is
+   already there. The held-back line and `naming` stay as they are.
+
+5. **Look at the stale case honestly.** A cached token for an app deleted since the last visit
+   puts a card on the page for the seconds until the fresh answer removes it; `Label(token)`
+   may draw blank, and Apply in that window would add a target for an app that is not there.
+   Try it if you can — install a small free app, open the page, delete the app, open the page
+   again — and write what you saw in HANDOFF. If the window is worse than a blank tile — a
+   crash, or a rule that sticks — hold cached tokens back from Apply until `naming` finishes,
+   which is one condition in `apply()`, and say so.
+
+6. **HANDOFF.** There is no step yet for the previous session's change either; it kept out of
+   HANDOFF because another session was editing it. Write one step, at the next free number after
+   item 13's, covering both: the tables, the monogram tiles and the deadline (the commit named
+   at the top of this prompt), and the cache — its key, its replace-not-merge rule, what reset
+   clears, and the stale-token finding. Add `Brand.swift` and `TokenCache.swift` to the code
+   map. Do not edit a step you did not write.
+
+Not in scope, whoever asks: looking bundle identifiers up over the network (the page promises
+that nothing leaves the phone); bundling app artwork (it is the app's trademark, and
+`Label(token)` is the only source Furlough may draw it from); a prefetch of the query on every
+launch (it enumerates every app, and the cache makes it unnecessary); any change to Path B or
+the report extension; any change to `Brand`'s colours beyond adding one. The cache is iOS only;
+the Mac names apps from their bundle identifiers already.
+
+Hand back: `xcodebuild test -project Furlough.xcodeproj -scheme FurloughCoreTests -destination
+'platform=macOS,arch=arm64'` green with the new count; the device build green; the app
+installed; the two git blocks. What Zach should do: open Settings › Where the time goes once
+and let the real icons arrive. Leave, and open it again: the cards should come up with Apple's
+icons in the same instant as the cards themselves — no letters, no "Asking Screen Time…" line.
+Settings › Diagnostics should show the "tokens from the cache" line. Then Reset everything and
+open it once more: letters first and icons after, as before.
