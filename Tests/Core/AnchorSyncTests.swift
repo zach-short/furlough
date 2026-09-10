@@ -131,23 +131,53 @@ struct AnchorSyncMergeTests {
 struct AnchorSyncMacDropTests {
     let noon = at(8, 12, 0)
 
-    @Test("the Mac drops only with something to hold and a phone that has been heard from")
+    @Test("the Mac drops only with something to hold, iCloud, and a phone that has been heard from")
     func refusals() {
         var config = makeConfig([])
-        #expect(AnchorSync.macDrop(&config, now: noon, phoneSeen: true) == .noList)
+        #expect(AnchorSync.macDrop(&config, now: noon, phoneSeen: true, cloudAvailable: true) == .noList)
         config.anchor.kinds = [.macApp(bundleID: "com.google.Chrome")]
-        #expect(AnchorSync.macDrop(&config, now: noon, phoneSeen: false) == .noPhone)
+        #expect(AnchorSync.macDrop(&config, now: noon, phoneSeen: false, cloudAvailable: true) == .noPhone)
         #expect(!config.anchor.isAnchored)
-        #expect(AnchorSync.macDrop(&config, now: noon, phoneSeen: true) == nil)
+        #expect(AnchorSync.macDrop(&config, now: noon, phoneSeen: true, cloudAvailable: true) == nil)
         #expect(config.anchor.isAnchored)
         #expect(config.anchor.anchoredAt == noon)
         #expect(config.anchor.until == nil)
         #expect(config.anchor.sequence == 1)
-        #expect(AnchorSync.macDrop(&config, now: noon, phoneSeen: true) == .alreadyAnchored)
+        #expect(AnchorSync.macDrop(&config, now: noon, phoneSeen: true, cloudAvailable: true) == .alreadyAnchored)
         // An empty allowlist is the whole Mac, which is something to hold.
         var everything = makeConfig([])
         everything.anchor.scope = .everythingExcept
-        #expect(AnchorSync.macDrop(&everything, now: noon, phoneSeen: true) == nil)
+        #expect(AnchorSync.macDrop(&everything, now: noon, phoneSeen: true, cloudAvailable: true) == nil)
+    }
+
+    /// The lock-with-no-key guard, in the case `phoneSeen` alone cannot see: the latch is set
+    /// once and never cleared, so a Mac signed out of iCloud after its first sync would other-
+    /// wise still take a drop that nothing on earth could lift.
+    @Test("a Mac signed out of iCloud refuses to drop, however many phones it has heard from")
+    func refusesWithoutCloud() {
+        var config = makeConfig([])
+        config.anchor.kinds = [.macApp(bundleID: "com.google.Chrome")]
+        #expect(AnchorSync.macDrop(&config, now: noon, phoneSeen: true, cloudAvailable: false) == .noCloud)
+        #expect(!config.anchor.isAnchored)
+        #expect(config.anchor.sequence == 0)
+        // Ahead of the phone: signed out, whether a phone has ever been heard from is moot,
+        // and the account is the thing to go and fix.
+        #expect(AnchorSync.macDrop(&config, now: noon, phoneSeen: false, cloudAvailable: false) == .noCloud)
+        // Behind the list, which is on this screen and fixable without leaving it.
+        var empty = makeConfig([])
+        #expect(AnchorSync.macDrop(&empty, now: noon, phoneSeen: true, cloudAvailable: false) == .noList)
+    }
+
+    /// An anchor already down is not touched by the account going away. Only dropping is
+    /// refused; a hold and its release are the phone's business and survive on their own.
+    @Test("losing iCloud does not lift an anchor already holding")
+    func cutOffLeavesAHoldAlone() {
+        var config = makeConfig([])
+        config.anchor.kinds = [.macApp(bundleID: "com.google.Chrome")]
+        #expect(AnchorSync.macDrop(&config, now: noon, phoneSeen: true, cloudAvailable: true) == nil)
+        #expect(config.anchor.isHolding(at: noon))
+        #expect(AnchorSync.macDrop(&config, now: noon, phoneSeen: true, cloudAvailable: false) == .noCloud)
+        #expect(config.anchor.isHolding(at: noon))
     }
 
     @Test("every drop moves the sequence on, on the phone too")
@@ -173,6 +203,28 @@ struct AnchorSyncMacDropTests {
     func messages() {
         #expect(Policy.DropRefusal.noList.message.contains("Choose"))
         #expect(Policy.DropRefusal.noPhone.message.contains("iPhone"))
+        // The instruction that actually clears the refusal. Pairing a tag publishes nothing,
+        // so the message must ask for the drop; this pins that it does not go back to asking
+        // only for the pairing.
+        #expect(Policy.DropRefusal.noPhone.message.contains("Drop anchor"))
+        #expect(Policy.DropRefusal.noCloud.message.contains("iCloud"))
+        #expect(Policy.DropRefusal.noCloud.message == AnchorSync.cutOffWarning)
+    }
+
+    /// The cut-off warning is written as a `\`-continued literal, where a missing space runs two
+    /// words together and a kept one doubles up, and neither shows in a diff. It is also the
+    /// only string here that a person reads as a paragraph in a banner, so: one paragraph, one
+    /// space between words, and it names both the harm and the way out.
+    @Test("the cut-off warning reads as one clean paragraph and says what to do")
+    func cutOffWarningReads() {
+        let warning = AnchorSync.cutOffWarning
+        #expect(!warning.contains("  "))
+        #expect(!warning.contains("\n"))
+        #expect(warning.hasSuffix("."))
+        #expect(warning.contains("iCloud Drive"))
+        // The harm, said on the device reading it. This bundle is built for macOS.
+        #expect(warning.contains("this Mac"))
+        #expect(warning.contains("System Settings"))
     }
 
     let decoder: JSONDecoder = {

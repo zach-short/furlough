@@ -123,6 +123,13 @@ struct AnchorSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     stateCard
+                    // Under the state, above everything about the list: a Mac that cannot
+                    // reach iCloud will not drop at all, so this explains the refused button
+                    // before someone goes looking for what is wrong with their list.
+                    if !model.cloudAvailable {
+                        CautionBanner(text: AnchorSync.cutOffWarning, isSevere: true)
+                            .padding(.top, 12)
+                    }
                     SectionLabel(text: "Scope")
                     scopeCard
                     SectionLabel(text: anchor.anchorsEverything ? "Stays open" : "Held")
@@ -196,6 +203,9 @@ struct AnchorSheet: View {
             return "\(held) since \(since.formatted(date: .omitted, time: .shortened))\(lift)"
         }
         if anchor.scope == .chosen, anchor.kinds.isEmpty { return "Nothing chosen yet" }
+        // Ahead of `phoneSeen`, and for the same reason `macDrop` checks it first: a latch set
+        // by some earlier account says nothing about whether a phone can be heard from now.
+        if !model.cloudAvailable { return "\(held) · iCloud unreachable" }
         if !model.phoneSeen { return "\(held) · waiting to hear from your iPhone" }
         return "\(held) · ready"
     }

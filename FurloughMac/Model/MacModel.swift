@@ -74,6 +74,7 @@ final class MacModel {
         if isOnboarded { Watchdog.enableIfNeeded() }
         observeCloud()
         AnchorCloud.synchronize()
+        SharedStore.log("iCloud at launch: \(cloudAvailable ? "reachable" : "unreachable; the anchor cannot cross")")
         enforce(reason: "launch")
     }
 
@@ -82,15 +83,35 @@ final class MacModel {
     @ObservationIgnored private var cloudObserver: (any NSObjectProtocol)?
     @ObservationIgnored private var cloudPolls = 0
 
+    /// Whether iCloud can carry the anchor between this Mac and the phone. Kept here rather
+    /// than read in the view: it is a file-system question, the anchor sheet asks it on every
+    /// rebuild of a window that rebuilds every second, and it only ever changes when the
+    /// account does — which iCloud says out loud.
+    private(set) var cloudAvailable = AnchorCloud.isAvailable
+
     /// Listens for the phone's writes, once. iCloud posts the change to a running app, which
     /// on the Mac is always, and the ticker asks again every half minute in case it did not.
     private func observeCloud() {
         guard cloudObserver == nil else { return }
         cloudObserver = NotificationCenter.default.addObserver(
             forName: AnchorCloud.changeNotification, object: nil, queue: .main
-        ) { _ in
-            Task { @MainActor in MacModel.shared.applyRemoteAnchor(reason: "iCloud changed") }
+        ) { notification in
+            let accountChanged = AnchorCloud.isAccountChange(notification)
+            Task { @MainActor in
+                if accountChanged { MacModel.shared.refreshCloudAvailability(reason: "account changed") }
+                MacModel.shared.applyRemoteAnchor(reason: accountChanged ? "iCloud account changed" : "iCloud changed")
+            }
         }
+    }
+
+    /// Re-reads whether iCloud is there, and says so in the log when the answer moves. Called
+    /// at launch, when iCloud reports an account change, and on the half-minute poll — the
+    /// account can be signed out in System Settings without the store saying a word.
+    func refreshCloudAvailability(reason: String) {
+        let available = AnchorCloud.isAvailable
+        guard available != cloudAvailable else { return }
+        cloudAvailable = available
+        SharedStore.log("iCloud is \(available ? "reachable again" : "unreachable; the anchor cannot cross") (\(reason))")
     }
 
     /// Merges what the phone wrote, through `AnchorSync.merge`, and enforces if it changed
@@ -112,7 +133,12 @@ final class MacModel {
     func dropAnchor() -> String? {
         var current = SharedStore.load()
         let now = current.now
-        if let refusal = AnchorSync.macDrop(&current.config, now: now, phoneSeen: phoneSeen) {
+        // Asked afresh, not read from the cache the banner draws from. The cache is refreshed
+        // when iCloud says the account moved and on the half-minute poll, and this is the one
+        // decision where being a poll behind is unrecoverable: an account signed out in System
+        // Settings a moment ago would otherwise buy a lock with no key.
+        refreshCloudAvailability(reason: "about to drop")
+        if let refusal = AnchorSync.macDrop(&current.config, now: now, phoneSeen: phoneSeen, cloudAvailable: cloudAvailable) {
             return refusal.message
         }
         SharedStore.save(current)
@@ -214,6 +240,9 @@ final class MacModel {
                 self.cloudPolls += 1
                 if self.cloudPolls % 30 == 0 {
                     AnchorCloud.synchronize()
+                    // Signing out happens in System Settings, which the store has no opinion
+                    // about, so the banner would otherwise stay wrong until the next launch.
+                    self.refreshCloudAvailability(reason: "poll")
                     self.applyRemoteAnchor(reason: "poll")
                 }
             }

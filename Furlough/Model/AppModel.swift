@@ -97,6 +97,9 @@ final class AppModel {
         observeChanges()
         observeCloud()
         AnchorCloud.synchronize()
+        // Signing out of iCloud happens in Settings, outside this app, so every activation is
+        // the soonest a returning phone can find out that the anchor stopped crossing.
+        refreshCloudAvailability(reason: "activate")
         note(AuthorizationCenter.shared.authorizationStatus)
         reload()
         applyRemoteAnchor(reason: "activate")
@@ -1140,6 +1143,25 @@ final class AppModel {
     /// A notification from iCloud that the other device wrote the anchor's record.
     @ObservationIgnored private var cloudObserver: (any NSObjectProtocol)?
 
+    /// Whether iCloud can carry the anchor off this phone. Read once per activation and when
+    /// iCloud says the account moved, rather than in the view: the Anchor screen would ask it
+    /// on every rebuild, and the answer changes only when someone signs in or out.
+    ///
+    /// The phone has no equivalent of the Mac's `phoneSeen`, so this is the whole of what it
+    /// can honestly say about the crossing — but it is the half that fails silently, and a
+    /// phone whose tag cannot release a locked Mac should not have to be guessed at.
+    private(set) var cloudAvailable = AnchorCloud.isAvailable
+
+    /// Re-reads whether iCloud is there, and logs the move. Nothing is enforced off the back
+    /// of it: the phone's own rules never depended on iCloud, and an anchor already down here
+    /// stays down. What changes is only what this phone can promise about the other device.
+    func refreshCloudAvailability(reason: String) {
+        let available = AnchorCloud.isAvailable
+        guard available != cloudAvailable else { return }
+        cloudAvailable = available
+        SharedStore.log("iCloud is \(available ? "reachable again" : "unreachable; the anchor cannot cross") (\(reason))")
+    }
+
     /// Listens for the other device's writes, once. iCloud posts the change to a running app
     /// only, so the reconciler pulls on every wake besides — the monitor's callbacks reach the
     /// record while the app is closed.
@@ -1147,8 +1169,12 @@ final class AppModel {
         guard cloudObserver == nil else { return }
         cloudObserver = NotificationCenter.default.addObserver(
             forName: AnchorCloud.changeNotification, object: nil, queue: .main
-        ) { _ in
-            Task { @MainActor in AppModel.shared.applyRemoteAnchor(reason: "iCloud changed") }
+        ) { notification in
+            let accountChanged = AnchorCloud.isAccountChange(notification)
+            Task { @MainActor in
+                if accountChanged { AppModel.shared.refreshCloudAvailability(reason: "account changed") }
+                AppModel.shared.applyRemoteAnchor(reason: accountChanged ? "iCloud account changed" : "iCloud changed")
+            }
         }
     }
 

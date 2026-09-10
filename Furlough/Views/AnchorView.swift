@@ -36,6 +36,14 @@ struct AnchorView: View {
             VStack(alignment: .leading, spacing: 0) {
                 header
                 stateCard
+                // Above the timed card and everything under it, because it is about where the
+                // anchor reaches rather than about anything on this screen's lists. Severe: a
+                // tag that cannot release a locked Mac is the one failure Furlough has no
+                // other way out of.
+                if !model.cloudAvailable {
+                    CautionBanner(text: AnchorSync.cutOffWarning, isSevere: true)
+                        .padding(.top, 12)
+                }
                 if !anchor.isAnchored {
                     timedCard
                         .padding(.top, 10)

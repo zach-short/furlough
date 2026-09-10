@@ -66,6 +66,30 @@ enum AnchorSync {
     /// heard from, a Mac drop would be a lock with no key, and `macDrop` refuses it.
     static var phoneSeen: Bool { SharedStore.defaults.bool(forKey: phoneSeenKey) }
 
+    /// What to say when iCloud cannot carry the anchor, in the words the banner on each device
+    /// uses. Both halves of the same broken feature, so both are said here rather than drifting
+    /// apart in two views; each names the harm on the device reading it, because the phone's
+    /// worry is a lock that does not arrive and the Mac's is a lock with no key.
+    ///
+    /// Furlough never says this as a passing failure. A signed-out account is a standing state,
+    /// and until it changes the two devices are two separate installs that happen to look alike.
+    static var cutOffWarning: String {
+        #if os(iOS)
+        """
+        Furlough cannot reach your iCloud account, so the Anchor stops at this iPhone. \
+        Dropping it here will not lock your Mac, and scanning your tag will not release one. \
+        Sign in to iCloud in Settings, with iCloud Drive on, and the two link themselves.
+        """
+        #else
+        """
+        Furlough cannot reach your iCloud account, so the Anchor stops at this Mac. Your \
+        iPhone's tag is the only thing that can release an anchor dropped here, and it cannot \
+        reach this Mac — so Furlough will not drop one until iCloud is back. Sign in to iCloud \
+        in System Settings, with iCloud Drive on.
+        """
+        #endif
+    }
+
     #if DEBUG || TESTING_TOOLS
     /// Forgets that a phone has ever written the record, for Settings > Testing > Reset
     /// everything on the Mac. Without it a reset Mac would still take a drop that a fresh
@@ -155,10 +179,19 @@ enum AnchorSync {
     }
 
     /// The Mac's drop. No tag here, so no `until` and no `canAnchor`: it needs something to
-    /// hold and a phone that has been heard from, since only that phone's tag can ever lift it.
-    static func macDrop(_ config: inout Config, now: Date, phoneSeen: Bool) -> Policy.DropRefusal? {
+    /// hold, an iCloud account a release could arrive through, and a phone that has been heard
+    /// from, since only that phone's tag can ever lift it.
+    ///
+    /// Both of those last two are the same guard wearing two faces — a Mac must never hold an
+    /// anchor whose key cannot reach it — and they are checked in the order they can be fixed
+    /// in. A signed-out account is refused first because it is the one that makes the other
+    /// unanswerable: `phoneSeen` is a latch that stays true from an account the Mac may no
+    /// longer be signed in to, so trusting it alone would let exactly the lock-with-no-key
+    /// through that it exists to stop.
+    static func macDrop(_ config: inout Config, now: Date, phoneSeen: Bool, cloudAvailable: Bool) -> Policy.DropRefusal? {
         Policy.liftExpiredAnchor(&config, now: now)
         guard config.anchor.hasSomethingToHold else { return .noList }
+        guard cloudAvailable else { return .noCloud }
         guard phoneSeen else { return .noPhone }
         guard !config.anchor.isAnchored else { return .alreadyAnchored }
         config.anchor.isAnchored = true
@@ -176,6 +209,26 @@ enum AnchorCloud {
     static let key = "furlough.anchor.v1"
 
     static var changeNotification: Notification.Name { NSUbiquitousKeyValueStore.didChangeExternallyNotification }
+
+    /// Whether iCloud could carry a record at all. Not a question about the network: a device
+    /// with no signal still has a token, and its writes go out when it next has one. A *nil*
+    /// token means signed out of iCloud, or iCloud Drive switched off — the key-value store
+    /// still reads and writes, but only to this device, and nothing will ever leave it.
+    ///
+    /// That distinction is the whole reason this exists. `read()` returning nil looks the same
+    /// whether the other device has said nothing yet or the store is a dead end, and the
+    /// difference is the difference between waiting and being told. Every caller that means
+    /// "can the anchor cross" asks this, and no caller treats a false as temporary.
+    static var isAvailable: Bool { FileManager.default.ubiquityIdentityToken != nil }
+
+    /// Whether a change notification is iCloud saying the account itself moved — signed in,
+    /// signed out, or switched. `isAvailable` has to be read again when it does, and the
+    /// record with it, since what arrives next belongs to a different account than what came
+    /// before.
+    static func isAccountChange(_ notification: Notification) -> Bool {
+        guard let reason = notification.userInfo?[NSUbiquitousKeyValueStoreChangeReasonKey] as? Int else { return false }
+        return reason == NSUbiquitousKeyValueStoreAccountChange
+    }
 
     static func read() -> AnchorRecord? {
         guard let data = NSUbiquitousKeyValueStore.default.data(forKey: key) else { return nil }

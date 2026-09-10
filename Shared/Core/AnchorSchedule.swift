@@ -88,6 +88,9 @@ extension Policy {
         /// The Mac's: no phone has written the iCloud record yet, so nothing could ever lift
         /// the anchor — a Mac has no tag reader.
         case noPhone
+        /// The Mac's: signed out of iCloud, so no phone can be heard from at all. Checked
+        /// before `noPhone`, which is a latch that outlives the account that set it.
+        case noCloud
 
         var message: String {
             switch self {
@@ -95,7 +98,12 @@ extension Policy {
             case .nothingToAnchor: "Choose apps and pair a tag first."
             case .tooSoon: "Give it at least \(Furlough.minimumWindowMinutes) minutes."
             case .noList: "Choose what the anchor holds first."
-            case .noPhone: "Pair a tag in Furlough on your iPhone first. Only that tag can release this Mac, and it has not been heard from yet."
+            // Names the drop, not the pairing. Pairing a tag writes nothing to iCloud, so
+            // someone who did only that came back to this Mac and found the same refusal —
+            // the phone is heard from when it first drops the anchor, which needs the tag
+            // anyway, so asking for the drop asks for both in the order they happen.
+            case .noPhone: "Drop anchor once in Furlough on your iPhone, and this Mac will have heard from it. Only your iPhone's tag can release an anchor dropped here, so Furlough waits for that phone before locking this Mac."
+            case .noCloud: AnchorSync.cutOffWarning
             }
         }
     }
