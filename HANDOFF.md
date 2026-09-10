@@ -2276,12 +2276,28 @@ The plan for this stretch. Tick each phase off here as it lands.
     "Out of reach: 3 items."
 
     619 Core tests pass (19 new: `MacGuideTests`, and the Mac half of `DiagnosticsTests`); both
-    apps build warning-free. **Verified visually** only for the guide cards and the segment, on
-    an offscreen `swiftc` harness (the recipe in the Mac-screenshots memory) — both guides in
-    each of their three live states, the ticks, the dimming and the ember buttons. The window
-    itself has **not** been run: Zach's installed copy was running and the launch hook cannot
-    get a window while it is (see that memory), so the sidebar halves, the anchor pane, the new
-    onboarding and the regrouped Settings have been built and read but not seen.
+    apps build warning-free. **Seen running on this Mac**, 2026-09-10, on Zach's real store (no
+    rule targets, the anchor on the everything-except scope holding Discord, never yet heard
+    from the phone): both halves with their guides, the segment, the toolbar with no padlock,
+    Settings, and the Diagnostics screen. A Release build was installed to `/Applications` the
+    way the README says — the launch hook cannot get a window while another copy of the same
+    bundle id is running, and `opensWindowAtLaunch` is false on an onboarded Mac, so the window
+    comes up with `open -b com.zachshort.furlough.mac` rather than by launching the binary.
+    Two things that pass changed on the strength of seeing it:
+
+    - The guide was pinned to the top left of a pane three times its height. Both halves now
+      centre it, the way the hero and the empty state already did, and the anchor pane's column
+      is `maxWidth: 620` centred, which is what `MacRuleEditor` uses — the two halves put their
+      content in the same place.
+    - `Footnote` on the Mac had no `fixedSize(horizontal:false, vertical:true)`, so a footnote
+      in a stack that was measuring itself came out as one line and an ellipsis.
+
+    **Replacing `/Applications/Furlough.app` reset the web filter.** `systemextensionsctl` still
+    lists the extension as activated and enabled, but `ExtensionRequest.properties()` comes back
+    empty for the new bundle, so Furlough reports *Not installed* and does not connect its XPC
+    link; `furlough.mac.filter.wanted` is still true. Settings > Web > Install the web filter
+    puts it back, with macOS's approval. Worth knowing before the next install: any reinstall
+    costs the filter, and the app cannot tell that from a filter nobody ever installed.
 
 ## Style rules
 

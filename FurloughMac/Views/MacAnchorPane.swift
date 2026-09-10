@@ -42,21 +42,33 @@ struct MacAnchorPane: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                switch screen {
-                case .scope: MacAnchorScopeScreen(onBack: { screen = nil })
-                case .phone: MacAnchorPhoneScreen(onBack: { screen = nil }, onExplainDevices: onExplainDevices)
-                case nil:
-                    // Before it is set up this pane is the checklist and nothing else.
-                    if guide.isRunning { guidePane } else { setUpPane }
+        Group {
+            // Before it is set up this pane is the checklist and nothing else, centred in the
+            // pane the way the other half's guide is. Everything else scrolls: a sub-screen can
+            // be taller than a small window.
+            if screen == nil, guide.isRunning {
+                guidePane
+                    .frame(maxWidth: 620, alignment: .leading)
+                    .padding(40)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        switch screen {
+                        case .scope: MacAnchorScopeScreen(onBack: { screen = nil })
+                        case .phone: MacAnchorPhoneScreen(onBack: { screen = nil }, onExplainDevices: onExplainDevices)
+                        case nil: setUpPane
+                        }
+                    }
+                    // Centred, and the column the width the rule editor uses, so the two halves
+                    // put their content in the same place.
+                    .frame(maxWidth: 620, alignment: .leading)
+                    .padding(.horizontal, 28)
+                    .padding(.top, 20)
+                    .padding(.bottom, 40)
+                    .frame(maxWidth: .infinity)
                 }
             }
-            .frame(maxWidth: 620, alignment: .leading)
-            .padding(.horizontal, 28)
-            .padding(.top, 20)
-            .padding(.bottom, 40)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
         // Asked when the pane arrives, so the link row is about now rather than about whenever
         // the app last happened to hear something.

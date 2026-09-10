@@ -646,14 +646,12 @@ struct MacHomeView: View {
             MacRuleEditor(targetID: selection)
                 .id(selection)
         } else if guide.isRunning {
-            ScrollView {
-                GuideCard(guide: guide) { rulesGuideButton(at: guide.live) }
-                    .frame(maxWidth: 560, alignment: .leading)
-                    .padding(.horizontal, 28)
-                    .padding(.top, 20)
-                    .padding(.bottom, 40)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
+            // Centred in the pane, like the hero and the empty state it stands in for, rather
+            // than pinned to the top left of a pane three times its height.
+            GuideCard(guide: guide) { rulesGuideButton(at: guide.live) }
+                .frame(maxWidth: 560, alignment: .leading)
+                .padding(40)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if !model.state.config.targets.isEmpty {
             hero
         } else {
