@@ -310,7 +310,7 @@ struct DevicesHelp: View {
             ])
 
             SectionLabel(text: "Moving a setup across")
-            HelpProse("Since rules cannot sync, they travel as a file instead. Settings > Save setup writes your rules, budgets, tiers and delay as JSON; the other device opens it and shows you every line before anything happens.")
+            HelpProse("Since rules cannot sync, they travel as a file instead. Settings > Your setup writes your rules, budgets, tiers and delay as JSON; the other device opens it and shows you every line before anything happens.")
                 .padding(.top, 2)
             HelpPoints([
                 .init("A proposal, never a restore", "Every rule in a file goes through the same gate the editor does, so the tightenings land and the loosenings wait out your delay. A file cannot hand you back time by going round it."),
@@ -380,8 +380,8 @@ struct StuckHelp: View {
         ) {
             SectionLabel(text: "What to try")
             HelpPoints([
-                .init("Re-apply enforcement now", "Settings > Enforcement. Does that whole pass again on demand, without waiting for a launch."),
-                .init("Activity log", "Settings > Activity log. Says what the monitor extension has been doing and when it last ran."),
+                .init("Re-apply enforcement now", "Settings > Diagnostics. Does that whole pass again on demand, without waiting for a launch."),
+                .init("Activity log", "Settings > Diagnostics. Says what the monitor extension has been doing and when it last ran."),
                 .init("Turn Screen Time access off, then on", "The Settings app > Screen Time > Apps with Screen Time Access > Furlough. iOS clears every shield. Your rules are kept; reopen Furlough to enforce them again."),
             ])
 
@@ -392,7 +392,7 @@ struct StuckHelp: View {
             SectionLabel(text: "Worth knowing")
             HelpPoints([
                 .init("The monitor runs late sometimes", "iOS wakes it at window edges, at midnight and when a budget is reached. A few minutes of drift is normal, and every wake-up re-derives the shields, so nothing compounds."),
-                .init("Enforcement is listed", "Settings > Enforcement shows Screen Time access, notifications, the App Group, and when the shields and schedules were last written."),
+                .init("Everything is listed", "Settings > Diagnostics shows Screen Time access, notifications, the App Group, and when the shields and schedules were last written. Its row on the settings screen says whether any of it is wrong."),
             ])
         }
     }

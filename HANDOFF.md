@@ -2167,8 +2167,54 @@ The plan for this stretch. Tick each phase off here as it lands.
     thing the harness cannot do is press a `UISwitch` — the tool's synthesized tap does not move
     the app's existing toggles either — so the Anchor row was driven through its own binding
     instead, which logged `anchor: let go of 1` and back. Not yet run on the phone.
-    **Still open in the build order: item 5, Settings on a diet; item 6, the Mac, which follows
-    the phone file for file.**
+
+34. **Settings on a diet (the two-halves pass, item 5).** Done 2026-09-10. The screen ran
+    eleven controls and about 170 words of explanation, of which two were settings a person
+    changes: the delay, and — since item 1 — which page the app opens on. The rest was
+    diagnostics and prose. Five sections now, in this order, and the settings are the top two:
+
+    - **Start.** "Opens on" (a Rules · Anchor chip pair on `AppModel.setStartHalf`, which keeps
+      `wantsBothHalves`: moving the page you land on says nothing about the other half's guide),
+      the + preference from item 33 folded in beside it, "Run the setup guide again", and
+      "Where the time goes", which was buried under Enforcement.
+    - **Rules.** The loosening delay and its first-week banner, unchanged.
+    - **The record**, unchanged, moved below the two settings sections.
+    - **Your setup.** Download and Restore under one footnote instead of two. Both dropped
+      facts — that restoring has to ask which app each rule was, and that every restored rule
+      goes through the delay — are already said on `ImportSetupView` itself, beside the pickers
+      doing the asking.
+    - **Diagnostics.** One row: a dot, whether anything is wrong, and the first thing that is if
+      something is. Everything the Enforcement section listed is one push behind it in the new
+      `DiagnosticsView` — the two permissions, the App Group, the two timestamps, Re-apply
+      enforcement, Allow notifications, the Activity log.
+    - **About.** Version (the five taps still live on it), About Furlough, and *If something
+      gets stuck* as a link to `StuckHelp` rather than a second copy of its opening paragraph.
+      Testing stays exactly as it was, behind its five taps.
+
+    Prose: 43 words in three footnotes, from about 176 in six. `Shared/Core/Diagnostics.swift`
+    is the summary line as a value — a `Reading` of four facts in, a line and a `Level` out —
+    so it is tested rather than tangled in a view, and the Mac can hand it its own answers in
+    item 6. Checks are ordered by what they cost, not by severity, so the line names the thing
+    furthest upstream: fixing notifications on a phone with no Screen Time access would leave
+    the row saying the same thing for a different reason. `AppModel` gained `setStartHalf`,
+    `restartGuides` (writes an empty `finishedGuides`; only the last step of each guide is a
+    flag, so a set-up half comes back showing step 3 live rather than pretending the apps were
+    never picked) and a `diagnostics` reading. `StuckHelp`'s own pointers now say
+    "Settings > Diagnostics", and the Devices page's stale "Settings > Save setup" says
+    "Settings > Your setup".
+
+    600 Core tests pass (five new for `Diagnostics`); iOS builds warning-free. **Verified in
+    the simulator** on the item-3 harness: every section, both chip pairs, the guide row live
+    and spent, "Opens on" set to Anchor and Home coming up on the Anchor page after a relaunch,
+    the guide restarted from Settings and the checklist back on Home with "Drop it" live, the
+    Diagnostics row in both its moss and ember states (the healthy line forced with a
+    harness-only env var, since the simulator can never authorize Screen Time), the Diagnostics
+    screen, and the stuck page opening from About. Not yet run on the phone.
+    **Still open in the build order: item 6, the Mac, which follows the phone file for file —
+    the sidebar segment, `AnchorSheet` as a pane with the guide, the start pane in onboarding,
+    `SettingsSheet` regrouped the same way (Web and Browsers stay; the six-step walkthrough
+    collapses behind the filter's status until that status is not On), and the padlock in the
+    toolbar replaced by the app's own anchor mark.**
 
 ## Style rules
 

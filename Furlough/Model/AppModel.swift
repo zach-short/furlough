@@ -118,6 +118,19 @@ final class AppModel {
         }
     }
 
+    /// The four questions the old Enforcement section asked, answered as one sentence. The rows
+    /// themselves are a screen in now — see `Diagnostics`.
+    var diagnostics: Diagnostics {
+        Diagnostics.summary(
+            Diagnostics.Reading(
+                screenTimeAllowed: isAuthorized,
+                appGroupAvailable: isAppGroupAvailable,
+                notificationsAllowed: notificationsGranted,
+                registrationError: state.runtime.registrationError
+            )
+        )
+    }
+
     /// Whether the first-run screen is what belongs on screen. Access decides it: a phone that
     /// has not granted it has nothing Furlough could enforce, and a phone that has is past this
     /// screen for good — except after a testing reset, which asks for the first run back and is
@@ -164,6 +177,14 @@ final class AppModel {
         wantsBothHalves = both
     }
 
+    /// The same answer, changed later from Settings. The intro asks it once and this is the only
+    /// other place it is asked, so `wantsBothHalves` rides along unchanged: someone moving the
+    /// page Furlough opens on has said nothing about whether the other half's guide still runs.
+    func setStartHalf(_ half: Half) {
+        guard half != startHalf else { return }
+        chooseStart(half: half, both: wantsBothHalves)
+    }
+
     /// Which half the + adds to over the Anchor page. See `anchorPageAdds`.
     func setAnchorPageAdds(_ half: Half) {
         guard half != anchorPageAdds else { return }
@@ -182,6 +203,17 @@ final class AppModel {
     func finishGuide(_ half: Half) {
         guard !finishedGuides.contains(half) else { return }
         write(finishedGuides: finishedGuides.union([half]))
+    }
+
+    /// Both checklists, asked for again from Settings.
+    ///
+    /// Only the last step of each is a flag, so this is the whole of what can be undone: a half
+    /// that is set up comes back showing its third step live — read your list, drop it — rather
+    /// than pretending the apps were never picked. That is the honest version of "again", and it
+    /// is the step worth seeing twice anyway.
+    func restartGuides() {
+        guard !finishedGuides.isEmpty else { return }
+        write(finishedGuides: [])
     }
 
     /// A phone that arrives already set up has no guide owed to it. Run once, on the first
