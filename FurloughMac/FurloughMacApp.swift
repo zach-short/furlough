@@ -6,24 +6,48 @@ import UserNotifications
 struct FurloughMacApp: App {
     @NSApplicationDelegateAdaptor(MacAppDelegate.self) private var delegate
     @State private var model = MacModel.shared
+    /// Which page Help is on. Held here rather than inside Help, because the window that opens
+    /// Help is the one that decides whether it lands on the hub or on a page.
+    @State private var help = HelpRoute()
 
     var body: some Scene {
         Window("Furlough", id: "main") {
             MacRootView()
                 .environment(model)
+                .environment(help)
                 .frame(minWidth: 880, minHeight: 580)
         }
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentMinSize)
         .defaultSize(width: 980, height: 660)
-        .commands {
-            CommandGroup(replacing: .newItem) {}
-        }
-        // Deliberately not `.defaultLaunchBehavior(.suppressed)` for the menu bar case. A
-        // suppressed scene is never built, and then there is no window for AppKit to raise —
+        // Deliberately not `.defaultLaunchBehavior(.suppressed)` for the menu bar case, which
+        // Help below can afford and this window cannot. A suppressed scene is never built, and
+        // then there is no window for AppKit to raise —
         // reopening Furlough switched the activation policy and put nothing on screen, which
         // on a Mac with no menu bar item is an app with no way in at all. So the window is
         // always built and put away instead; `MacAppDelegate` hides it at launch.
+        .commands {
+            CommandGroup(replacing: .newItem) {}
+            // The stock item opens a help book Furlough does not ship, so ⌘? did nothing at
+            // all. It opens the same window the question mark in the toolbar does.
+            CommandGroup(replacing: .help) { HelpMenuItem(route: help) }
+        }
+
+        // Help is a window rather than a sheet: it is long enough to want a scroll bar and a
+        // size of your own, and a sheet that size was taller than a small main window.
+        Window("Furlough Help", id: HelpRoute.windowID) {
+            HelpWindow()
+                .environment(model)
+                .environment(help)
+        }
+        .windowStyle(.hiddenTitleBar)
+        .windowResizability(.contentMinSize)
+        .defaultSize(width: 560, height: 720)
+        // Opened on request and never on its own: a launch meant for the menu bar puts no
+        // window up, and a Help window left open at a force quit is not something to restore
+        // over whatever the Mac is doing when the watchdog starts Furlough again.
+        .defaultLaunchBehavior(.suppressed)
+        .restorationBehavior(.disabled)
     }
 }
 
@@ -47,11 +71,24 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationC
     static var opensWindowAtLaunch: Bool { !isWatchdogLaunch && !MacModel.shared.isOnboarded }
 
     /// The `Window` scene's window, for the menu bar's way back to it. Matched on the scene id
-    /// SwiftUI stamps on it, falling back to the one titled window that is not the shield.
+    /// SwiftUI stamps on it, falling back to the one titled window that is neither the shield
+    /// nor Help — Help is a window of its own now, and raising it instead would put the app's
+    /// reading matter on screen in place of its rules.
     @MainActor
     static var mainWindow: NSWindow? {
         NSApp.windows.first { $0.identifier?.rawValue.contains("main") == true }
-            ?? NSApp.windows.first { !($0 is NSPanel) && $0.styleMask.contains(.titled) }
+            ?? NSApp.windows.first { isAppWindow($0) && !isHelpWindow($0) }
+    }
+
+    /// A window of Furlough's own: not the shield, which is a panel, and not the status item.
+    @MainActor
+    static func isAppWindow(_ window: NSWindow) -> Bool {
+        !(window is NSPanel) && window.styleMask.contains(.titled)
+    }
+
+    @MainActor
+    static func isHelpWindow(_ window: NSWindow) -> Bool {
+        window.identifier?.rawValue.contains(HelpRoute.windowID) == true
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -111,9 +148,7 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationC
             // count, so blocking something never drags the Dock icon back.
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
-                    let stillShowing = NSApp.windows.contains {
-                        !($0 is NSPanel) && $0.isVisible && $0.styleMask.contains(.titled)
-                    }
+                    let stillShowing = NSApp.windows.contains { Self.isAppWindow($0) && $0.isVisible }
                     if !stillShowing { NSApp.setActivationPolicy(.accessory) }
                 }
             }
@@ -129,15 +164,23 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationC
     /// None of the three is guaranteed to have happened by now.
     @MainActor
     private func putTheWindowAway() {
-        Self.mainWindow?.orderOut(nil)
-        DispatchQueue.main.async { MainActor.assumeIsolated { Self.mainWindow?.orderOut(nil) } }
+        Self.orderOutEveryWindow()
+        DispatchQueue.main.async { MainActor.assumeIsolated { Self.orderOutEveryWindow() } }
         restoreWatcher = NotificationCenter.default.addObserver(
             forName: NSApplication.didFinishRestoringWindowsNotification, object: nil, queue: .main
         ) { _ in
             // Captures nothing: the delegate is not Sendable, and the notification fires once
             // per launch anyway, so there is nothing to tear down.
-            MainActor.assumeIsolated { Self.mainWindow?.orderOut(nil) }
+            MainActor.assumeIsolated { Self.orderOutEveryWindow() }
         }
+    }
+
+    /// Every window, not just the main one: macOS restores whatever was open when Furlough was
+    /// last force quit, and a Help window left open is exactly the sort of thing a launch meant
+    /// for the menu bar should not put back on screen.
+    @MainActor
+    private static func orderOutEveryWindow() {
+        for window in NSApp.windows where isAppWindow(window) { window.orderOut(nil) }
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {

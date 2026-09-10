@@ -99,9 +99,9 @@ struct AddAppSheet: View {
 /// bundle identifiers and hosts, since a Screen Time token means nothing here.
 struct AnchorSheet: View {
     @Environment(MacModel.self) private var model
-    @Environment(\.dismiss) private var dismiss
-    /// Asks the window to explain the link to the phone. The sheet closes and Help opens on
-    /// that page: two sheets cannot be up at once here, and this one is the shallower of them.
+    /// Asks the window to explain the link to the phone. Help opens on that page in its own
+    /// window, beside this sheet rather than instead of it, so the list being read about is
+    /// still on screen.
     var onExplainDevices: () -> Void = {}
     @State private var apps: [InstalledApp] = []
     @State private var query = ""
@@ -257,14 +257,11 @@ struct AnchorSheet: View {
         .emberCard()
     }
 
-    /// The one row on the Anchor sheet that leaves it: the same row Help's own hub draws, so it
-    /// is plainly a link into Help rather than a setting of its own — there is nothing here to
-    /// switch, which is the first thing the page it opens says.
+    /// The one row on the Anchor sheet that opens something else: the same row Help's own hub
+    /// draws, so it is plainly a link into Help rather than a setting of its own — there is
+    /// nothing here to switch, which is the first thing the page it opens says.
     private var devicesCard: some View {
-        Button {
-            onExplainDevices()
-            dismiss()
-        } label: {
+        Button(action: onExplainDevices) {
             HelpRow(topic: .devices)
         }
         .buttonStyle(.plain)

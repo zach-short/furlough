@@ -28,6 +28,8 @@ struct MacRootView: View {
 /// The main window: the list of apps and sites on the left, the selected one's rule on the right.
 struct MacHomeView: View {
     @Environment(MacModel.self) private var model
+    @Environment(HelpRoute.self) private var route
+    @Environment(\.openWindow) private var openWindow
     @State private var selection: UUID?
     /// The Application / Website popover under the + button.
     @State private var showAddChoice = false
@@ -35,14 +37,7 @@ struct MacHomeView: View {
     @State private var showAddSite = false
     @State private var showPending = false
     @State private var showSettings = false
-    @State private var showHelp = false
     @State private var showAnchor = false
-    /// Which page Help opens on: nil for its hub, a topic when something linked to one. Read
-    /// once, when the sheet is built.
-    @State private var helpTopic: HelpTopic?
-    /// A topic the Anchor sheet asked for, held until that sheet has fully gone — the same
-    /// reason `pendingCompanion` waits, and the same handoff.
-    @State private var pendingHelpTopic: HelpTopic?
     /// The other half of what was just added, held until the add sheet has fully gone: a sheet
     /// presented over one still leaving is dropped, so the offer waits for `onDismiss`.
     @State private var pendingCompanion: CompanionPrompt?
@@ -99,10 +94,9 @@ struct MacHomeView: View {
         }
         .sheet(isPresented: $showPending) { PendingSheet() }
         .sheet(isPresented: $showSettings) { SettingsSheet() }
-        .sheet(isPresented: $showAnchor, onDismiss: openRequestedHelp) {
-            AnchorSheet { pendingHelpTopic = .devices }
+        .sheet(isPresented: $showAnchor) {
+            AnchorSheet { openHelp(on: .devices) }
         }
-        .sheet(isPresented: $showHelp) { HelpSheet(topic: helpTopic) }
         .onChange(of: model.state.config.targets.map(\.id)) { _, ids in
             if let selection, !ids.contains(selection) { self.selection = nil }
         }
@@ -147,9 +141,9 @@ struct MacHomeView: View {
                 .help("Settings")
         }
         ToolbarItem(placement: .primaryAction) {
-            // Cleared, not left as it was: the question mark opens the hub, and a topic still
-            // held from the last visit would silently reopen that page instead.
-            Button("Help", systemImage: "questionmark") { helpTopic = nil; showHelp = true }
+            // The hub, not wherever Help was left: the question mark is the way in, and a page
+            // still showing from the last visit would silently stand in for it.
+            Button("Help", systemImage: "questionmark") { openHelp(on: nil) }
                 .tint(Ember.cream)
                 .help("Help")
         }
@@ -192,14 +186,13 @@ struct MacHomeView: View {
         companionPrompt = pending
     }
 
-    /// Opens Help on the page the sheet that just closed asked for, once it has finished
-    /// closing. Nothing happens when it asked for nothing, so closing the Anchor sheet the
-    /// ordinary way is still just closing it.
-    private func openRequestedHelp() {
-        guard let topic = pendingHelpTopic else { return }
-        pendingHelpTopic = nil
-        helpTopic = topic
-        showHelp = true
+    /// Puts Help on a page, then brings its window up — in that order, since the window reads
+    /// the route rather than being handed one. Already open, it comes forward showing the page
+    /// just asked for. A sheet can call this and stay where it is: Help is not a sheet, so the
+    /// Anchor no longer has to close itself to explain the phone.
+    private func openHelp(on topic: HelpTopic?) {
+        route.topic = topic
+        openWindow(id: HelpRoute.windowID)
     }
 
     /// The websites `app` is also at that are not in Furlough yet; a host already covered by a

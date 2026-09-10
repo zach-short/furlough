@@ -56,28 +56,65 @@ enum HelpTopic: String, Identifiable, CaseIterable {
     }
 }
 
-/// The help sheet: a hub of topics, and one page at a time over it.
-///
-/// The same shape as `SettingsSheet` — one `SheetFrame` whose title follows the state, and a
-/// back button rather than a navigation stack, because a Mac sheet is a fixed pane.
-struct HelpSheet: View {
-    @State private var topic: HelpTopic?
+/// Which page Help is showing, shared between the window that asks for it and the window that
+/// shows it. Help is a window of its own rather than a sheet, so the page cannot be handed to
+/// it as an argument the way a sheet's was: whoever opens Help sets this first.
+@MainActor
+@Observable
+final class HelpRoute {
+    /// The scene id, in one place so the toolbar button and the Help menu open the same window.
+    static let windowID = "help"
 
-    /// Opens straight onto a page rather than the hub, for the places in the app that link to
-    /// one topic — the Anchor sheet's row about the phone. Back still lands on the hub, so
-    /// arriving this way is a shortcut into Help rather than a dead end inside it.
-    init(topic: HelpTopic? = nil) {
-        _topic = State(initialValue: topic)
-    }
+    /// nil is the hub. A topic is a page, for the places in the app that link to one — the
+    /// Anchor sheet's row about the phone. Back still lands on the hub, so arriving that way is
+    /// a shortcut into Help rather than a dead end inside it.
+    var topic: HelpTopic?
+}
+
+/// The Help menu's one item. A view rather than a plain `Button` because `openWindow` is an
+/// environment value, and only a view can read one. The route is handed over rather than read
+/// from the environment: commands hang off the scene, not off a window's content, so nothing
+/// put in a window's environment reaches here.
+struct HelpMenuItem: View {
+    let route: HelpRoute
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        SheetFrame(title: topic?.title ?? "Help", width: 560, height: 640) {
-            if let topic {
-                HelpPage(topic: topic) { self.topic = nil }
-            } else {
-                hub
+        Button("Furlough Help") {
+            route.topic = nil
+            openWindow(id: HelpRoute.windowID)
+        }
+        .keyboardShortcut("?", modifiers: .command)
+    }
+}
+
+/// Help: a hub of topics, and one page at a time over it.
+///
+/// A window of its own, not a sheet. As a sheet it was a fixed 560×640 pane, which is most of
+/// the main window and more than all of it once someone had made theirs small — the sheet hung
+/// off the bottom with its own scroll view inside. A window is resizable, can sit beside the
+/// rules while they are read, and can be opened from a screen that is itself a sheet, which the
+/// Anchor's link to the phone page needed and had to fake by closing itself first.
+struct HelpWindow: View {
+    @Environment(HelpRoute.self) private var route
+
+    var body: some View {
+        ZStack {
+            EmberWall()
+            VStack(spacing: 0) {
+                // The window has no title bar, so its content starts under the traffic lights.
+                // This is the strip they sit in, and the one that drags the window.
+                Color.clear.frame(height: 32)
+                if let topic = route.topic {
+                    HelpPage(topic: topic) { route.topic = nil }
+                } else {
+                    hub
+                }
             }
         }
+        .frame(minWidth: 460, minHeight: 380)
+        .preferredColorScheme(.dark)
+        .tint(Ember.ember)
     }
 
     private var hub: some View {
@@ -98,6 +135,9 @@ struct HelpSheet: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 24)
         }
+        // AppKit measures a scroll view from the bottom, so a page whose text grows as it wraps
+        // opens partway down — the long pages did exactly that. This pins the top.
+        .defaultScrollAnchor(.top)
     }
 
     /// Both halves in three sentences, so someone who reads nothing else knows there are two of
@@ -128,7 +168,7 @@ struct HelpSheet: View {
         VStack(spacing: 0) {
             ForEach(Array(topics.enumerated()), id: \.element.id) { index, item in
                 if index > 0 { CardDivider() }
-                Button { topic = item } label: {
+                Button { route.topic = item } label: {
                     HelpRow(topic: item)
                 }
                 .buttonStyle(.plain)
@@ -293,6 +333,9 @@ struct HelpPage: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 24)
             }
+            // As on the hub, and it matters more here: the longest pages opened a third of the
+            // way down, under a heading you had to scroll up to read.
+            .defaultScrollAnchor(.top)
         }
     }
 
