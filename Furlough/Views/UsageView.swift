@@ -36,19 +36,22 @@ struct UsageView: View {
     @State private var busy: String?
     /// Where Path A has got to; see `Phase`.
     @State private var phase = Phase.reading
-    /// How many times to ask Screen Time for the names before giving up on them. Three, a
-    /// second apart: long enough to ride out a query that simply did not answer, short enough
-    /// that nobody sits watching an hourglass wondering whether it is stuck.
+    /// Screen Time is still being asked for the tokens (`nameApps`). While this is true a card
+    /// whose app the tables did not know is held back, because there is nothing to call it yet,
+    /// and Apply waits for the answer rather than asking the same slow question a second time.
+    @State private var naming = false
+    /// How many times to ask Screen Time for the tokens before giving up on them, each ask given
+    /// `UsageReader.patience`. Three, a second apart: long enough to ride out a query that simply
+    /// did not answer, short enough that the icons stop changing under the reader within the
+    /// minute. Nothing on the page waits on this; see `nameApps`.
     private static let namingAttempts = 3
 
-    /// What the page is doing where the app reads the numbers itself. Nothing is shown until
-    /// the names are in hand: an app the card cannot name is one nobody can judge and one no
-    /// rule can be written on, so a card for it would be furniture.
+    /// What the page is doing where the app reads the numbers itself. Nothing is shown until the
+    /// hours are in; the cards are drawn the moment they are, named from the tables (`Brand`),
+    /// and Apple's own names and icons arrive behind them as Screen Time hands the tokens over.
     private enum Phase: Equatable {
         /// Reading the fortnight out of Screen Time.
         case reading
-        /// The hours are in; Screen Time has not yet said what the apps are called.
-        case naming
         /// Cards.
         case ready
         /// Screen Time would not hand the hours over at all.
@@ -137,8 +140,6 @@ struct UsageView: View {
         switch phase {
         case .reading:
             waiting("Reading the last \(UsageReader.days) days…")
-        case .naming:
-            waiting("Asking Screen Time what these apps are called…")
         case .failed(let reason):
             problem(
                 eyebrow: "Screen Time said no",
@@ -158,15 +159,41 @@ struct UsageView: View {
                     .foregroundStyle(Ember.muted)
                     .padding(16)
                     .emberCard()
-            }
-            if let summary {
-                ForEach(advice) { item in
+            } else if let summary {
+                ForEach(shown) { item in
                     if let entry = summary.entry(for: item) {
                         card(item, entry, days: summary.totalDays)
                     }
                 }
+                if naming, shown.count < advice.count {
+                    heldBack(advice.count - shown.count)
+                }
             }
         }
+    }
+
+    /// The suggestions with something to be called. Everything, once naming is over, because
+    /// `nameApps` drops the rest then; while Screen Time is still being asked, the ones the tables
+    /// knew, so that an app they did not is not drawn as "This app" over a dashed square and then
+    /// renamed under the reader's eyes.
+    private var shown: [Recommendation] {
+        guard let summary else { return [] }
+        return advice.filter { summary.entry(for: $0)?.isNamed == true }
+    }
+
+    /// The line under the cards for the ones held back: why the list is short, and that it may
+    /// yet grow — without an hourglass over the whole page.
+    private func heldBack(_ count: Int) -> some View {
+        HStack(spacing: 10) {
+            ProgressView().tint(Ember.amber).controlSize(.small)
+            Text(count == 1
+                ? "Asking Screen Time about one more app…"
+                : "Asking Screen Time about \(count) more apps…")
+                .emberBody(12)
+                .foregroundStyle(Ember.faint)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 6)
     }
 
     /// The hourglass, running, while Screen Time is being asked something.
@@ -371,14 +398,19 @@ struct UsageView: View {
         guard #available(iOS 26.4, *), hasDataAccess, summary == nil else { return }
         phase = .reading
         do {
-            let read = try await UsageReader.summary()
+            // Folded now for the halves a key alone can pair — a typed site beside its app's
+            // row — and again in `nameApps`, once the tokens say which entry is which app.
+            let read = try await UsageReader.summary().folded(in: model.state.config)
             advice = read.recommendations
             summary = read
-            SharedStore.log("usage: \(read.entries.count) entries, \(advice.count) worth a rule")
+            SharedStore.log("usage: \(read.entries.count) entries, \(advice.count) worth a rule, \(unnamed) not in the tables")
         } catch {
             phase = .failed(error.localizedDescription)
             return
         }
+        // Cards, now. The names come from the tables and the icons are letters until Screen
+        // Time hands the tokens over, which is the slow, unreliable half and no longer the gate.
+        phase = .ready
         await nameApps()
     }
 
@@ -389,30 +421,35 @@ struct UsageView: View {
         await load()
     }
 
-    /// Puts Apple's names and icons on the suggestions before any of them is drawn.
+    /// Puts Apple's names and icons on the suggestions — behind them, not before them.
     ///
-    /// Data access names an app by its bundle identifier alone, so the only name that exists
-    /// comes from a token, and the only way to a token is a query into Screen Time's own store
+    /// Data access names an app by its bundle identifier alone, so Apple's own name and icon
+    /// come from a token, and the only way to a token is a query into Screen Time's own store
     /// (`UsageReader.fillingTokens`). That query is not reliable: it answers, it comes back with
-    /// nothing, or it throws, and the app cannot tell which in advance. So it is asked again, a
-    /// second apart, until Screen Time answers — an answer holding nothing is a failed query
-    /// worth repeating, while an answer that named only some is Screen Time working, and asking
-    /// twice more would only take longer to say the same thing.
+    /// nothing, it throws, or it never comes back at all, and the app cannot tell which in
+    /// advance. So each ask is given `UsageReader.patience`, and it is asked again, a second
+    /// apart, until Screen Time answers — an answer holding nothing is a failed query worth
+    /// repeating, while an answer that named only some is Screen Time working, and asking twice
+    /// more would only take longer to say the same thing.
     ///
-    /// Whatever is still nameless at the end is dropped rather than drawn: it has no name to
-    /// show and no token to write a rule on, so its card would be furniture. An app used in the
-    /// last fortnight and since deleted is exactly that, and it must not be able to wedge the
-    /// page for good.
+    /// The cards are on the page throughout, drawn from the tables (`Brand`), and every token
+    /// that lands swaps Apple's artwork in for a letter. Whatever the tables did not know and
+    /// Screen Time never named is dropped at the end rather than drawn: it has no name to show
+    /// and no token to write a rule on, so its card would be furniture. An app used in the last
+    /// fortnight and since deleted is exactly that, and it must not be able to wedge the page.
     private func nameApps() async {
         guard #available(iOS 26.4, *) else { return }
-        phase = .naming
+        naming = true
+        defer { naming = false }
         for attempt in 1...Self.namingAttempts {
             guard let read = summary else { return }
             do {
-                let pass = try await UsageReader.fillingTokens(in: read)
+                let pass = try await UsageReader.fillingTokens(in: read, within: UsageReader.patience)
                 summary = pass.summary
-                SharedStore.log("usage: naming attempt \(attempt) \(pass.answered ? "answered" : "came back empty"), \(unnamed) of \(advice.count) unnamed")
+                SharedStore.log("usage: naming attempt \(attempt) \(pass.answered ? "answered" : "came back empty"), \(tokenless) of \(advice.count) still without a token")
                 if pass.answered { break }
+            } catch is UsageReader.Unanswered {
+                SharedStore.log("usage: naming attempt \(attempt) unanswered after \(UsageReader.patience.components.seconds) s")
             } catch {
                 SharedStore.log("usage: naming attempt \(attempt) failed: \(error.localizedDescription)")
             }
@@ -420,11 +457,11 @@ struct UsageView: View {
             try? await Task.sleep(for: .seconds(1))
         }
         guard !Task.isCancelled else { return }
-        // Only now can the halves of a linked pair be added together, and only now is it worth
-        // ranking. Folding needs to know which entry is which target, and for an app that is the
-        // token — which is exactly what the loop above has just been waiting for. Ranked again
-        // afterwards because a folded pair carries both halves' minutes and so may place higher
-        // than either half did alone.
+        // Only now can an app's half of a linked pair be added to its site's, and only now is it
+        // worth ranking again. Folding needs to know which entry is which target, and for an app
+        // that is the token — which is exactly what the loop above has just been waiting for.
+        // Ranked again because a folded pair carries both halves' minutes and so may place
+        // higher than either half did alone.
         if let read = summary {
             let folded = read.folded(in: model.state.config)
             if folded.entries.count != read.entries.count {
@@ -433,15 +470,18 @@ struct UsageView: View {
             summary = folded
             advice = folded.recommendations
         }
-        let named = advice.filter { summary?.entry(for: $0)?.targetKind != nil }
-        // Suggestions existed and not one of them could be named: Screen Time did not do its
-        // half, and there is nothing to show. An honestly empty fortnight is not this.
+        let named = shown
+        // Suggestions existed and not one of them could be named, by the tables or by Screen
+        // Time: there is nothing to show. An honestly empty fortnight is not this.
         phase = (!advice.isEmpty && named.isEmpty) ? .nameless : .ready
         advice = named
     }
 
+    /// Suggestions the tables had no name for.
+    private var unnamed: Int { advice.count - shown.count }
+
     /// Suggestions Screen Time has still handed no token for.
-    private var unnamed: Int {
+    private var tokenless: Int {
         guard let summary else { return 0 }
         return advice.filter { summary.entry(for: $0)?.targetKind == nil }.count
     }
@@ -455,10 +495,18 @@ struct UsageView: View {
         busy = item.key
         defer { busy = nil }
 
+        var entry = entry
+        if entry.targetKind == nil, naming {
+            // `nameApps` is asking Screen Time this very question for every card at once, and
+            // asking it again for this one would be a second slow query racing the first. Wait
+            // for that answer instead; the button reads "Applying…" meanwhile.
+            while naming, !Task.isCancelled { try? await Task.sleep(for: .milliseconds(200)) }
+            entry = summary?.entry(for: item) ?? entry
+        }
         var kind = entry.targetKind
         if kind == nil {
             do {
-                kind = try await UsageReader.kind(forKey: entry.key)
+                kind = try await UsageReader.kind(forKey: entry.key, within: UsageReader.patience)
             } catch {
                 states[item.key] = .failed(error.localizedDescription)
                 return

@@ -39,12 +39,19 @@ struct UsageEntry: Hashable, @unchecked Sendable {
     }
 
     /// What to call this where there is no token to draw Apple's own name from. With data
-    /// access `localizedDisplayName` is nil and `name` falls back to the bundle identifier,
-    /// which is not a name anybody should be shown: a site names itself, an app does not.
+    /// access `localizedDisplayName` is nil and `name` is what the tables call the bundle
+    /// identifier (`Brand.name`), or the identifier itself when they do not know it — which is
+    /// not a name anybody should be shown: a site names itself, an app does not.
     var plainName: String {
         if let domain = UsageAnalysis.domain(inKey: key) { return domain }
         return name == key ? "This app" : name
     }
+
+    /// Whether there is anything to call this on screen: a token, which draws Apple's own name,
+    /// or a name the tables knew. A bare bundle identifier is neither, and a card is not drawn on
+    /// one — `UsageView` holds it back while Screen Time is still being asked for the token, and
+    /// drops it once Screen Time has stopped answering.
+    var isNamed: Bool { targetKind != nil || name != key }
 }
 
 /// Everything one walk of the data found.
@@ -119,9 +126,15 @@ enum UsageCollector {
                     for await activity in category.applications {
                         let app = activity.application
                         guard let key = app.bundleIdentifier ?? app.token.map({ "app:\($0.hashValue)" }) else { continue }
+                        // Apple's name where the report extension gets one; with data access it
+                        // does not, and the tables know most of what is worth a card. The
+                        // identifier itself is the last resort, and `plainName` reads it as none.
                         var entry = entries[key] ?? UsageEntry(
                             key: key,
-                            name: app.localizedDisplayName ?? app.bundleIdentifier ?? "This app",
+                            name: app.localizedDisplayName
+                                ?? app.bundleIdentifier.flatMap(Brand.name(forKey:))
+                                ?? app.bundleIdentifier
+                                ?? "This app",
                             histogram: UsageHistogram(),
                             applicationToken: app.token
                         )

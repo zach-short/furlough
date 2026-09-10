@@ -60,7 +60,7 @@ struct UsageSuggestionCard: View {
             if let kind = entry.targetKind {
                 TokenTile(kind: kind, size: 42)
             } else {
-                PlainTile(isSite: entry.key.hasPrefix("web:"), size: 42)
+                MonogramTile(entry: entry, size: 42)
             }
             VStack(alignment: .leading, spacing: 3) {
                 name
@@ -82,9 +82,9 @@ struct UsageSuggestionCard: View {
         }
     }
 
-    /// Apple's own name for the app, drawn by Apple. With data access `localizedDisplayName` is
-    /// nil, so the only name that exists is the one `Label(token)` draws inside this process —
-    /// which is why a bundle identifier must never reach the screen.
+    /// Apple's own name for the app, drawn by Apple, once there is a token to draw it from.
+    /// Until then the tables' name (`Brand.name`, via `plainName`): with data access
+    /// `localizedDisplayName` is nil, and a bundle identifier must never reach the screen.
     @ViewBuilder
     private var name: some View {
         if let kind = entry.targetKind {
@@ -173,7 +173,7 @@ struct UsageAppliedLine: View {
                 if let kind = entry.targetKind {
                     TokenTile(kind: kind, size: 24)
                 } else {
-                    PlainTile(isSite: entry.key.hasPrefix("web:"), size: 24)
+                    MonogramTile(entry: entry, size: 24)
                 }
                 if let kind = entry.targetKind {
                     TokenName(kind: kind).foregroundStyle(Ember.cream)
@@ -228,7 +228,7 @@ struct UsageSkippedLine: View {
                 if let kind = entry.targetKind {
                     TokenTile(kind: kind, size: 24).opacity(0.55)
                 } else {
-                    PlainTile(isSite: entry.key.hasPrefix("web:"), size: 24).opacity(0.55)
+                    MonogramTile(entry: entry, size: 24).opacity(0.55)
                 }
                 if let kind = entry.targetKind {
                     TokenName(kind: kind).foregroundStyle(Ember.muted)
@@ -305,24 +305,42 @@ struct UsageFoldButton: View {
     }
 }
 
-/// The tile for something Screen Time counted but handed no token for, so there is no artwork
-/// to draw. The same shape `TokenTile` gives a typed host, in the same proportions.
-struct PlainTile: View {
-    let isSite: Bool
+/// The tile for something Screen Time has handed no token for yet, so there is no artwork to
+/// draw: the first letter of the name on the colour the app is known by (`Brand`), in the shape
+/// and proportions `TokenTile` gives a typed host, so the real icon can take its place without
+/// the row moving. An app the tables know but have no colour for gets its letter in amber on the
+/// plain ground; a site they do not know keeps the globe. An app they do not know is not drawn at
+/// all (`UsageEntry.isNamed`), so the dashed square is a fallback that should never be seen.
+struct MonogramTile: View {
+    let entry: UsageEntry
     var size: CGFloat = 34
 
+    private var isSite: Bool { UsageAnalysis.domain(inKey: entry.key) != nil }
+    private var letter: String? { entry.isNamed ? Brand.monogram(entry.plainName) : nil }
+    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: size * 0.26, style: .continuous) }
+
     var body: some View {
-        Image(systemName: isSite ? TokenTile.hostSymbol : "square.dashed")
-            .font(.system(size: size * 0.46, weight: .semibold))
-            .foregroundStyle(Ember.amber)
-            .frame(width: size, height: size)
-            .background(
-                Color.white.opacity(0.07),
-                in: RoundedRectangle(cornerRadius: size * 0.26, style: .continuous)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: size * 0.26, style: .continuous)
-                    .strokeBorder(Ember.cardBorder, lineWidth: 1)
-            )
+        Group {
+            if let letter, let color = Brand.color(forKey: entry.key) {
+                Text(letter)
+                    .emberDisplaySmall(size * 0.5)
+                    .foregroundStyle(Brand.isLight(color) ? Color(hex: Brand.ink) : Ember.cream)
+                    .frame(width: size, height: size)
+                    .background(Color(hex: color), in: shape)
+            } else if let letter, !isSite {
+                Text(letter)
+                    .emberDisplaySmall(size * 0.5)
+                    .foregroundStyle(Ember.amber)
+                    .frame(width: size, height: size)
+                    .background(Color.white.opacity(0.07), in: shape)
+            } else {
+                Image(systemName: isSite ? TokenTile.hostSymbol : "square.dashed")
+                    .font(.system(size: size * 0.46, weight: .semibold))
+                    .foregroundStyle(Ember.amber)
+                    .frame(width: size, height: size)
+                    .background(Color.white.opacity(0.07), in: shape)
+            }
+        }
+        .overlay(shape.strokeBorder(Ember.cardBorder, lineWidth: 1))
     }
 }

@@ -63,6 +63,52 @@ enum UsageReader {
         )
     }
 
+    /// How long one question to Screen Time is given before it is treated as unanswered. The
+    /// installed-apps query behind `fillingTokens` and `kind(forKey:)` is one round trip to
+    /// Screen Time's own process that usually answers in a second or two and sometimes never
+    /// does, and a caller with nothing else to do about it kept "Asking Screen Time…" on the
+    /// screen for minutes at a time. Generous rather than tight, because the page no longer waits
+    /// on the answer: the cost of giving up on a slow answer is an icon, and the cost of not
+    /// giving up was the page.
+    static let patience: Duration = .seconds(12)
+
+    /// Screen Time did not answer within `patience`.
+    struct Unanswered: LocalizedError {
+        var errorDescription: String? { "Screen Time did not answer." }
+    }
+
+    /// `fillingTokens(in:)`, given up on after `limit` — see `patience`.
+    @available(iOS 26.4, *)
+    static func fillingTokens(in summary: UsageSummary, within limit: Duration) async throws -> Naming {
+        try await within(limit) { try await fillingTokens(in: summary) }
+    }
+
+    /// `kind(forKey:)`, given up on after `limit` — see `patience`.
+    @available(iOS 26.4, *)
+    static func kind(forKey key: String, within limit: Duration) async throws -> TargetKind? {
+        try await within(limit) { try await encodedKind(forKey: key) }
+            .map { try JSONDecoder().decode(TargetKind.self, from: $0) }
+    }
+
+    /// `ask`, or `Unanswered` when it has not come back within `limit`. The question is
+    /// cancelled then, though the process on the other side may well go on with it; nothing
+    /// here waits for that.
+    private static func within<Answer: Sendable>(
+        _ limit: Duration,
+        _ ask: @escaping @Sendable () async throws -> Answer
+    ) async throws -> Answer {
+        try await withThrowingTaskGroup(of: Answer?.self) { group in
+            group.addTask { try await ask() }
+            group.addTask {
+                try await Task.sleep(for: limit)
+                return nil
+            }
+            defer { group.cancelAll() }
+            guard let first = try await group.next(), let answer = first else { throw Unanswered() }
+            return answer
+        }
+    }
+
     /// What one pass at naming found.
     struct Naming: Sendable {
         var summary: UsageSummary
