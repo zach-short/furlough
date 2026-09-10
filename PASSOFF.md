@@ -31,11 +31,14 @@ on 1. Read the Done prompts only as history, or where one says a later item shou
 | 10 | Write down the no-QR, no-pause decisions | Done — HANDOFF 23, in the 8a session | Opus | D | nothing | `HANDOFF.md`, `site/src/pages/help/nfc-tags.astro` |
 | 11 | More companion pairs, every one confirmed | Done — HANDOFF 30 | **Sonnet** | F | nothing | `Companions.swift`, `CompanionsTests.swift`, new `design/companions-sources.md` |
 | 12 | Suggested rules by hazard tier, and an audit for quality-of-life defaults like it | Done — HANDOFF 28 | Opus | G | nothing | new `Shared/Core/RuleSuggestion.swift`, `RuleEditorView`, `Tests/Core` |
+| 13 | The link contract: schemas, test vectors and tables a port can be built against | **Open** — added 2026-09-10 | Opus | H | nothing; HANDOFF 37 landed | new `protocol/`, new `Tests/Core/ProtocolFixturesTests.swift`, `HANDOFF.md` |
 
 **Two things landed that this board never planned**, so look for them in HANDOFF rather than
 here: the first week with capped delays and the 15-minute undo (HANDOFF 27, the lane-f
 session — it is why item 10's prompt carries a correction), and the Mac's Reset everything
 going all the way back to a first run (HANDOFF 31, with the detail in its "The Mac" section).
+
+**Item 13 was added 2026-09-10**, after HANDOFF 37 landed: the link contract as data, so a port on another platform can be built against the real record shapes and the real merge rules. It is the one open item not gated on Apple, and it is parallel-safe with everything.
 
 **Lanes run in parallel with each other; tasks inside a lane run one after another.**
 A, B, C, D and E can all be open at once, each in its own worktree. Inside A the order is
@@ -767,3 +770,129 @@ bare default.
 Hand back: the agreed tier defaults and exception list (with Zach's sign-off noted), the
 suggestion mechanism, two or three other quality-of-life proposals from the second half with
 Zach's answer on each, and the test run's output.
+
+---
+
+## 13. The link contract: schemas, test vectors and tables a port can be built against
+
+**Model: Opus. Lane H. Waits on nothing — HANDOFF 37 landed as `6158863`. Parallel-safe: it
+adds `protocol/` and one test file and changes no existing Swift.**
+
+You are picking up Furlough, Zach's iOS and Mac app blocker. Read `HANDOFF.md` (step 37 most
+carefully), then `README.md`, then the memory note "Cross-platform ports assessment" and the
+page it links, which holds the platform matrix this work serves. Session rules: never commit
+or push; when done, print `git add <your files>` and a lowercase `git commit -m "..."` for
+Zach, with no Co-Authored-By; run `xcodegen generate` after adding a file; keep the build
+warning-free; every `Shared/Core` change gets tests in `Tests/Core`; ask Zach before building
+anything marked "decide with Zach". Work in a worktree (`EnterWorktree`, then `git reset
+--hard main`, because the worktree branches from a stale origin); the worktree guard refuses
+heredocs and `a; b` lines, so use Edit and Write there.
+
+**Why this exists.** Zach is weighing Android, Windows and Linux. Every port needs the same
+two things before a line of Kotlin or C# is worth writing: the exact shape of what crosses
+between devices, and a way to prove that a second implementation merges, drops and lands
+additions exactly as the Swift does. Today both live only in Swift and its tests. This session
+writes them down as data any language can load, generated from the real code so they cannot
+drift. It builds no port, no relay and no transport; those are later items, and some of them
+are Zach's decisions.
+
+**What is fixed, and must be described as it is rather than as it might become.** These are
+the linking session's decisions of 2026-09-10. Do not relitigate them and do not change the
+code they describe.
+
+- The link is opt-in per device and gates everything, the Anchor included. Grandfathering is
+  only for installs that had already heard the other device.
+- Four key namespaces in the store: `furlough.anchor.v1` (`AnchorRecord`),
+  `furlough.device.<id>` (`LinkedDevice`), `furlough.revoke.<id>` (`Revocation`), and
+  `furlough.adds.<id>` (a ring of the last 20 `SharedAddition`s).
+- `AnchorSync.merge` accepts a release only from origin `tagScan` on platform `phone`. The
+  roster carries `canRelease`, and switching the merge to it is a one-line change Zach has not
+  made. The contract says what the code does today and lists the switch under "not decided".
+- `macDrop` needs something to hold, the store reachable, and another roster device that can
+  release. Leaving or revoking is refused while an anchor holds here or on the record.
+- A `SharedAddition` is a name plus every bundle id and host, never a token; a receiver blocks
+  what it can find. Defaults: companion site Always, send Ask, accept Ask.
+- A device without iCloud has no path today. There is no relay, and nothing you write may
+  imply one is coming or small: it would mean Furlough running a server, which the privacy
+  page says it does not.
+
+Do these, in order:
+
+1. **`protocol/README.md`, the contract in words.** One document a Kotlin or C# engineer
+   could implement from with nothing else open. Sections: what crosses and what never does
+   (tokens, and rules as such); the four keys and the lifetime of each entry; every field of
+   `AnchorRecord`, `LinkedDevice`, `Revocation` and `SharedAddition` with its meaning and its
+   encoding (dates ISO-8601, the way `AnchorCloud` encodes); the merge rules; the Mac-drop
+   guard; the leave refusal; the ring, the watermark per source and the declined set; what a
+   receiver does with an addition on each platform today; the three settings; what a transport
+   must provide (a keyed store that lists by prefix, a reachable probe, a change signal, and
+   identity scoping) and which of those iCloud gives for free; and a "not decided" list (the
+   relay, `canRelease` in the merge, platform values beyond phone, pad and mac). Take the
+   sentences from HANDOFF 37 and the doc comments in `AnchorSync.swift`, `DeviceLink.swift`,
+   `SharedAdditions.swift` and `LinkFlow.swift`. Do not paraphrase a rule you have not read in
+   the code.
+
+2. **JSON Schemas** (draft 2020-12) in `protocol/schema/`: `anchor-record.json`,
+   `linked-device.json`, `revocation.json`, `shared-addition.json`, and `config-export.json`
+   for the setup file (`ConfigExport` version 1, with `ExportedTarget` and `alsoBlocks`).
+   Required fields, enums with the exact raw values the Swift enums encode, dates as
+   `date-time`. Field descriptions are the README's sentences, shortened.
+
+3. **Test vectors** in `protocol/fixtures/`, one JSON file per case, inputs written by hand and
+   expectations written by the code:
+   - `merge/`: every branch of `AnchorSync.merge`. A stale sequence; a release from a phone's
+     tag scan over a holding anchor; a release refused from a Mac writer, from origin `lift`,
+     and from origin `drop` with `isAnchored` false; a release when nothing holds here; a drop
+     already over by this clock; a hold lengthened; a drop over an anchor already down with the
+     same `until`; anchored by the other device with and without an `until`.
+   - `mac-drop/`: each `DropRefusal` and the success case.
+   - `roster/`: `Roster.linked`; `hasKey(besides:)` with and without a releaser; a revocation
+     newer and one older than the entry; `leaveRefusal` in its four combinations.
+   - `additions/`: the ring capped at 20 and an id replacing its earlier write; `unseen`
+     against a watermark; the Mac's `landing` for an app installed, an app not installed, a row
+     already covering a door, and a rule arriving where the row has none.
+   Shape per file: `{ "name", "input": {…}, "expected": {…} }`, with `expected` carrying the
+   note string wherever the function returns one. Dates in inputs are fixed ISO-8601 strings,
+   never now.
+
+4. **`Tests/Core/ProtocolFixturesTests.swift`** loads every fixture with the real Codable
+   types, runs the pure function, and asserts `expected`. With `FURLOUGH_WRITE_FIXTURES=1` in
+   the environment it rewrites every `expected` from the current code instead, so a behaviour
+   change fails the test until someone regenerates on purpose, and the diff of the fixtures is
+   the review. Find the files from `#filePath` (`Tests/Core`, up to the repo root, then
+   `protocol/`) rather than adding resources to the test bundle, so `project.yml` stays
+   untouched. The same test checks every schema against a fixture: each key the encoder wrote
+   is a property the schema names, and each enum's raw values equal the schema's `enum` list.
+   No JSON Schema library; a small walk over `properties` is enough.
+
+5. **Tables** in `protocol/tables/`, written and checked by the same test under the same flag:
+   `companions.json` from `Companions.pairs` (names, bundle ids, hosts, in table order),
+   `tiers.json` from the tier-suggestion table in `AppUtility`, and `rule-suggestions.json`
+   from `RuleSuggestion`. Then `other-platforms.json`, keyed by a pair's title, with `android`
+   package names and `windows` executable names, and a test that every key is a real title.
+   **Decide with Zach** whether to fill it now. The house rule from item 11 is every entry
+   confirmed: a Play Store listing URL confirms a package name, while most Windows executables
+   cannot be confirmed from a vendor page. Leave what cannot be confirmed empty rather than
+   guessed.
+
+6. **HANDOFF step 38**, at the end of "Next work": what `protocol/` is, how to regenerate, and
+   that the fixtures are the contract for any port. Add one line to the code map for
+   `protocol/`. Do not edit step 37.
+
+Hand back first. Then, only if Zach says go on:
+
+7. **Rules-engine vectors** in `protocol/fixtures/policy/`, the same mechanism over `Policy`:
+   status at a time, the next transition, tightening against loosening (`classify`), pending
+   changes landing, a window crossing midnight kept as two, and per-weekday budgets. Draw the
+   cases from `PolicyStatusTests`, `PolicyPendingTests`, `NextWindowTests`,
+   `WeekdayBudgetTests` and `ActivityLimitTests`. This is the safety net a Kotlin engine would
+   run, and it is a second commit.
+
+Not in scope, whoever asks: a relay or any transport; any change to `merge`, `macDrop`, the
+roster, the ring or `LinkFlow`; new platform values; compiling Swift for another OS; any
+screen. If a fixture cannot be written without changing the code, stop and say so.
+
+Hand back: `xcodebuild test -project Furlough.xcodeproj -scheme FurloughCoreTests -destination
+'platform=macOS,arch=arm64'` green, with the fixture count; the README; the two git blocks.
+Nothing to tap. What Zach should do is read `protocol/README.md` once as if he were the
+Android engineer and say what he could not build from it.
