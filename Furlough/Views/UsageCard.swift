@@ -202,6 +202,11 @@ struct UsageAppliedLine: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 13)
+        .contentShape(Rectangle())
+        // Anywhere the three buttons are not. They are inside this, and a button takes its own
+        // tap first, so Undo and Edit rule still do their own thing; the rest of the line opens
+        // the card, the way the skipped line reopens from anywhere on it.
+        .onTapGesture(perform: expand)
         .emberCard()
     }
 }
