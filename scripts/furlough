@@ -98,33 +98,59 @@ phone_destination() {
     | sed -n 's/.*id:\([0-9A-Za-z-]*\).*/\1/p'
 }
 
+# The State column has at least three values — "available (paired)", "connected" and
+# "unavailable" — and only the last one means it cannot be installed onto. Matching the good
+# states by name got this wrong: an earlier version asked for /available/, which a phone
+# reading "connected" fails, so a finished build was thrown away at the install step for a
+# device that was sitting right there. Name the one bad state instead and accept the rest.
 phone_device() {
   xcrun devicectl list devices 2>/dev/null \
-    | awk '/available/ && !/unavailable/ { for (i = 1; i <= NF; i++) if ($i ~ /^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-/) { print $i; exit } }'
+    | awk '!/unavailable/ { for (i = 1; i <= NF; i++) if ($i ~ /^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-/) { print $i; exit } }'
 }
 
 cmd_phone() {
-  local dest dev app
+  local dest dev app stamp on_phone
+  # project.yml pins CURRENT_PROJECT_VERSION to 1, so without this every local build calls
+  # itself "1.1 (1)": older-looking than the TestFlight build beside it, and identical to the
+  # one it just replaced. That makes a fresh install impossible to tell from a stale one by
+  # looking, which is exactly the doubt this command exists to remove. archive.sh stamps a UTC
+  # timestamp for the same reason; do it here too, so About names the minute it was built.
+  stamp="$(date -u +%Y%m%d%H%M)"
+
+  # Both lookups happen before the build. They are the two things that can be wrong about the
+  # phone, the build takes minutes, and finding out afterwards means doing it all again.
   dest="$(phone_destination)"
   [[ -n "$dest" ]] || die "no iPhone among the build destinations.
-  Plug it in, unlock it, tap Trust, and check with:  xcrun devicectl list devices
-  It has to say available (paired) — unavailable usually means locked or half-seated."
+  Plug it in, unlock it, tap Trust, and check with:  xcrun devicectl list devices"
+  dev="$(phone_device)"
+  [[ -n "$dev" ]] || die "xcodebuild can see the phone but devicectl calls it unavailable.
+  Unlock it, or unplug and replug it, then check:  xcrun devicectl list devices"
 
-  say "Building Debug for $dest"
+  say "Building Debug for $dest  (build $stamp)"
   xcodebuild -project Furlough.xcodeproj -scheme Furlough -configuration Debug \
     -destination "platform=iOS,id=$dest" -allowProvisioningUpdates \
-    -derivedDataPath build/DerivedData "$@" build
+    -derivedDataPath build/DerivedData CURRENT_PROJECT_VERSION="$stamp" "$@" build
 
   app="build/DerivedData/Build/Products/Debug-iphoneos/Furlough.app"
   [[ -d "$app" ]] || die "the build left no app at $app"
-
-  dev="$(phone_device)"
-  [[ -n "$dev" ]] || die "built it, but devicectl lists no available device to install onto"
 
   say "Installing"
   xcrun devicectl device install app --device "$dev" "$app"
   say "Launching"
   xcrun devicectl device process launch --device "$dev" "$BUNDLE_ID"
+
+  # Ask the phone what it ended up with rather than trusting that the three steps above did
+  # what they said. An install that quietly did not replace anything is the failure this
+  # command cannot otherwise show, and the answer is one query away.
+  on_phone="$(xcrun devicectl device info apps --device "$dev" 2>/dev/null \
+    | awk -v b="$BUNDLE_ID" '$2 == b { print $3 " (" $4 ")" }')"
+  if [[ "$on_phone" == *"($stamp)"* ]]; then
+    say "on the phone now: $on_phone"
+  else
+    printf '%sfurlough: the phone reports %s, not build %s.%s\n' "$B" "${on_phone:-nothing}" "$stamp" "$O" >&2
+    printf '  The install did not replace what was there. Delete Furlough on the phone and run this again.\n' >&2
+    return 1
+  fi
 }
 
 # --- the Mac --------------------------------------------------------------------------------
