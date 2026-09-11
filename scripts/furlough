@@ -1,0 +1,216 @@
+#!/usr/bin/env bash
+#
+# furlough — one name for everything this repo gets told to do.
+#
+#   furlough                 the menu
+#   furlough phone           build Debug and run it on the connected iPhone
+#   furlough beta            cut a build, audit it, and send it to TestFlight
+#   furlough status          what App Store Connect made of the last few builds
+#
+# A front door onto the scripts beside it, which keep all the knowledge: archive.sh cuts and
+# audits the build, beta-submit.sh puts one in front of Beta App Review, store-submit.sh
+# finishes the store record. This file adds the three things none of them can add for
+# themselves — one name to remember instead of nine, one place the App Store Connect
+# credentials are named instead of an env var nobody exports, and a list you can tab through
+# when you have forgotten what the script was called.
+#
+# It lives in scripts/ rather than in ~/.zshrc so that it is version-controlled next to the
+# scripts it calls: a command that grows a step grows it in the same commit as the step. The
+# shell side stays three lines and never needs editing again — `furlough shell` prints them.
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
+# The key id and the issuer are not the secret — the .p8 is, and it stays in
+# ~/.appstoreconnect/private_keys, out of this repo. Both of these are already committed in
+# scripts/check-review-status.sh, so naming them here leaks nothing new and means every store
+# command below works from a cold shell instead of dying on a missing export. A real export
+# still wins, for the day there is a second key.
+export ASC_KEY_ID="${ASC_KEY_ID:-L6A2R4SBXQ}"
+export ASC_ISSUER_ID="${ASC_ISSUER_ID:-04f9fe5a-56e5-460f-80ac-c57e788fbdc6}"
+
+if [[ -t 1 ]]; then B=$'\033[1m'; D=$'\033[2m'; O=$'\033[0m'; else B=''; D=''; O=''; fi
+say()  { printf '%s==>%s %s\n' "$B" "$O" "$*"; }
+die()  { printf 'furlough: %s\n' "$*" >&2; exit 1; }
+
+BUNDLE_ID="$(grep -m1 'PRODUCT_BUNDLE_IDENTIFIER:' project.yml | awk '{print $2}')"
+
+# xcodebuild says everything, and the one line that matters — a Swift error, or one of
+# archive.sh's REFUSING TO SHIP checks — sits somewhere in a thousand others. A build that
+# failed after the terminal scrolled is otherwise unreadable, and worse, a background run
+# reports the wrapper's exit code rather than xcodebuild's, so "exit 0" has meant a failed
+# archive here before. Keep the last log and pull the errors out of it.
+LOG="$ROOT/build/last-archive.log"
+run_logged() {
+  mkdir -p "$ROOT/build"
+  if "$@" 2>&1 | tee "$LOG"; then return 0; fi
+  printf '\n%sfurlough: that failed.%s The lines that say why:\n\n' "$B" "$O" >&2
+  grep -nE 'error:|BUILD FAILED|REFUSING TO SHIP' "$LOG" | awk '!seen[substr($0, index($0, ":") + 1)]++' | head -20 >&2 || true
+  printf '\n  the whole log: %s\n' "$LOG" >&2
+  return 1
+}
+
+# The table both the menu and the zsh completion read, so a command added here appears in both
+# without either being touched. "name:one line about it" — the name up to the first colon.
+COMMANDS=(
+  "phone:build Debug and run it on the connected iPhone"
+  "mac:build the Mac app and put it in /Applications"
+  "test:run the rules-engine tests here, no phone needed"
+  "gen:regenerate Furlough.xcodeproj from project.yml"
+  "open:open the project in Xcode"
+  "archive:cut and audit a Release build, stopping at the .ipa"
+  "beta:archive, then upload it to TestFlight"
+  "submit:send an uploaded build to external Beta App Review"
+  "status:what App Store Connect made of the last few builds"
+  "review:where the App Store version stands right now"
+  "shots:render the App Store screenshots"
+  "shots-up:upload the rendered screenshots"
+  "store:finish the App Store record for this version"
+  "resubmit:resolve a rejection and submit the version again"
+  "log:the tail of the last archive log"
+  "shell:print the three lines that go in ~/.zshrc"
+  "help:this menu"
+)
+
+menu() {
+  printf '%sfurlough%s — %s\n\n' "$B" "$O" "$ROOT"
+  local entry name desc
+  for entry in "${COMMANDS[@]}"; do
+    name="${entry%%:*}"
+    desc="${entry#*:}"
+    printf '  %s%-10s%s %s%s%s\n' "$B" "$name" "$O" "$D" "$desc" "$O"
+  done
+  printf '\n  %sTab completes these. Anything after the name is passed straight through,%s\n' "$D" "$O"
+  printf '  %sso `furlough beta --tools` and `furlough status 20` do what you expect.%s\n' "$D" "$O"
+}
+
+# --- the phone ------------------------------------------------------------------------------
+#
+# One device, named twice by two tools that do not agree on what to call it. xcodebuild wants
+# the hardware UDID, which it prints itself under -showdestinations; devicectl wants the
+# CoreDevice identifier from its own list. Ask each tool for the name it uses rather than
+# trying to convert one into the other — the README carries the scar from the other way round.
+phone_destination() {
+  xcodebuild -project Furlough.xcodeproj -scheme Furlough -showdestinations 2>/dev/null \
+    | grep 'platform:iOS,' | grep -v 'placeholder' | head -1 \
+    | sed -n 's/.*id:\([0-9A-Za-z-]*\).*/\1/p'
+}
+
+phone_device() {
+  xcrun devicectl list devices 2>/dev/null \
+    | awk '/available/ && !/unavailable/ { for (i = 1; i <= NF; i++) if ($i ~ /^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-/) { print $i; exit } }'
+}
+
+cmd_phone() {
+  local dest dev app
+  dest="$(phone_destination)"
+  [[ -n "$dest" ]] || die "no iPhone among the build destinations.
+  Plug it in, unlock it, tap Trust, and check with:  xcrun devicectl list devices
+  It has to say available (paired) — unavailable usually means locked or half-seated."
+
+  say "Building Debug for $dest"
+  xcodebuild -project Furlough.xcodeproj -scheme Furlough -configuration Debug \
+    -destination "platform=iOS,id=$dest" -allowProvisioningUpdates \
+    -derivedDataPath build/DerivedData "$@" build
+
+  app="build/DerivedData/Build/Products/Debug-iphoneos/Furlough.app"
+  [[ -d "$app" ]] || die "the build left no app at $app"
+
+  dev="$(phone_device)"
+  [[ -n "$dev" ]] || die "built it, but devicectl lists no available device to install onto"
+
+  say "Installing"
+  xcrun devicectl device install app --device "$dev" "$app"
+  say "Launching"
+  xcrun devicectl device process launch --device "$dev" "$BUNDLE_ID"
+}
+
+# --- the Mac --------------------------------------------------------------------------------
+#
+# Release, and into /Applications, because that is the only place the login item can point at
+# and the only place macOS will load the web filter from. Same reason the README says so.
+cmd_mac() {
+  say "Building the Mac app"
+  xcodebuild -project Furlough.xcodeproj -scheme FurloughMac -configuration Release \
+    -destination 'platform=macOS,arch=arm64' \
+    -allowProvisioningUpdates -allowProvisioningDeviceRegistration \
+    -derivedDataPath build/DerivedDataMac "$@" build
+  say "Installing to /Applications"
+  rm -rf /Applications/Furlough.app
+  ditto build/DerivedDataMac/Build/Products/Release/Furlough.app /Applications/Furlough.app
+  open /Applications/Furlough.app
+}
+
+# --- everything else ------------------------------------------------------------------------
+
+cmd_log() {
+  [[ -f "$LOG" ]] || die "nothing archived yet on this Mac — run: furlough archive"
+  say "$LOG"
+  grep -nE 'error:|BUILD FAILED|REFUSING TO SHIP' "$LOG" | awk '!seen[substr($0, index($0, ":") + 1)]++' | head -20 || true
+  tail -25 "$LOG"
+}
+
+# The lines for ~/.zshrc. Printed rather than appended, because a shell profile is the one
+# file that should not be edited by something its owner has not read first.
+#
+# They never need editing again: the command list lives in this file, and `--complete` below
+# hands it to zsh at completion time, so a command added to the table above is tab-completable
+# in the shell that is already open.
+cmd_shell() {
+  cat <<SNIPPET
+# furlough: the app's own commands, from anywhere. \`furlough\` alone prints the menu.
+furlough() {
+  if [[ "\$1" == "cd" ]]; then cd "$ROOT"; else "$ROOT/scripts/furlough" "\$@"; fi
+}
+# compdef needs the completion system, and this profile does not otherwise start it.
+(( \$+functions[compdef] )) || { autoload -Uz compinit && compinit }
+_furlough() {
+  local -a cmds
+  # (f) splits on newlines only. Unquoted \$(...) would split on spaces too and turn every
+  # description into a handful of bogus completions.
+  cmds=( \${(f)"\$("$ROOT/scripts/furlough" --complete)"} )
+  _describe 'furlough command' cmds
+}
+compdef _furlough furlough
+SNIPPET
+}
+
+# What _describe eats: one name:description per line. A colon inside a description would end
+# the value early, so they are stripped rather than trusted.
+cmd_complete() {
+  local entry
+  for entry in "${COMMANDS[@]}"; do
+    printf '%s:%s\n' "${entry%%:*}" "$(printf '%s' "${entry#*:}" | tr -d ':')"
+  done
+  printf 'cd:jump to the repo\n'
+}
+
+case "${1:-help}" in
+  phone)     shift; cmd_phone "$@" ;;
+  mac)       shift; cmd_mac "$@" ;;
+  test)      shift; xcodebuild test -project Furlough.xcodeproj -scheme FurloughCoreTests \
+                      -destination 'platform=macOS,arch=arm64' "$@" ;;
+  gen)       shift; xcodegen generate "$@" ;;
+  open)      shift; open Furlough.xcodeproj ;;
+  archive)   shift; run_logged scripts/archive.sh "$@" ;;
+  beta)      shift
+             # --tools is the one flag worth a name of its own: it is an env var on the script
+             # underneath, and a build carrying the testing section must never be the one
+             # promoted for review. archive.sh says so too, loudly, both ways.
+             if [[ "${1:-}" == "--tools" ]]; then shift; TESTING_TOOLS=1 run_logged scripts/archive.sh --upload "$@"
+             else run_logged scripts/archive.sh --upload "$@"; fi ;;
+  submit)    shift; scripts/beta-submit.sh "$@" ;;
+  status)    shift; scripts/status.sh "$@" ;;
+  review)    shift; scripts/check-review-status.sh "$@" ;;
+  shots)     shift; scripts/store-shots.sh "$@" ;;
+  shots-up)  shift; scripts/store-upload.sh "$@" ;;
+  store)     shift; scripts/store-submit.sh "$@" ;;
+  resubmit)  shift; scripts/store-resubmit.sh "$@" ;;
+  log)       shift; cmd_log "$@" ;;
+  shell)     shift; cmd_shell ;;
+  --complete) cmd_complete ;;
+  help|-h|--help) menu ;;
+  *)         printf 'furlough: no command %s\n\n' "$1" >&2; menu >&2; exit 1 ;;
+esac
