@@ -1057,11 +1057,10 @@ final class AppModel {
         // in the queue either way: the anchor lifts, and the scope can be switched back.
         let anchor = state.config.anchor
         guard !anchor.isHolding(at: state.now), !anchor.anchorsEverything else { return }
-        var found: [String: TargetKind] = [:]
-        for bundleID in owed {
-            guard let kind = try? await UsageReader.kind(forKey: bundleID) else { continue }
-            found[bundleID] = kind
-        }
+        // One question for the whole queue, and given up on: asking per bundle identifier was a
+        // walk of every app on the phone per bundle identifier, and an unlimited one — a queue
+        // of those is what the usage page then had to wait behind.
+        let found = (try? await UsageReader.kinds(forKeys: owed, within: UsageReader.patience)) ?? [:]
         guard !found.isEmpty else { return }
         var current = SharedStore.load()
         // Asked again on the store this is about to write: the anchor may have dropped while

@@ -51,6 +51,10 @@ struct UsageView: View {
     /// did not answer, short enough that the icons stop changing under the reader within the
     /// minute. Nothing on the page waits on this; see `nameApps`.
     private static let namingAttempts = 3
+    /// How long Apply waits for `nameApps` to confirm a token before going with the one it has.
+    /// Shorter than the naming can run, on purpose: the wait is worth something, and a button
+    /// that has been spinning for ten seconds is already worse than the thing the wait prevents.
+    private static let applyPatience: Duration = .seconds(10)
 
     /// What the page is doing where the app reads the numbers itself. Nothing is shown until the
     /// hours are in; the cards are drawn the moment they are, named from the tables (`Brand`),
@@ -544,8 +548,20 @@ struct UsageView: View {
             // is wrong — writing a rule on it would leave a target nothing can name and no shield
             // will ever cover, past the half hour `undoFreshTarget` allows. So the one place the
             // cache is not trusted is the place where being wrong outlives the screen.
-            while naming, !Task.isCancelled { try? await Task.sleep(for: .milliseconds(200)) }
+            //
+            // Bounded, though, because `nameApps` is waiting on Screen Time and Screen Time is
+            // not obliged to answer at all: a wait that ended only when the naming did is what
+            // left "Applying…" on this button for good. Past `applyPatience` the button goes
+            // with the token it has — a rule on a stale token is wrong for half an hour and
+            // `undo` is on the card, where a button that never comes back is wrong for ever.
+            let deadline = ContinuousClock.now.advanced(by: Self.applyPatience)
+            while naming, !Task.isCancelled, ContinuousClock.now < deadline {
+                try? await Task.sleep(for: .milliseconds(200))
+            }
             entry = summary?.entry(for: item) ?? entry
+            if naming {
+                SharedStore.log("usage: apply for \(entry.key) went ahead while Screen Time was still being asked")
+            }
         }
         var kind = entry.targetKind
         if kind == nil {

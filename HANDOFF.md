@@ -2567,6 +2567,52 @@ The plan for this stretch. Tick each phase off here as it lands.
     should carry the "tokens from the cache" line. Then Reset everything and open it once more:
     letters first, icons after, as before.
 
+39. **The twelve seconds of patience were not twelve seconds.** Zach, 2026-09-11: Apply on a
+    usage card "stays in a permanent loading state". Fixed the same day.
+
+    **The bug, and it is one line of Swift semantics.** `UsageReader.within(_:_:)` raced the
+    question against `Task.sleep(for: limit)` inside a `withThrowingTaskGroup` and threw
+    `Unanswered` when the sleeper won. But **a task group may not be returned from while a child
+    of it is still running** — `cancelAll()` only *asks*, and
+    `FamilyActivityData.shared.installedApplications` is precisely the question that sometimes
+    never comes back and does not answer the asking. So `within` could not return before its own
+    question did: `patience` was decoration, `nameApps()` never finished, `naming` stayed true,
+    and `apply()`'s `while naming` — which item 38 widened to *every* card with a cached token —
+    had nothing that could ever end it. The button spun for as long as Screen Time sulked.
+
+    Three fixes, all in the query's own layer except the last:
+    - **`within` leaves the straggler behind.** The question runs in a detached task and nothing
+      joins it; a `Race` actor takes whichever of the answer, the failure and the deadline
+      settles first and drops the rest. The outcome crosses as an `Outcome` enum because an
+      error is not `Sendable` — hence `UsageReader.Refused`, which carries what the error said.
+      The straggler is not even cancelled: it still fills the cache and still answers the next
+      caller.
+    - **One walk of the installed list at a time, shared** (`UsageReader.Enumeration`). That is
+      what makes leaving a straggler safe rather than a way to stack three enumerations on a
+      phone that is already struggling: the second attempt joins the first question instead of
+      adding one. `kind(forKey:)` goes through it too, so a single-key lookup is a dictionary
+      read of the shared answer rather than its own enumeration of every app on the phone —
+      and `encodedKind(forKey:)` is gone. The cache is saved inside the shared question, so
+      joining costs nothing. **Untested on a real phone; no test covers the actor.**
+    - **`AppModel.anchorArrivalsFromTheTables`** asked `kind(forKey:)` once per owed bundle
+      identifier with no limit at all — a full enumeration each, on every activation with a
+      queued arrival, which is the likeliest thing the usage page was stuck behind. Now one
+      `UsageReader.kinds(forKeys:within:)` for the whole queue.
+    - **Apply stops waiting eventually.** `UsageView.applyPatience` (10 s), then it goes with
+      the token it has and logs `usage: apply for <key> went ahead while Screen Time was still
+      being asked`. This is the one place item 38's rule is relaxed: a rule written on a stale
+      cached token is wrong for the half hour `undoWindow` allows and `undo` is on the card,
+      and a button that never comes back is wrong for ever. Worst case Apply is now ~22 s
+      (10 s waiting on naming, 12 s on its own lookup) and then says something definite.
+
+    **Not seen on the phone.** 677 tests in 97 suites pass and the phone build is warning-free,
+    but the failure itself has not been reproduced here — a wedged `installedApplications` is
+    not something the simulator can be made to do, and FamilyControls cannot authorise there at
+    all. What to check on the device: Apply while the "Asking Screen Time about N more apps…"
+    line is still up, and confirm the button resolves — applied, or a card that says why —
+    within about twenty seconds either way. Diagnostics carries the naming attempts and, if the
+    wait ran out, the "went ahead" line.
+
 ## Style rules
 
 Swift 6 language mode with approachable concurrency, SwiftUI, `@Observable`, async/await, no

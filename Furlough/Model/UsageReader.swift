@@ -83,29 +83,101 @@ enum UsageReader {
         try await within(limit) { try await fillingTokens(in: summary) }
     }
 
-    /// `kind(forKey:)`, given up on after `limit` — see `patience`.
+    /// `kind(forKey:)`, given up on after `limit` — see `patience`. Nil where the key is not
+    /// installed, which is an answer and not a failure: only silence throws.
     @available(iOS 26.4, *)
     static func kind(forKey key: String, within limit: Duration) async throws -> TargetKind? {
-        try await within(limit) { try await encodedKind(forKey: key) }
-            .map { try JSONDecoder().decode(TargetKind.self, from: $0) }
+        guard let encoded = try await within(limit, { try await encodedKinds()[key] }) else { return nil }
+        return try JSONDecoder().decode(TargetKind.self, from: encoded)
     }
 
-    /// `ask`, or `Unanswered` when it has not come back within `limit`. The question is
-    /// cancelled then, though the process on the other side may well go on with it; nothing
-    /// here waits for that.
+    /// The tokens behind `keys`, out of one walk of the installed list, given up on after
+    /// `limit`. Keys that are not installed are simply absent.
+    @available(iOS 26.4, *)
+    static func kinds(forKeys keys: [String], within limit: Duration) async throws -> [String: TargetKind] {
+        let encoded = try await within(limit) { try await encodedKinds() }
+        let decoder = JSONDecoder()
+        var found: [String: TargetKind] = [:]
+        for key in keys {
+            guard let data = encoded[key] else { continue }
+            found[key] = try decoder.decode(TargetKind.self, from: data)
+        }
+        return found
+    }
+
+    /// `ask`, or `Unanswered` when it has not come back within `limit`.
+    ///
+    /// The question is left behind at the deadline rather than waited on, and that distinction
+    /// is the whole of this. A task group may not be left while a child of it is still running,
+    /// so `cancelAll` inside one only *asks* the child to stop — and the question this exists
+    /// for, `installedApplications`, is exactly the one that sometimes never comes back and does
+    /// not answer the asking. A timeout that still had to wait for it was no timeout at all: it
+    /// is what left "Applying…" on a usage card with nothing that could ever take it off.
+    ///
+    /// The straggler is not even cancelled. `Enumeration` holds one query for everyone who asks,
+    /// so a question that answers late still fills the cache and still answers the next caller —
+    /// which is what makes asking again a second later cost nothing.
     private static func within<Answer: Sendable>(
         _ limit: Duration,
         _ ask: @escaping @Sendable () async throws -> Answer
     ) async throws -> Answer {
-        try await withThrowingTaskGroup(of: Answer?.self) { group in
-            group.addTask { try await ask() }
-            group.addTask {
-                try await Task.sleep(for: limit)
-                return nil
+        let race = Race<Answer>()
+        Task.detached(priority: .userInitiated) {
+            do { await race.settle(.answered(try await ask())) }
+            catch { await race.settle(.refused(error.localizedDescription)) }
+        }
+        // Detached, so a caller that goes away cannot leave the race with nobody to end it.
+        let timer = Task.detached(priority: .utility) {
+            try? await Task.sleep(for: limit)
+            await race.settle(.unanswered)
+        }
+        defer { timer.cancel() }
+        let outcome = await withTaskCancellationHandler {
+            await race.first()
+        } onCancel: {
+            Task { await race.settle(.unanswered) }
+        }
+        switch outcome {
+        case .answered(let answer): return answer
+        case .unanswered: throw Unanswered()
+        case .refused(let reason): throw Refused(reason)
+        }
+    }
+
+    /// Screen Time answered with a complaint. Carried as what it said rather than as the error
+    /// itself, which cannot cross out of the task that caught it.
+    struct Refused: LocalizedError {
+        var errorDescription: String?
+        init(_ reason: String) { errorDescription = reason }
+    }
+
+    /// Which of the two came first.
+    private enum Outcome<Answer: Sendable>: Sendable {
+        case answered(Answer)
+        case refused(String)
+        case unanswered
+    }
+
+    /// The first answer in, and no way for the second to matter. Whoever settles first wins and
+    /// the loser's `settle` does nothing, so a question that comes back after the deadline is
+    /// dropped on the floor rather than resuming anybody twice.
+    private actor Race<Answer: Sendable> {
+        private var outcome: Outcome<Answer>?
+        private var waiting: CheckedContinuation<Outcome<Answer>, Never>?
+
+        func settle(_ result: Outcome<Answer>) {
+            guard outcome == nil else { return }
+            outcome = result
+            if let waiting {
+                self.waiting = nil
+                waiting.resume(returning: result)
             }
-            defer { group.cancelAll() }
-            guard let first = try await group.next(), let answer = first else { throw Unanswered() }
-            return answer
+        }
+
+        /// Awaited once, by `within`.
+        func first() async -> Outcome<Answer> {
+            if let outcome { return outcome }
+            return await withCheckedContinuation { waiting = $0 }
         }
     }
 
@@ -176,13 +248,39 @@ enum UsageReader {
     /// Everything installed and everything visited, keyed the way `UsageCollector` keys an
     /// entry, as encoded `TargetKind`s — and written down on the way past, so the next visit
     /// opens on it rather than on this query.
+    ///
+    /// One question at a time, through `Enumeration`: the usage page asks on every visit, an
+    /// activation asks for the names it is missing, an arrival asks for the token behind a
+    /// bundle identifier, and each one of those is a walk of every app on the phone. Asked at
+    /// once they queue up inside Screen Time and every caller pays for all of them, which is how
+    /// a page that had given up waiting could still be waiting.
     @available(iOS 26.4, *)
     private static func encodedKinds() async throws -> [String: Data] {
-        let kinds = try await queryKinds()
-        // Only an answer worth keeping: `refreshed` says no to an empty one, so a query that
-        // failed cannot wipe a good cache.
-        if let fresh = TokenCache.refreshed(with: kinds) { SharedStore.save(fresh) }
-        return kinds
+        try await Enumeration.shared.kinds()
+    }
+
+    /// The one walk of the installed list, shared. A caller arriving while a question is in
+    /// flight waits on that one rather than adding another — including the caller whose own
+    /// patience ran out a moment ago and is asking again (`within`).
+    private actor Enumeration {
+        static let shared = Enumeration()
+        private var asking: Task<[String: Data], any Error>?
+
+        @available(iOS 26.4, *)
+        func kinds() async throws -> [String: Data] {
+            if let asking { return try await asking.value }
+            let question = Task<[String: Data], any Error> {
+                let kinds = try await UsageReader.queryKinds()
+                // Only an answer worth keeping: `refreshed` says no to an empty one, so a query
+                // that failed cannot wipe a good cache. Written here rather than by each caller,
+                // so that joining a question in flight costs nothing.
+                if let fresh = TokenCache.refreshed(with: kinds) { SharedStore.save(fresh) }
+                return kinds
+            }
+            asking = question
+            defer { asking = nil }
+            return try await question.value
+        }
     }
 
     /// The query itself. Off the main actor and answering in bytes for the same reason
@@ -236,26 +334,14 @@ enum UsageReader {
     /// The target for a usage entry Screen Time named but handed no token for: its key is a
     /// bundle identifier, or "web:" and a domain, looked up among the apps installed and the
     /// domains visited. Nil when it is not there.
+    ///
+    /// Out of the same shared walk everything else uses (`encodedKinds`) rather than a walk of
+    /// its own: finding one app costs the whole list either way, so a lookup per key was a
+    /// whole enumeration per key. The answer crosses as bytes and is decoded here, on the
+    /// caller's side: `FamilyActivityData` and the tokens it hands back are not Sendable.
     @available(iOS 26.4, *)
     static func kind(forKey key: String) async throws -> TargetKind? {
-        try await encodedKind(forKey: key).map { try JSONDecoder().decode(TargetKind.self, from: $0) }
-    }
-
-    /// The lookup itself, off the main actor: `FamilyActivityData` and what it returns are not
-    /// Sendable, so they may neither be reached from an actor nor handed back to one. The
-    /// answer crosses as bytes instead; `TargetKind` is Codable for the store anyway.
-    @available(iOS 26.4, *)
-    @concurrent
-    private static func encodedKind(forKey key: String) async throws -> Data? {
-        let kind: TargetKind?
-        if key.hasPrefix("web:") {
-            let domain = String(key.dropFirst(4))
-            kind = try await FamilyActivityData.shared.visitedWebDomains
-                .first { $0.domain == domain }?.token.map(TargetKind.webDomain)
-        } else {
-            kind = try await FamilyActivityData.shared.installedApplications
-                .first { $0.bundleIdentifier == key }?.token.map(TargetKind.application)
-        }
-        return try kind.map { try JSONEncoder().encode($0) }
+        guard let encoded = try await encodedKinds()[key] else { return nil }
+        return try JSONDecoder().decode(TargetKind.self, from: encoded)
     }
 }
