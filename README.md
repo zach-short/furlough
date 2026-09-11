@@ -119,7 +119,7 @@ Or open the project in Xcode, pick the `FurloughMac` scheme and My Mac, and pres
 
 ## Requirements
 
-- A paid Apple Developer account (Family Controls is not available to Personal Teams).
+- A paid Apple Developer account (Family Controls is not available to Personal Teams). The Mac app on its own can be built without one — see [Building the Mac app without a developer account](#building-the-mac-app-without-a-developer-account).
 - Xcode 26 or newer, a physical iPhone. The Screen Time API does not work in the Simulator. The Mac app needs macOS 26.
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen): `brew install xcodegen`
 
@@ -214,3 +214,54 @@ xcodebuild test -project Furlough.xcodeproj -scheme FurloughCoreTests -destinati
 - The monitor extension can fire a few minutes late, and threshold callbacks occasionally fire twice. Every callback is idempotent, so this is harmless.
 - Anchoring **Everything except** a list shields every app and website iOS lets a shield cover, through `.all(except:)` on the app and website category shields, plus the web content filter for every browser. iOS keeps some of its own apps outside every shield, so those stay reachable however the anchor is set; the site's Anchor help page records which, as they are confirmed on a phone. Websites off the list are blocked by the content filter as well as the shield, so a browser other than Safari shows iOS's own "Website Not Allowed" page, and an app on the list that loads web content inside itself may be blocked from doing so. A category cannot be excepted from a shield over everything, so the allowlist holds apps and sites only; picking a category in the picker puts its apps on the list one by one.
 - Distributing outside Xcode (TestFlight, App Store) needs the Family Controls distribution entitlement, requested per bundle ID, which can take weeks. `~/Projects/archive/furlough/testflight-deployment/DEPLOYMENT.md` has the request, and everything else the App Store wants.
+
+## Building the Mac app without a developer account
+
+The Mac app is the half of Furlough that never touches the Screen Time API, so nothing it does needs Family Controls — and with five lines out of `project.yml` it does not need an Apple Developer account either. Rules, windows, budgets, the quitting of blocked apps, the tab reader and its shield page, and the menu bar hourglass all work under an ad-hoc signature.
+
+You need macOS 26, Xcode 26 from the App Store, and Homebrew.
+
+1. Install XcodeGen. The Xcode project file is not in the repo — it is generated from `project.yml`:
+   ```bash
+   brew install xcodegen
+   ```
+2. Clone the repo, and run everything below from inside the `furlough` folder it makes:
+   ```bash
+   git clone https://github.com/zach-short/furlough.git
+   ```
+3. Open `project.yml` and delete five lines, all inside the `FurloughMac:` target (it starts around line 319). These are the parts Apple only grants a paid account. Four of them are under `entitlements:`:
+   ```yaml
+   com.apple.developer.ubiquity-kvstore-identifier: $(TeamIdentifierPrefix)com.zachshort.furlough
+   com.apple.developer.system-extension.install: true
+   com.apple.developer.networking.networkextension:
+     - content-filter-provider
+   ```
+   and the fifth is in the `dependencies:` block at the end of that same target:
+   ```yaml
+   - target: FurloughMacFilter
+   ```
+   Leave everything else alone. Do not touch the `.entitlements` files: XcodeGen writes those from `project.yml`.
+4. Generate the Xcode project:
+   ```bash
+   xcodegen generate
+   ```
+5. Build it:
+   ```bash
+   xcodebuild -project Furlough.xcodeproj -scheme FurloughMac -configuration Release \
+     -destination 'platform=macOS,arch=arm64' -derivedDataPath build/DerivedDataMac \
+     DEVELOPMENT_TEAM= CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual build
+   ```
+6. Put it in `/Applications`. It has to live there for the login item to point at it:
+   ```bash
+   ditto build/DerivedDataMac/Build/Products/Release/Furlough.app /Applications/Furlough.app
+   ```
+7. Open it:
+   ```bash
+   open /Applications/Furlough.app
+   ```
+8. Say yes to the permission prompts. macOS asks once per browser whether Furlough may control it — that is how sites get blocked. Refusing means that browser is not enforced. You can change it later under System Settings > Privacy & Security > Automation.
+
+Two things are not in a build made this way, since both ride on entitlements only a paid team can grant:
+
+- **The web filter.** The tab reader is the whole of web enforcement, so Safari and the Chromium browsers are covered and Firefox, a site saved to the Dock as an app, and anything else that loads a site outside a scriptable browser are not.
+- **The Anchor's lock.** It crosses between devices on the iCloud key-value store, which needs the first entitlement removed above, so nothing crosses at all. A Mac refuses to drop an anchor unless an iPhone is on the link — only that phone's tag could ever release one — and in this build none ever will be, so **Drop anchor** stays refused. Nothing can get stuck: that refusal is the guard against a lock with no key, and it is doing its job.
