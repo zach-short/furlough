@@ -12,24 +12,31 @@ import SwiftUI
 /// the cards did. The alerts and confirmations came with their cards, so each screen owns its
 /// own — the Anchor page keeps only the ones its reader can raise.
 
-/// The chrome the four share: the title in the bar, the lead under it, the cards below.
+/// The chrome the four share: the title in the bar, the lead under it, the cards below. The
+/// sections behind Settings' menu are built the same way and share it.
 ///
 /// No heading of its own above the lead. The bar already names the screen, and a page that
 /// opens by saying its own name twice is the thing the Anchor page's old header was doing.
+///
+/// The lead is optional because two of the screens have nothing to say before their first card
+/// — About and Diagnostics both open on rows that are already plain — and a paragraph written
+/// only to fill the gap would be the prose this pass took out.
 struct AnchorSettingScreen<Content: View>: View {
     let title: String
-    let lead: String
+    var lead = ""
     @ViewBuilder var content: Content
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                Text(lead)
-                    .emberBody(13.5)
-                    .foregroundStyle(Ember.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 14)
+                if !lead.isEmpty {
+                    Text(lead)
+                        .emberBody(13.5)
+                        .foregroundStyle(Ember.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 8)
+                        .padding(.bottom, 14)
+                }
                 content
             }
             .padding(.horizontal, 16)

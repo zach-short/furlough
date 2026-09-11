@@ -1,21 +1,23 @@
 import SwiftUI
 
-/// The record of the contract, in Settings: days without a budget spent, time held shut this
-/// week, loosenings cancelled against loosenings landed, and the longest the Anchor has held.
+/// The record of the contract, behind Settings' menu: days without a budget spent, time held
+/// shut this week, loosenings cancelled against loosenings landed, and the longest the Anchor
+/// has held.
 ///
 /// Every sentence comes from `Record`, so the Mac's sidebar says the same words. Nothing here
 /// is celebratory: a streak that broke says so, and the numbers the phone cannot see — minutes
 /// actually *used* — are not here at all, because without Screen Time's data-access
 /// entitlement Furlough only knows whether a budget ran out, not how much of it went.
 ///
-/// It draws nothing until there is something to say, so a fresh install sees no empty card.
-struct RecordCard: View {
+/// How far back the counts go was the footnote under the card; it is the lead now, so it is read
+/// before the numbers rather than after them. The menu leaves the row out entirely until there
+/// is a record — see `SettingsView.recordSummary` — so a fresh install never opens an empty one.
+struct RecordScreen: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
         let card = Record.card(model.state, now: model.state.now)
-        if !card.isEmpty {
-            SectionLabel(text: "The record")
+        AnchorSettingScreen(title: "The record", lead: Record.rangeLine(card)) {
             VStack(spacing: 0) {
                 row("No budget spent", Record.streakLine(card))
                 CardDivider()
@@ -30,8 +32,6 @@ struct RecordCard: View {
                 row("Longest anchor", Record.anchorLine(card))
             }
             .emberCard()
-            Footnote(text: Record.rangeLine(card))
-                .padding(.top, 8)
         }
     }
 

@@ -364,9 +364,10 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   that leaves the app looks like one. The app itself still issues no request to any server of
   its own; since step 18 the Anchor's state goes to the user's iCloud key-value store, so the
   privacy page no longer says "no networking code at all"),
-  `Settings` + `LogView` (Settings gained the build version on 2026-09-09, because it moved out
-  of the old in-app About and the site cannot know which build is running),
-  `RecordCard` (the record, at the top of Settings; its Mac twin is
+  `Settings` + `LogView` (Settings is a menu of rows since 2026-09-11 — see item 40 — each one
+  opening a screen in the same file; the build version is on the About row and behind it,
+  because it moved out of the old in-app About on 2026-09-09 and the site cannot know which
+  build is running), `RecordScreen` (the record, behind Settings' menu; its Mac twin is
   `FurloughMac/Views/MacRecord.swift`, where `MacRecordRows` is split out of
   `MacRecordSection` so the sidebar's card can be rendered to a PNG with no app around it). Screens are
   `ScrollView`s over `EmberWall`, not `List`/`Form`; the iOS 26 toolbar supplies the glass.
@@ -2612,6 +2613,40 @@ The plan for this stretch. Tick each phase off here as it lands.
     line is still up, and confirm the button resolves — applied, or a card that says why —
     within about twenty seconds either way. Diagnostics carries the naming attempts and, if the
     wait ran out, the "went ahead" line.
+
+40. **Settings becomes a menu.** Zach, 2026-09-11: the phone's Settings should be "just buttons
+    to open the different sections instead of all being exposed", "especially as they grow".
+    Done the same day.
+
+    Seven cards down one scroll are eight rows in three cards, each opening a screen: Start,
+    Rules, Devices | The record, Where the time goes | Your setup, Diagnostics, About. It is the
+    move the Anchor page already made for its own four settings, down to the row (`sectionRow`,
+    the twin of `AnchorView.settingsRow`) and the chrome behind it (`AnchorSettingScreen`), so
+    the two screens are read the same way. Each row carries the one fact you would have scrolled
+    to read — "Opens on Anchor", "A loosening waits 1 day", "Not linked · iCloud Drive is off",
+    "No budget spent: 9 days in a row.", "Screen Time access is off", the build version — and
+    each card's old footnote is the lead sentence of the screen its row opens. That chrome's
+    `lead` is optional now: About and Diagnostics have nothing to say before their first card,
+    and a paragraph written to fill the gap would be the prose item 34 took out.
+
+    What moved rather than changed: the delay stepper, its footnote and the first-week banner
+    are the Rules screen; the export and the import, with both file pickers and every alert,
+    are `SetupScreen`; `RecordCard` is `RecordScreen` (file renamed with it), its range line the
+    lead rather than a footnote, and the menu leaves the row out entirely while the record is
+    empty, exactly as the card drew nothing; `DiagnosticsView` keeps its two cards and borrows
+    the shared chrome. The Testing section follows the five taps on Version onto the About
+    screen — what a gesture asks for should appear where it was asked for — and its Reset
+    everything closes the sheet through a closure handed down from `SettingsView`, because a
+    pushed screen's own `dismiss` only pops.
+
+    The + preference is deliberately **not** on the Start row. Two facts wrapped the row onto a
+    second line, and the short true version of the second one — "+ adds to the anchor" — is only
+    true over the Anchor page, which is the misreading item 33 wrote the preference to undo. So
+    it is said in full on the screen or not at all.
+
+    No `Shared/Core` change, so no new tests; the phone build is warning-free. **Seen in the
+    simulator** (the patched-`RootView` harness from the memory note, seeded with a phone nine
+    days into a record): the menu, and all six screens behind its rows.
 
 ## Style rules
 

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The record of the contract at the foot of the sidebar. The phone's `RecordCard` in the
+/// The record of the contract at the foot of the sidebar. The phone's `RecordScreen` in the
 /// window's proportions; both say what `Record` says, so neither can word it differently.
 struct MacRecordSection: View {
     @Environment(MacModel.self) private var model

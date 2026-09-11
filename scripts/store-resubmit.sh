@@ -3,6 +3,7 @@
 # Puts a newer build on the version App Review rejected, and resubmits the same submission.
 #
 #   BUILD=202609090936 scripts/store-resubmit.sh
+#   VERSION=1.1 BUILD=202609111514 scripts/store-resubmit.sh   …renaming the record first
 #
 # The two clicks in the web form after a rejection — swap the build under Version > Build,
 # then "Resubmit to App Review" — through the API instead. It finds the iOS version whose
@@ -87,6 +88,19 @@ abort "no iOS version is in a state that takes a build" unless version
 attached_id = version.dig('relationships', 'build', 'data', 'id')
 attached = (versions['included'] || []).find { |b| b['id'] == attached_id }
 puts "version #{version['attributes']['versionString']}: #{version['attributes']['appVersionState']}, build #{attached ? attached['attributes']['version'] : 'none'}"
+
+# A build carries its own marketing version, and App Store Connect refuses one whose
+# CFBundleShortVersionString differs from the version record's. Renaming the record is how a
+# rejected first release takes a build cut under a later number: it has never shipped, so the
+# number is still free. Set VERSION to rename; left unset, the record keeps the name it has.
+target_version = ENV['VERSION'].to_s
+unless target_version.empty? || target_version == version['attributes']['versionString']
+  request(token, 'PATCH', "/v1/appStoreVersions/#{version['id']}",
+          { data: { type: 'appStoreVersions', id: version['id'],
+                    attributes: { versionString: target_version } } })
+  puts "renamed version #{version['attributes']['versionString']} -> #{target_version}"
+  version['attributes']['versionString'] = target_version
+end
 
 if attached_id == build['id']
   puts "build already attached; nothing to change"
