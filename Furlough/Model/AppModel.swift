@@ -1319,6 +1319,48 @@ final class AppModel {
         enforce(reason: "anchor edit")
     }
 
+    /// Takes doors into the anchor by kind rather than by rules row — the usage flow's anchor
+    /// half, where the app being judged may have no row at all and does not need one. Somebody
+    /// who came for the Anchor alone should not collect a rules list on the way to a list of
+    /// things the tag holds, so nothing here makes a `Target`.
+    ///
+    /// The same two refusals as `addToAnchor`: nothing changes under a lock, and under the
+    /// everything-except scope the list is what stays open, where adding would be letting
+    /// through. Returns whether the anchor ends up holding every one of them — true when they
+    /// were already on the list, because the caller's question is "is it held", not "did I
+    /// change anything".
+    @discardableResult
+    func hold(_ kinds: [TargetKind]) -> Bool {
+        var current = SharedStore.load()
+        guard !current.config.anchor.isAnchored, !current.config.anchor.anchorsEverything else { return false }
+        let fresh = kinds.filter { !current.config.anchor.contains($0) }
+        guard !fresh.isEmpty else { return true }
+        current.config.anchor.kinds += fresh
+        SharedStore.save(current)
+        SharedStore.log("anchor: took in \(fresh.count) from the usage flow; now holds \(current.config.anchor.count) item(s)")
+        enforce(reason: "anchor edit")
+        // Held here is worth holding there, the same as every other way onto the list.
+        settleLink(reason: "anchor edit")
+        // Most of what lands here is a token and nothing else, so the grid would draw it with
+        // no name until the shield learns one. Off the critical path; nothing waits on it.
+        Task { await nameAnchoredKinds() }
+        return true
+    }
+
+    /// Takes those doors back off the anchor's list: the usage flow's Undo. No delay, for the
+    /// reason `removeFromAnchor` gives — the list is not a rule, and the tag is what makes it
+    /// hard to undo.
+    func stopHolding(_ kinds: [TargetKind]) {
+        var current = SharedStore.load()
+        guard !current.config.anchor.isAnchored, !current.config.anchor.anchorsEverything else { return }
+        let going = Set(kinds)
+        guard current.config.anchor.kinds.contains(where: going.contains) else { return }
+        current.config.anchor.kinds.removeAll(where: going.contains)
+        SharedStore.save(current)
+        SharedStore.log("anchor: let go of \(going.count) the usage flow put on; now holds \(current.config.anchor.count) item(s)")
+        enforce(reason: "anchor edit")
+    }
+
     /// The rules half's row for `kind`, made if there is not one yet: the landing for the
     /// anchor grid's "Give it hours too", which is the one place a thing can already be held
     /// and not yet be a target at all.

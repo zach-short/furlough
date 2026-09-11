@@ -1,18 +1,85 @@
 import FamilyControls
 import SwiftUI
 
+/// What a card offers to do about an app: the half the intro was told to start on, or the
+/// question when it was told both.
+///
+/// The page is the same page either way — where a fortnight went, heaviest app first — because
+/// that is worth reading whichever half you came for. What changes is the third question a card
+/// answers. Rules propose hours and a budget; the Anchor has neither to propose, so its card
+/// asks the only question the Anchor has: hold it, or don't. Somebody who asked for both is
+/// shown the schedule and then asked where it should land, because they are the one person on
+/// this screen for whom that is a real choice.
+enum UsageOffer {
+    case rules
+    case anchor
+    case both
+}
+
+/// Where one card's answer would land, under `UsageOffer.both`. The default is both, which is
+/// what was asked for; the segment is there because "both" is a sensible default and a poor
+/// rule, and an app can deserve hours without deserving the tag.
+enum UsageDestination: String, CaseIterable, Identifiable {
+    case rules, anchor, both
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .rules: "Rules"
+        case .anchor: "Anchor"
+        case .both: "Both"
+        }
+    }
+
+    var writesRule: Bool { self != .anchor }
+    var holds: Bool { self != .rules }
+}
+
 /// Where one card stands in this run of the flow. Nothing here is written down: skipping is for
 /// this run, and the next time the flow is opened every app is offered again. Zach's call,
 /// 2026-09-08 — a skip is "not now", and there is no un-skip screen to build.
 enum UsageCardState: Equatable {
     case offered
-    /// The rule is written. `fresh` is true when the flow added the app itself, which is the
-    /// only case it may take straight back; see `AppModel.undoFreshTarget`. `waiting` is true
-    /// when the rule loosened what was there and so has to sit out the delay, which is the one
-    /// thing the collapsed line says for itself rather than keep behind a tap: it names a time.
-    case applied(targetID: UUID, fresh: Bool, message: String, waiting: Bool)
+    /// Something was done. See `Applied`.
+    case applied(Applied)
     case skipped
     case failed(String)
+
+    /// What a card did when Apply was pressed, which is no longer one thing: a rule, a place on
+    /// the anchor's list, or both at once.
+    struct Applied: Equatable {
+        /// The rules row the rule was written on, or nil when nothing but the anchor happened.
+        var targetID: UUID?
+        /// The doors the anchor took in, and what Undo takes back off it.
+        var heldKinds: [TargetKind] = []
+        /// True when the flow added the app to Rules itself, which is the only case it may take
+        /// the rule straight back; see `AppModel.undoFreshTarget`. Says nothing about the
+        /// anchor's list, which has no delay and is always takeable back.
+        var fresh = false
+        /// What `AppModel.ApplyOutcome` said, plus the anchor's half where there was one.
+        var message: String
+        /// The rule loosened what was there and so has to sit out the delay — the one thing the
+        /// collapsed line says for itself rather than keep behind a tap: it names a time.
+        var waiting = false
+
+        var holds: Bool { !heldKinds.isEmpty }
+
+        /// Whether Undo can put everything back. A rule written on a row that was already there
+        /// is a loosening like any other and belongs in the editor, where the delay is
+        /// explained; everything this flow made itself comes straight back off.
+        var canUndo: Bool { fresh || targetID == nil }
+
+        /// What was done, in the one line the folded card carries. A waiting rule names its
+        /// time and that outranks everything; otherwise the rule as a sentence, the anchor as a
+        /// sentence, or both.
+        func line(for item: Recommendation) -> String {
+            if waiting { return message }
+            let rule = targetID != nil ? item.consequence() : nil
+            let held = holds ? "Out of reach the moment you drop the anchor." : nil
+            return [rule, held].compactMap { $0 }.joined(separator: " ")
+        }
+    }
 }
 
 /// One app, answering three questions in order — what it is and how much of the day it takes,
@@ -20,16 +87,34 @@ enum UsageCardState: Equatable {
 /// buttons. The app draws this itself where iOS 26.4 lets it read the numbers; where it cannot,
 /// `UsageReportCard` in the report extension draws the same anatomy and the buttons become a
 /// hand-off to the picker.
+///
+/// The first two questions are the same for everybody. The third is the half the intro was told
+/// to start on (`UsageOffer`): a schedule for Rules, one sentence for the Anchor, and for
+/// somebody who asked for both, the schedule followed by the question of where it lands.
 struct UsageSuggestionCard: View {
     let item: Recommendation
     let entry: UsageEntry
     let days: Int
     let state: UsageCardState
+    /// Which half this card is offering, and — under `.both` — where the offer lands. The
+    /// binding is the page's, so the answer carries from one card to the next: choosing once is
+    /// choosing for the run unless the next app deserves something else.
+    var offer: UsageOffer = .rules
+    @Binding var destination: UsageDestination
     var isBusy = false
     let apply: () -> Void
     let skip: () -> Void
     let undo: () -> Void
     let collapse: () -> Void
+
+    /// What Apply would do, given the offer and — under `.both` — the segment.
+    private var landing: UsageDestination {
+        switch offer {
+        case .rules: .rules
+        case .anchor: .anchor
+        case .both: destination
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -42,15 +127,43 @@ struct UsageSuggestionCard: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             CardDivider()
-            VStack(alignment: .leading, spacing: 10) {
-                Eyebrow(text: "What Furlough would do", color: Ember.amber)
-                RuleDrawing(item: item)
-            }
+            verdict
             CardDivider()
             actions
         }
         .padding(16)
         .emberCard()
+    }
+
+    // MARK: What Furlough would do
+
+    /// The third question, answered in the shape the offer has. Rules draw a schedule; the
+    /// Anchor has none to draw and says the one thing it does instead; both draw the schedule
+    /// and then ask where it goes.
+    @ViewBuilder
+    private var verdict: some View {
+        switch offer {
+        case .rules:
+            VStack(alignment: .leading, spacing: 10) {
+                Eyebrow(text: "What Furlough would do", color: Ember.amber)
+                RuleDrawing(item: item)
+            }
+        case .anchor:
+            VStack(alignment: .leading, spacing: 10) {
+                Eyebrow(text: "What the Anchor would do", color: Ember.amber)
+                AnchorHolding()
+            }
+        case .both:
+            VStack(alignment: .leading, spacing: 10) {
+                Eyebrow(text: "What Furlough would do", color: Ember.amber)
+                RuleDrawing(item: item)
+                    // Dimmed rather than hidden when the answer is the Anchor alone: the
+                    // schedule is still the proposal on the table, and taking it off the card
+                    // the moment somebody leans the other way makes the comparison impossible.
+                    .opacity(landing.writesRule ? 1 : 0.35)
+                    .animation(.easeInOut(duration: 0.2), value: landing.writesRule)
+            }
+        }
     }
 
     // MARK: What it is
@@ -107,17 +220,30 @@ struct UsageSuggestionCard: View {
 
     // MARK: What happens next
 
+    /// "Apply" writes something with hours in it; "Hold it" only ever puts a name on a list.
+    /// Two words rather than one, because the Anchor's button is not an apply — there is
+    /// nothing to apply — and calling it one would be the card's only dishonest word.
+    private var applyTitle: String {
+        if isBusy { return landing == .anchor ? "Holding…" : "Applying…" }
+        return landing == .anchor ? "Hold it" : "Apply"
+    }
+
     @ViewBuilder
     private var actions: some View {
         switch state {
         case .offered:
-            HStack(spacing: 12) {
-                ProminentButton(title: isBusy ? "Applying…" : "Apply", isBusy: isBusy, action: apply)
-                    .disabled(isBusy)
-                GhostButton(title: "Skip", color: Ember.muted, action: skip)
-                    .frame(width: 78)
+            VStack(alignment: .leading, spacing: 12) {
+                if offer == .both {
+                    UsageDestinationPicker(destination: $destination)
+                }
+                HStack(spacing: 12) {
+                    ProminentButton(title: applyTitle, isBusy: isBusy, action: apply)
+                        .disabled(isBusy)
+                    GhostButton(title: "Skip", color: Ember.muted, action: skip)
+                        .frame(width: 78)
+                }
             }
-        case .applied(let targetID, let fresh, let message, _):
+        case .applied(let done):
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 7) {
                     Image(systemName: "checkmark.circle.fill")
@@ -125,14 +251,14 @@ struct UsageSuggestionCard: View {
                         .foregroundStyle(Ember.moss)
                     Eyebrow(text: "Applied", color: Ember.moss)
                     Spacer()
-                    if fresh { UsageUndoButton(action: undo) }
+                    if done.canUndo { UsageUndoButton(action: undo) }
                 }
-                Text(message)
+                Text(done.message)
                     .emberBody(12)
                     .foregroundStyle(Ember.muted)
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 16) {
-                    UsageEditRuleLink(targetID: targetID)
+                    if let targetID = done.targetID { UsageEditRuleLink(targetID: targetID) }
                     Spacer(minLength: 8)
                     UsageFoldButton(title: "Collapse", symbol: "chevron.up", action: collapse)
                 }
@@ -152,6 +278,84 @@ struct UsageSuggestionCard: View {
     }
 }
 
+/// What the Anchor would do about this app, where Rules would draw a schedule. There is no
+/// picture to draw, because there is nothing gradual about it: the Anchor has no hours and no
+/// budget, so its whole proposal is one line and the mark beside it.
+struct AnchorHolding: View {
+    var body: some View {
+        HStack(alignment: .top, spacing: 11) {
+            AnchorGlyph(isAnchored: false, size: 38)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Out of reach the moment you drop the anchor.")
+                    .emberBody(13)
+                    .foregroundStyle(Ember.cream)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("No hours and no budget — it is held or it is not, and only a paired tag lifts it.")
+                    .emberBody(11.5)
+                    .foregroundStyle(Ember.faint)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+/// The question a card asks somebody who came for both halves: Rules, the Anchor, or both, and
+/// one line saying what that means for this app. The segment is the ask and the line is the
+/// answer read back — between them they are the whole of "in a clear, simple and concise
+/// manner", which is what was asked for and all that was asked for.
+struct UsageDestinationPicker: View {
+    @Binding var destination: UsageDestination
+
+    /// What Apply would do, in one sentence. Written against the drawing above rather than
+    /// repeating it: the schedule has just been read, and saying it a second time under the
+    /// segment is how three short answers turn into a wall.
+    private var effect: String {
+        switch destination {
+        case .rules: "The hours above, and nothing on the Anchor's list."
+        case .anchor: "The hours above are not written. It goes on the Anchor's list instead."
+        case .both: "The hours above, and on the Anchor's list — out of reach when you drop it."
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                Eyebrow(text: "Apply to", color: Ember.faint)
+                Spacer(minLength: 0)
+            }
+            HStack(spacing: 3) {
+                ForEach(UsageDestination.allCases) { value in
+                    Button {
+                        guard value != destination else { return }
+                        withAnimation(.snappy(duration: 0.2)) { destination = value }
+                    } label: {
+                        Text(value.title)
+                            .emberBody(12.5, .bold)
+                            .foregroundStyle(value == destination ? Ember.cream : Ember.muted)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
+                            .background(
+                                Capsule().fill(value == destination ? Ember.ember.opacity(0.22) : .clear)
+                            )
+                            .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(value.title)
+                    .accessibilityAddTraits(value == destination ? [.isButton, .isSelected] : .isButton)
+                }
+            }
+            .padding(3)
+            .background(Color.white.opacity(0.05), in: Capsule())
+            .overlay(Capsule().strokeBorder(Ember.cardBorder, lineWidth: 1))
+            Text(effect)
+                .emberBody(11.5)
+                .foregroundStyle(Ember.faint)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
 /// An applied card, collapsed to its verdict: the app, what the rule now does, and the three
 /// things left to do about it — take it back, open the rule, or put the whole card back. Applying
 /// folds the card straight away, because a card that has been decided has stopped being a
@@ -159,11 +363,7 @@ struct UsageSuggestionCard: View {
 struct UsageAppliedLine: View {
     let item: Recommendation
     let entry: UsageEntry
-    let targetID: UUID
-    let fresh: Bool
-    /// What `AppModel.ApplyOutcome` said, which is only worth the line when it names a time.
-    let message: String
-    let waiting: Bool
+    let done: UsageCardState.Applied
     let undo: () -> Void
     let expand: () -> Void
 
@@ -181,6 +381,9 @@ struct UsageAppliedLine: View {
                     Text(entry.plainName).emberBody(13).foregroundStyle(Ember.cream).lineLimit(1)
                 }
                 Spacer(minLength: 8)
+                // The anchor's own mark where the anchor took it in, so a folded list says
+                // which half each line landed on without being read.
+                if done.holds { AnchorGlyph(isAnchored: false, size: 20) }
                 HStack(spacing: 5) {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 12, weight: .semibold))
@@ -188,14 +391,14 @@ struct UsageAppliedLine: View {
                     Eyebrow(text: "Applied", color: Ember.moss)
                 }
             }
-            // The rule, said in one line, so folding the card does not hide what was agreed to.
-            Text(waiting ? message : item.consequence())
+            // What was done, said in one line, so folding does not hide what was agreed to.
+            Text(done.line(for: item))
                 .emberBody(11.5)
                 .foregroundStyle(Ember.muted)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 16) {
-                if fresh { UsageUndoButton(action: undo) }
-                UsageEditRuleLink(targetID: targetID)
+                if done.canUndo { UsageUndoButton(action: undo) }
+                if let targetID = done.targetID { UsageEditRuleLink(targetID: targetID) }
                 Spacer(minLength: 8)
                 UsageFoldButton(title: "Expand", symbol: "chevron.down", action: expand)
             }
@@ -220,7 +423,16 @@ struct UsageAppliedLine: View {
 struct UsageSkippedLine: View {
     let item: Recommendation
     let entry: UsageEntry
+    /// Which half was on offer, so the line says what was actually passed on: a schedule where
+    /// one was proposed, and the Anchor's one sentence where none was.
+    var offer: UsageOffer = .rules
     let reopen: () -> Void
+
+    /// What was on the table. Under `.both` the schedule, because that is what the card drew
+    /// and the destination was never answered.
+    private var passedOn: String {
+        offer == .anchor ? "Not on the Anchor's list." : item.consequence()
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
@@ -238,8 +450,8 @@ struct UsageSkippedLine: View {
                 Spacer(minLength: 8)
                 Eyebrow(text: "Skipped", color: Ember.faint)
             }
-            // The rule that was on offer, so what was passed on is still on the page.
-            Text(item.consequence())
+            // What was on offer, so what was passed on is still on the page.
+            Text(passedOn)
                 .emberBody(11.5)
                 .foregroundStyle(Ember.faint)
                 .fixedSize(horizontal: false, vertical: true)

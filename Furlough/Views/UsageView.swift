@@ -69,6 +69,10 @@ struct UsageView: View {
         /// The hours came and the names never did, so there is nothing worth drawing.
         case nameless
     }
+    /// Where an answer lands, while both halves are on offer. Held for the page rather than the
+    /// card, so answering once answers for the run: most people want the same thing for every
+    /// app on the list, and the ones who do not change it on the card that is the exception.
+    @State private var destination = UsageDestination.both
     /// Path B: which card the tour is showing, 1…`UsageAnalysis.rankLimit`.
     @State private var position = 1
     @State private var showPicker = false
@@ -79,6 +83,21 @@ struct UsageView: View {
     private struct EditingTarget: Identifiable, Hashable { let id: UUID }
 
     private var hasDataAccess: Bool { UsageReader.hasDataAccess(model.authorization) }
+
+    /// Which half the cards offer. The page itself is the same page for everybody — a fortnight,
+    /// heaviest app first, which is worth reading whichever half you came for — so the start
+    /// pane's answer only decides what a card proposes at the end of it.
+    ///
+    /// The Anchor drops out where it has nothing to take in: while it is down its list cannot
+    /// change at all, and under the everything-except scope the list is what stays open, so
+    /// "hold this too" would mean letting it through. Neither can happen on the way out of the
+    /// intro; both can from Settings, which opens the same screen months later.
+    private var offer: UsageOffer {
+        let anchor = model.state.config.anchor
+        guard !anchor.isAnchored, !anchor.anchorsEverything else { return .rules }
+        if model.wantsBothHalves { return .both }
+        return model.startHalf == .anchor ? .anchor : .rules
+    }
 
     /// Allowed the old way, on a phone that knows the new one.
     private var couldHaveDataAccess: Bool {
@@ -116,7 +135,9 @@ struct UsageView: View {
         .task(id: model.authorization) { await load() }
         .familyActivityPicker(
             headerText: "Choose the app this card is about",
-            footerText: "Pick the one the card names. The next screen is where its rule is written.",
+            footerText: offer == .anchor
+                ? "Pick the one the card names. It goes on the Anchor's list."
+                : "Pick the one the card names. The next screen is where its rule is written.",
             isPresented: $showPicker,
             selection: $selection
         )
@@ -134,13 +155,30 @@ struct UsageView: View {
             Text(role == .onboarding ? "Where your time went" : "Where the time goes")
                 .emberDisplay(30)
                 .foregroundStyle(Ember.cream)
-            Text(hasDataAccess
-                ? "One card an app, heaviest first. Each suggestion closes the hours the time actually falls in and keeps half of what you spend."
-                : "Screen Time draws these cards inside a sandbox of its own. Furlough cannot read a number off one or press a button for you, so read the card, then add the app and write the rule it shows.")
+            Text(hasDataAccess ? lead : sandboxLead)
                 .emberBody(14)
                 .foregroundStyle(Ember.muted)
                 .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    /// The page's second line, in the shape of the half on offer.
+    private var lead: String {
+        switch offer {
+        case .rules:
+            "One card an app, heaviest first. Each suggestion closes the hours the time actually falls in and keeps half of what you spend."
+        case .anchor:
+            "One card an app, heaviest first. Take in the ones you want out of reach, and the Anchor holds them the moment you drop it."
+        case .both:
+            "One card an app, heaviest first. Each suggestion closes the hours the time actually falls in and keeps half of what you spend — and you say whether it lands on Rules, the Anchor, or both."
+        }
+    }
+
+    /// The same, on a phone where only the report extension ever sees a number.
+    private var sandboxLead: String {
+        offer == .anchor
+            ? "Screen Time draws these cards inside a sandbox of its own. Furlough cannot read a number off one or press a button for you, so read the card, then choose the app to put on the Anchor's list."
+            : "Screen Time draws these cards inside a sandbox of its own. Furlough cannot read a number off one or press a button for you, so read the card, then add the app and write the rule it shows."
     }
 
     // MARK: Path A — the app has the numbers
@@ -160,11 +198,13 @@ struct UsageView: View {
             problem(
                 eyebrow: "Could not read your Screen Time",
                 body: "Furlough got the hours but Screen Time would not say what the apps are called, and a card that cannot name the app is not one anybody can judge.",
-                hint: "Choose the apps you want to manage by hand instead."
+                hint: offer == .anchor
+                    ? "Choose the apps you want held by hand instead."
+                    : "Choose the apps you want to manage by hand instead."
             )
         case .ready:
             if advice.isEmpty {
-                Text("Nothing on this phone passes \(Int(UsageAnalysis.minimumDailyMinutes)) minutes a day. There is nothing here worth a rule.")
+                Text("Nothing on this phone passes \(Int(UsageAnalysis.minimumDailyMinutes)) minutes a day. There is nothing here worth \(offer == .anchor ? "holding" : "a rule").")
                     .emberBody(13)
                     .foregroundStyle(Ember.muted)
                     .padding(16)
@@ -238,10 +278,7 @@ struct UsageView: View {
                 .emberBody(13)
                 .foregroundStyle(Ember.cream)
                 .fixedSize(horizontal: false, vertical: true)
-            ProminentButton(title: "Choose apps by hand") {
-                selection = model.pickerSelection
-                showPicker = true
-            }
+            ProminentButton(title: "Choose apps by hand", action: openPicker)
             GhostButton(title: "Try again", color: Ember.amber) { Task { await restart() } }
         }
         .padding(16)
@@ -253,17 +290,14 @@ struct UsageView: View {
         let state = states[item.key] ?? .offered
         switch state {
         case .skipped:
-            UsageSkippedLine(item: item, entry: entry) {
+            UsageSkippedLine(item: item, entry: entry, offer: offer) {
                 withAnimation(.easeInOut(duration: 0.2)) { states[item.key] = .offered }
             }
-        case .applied(let targetID, let fresh, let message, let waiting) where !expanded.contains(item.key):
+        case .applied(let done) where !expanded.contains(item.key):
             UsageAppliedLine(
                 item: item,
                 entry: entry,
-                targetID: targetID,
-                fresh: fresh,
-                message: message,
-                waiting: waiting,
+                done: done,
                 undo: { undo(item) },
                 expand: { withAnimation(.easeInOut(duration: 0.2)) { _ = expanded.insert(item.key) } }
             )
@@ -273,6 +307,8 @@ struct UsageView: View {
                 entry: entry,
                 days: days,
                 state: state,
+                offer: offer,
+                destination: $destination,
                 isBusy: busy == item.key,
                 apply: { Task { await apply(item, entry) } },
                 skip: { withAnimation(.easeInOut(duration: 0.2)) { states[item.key] = .skipped } },
@@ -320,12 +356,18 @@ struct UsageView: View {
                     position += 1
                 }
             }
-            ProminentButton(title: "Manage this app") {
-                selection = model.pickerSelection
-                showPicker = true
-            }
-            Footnote(text: "Apple's picker opens on its own list of apps. Pick the one the card names, and the rule editor opens next so you can write what the card showed.")
+            ProminentButton(title: offer == .anchor ? "Hold this app" : "Manage this app", action: openPicker)
+            Footnote(text: offer == .anchor
+                ? "Apple's picker opens on its own list of apps. Pick the one the card names, and it goes on the Anchor's list — out of reach the moment you drop it."
+                : "Apple's picker opens on its own list of apps. Pick the one the card names, and the rule editor opens next so you can write what the card showed.")
         }
+    }
+
+    /// Apple's picker, seeded with whatever the half on offer already has: both ways in replace
+    /// a whole list rather than add to one, so what is already there has to go in with it.
+    private func openPicker() {
+        selection = offer == .anchor ? model.anchorSelection : model.pickerSelection
+        showPicker = true
     }
 
     private func step(
@@ -351,6 +393,12 @@ struct UsageView: View {
     /// see, so the selection was seeded with everything already managed; whatever is new is the
     /// app this card was about, and the editor opens on it.
     private func addPicked() {
+        // The anchor's list is replaced whole, the way its own screen replaces it, and there is
+        // no editor to go to afterwards: a held app has no hours to write.
+        guard offer != .anchor else {
+            model.setAnchorSelection(selection)
+            return
+        }
         let before = Set(model.state.config.targets.map(\.id))
         let result = model.applyPicker(selection)
         guard result.added > 0 else { return }
@@ -391,15 +439,35 @@ struct UsageView: View {
         }
     }
 
-    /// "3 apps managed, about 2 h 10 min a day taken back." The time is what each average is
-    /// over its new budget, rounded down to five minutes — an estimate, and said as one.
+    /// What each of them did, for the closing count.
+    private func done(_ item: Recommendation) -> UsageCardState.Applied? {
+        guard case .applied(let done) = states[item.key] else { return nil }
+        return done
+    }
+
+    /// "3 apps managed, about 2 h 10 min a day taken back. 2 on the Anchor's list." The time is
+    /// what each average is over its new budget, rounded down to five minutes — an estimate, and
+    /// said as one. The two halves are counted separately because a card can land on both, and
+    /// one number covering them would be a number of nothing.
     private var closingLine: String {
-        let apps = applied.count == 1 ? "1 app" : "\(applied.count) apps"
-        let saved = applied.reduce(0) { total, item in
-            total + max(0, Int(item.averageDailyMinutes.rounded()) - item.rule.dailyBudgetMinutes)
-        } / 5 * 5
-        guard saved >= 5 else { return "\(apps) managed." }
-        return "\(apps) managed, about \(TimeFormat.budget(saved)) a day taken back."
+        var lines: [String] = []
+        let ruled = applied.filter { done($0)?.targetID != nil }
+        if !ruled.isEmpty {
+            let apps = ruled.count == 1 ? "1 app" : "\(ruled.count) apps"
+            let saved = ruled.reduce(0) { total, item in
+                total + max(0, Int(item.averageDailyMinutes.rounded()) - item.rule.dailyBudgetMinutes)
+            } / 5 * 5
+            lines.append(saved >= 5
+                ? "\(apps) managed, about \(TimeFormat.budget(saved)) a day taken back."
+                : "\(apps) managed.")
+        }
+        let held = applied.filter { done($0)?.holds == true }
+        if !held.isEmpty {
+            lines.append(held.count == 1
+                ? "1 app on the Anchor's list, out of reach when you drop it."
+                : "\(held.count) apps on the Anchor's list, out of reach when you drop it.")
+        }
+        return lines.joined(separator: " ")
     }
 
     // MARK: Doing it
@@ -528,10 +596,13 @@ struct UsageView: View {
         return advice.filter { summary.entry(for: $0)?.targetKind == nil }.count
     }
 
-    /// Write the suggested rule, adding the app first when Furlough does not manage it yet. A
-    /// usage entry may arrive without a token; then the token is looked up among what is
-    /// installed. Adding goes through the picker path with everything already chosen kept in
-    /// the selection, because `applyPicker` schedules a removal for whatever it does not see.
+    /// Do what the card offered, wherever the card said it lands: write the suggested rule,
+    /// adding the app to Rules first when Furlough does not manage it yet; put it on the
+    /// Anchor's list; or both. A usage entry may arrive without a token; then the token is
+    /// looked up among what is installed — the anchor needs one exactly as much as a rule does,
+    /// since its list is tokens too. Adding to Rules goes through the picker path with
+    /// everything already chosen kept in the selection, because `applyPicker` schedules a
+    /// removal for whatever it does not see.
     private func apply(_ item: Recommendation, _ entry: UsageEntry) async {
         guard #available(iOS 26.4, *) else { return }
         busy = item.key
@@ -573,56 +644,88 @@ struct UsageView: View {
             }
         }
         guard let kind else {
-            states[item.key] = .failed("Screen Time counted \(entry.plainName) but gave no token for it, so there is nothing to write a rule on.")
+            states[item.key] = .failed("Screen Time counted \(entry.plainName) but gave no token for it, so there is nothing for Furlough to act on.")
             return
         }
 
-        var fresh = false
-        // `target(kind:)` rather than a match on `kind` alone: this app may already be the linked
-        // half of a row — YouTube beside youtube.com — and adding it again would split the pair
-        // back into the two rows linking exists to join.
-        if model.state.config.target(kind: kind) == nil {
-            var picked = model.pickerSelection
-            switch kind {
-            case .application(let token): picked.applicationTokens.insert(token)
-            case .webDomain(let token): picked.webDomainTokens.insert(token)
-            // A report names what Screen Time counted, and it counts neither a whole category
-            // nor a site typed by hand.
-            case .category, .host: break
+        let landing = landing()
+        var done = UsageCardState.Applied(message: "")
+
+        if landing.writesRule {
+            var fresh = false
+            // `target(kind:)` rather than a match on `kind` alone: this app may already be the
+            // linked half of a row — YouTube beside youtube.com — and adding it again would split
+            // the pair back into the two rows linking exists to join.
+            if model.state.config.target(kind: kind) == nil {
+                var picked = model.pickerSelection
+                switch kind {
+                case .application(let token): picked.applicationTokens.insert(token)
+                case .webDomain(let token): picked.webDomainTokens.insert(token)
+                // A report names what Screen Time counted, and it counts neither a whole category
+                // nor a site typed by hand.
+                case .category, .host: break
+                }
+                _ = model.applyPicker(picked)
+                model.reload()
+                fresh = true
             }
-            _ = model.applyPicker(picked)
-            model.reload()
-            fresh = true
+            guard let target = model.state.config.targets.first(where: { $0.kind == kind }) else {
+                states[item.key] = .failed("Could not add \(entry.plainName).")
+                return
+            }
+            let outcome = model.apply(rule: item.rule, nickname: target.nickname, for: target.id, andTo: [])
+            done.targetID = target.id
+            done.fresh = fresh
+            done.waiting = outcome.scheduled > 0
+            done.message = outcome.message
         }
-        guard let target = model.state.config.targets.first(where: { $0.kind == kind }) else {
-            states[item.key] = .failed("Could not add \(entry.plainName).")
-            return
+
+        if landing.holds {
+            // Every door of the row where there is one — a linked app and site are two ways into
+            // one habit and should not need two picks to close — and the one the card names where
+            // there is not. An anchor-only person gets no rules row out of this at all.
+            let doors = model.state.config.target(kind: kind)?.kinds ?? [kind]
+            guard model.hold(doors) else {
+                states[item.key] = .failed("The Anchor cannot take anything in while it is down.")
+                return
+            }
+            done.heldKinds = doors
+            let held = "On the Anchor's list: out of reach the moment you drop it."
+            done.message = done.message.isEmpty ? held : "\(done.message)\n\n\(held)"
         }
-        let outcome = model.apply(rule: item.rule, nickname: target.nickname, for: target.id, andTo: [])
+
         withAnimation(.easeInOut(duration: 0.2)) {
             // Folded, whatever the card was doing before: this is the answer to the question the
             // card was asking, and the rest of it has been read by the time Apply is pressed.
             expanded.remove(item.key)
-            states[item.key] = .applied(
-                targetID: target.id,
-                fresh: fresh,
-                message: outcome.message,
-                waiting: outcome.scheduled > 0
-            )
+            states[item.key] = .applied(done)
         }
     }
 
-    /// Takes back a rule this run wrote on an app this run added. Anything else is a loosening
-    /// like any other, and belongs in the rule editor where the delay is explained.
+    /// Where this card's answer lands: the half on offer, or the segment's answer when both are.
+    private func landing() -> UsageDestination {
+        switch offer {
+        case .rules: .rules
+        case .anchor: .anchor
+        case .both: destination
+        }
+    }
+
+    /// Takes back what this run did: the place on the anchor's list, which has no delay and
+    /// always comes straight off, and a rule this run wrote on an app this run added. A rule on
+    /// a row that was already there is a loosening like any other, and belongs in the rule
+    /// editor where the delay is explained — `Applied.canUndo` is what keeps the button off
+    /// those cards.
     private func undo(_ item: Recommendation) {
-        guard case .applied(let targetID, true, _, _) = states[item.key] else { return }
-        if model.undoFreshTarget(targetID) {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                expanded.remove(item.key)
-                states[item.key] = .offered
-            }
-        } else {
+        guard case .applied(let done) = states[item.key], done.canUndo else { return }
+        if done.holds { model.stopHolding(done.heldKinds) }
+        if let targetID = done.targetID, !model.undoFreshTarget(targetID) {
             states[item.key] = .failed("Furlough has held this rule too long to take it straight back. Loosen it from the rule editor instead.")
+            return
+        }
+        withAnimation(.easeInOut(duration: 0.2)) {
+            expanded.remove(item.key)
+            states[item.key] = .offered
         }
     }
 }
