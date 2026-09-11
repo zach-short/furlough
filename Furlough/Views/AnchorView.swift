@@ -59,7 +59,11 @@ struct AnchorPage: View {
                 .padding(.top, 12)
                 .padding(.bottom, 48)
             }
-            .background(EmberWall())
+            // No wall of its own. Home draws one behind the pager, and both halves stand on
+            // it: Rules already does. A second wall here would be laid over the first at a
+            // different size, so the two would put their glows in two places and the edge
+            // between them would read as a crease under the toolbar.
+            //
             // No title of its own: Home's segment names this page, and a second "Anchor" in the
             // same bar would be the app saying it twice.
             //
