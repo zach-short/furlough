@@ -221,7 +221,15 @@ struct ProminentButton: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
-                if isBusy { ProgressView().tint(Ember.cream) }
+                // Small, and boxed no taller than the label: a spinner at the button's own
+                // large control size is 32 pt and would grow the button as it starts working,
+                // so Continue and Waiting for iOS would stand at different heights.
+                if isBusy {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(Ember.cream)
+                        .frame(width: 16, height: 16)
+                }
                 Text(title).emberBody(14.5, .bold)
             }
             .foregroundStyle(Ember.cream)
