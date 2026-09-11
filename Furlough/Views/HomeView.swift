@@ -374,6 +374,14 @@ struct HeroPager: View {
                 .scrollTargetBehavior(.paging)
                 .scrollPosition(id: $featured)
                 .scrollIndicators(.hidden)
+                // The glass throws its light a good deal further than the page it is drawn on,
+                // and a scroll view clips to its bounds: the halo used to stop dead on a
+                // straight line a few points under the base, with flat black beneath it. So the
+                // pager's own clip comes off and a looser one goes on — the same left and right
+                // edges, so the next page's glass cannot bleed in from the side, and open above
+                // and below, where there is nothing but the wall for the light to land on.
+                .scrollClipDisabled()
+                .clipShape(SpillingRect(spill: HeroPage.glowSpill))
                 .padding(.horizontal, -16)
                 HeroIndicator(pages: pages, glasses: glasses, featured: $featured)
             }
@@ -387,6 +395,14 @@ struct HeroPager: View {
     }
 }
 
+/// A rectangle grown past the top and bottom of the bounds it is given. A shape is handed its
+/// view's frame, so this is all it takes to clip one axis and leave the other alone.
+private struct SpillingRect: Shape {
+    let spill: CGFloat
+
+    func path(in rect: CGRect) -> Path { Path(rect.insetBy(dx: 0, dy: -spill)) }
+}
+
 /// One page: the living hourglass, eyebrow, name, the big line and a sub line for one
 /// target's status. Ticks once a second so the sand and the countdown share a clock.
 struct HeroPage: View {
@@ -395,6 +411,12 @@ struct HeroPage: View {
     let status: TargetStatus
     let runtime: RuntimeState
     let anchor: AnchorProfile
+
+    /// How far the glow reaches past the page. A blur of `glowRadius` is spent by about three
+    /// times it, so the pager's clip is opened this far and the halo ends where it ends rather
+    /// than where the scroll view does.
+    static let glowSpill: CGFloat = 3 * glowRadius
+    private static let glowRadius: CGFloat = 20
 
     private struct Line {
         enum Big {
@@ -418,7 +440,7 @@ struct HeroPage: View {
                 LivingHourglass(state: glass)
                     .frame(width: 74, height: 98)
                     .compositingGroup()
-                    .shadow(color: (glass.glow ?? .clear).opacity(0.4), radius: 20)
+                    .shadow(color: (glass.glow ?? .clear).opacity(0.4), radius: Self.glowRadius)
                 VStack(alignment: .leading, spacing: 0) {
                     Eyebrow(text: line.eyebrow, color: line.color)
                     name
