@@ -33,6 +33,12 @@ on 1. Read the Done prompts only as history, or where one says a later item shou
 | 12 | Suggested rules by hazard tier, and an audit for quality-of-life defaults like it | Done — HANDOFF 28 | Opus | G | nothing | new `Shared/Core/RuleSuggestion.swift`, `RuleEditorView`, `Tests/Core` |
 | 13 | The link contract: schemas, test vectors and tables a port can be built against | **Open** — added 2026-09-10 | Opus | H | nothing; HANDOFF 37 landed | new `protocol/`, new `Tests/Core/ProtocolFixturesTests.swift`, `HANDOFF.md` |
 | 14 | Cache the token map, so the usage page's icons are instant on later visits | **Open** — added 2026-09-10 | Opus | I | the tables-and-monograms commit on main | new `Shared/Core/TokenCache.swift`, `SharedStore`, `UsageReader`, `UsageView.load`, `AppModel.nameUnnamedTargets`, new `Tests/Core/TokenCacheTests.swift`, `HANDOFF.md` |
+| 15 | Apple Watch complication and a wrist-only Drop Anchor | **Open** — proposed 2026-09-12, needs Zach's go-ahead | Fable | J | nothing | new `FurloughWatch` target(s), `AnchorDrop.swift`, `project.yml` |
+| 16 | A StandBy-friendly widget | **Open** — proposed 2026-09-12 | Opus | K | nothing | `FurloughWidgets/StatusWidget.swift`, `Shared/UI/Hourglass.swift` |
+| 17 | Focus Filter: drop the Anchor when a Focus turns on | **Open** — proposed 2026-09-12 | Fable | L | nothing | new `Shared/Intents/AnchorFocusFilter.swift`, `project.yml` |
+| 18 | A trend view in the Mac's menu bar | **Open** — proposed 2026-09-12 | Opus | M | nothing | `FurloughMac/MenuBar.swift`, `Shared/Core/Record.swift` |
+| 19 | A weekly digest notification | **Open** — proposed 2026-09-12 | Opus | N | nothing | `Shared/Core/Record.swift`, `Shared/Core/PendingNotifications.swift`, `AppModel`, `MacModel` |
+| 20 | Onboarding: where to put the tag | **Open** — proposed 2026-09-12 | Sonnet | O | nothing | `Furlough/Views/Onboarding`, `site/src/pages/help/nfc-tags.astro` |
 
 **Two things landed that this board never planned**, so look for them in HANDOFF rather than
 here: the first week with capped delays and the 15-minute undo (HANDOFF 27, the lane-f
@@ -42,6 +48,8 @@ going all the way back to a first run (HANDOFF 31, with the detail in its "The M
 **Item 13 was added 2026-09-10**, after HANDOFF 37 landed: the link contract as data, so a port on another platform can be built against the real record shapes and the real merge rules. It is the one open item not gated on Apple, and it is parallel-safe with everything.
 
 **Item 14 was added 2026-09-10**, the third step of the usage-page speed-up whose first two (cards drawn from the tables, letters for icons, a deadline on the token query) landed the same day: keep Screen Time's answer in the App Group store so the next visit opens on it. Small, iOS only, and it waits only on that commit being on main.
+
+**Items 15 through 20 were added 2026-09-12**, from a session that was asked what else might be nice on iOS or the Mac rather than told what to build. None of them have Zach's go-ahead yet the way items 1–14 did before they were written down; each prompt says up front what still needs deciding. They are lanes J–O: independent of each other and of A–I, so any can be picked up whenever, but 15 and 17 both put a new process in a position to write `Config.anchor` (even though both are tightening-only), which is why they carry the Fable rule rather than Opus.
 
 **Lanes run in parallel with each other; tasks inside a lane run one after another.**
 A, B, C, D and E can all be open at once, each in its own worktree. Inside A the order is
@@ -1017,3 +1025,291 @@ and let the real icons arrive. Leave, and open it again: the cards should come u
 icons in the same instant as the cards themselves — no letters, no "Asking Screen Time…" line.
 Settings › Diagnostics should show the "tokens from the cache" line. Then Reset everything and
 open it once more: letters first and icons after, as before.
+
+---
+
+## 15. Apple Watch complication and a wrist-only Drop Anchor
+
+**Open — proposed 2026-09-12. Needs Zach's go-ahead before any code: does he wear an Apple
+Watch worth building for, and does a wrist Drop Anchor earn its keep over the phone widget
+and Control Center control that already exist (item 2, done)?**
+
+**Model: Fable — a Watch complication calling into `AnchorDrop` is a new process writing
+`Config.anchor`, exactly the case HANDOFF's model rule calls out, even though the action is
+tightening-only. Lane J. Waits on nothing; parallel-safe.**
+
+You are picking up Furlough, Zach's iOS and Mac app blocker. Read `HANDOFF.md`, then
+`README.md`. Session rules: never commit or push; when done, print `git add <your files>`
+and a lowercase `git commit -m "..."` for Zach, with no Co-Authored-By; run `xcodegen
+generate` after adding files; keep the build warning-free; every `Shared/Core` change gets
+tests in `Tests/Core`; you cannot see the phone or the Watch, so end with what Zach should
+tap and see on each. Ask Zach before building anything marked "decide with Zach", and do not
+scaffold a Watch target before he has answered the go/no-go question above.
+
+Today `Shared/Core/AnchorDrop.swift` (iOS only) is the one function that drops the anchor
+from any process; the Control Center control and `Shared/Intents/DropAnchorIntent.swift`
+both call it. A Watch complication would be a fourth caller, but watchOS is a separate
+device, not a second process sharing the phone's App Group container — App Group sharing
+only works within one device's sandbox, so this needs real transport, not just a new call
+site.
+
+1. **Decide with Zach: is this worth building at all**, given the phone widget and Control
+   Center already do a one-tap drop. If yes, continue; if no, stop here and say so in
+   HANDOFF so nobody re-proposes it without reason.
+2. `WatchConnectivity` is the only channel that needs no server: `WCSession` with
+   `updateApplicationContext` for the latest status snapshot (delivered opportunistically,
+   not on demand) and `sendMessage` for the drop action when the phone is reachable, falling
+   back to `transferUserInfo` when it is not. Read Apple's current complication-refresh and
+   background-transfer budgets before promising anything close to live; watchOS decides when
+   a complication actually redraws, not the app.
+3. Check the current watchOS SDK for whether a full WatchKit companion app is still required
+   to host `WCSession`, or whether a widget extension alone can attach to the iOS app and use
+   it — this has moved over recent watchOS releases and the answer decides how much to
+   scaffold. If a companion app is required, add it as `FurloughWatch`; the complication
+   itself is a new `FurloughWatchWidgets` extension drawing a still `HourglassView` (from
+   `Shared/UI/Hourglass.swift`) off the last delivered snapshot.
+4. The complication's action calls into the drop path via `sendMessage`/`transferUserInfo`,
+   which the phone applies through the same `AnchorDrop` function on receipt — never a new
+   write path. There is no release path from the Watch: it has no reader for arbitrary NFC
+   tags (Apple Pay's NFC is not exposed to third-party apps), so Unanchor stays phone-only,
+   the same way it does on an iPad without item 4.
+5. Say plainly, on the complication and in HANDOFF, that the status shown can be stale by
+   whatever the delivery budget allows — it is not the phone's Live Activity, which ticks
+   every second.
+
+Keep: no new release path anywhere; `Policy.decide` untouched; the phone remains the only
+device a tag scan can happen on.
+
+Tests: none in `Tests/Core` — nothing here is pure; it is transport and WidgetKit. Log the
+`WCSession` message flow on both ends instead.
+
+Hand back: the go/no-go answer, the transport chosen and its actual refresh behaviour as
+observed (not as documented), the target(s) added, and exactly what Zach should do on the
+phone and the Watch to see a status update arrive and a drop actually land.
+
+---
+
+## 16. A StandBy-friendly widget
+
+**Open — proposed 2026-09-12.**
+
+**Model: Opus. Lane K. Waits on nothing; parallel-safe.**
+
+You are picking up Furlough, Zach's iOS and Mac app blocker. Read `HANDOFF.md`, then
+`README.md`, then `design/DESIGN.md`. Session rules: never commit or push; when done, print
+`git add <your files>` and a lowercase `git commit -m "..."` for Zach, with no
+Co-Authored-By; run `xcodegen generate` after adding files; keep the build warning-free; you
+cannot see the phone, so end with what Zach should do and see.
+
+StandBy (the landscape charging-stand mode) surfaces the same WidgetKit widgets the Lock
+Screen and Home Screen already use — there is no separate StandBy widget API, only existing
+families rendered larger and, after dark, under a system red-tinted night mode Furlough does
+not control. So this is a layout and legibility task, not a new extension.
+
+1. Check `FurloughWidgets/StatusWidget.swift`'s current `supportedFamilies`. Add
+   `.systemLarge` if it is not already declared, and lay the hourglass and countdown out so
+   they read from across a room rather than looking like a scaled-up Home Screen tile.
+2. Confirm Ember Glass survives the automatic night tint rather than assuming it does —
+   charge the phone after dark in the stand orientation and look. If the palette fights the
+   tint (the ember accent going muddy, the glass losing contrast), say so in HANDOFF; do not
+   silently add a StandBy-specific palette without asking Zach first, since the whole design
+   language is settled and reviewed.
+3. Confirm the Live Activity (`WindowLiveActivity.swift`) already appears in StandBy while a
+   window is open — it should, since StandBy shows the same Lock Screen Live Activities by
+   default — and note whether it needs anything of its own.
+
+Keep: no shield or anchor logic touched; this is presentation only; nothing here changes
+`Policy.decide` or any writer of `Config`.
+
+Tests: none in `Tests/Core`. Visual check on the device is the only proof.
+
+Hand back: the widget family added (if any), a screenshot Zach takes of StandBy showing it
+in daylight and after dark, and the night-tint finding.
+
+---
+
+## 17. Focus Filter: drop the Anchor when a Focus turns on
+
+**Open — proposed 2026-09-12.**
+
+**Model: Fable — a Focus Filter intent extension is a new process writing `Config.anchor`,
+exactly the case the model rule calls out, even though it can only tighten. Lane L. Waits on
+nothing; parallel-safe.**
+
+You are picking up Furlough, Zach's iOS and Mac app blocker. Read `HANDOFF.md`, then
+`README.md`. Session rules: never commit or push; when done, print `git add <your files>`
+and a lowercase `git commit -m "..."` for Zach, with no Co-Authored-By; run `xcodegen
+generate` after adding files; keep the build warning-free; every `Shared/Core` change gets
+tests in `Tests/Core`; you cannot see the phone, so end with what Zach should configure and
+test. Ask Zach before building anything marked "decide with Zach".
+
+iOS lets a third-party app plug an action into a system Focus (Sleep, Work, or one Zach
+names) through a Focus Filter — the user turns it on once from Settings > Focus > a Focus >
+Focus Filters > Furlough, the same screen every Focus Filter uses. No entitlement beyond App
+Intents is needed.
+
+1. A new intent conforming to `SetFocusFilterIntent`, in a new
+   `Shared/Intents/AnchorFocusFilter.swift`, with one configurable parameter: which of the
+   anchor's existing shapes to apply when the chosen Focus turns on — today's chosen-apps
+   list, or, if item 3 has landed, the everything-except scope. Nothing here is configurable
+   about *what* the anchor holds, only *when* it drops; the anchor's own screen still owns
+   the list.
+2. Check the current App Intents signature for how the system reports activation versus
+   deactivation to `perform()`. **Act only on activation.** On deactivation, do nothing at
+   all — no call into `AnchorDrop`, no write of any kind — and leave a comment saying why:
+   this is exactly the seam where "the Focus controls it" would quietly grow into an
+   unblock if the off-case were ever wired to anything. Unanchoring stays tag-only,
+   unconditionally, regardless of what this item adds.
+3. The activation path calls the same drop semantics `Shared/Core/AnchorDrop.swift` already
+   exposes to the Control Center control and `DropAnchorIntent` — a fourth caller of
+   existing code, not new anchor logic.
+4. Decide with Zach: a Focus Filter's system configuration screen has no room for Furlough's
+   own confirmation sheet, so `Config.anchorWarning`'s essential-app warning cannot appear at
+   the moment of activation the way tapping Anchor in the app shows it. The honest options are
+   either a warning sentence baked into the Filter's own setup screen (read once, at
+   configuration time, not at every activation) or accepting that this path skips the warning
+   entirely. Write whichever Zach picks into HANDOFF as a decision, not an oversight.
+
+Keep: `AnchorDrop.drop` unmodified; the anchor's writers list in HANDOFF grows to include
+this Filter, alongside Control Center, the intent, the schedule and the tag; nothing here can
+release.
+
+Tests: none in `Tests/Core` — `SetFocusFilterIntent` conformance is not unit-testable the way
+`Policy` is. A manual device test is the only proof: turn the configured Focus on and confirm
+the anchor drops within a few seconds; turn it off and confirm nothing changes.
+
+Hand back: the intent, the scope decision, the warning-copy decision, and what Zach should
+configure under Settings > Focus and then test.
+
+---
+
+## 18. A trend view in the Mac's menu bar
+
+**Open — proposed 2026-09-12.**
+
+**Model: Opus. Lane M. Waits on nothing; parallel-safe.**
+
+You are picking up Furlough, Zach's iOS and Mac app blocker. Read `HANDOFF.md`, then
+`README.md`, then `FurloughMac/MenuBar.swift` and `Shared/Core/Record.swift`. Session rules:
+never commit or push; when done, print `git add <your files>` and a lowercase
+`git commit -m "..."` for Zach, with no Co-Authored-By; run `xcodegen generate` after adding
+files; keep the build warning-free; Mac screens can be rendered to PNG with the swiftc
+approach in the memory note "Verify Shared/UI drawing on the Mac with swiftc". Ask Zach
+before building anything marked "decide with Zach".
+
+`MenuBar.swift`'s `NSMenu` already shows the hourglass, the countdown and every target's
+status off `Policy.summary`, rebuilt on `menuNeedsUpdate`. `Record.swift` already accumulates
+`DayRecord` per day for 60 days — minutes shielded, whether a budget was spent, loosenings
+cancelled versus landed — feeding the phone's Settings card and the Mac sidebar's
+`MacRecordSection`/`MacRecordRows`. Nothing today puts that history where it is seen without
+opening the app.
+
+1. **Decide with Zach first**: whether a chart belongs in the menu bar dropdown at all, or
+   whether it stays sidebar-only. A menu that takes a visible beat to render every time it
+   opens is a worse menu than the one that exists today — measure that before committing to
+   it, not after.
+2. If yes: one more section in the menu, a week-over-week view (a sparkline or a bar per day
+   of minutes shielded) reusing `Record`'s existing data — no new accumulation, no new
+   `Config` field. Draw it as a hosted SwiftUI view inside a custom `NSMenuItem`, the way the
+   countdown already is; check `project.yml`'s macOS deployment minimum before reaching for
+   Swift Charts, since a hand-rolled bar row is also fine and has no dependency to check.
+   Rebuild it in the same `menuNeedsUpdate` pass as everything else in the menu.
+
+Keep: no new state, no new writer; this reads `Record` and nothing else; `Policy.decide`
+untouched.
+
+Tests: none new — `Record`'s arithmetic is already covered by `Tests/Core/RecordTests.swift`.
+If a formatting helper is added (bucketing minutes into rows, say), test it in `Tests/Core`
+since it is pure.
+
+Hand back: the "does this belong here" decision, the section if it went ahead, and a
+screenshot of the menu open with at least a week of real data behind it.
+
+---
+
+## 19. A weekly digest notification
+
+**Open — proposed 2026-09-12.**
+
+**Model: Opus. Lane N. Waits on nothing; parallel-safe.**
+
+You are picking up Furlough, Zach's iOS and Mac app blocker. Read `HANDOFF.md`, then
+`README.md`, then `Shared/Core/Record.swift` and `Shared/Core/PendingNotifications.swift`.
+Session rules: never commit or push; when done, print `git add <your files>` and a
+lowercase `git commit -m "..."` for Zach, with no Co-Authored-By; run `xcodegen generate`
+after adding files; keep the build warning-free; every `Shared/Core` change gets tests in
+`Tests/Core`; you cannot see the phone, so end with what Zach should do to see one fire. Ask
+Zach before building anything marked "decide with Zach".
+
+`Record.swift`'s numbers — streaks, minutes shielded, loosenings cancelled versus landed, the
+longest anchor — are visible today only if Zach opens Settings or the Mac sidebar. A once-a-
+week push of the same numbers would make the record something that reaches him rather than
+something he has to go looking for.
+
+1. A pure function in `Record.swift` — something like
+   `Record.weeklyDigest(days:calendar:at:) -> DigestText?` — answering two or three lines
+   condensed from the same copy functions `RecordScreen`/`MacRecordSection` already use: the
+   streak, minutes shielded this week, loosenings cancelled versus landed. Reuse the existing
+   wording rather than drafting new prose, and keep the existing refusal to be celebratory —
+   a broken streak says so plainly, here as everywhere else in `Record`.
+2. Schedule it through the existing planned-notification path
+   (`PendingNotifications.swift`'s `Notifier`, `PlannedNotification`, `plan`/`sync`) rather
+   than a one-off `UNNotificationRequest` written from scratch — a weekly digest is exactly
+   what that infrastructure is for. A `UNCalendarNotificationTrigger` for Monday morning
+   (time configurable; default matching whatever hour Zach's other notifications already use)
+   works identically on the phone and the Mac, since both post local notifications today.
+3. Re-plan it on every `enforce()`/`reconcile()`, the way every other planned notification is,
+   so a fresh install or a Reset schedules the next one with no special case.
+4. Decide with Zach: on or off by default, and where the toggle lives (a Settings row next to
+   the Record card is the obvious place).
+
+Keep: read-only over `Record`; nothing here writes `Config` or touches `Policy.decide`; a
+missed digest (phone off, Do Not Disturb) is not retried outside its own next week — no
+catch-up logic, the same way a missed midnight callback is not specially retried elsewhere.
+
+Tests: `Tests/Core/RecordDigestTests.swift` (or added to `RecordTests.swift`) with a pinned
+calendar: a week with a held streak, a week with a break, a fresh install with no data yet,
+and the Monday scheduling math across a DST boundary.
+
+Hand back: the function, the scheduling wired on both platforms, the default-on/off decision,
+and how to see one fire without waiting a week — backdating a test trigger a few minutes out,
+the same demo shape as item 2's timed Anchor drop.
+
+---
+
+## 20. Onboarding: where to put the tag
+
+**Open — proposed 2026-09-12.**
+
+**Model: Sonnet — copy and a static screen, no logic. Lane O. Waits on nothing;
+parallel-safe.**
+
+You are picking up Furlough, Zach's iOS and Mac app blocker. Read `HANDOFF.md`, then
+`README.md`, then `site/src/pages/help/nfc-tags.astro`'s "Why a tag and not a code" section to
+learn the voice already settled there. Session rules: never commit or push; when done, print
+`git add <your files>` and a lowercase `git commit -m "..."` for Zach, with no
+Co-Authored-By. You cannot see the phone, so end with what Zach should see.
+
+The whole mechanism leans on the tag being "somewhere else" — a code is a photograph away
+from being a copy, and the tag is not. Onboarding pairs the tag today and says nothing about
+where to put it afterward, and neither does the Anchor screen.
+
+1. A new step in `Furlough/Views/Onboarding`, shown once, right after the tag pairs
+   successfully: the Ember Glass card style, three or four concrete placement suggestions (a
+   housemate's bag, a locked drawer at work, the bottom of a bike pannier, mailed to yourself
+   with a delay, handed to a partner) and one line on why it matters, pulled from the site's
+   existing "Why a tag and not a code" sentence rather than a second version of the same
+   claim. No checkboxes, no persisted state — this is guidance a person reads once, not a
+   feature Furlough tracks doing.
+2. A `?` link from the Anchor screen to the same content on the site, for anyone who paired a
+   tag before this shipped, rather than duplicating the screen's prose in two places.
+3. Condition the onboarding screen on this being the *first* pairing, not any pairing, so
+   `Forget tag` → pair again does not repeat it.
+
+Keep: no new persisted state; `AnchorProfile` and `Config` untouched; nothing here can be
+mistaken for a pause or a break.
+
+Tests: none — pure SwiftUI copy; nothing in `Shared/Core` changes.
+
+Hand back: the screen, seen once during a fresh pairing on the phone, and the Anchor screen's
+new link.
