@@ -207,6 +207,72 @@ The rules engine has its own tests. `Shared/Core` is plain Foundation and builds
 xcodebuild test -project Furlough.xcodeproj -scheme FurloughCoreTests -destination 'platform=macOS,arch=arm64'
 ```
 
+## Versioning
+
+`MARKETING_VERSION` lives once, in `project.yml`'s base settings, and every target's Info.plist
+reads it through `$(MARKETING_VERSION)`. It is always **three numbers** — `1.2.0`, never `1.2` —
+so that one version cannot be written down two ways.
+
+**`CURRENT_PROJECT_VERSION` is not the version.** `scripts/archive.sh` stamps each build with a
+UTC timestamp, which always rises and is never reused. The build number says *when*; the
+marketing version says *what*.
+
+Which number moves:
+
+| | When | Examples |
+|---|---|---|
+| **PATCH** `1.1.0 → 1.1.1` | Nothing new to learn. Something that was wrong now works. | A crash, a wrong label, a spinner that never stops, a slow screen, more rows in the companion or utility tables. |
+| **MINOR** `1.1.1 → 1.2.0` | Something new to find. Anything that changes what you can say or where you can say it. | A new screen or setting, a new way in (widget, Control Center, an intent, a Focus filter), a new field in the setup file that older builds ignore, a new platform. |
+| **MAJOR** `1.x.y → 2.0.0` | Something you would want to be told before you update. | Stored state an older build can no longer read, the delay or the Anchor or the escape hatch changing meaning, a device or OS version dropped. |
+
+Two rules this app has that the general ones do not:
+
+- **A change to what `Policy.decide` shields is never a patch**, even when it is a fix. If a
+  build can block or unblock something the one before it could not, the minor moves, so that a
+  person whose phone behaved differently this morning can see the reason in the version number.
+- **One version, one batch.** The version is bumped when a build is cut *for other people* — at
+  `furlough beta`, not on every merge to `main` — and the batch it covers stops there. Do not
+  put a second day of feature work out under a version string that has already shipped.
+
+Every bump needs an entry in `release-notes.json` **first**:
+
+```bash
+scripts/version.sh minor
+```
+
+It refuses a version that is not three numbers, one that does not rise, and one the notes have
+no entry for, then rewrites the single line in `project.yml`. `scripts/version.sh` on its own
+says where things stand, and `scripts/archive.sh` runs `--check` before it archives, so a build
+cannot be cut whose What's new screen would not mention the version it is running. Neither
+commits anything.
+
+### The notes
+
+`release-notes.json` at the root of the repo is the one copy. Both apps bundle it as a resource
+and read it through `Shared/Core/ReleaseNotes.swift` (Help > What's new, and Settings > About on
+the phone); the site imports the same file at build time for `furloughapp.com/releases`. There
+is no second copy to keep in sync, and `Tests/Core/ReleaseNotesTests.swift` holds the file to
+its shape and to `project.yml`.
+
+Newest first. Each entry is a version, a date, a channel (`appstore`, `testflight` or
+`unreleased`), a headline, a paragraph, and the changes — each one a `kind` (`new`, `better`,
+`fixed`), a `platform` (`both`, `iphone`, `mac`), a title and a sentence or two. Write them for
+somebody who uses Furlough and does not read this repo: what changed and what it means, not
+which file moved.
+
+### What the first three versions were
+
+Recorded as shipped, and worth knowing before reading the numbers:
+
+- **1.0** and **1.1** were written without the patch component. `release-notes.json` records
+  them padded — `1.0.0`, `1.1.0` — and `Version` compares numerically, so `1.1` and `1.1.0` are
+  the same version and a build of either finds its own notes.
+- **1.1 carried four builds across two days** of feature work under one version string. The
+  "one version, one batch" rule above is there because of it: the second day should have been
+  `1.2.0`.
+- Nothing has been released on the App Store. Version 1.0 was submitted and rejected; every
+  build so far went to TestFlight, which is what the channel on each entry says.
+
 ## Known limits of the Screen Time API
 
 - Windows must be at least 15 minutes and, as stored, cannot cross midnight. A night is kept as two of them, one either side of midnight, and each half needs its own 15 minutes.

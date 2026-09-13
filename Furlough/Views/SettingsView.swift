@@ -419,6 +419,8 @@ private struct AboutScreen: View {
                 CardDivider()
                 navRow("About Furlough") { AboutHelp() }
                 CardDivider()
+                navRow("What's new") { WhatsNewView() }
+                CardDivider()
                 navRow("If something gets stuck") { StuckHelp() }
             }
             .emberCard()

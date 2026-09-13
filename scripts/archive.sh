@@ -42,6 +42,16 @@ if [[ "$TESTING_TOOLS" == "1" ]]; then
     echo "==> TESTING_TOOLS=1: this build will carry Settings > Testing"
 fi
 
+# Three components, and an entry in release-notes.json for this exact version. The notes are
+# bundled into the app and imported by the site, so a build with none ships a What's new screen
+# that does not mention the version it is running. Written before the bump, never after —
+# scripts/version.sh has the whole argument, and is what does the bumping.
+echo "==> Checking the version against release-notes.json"
+if ! scripts/version.sh --check; then
+    echo "REFUSING TO SHIP: the version and the release notes do not agree (see above)." >&2
+    exit 1
+fi
+
 echo "==> Regenerating the project"
 xcodegen generate
 

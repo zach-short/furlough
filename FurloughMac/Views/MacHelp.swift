@@ -12,7 +12,7 @@ import SwiftUI
 /// A page of help and the row that opens it. One case per page, so the sheet's title and the
 /// hub's rows cannot drift apart.
 enum HelpTopic: String, Identifiable, CaseIterable {
-    case windows, delay, targets, blocking, devices, elsewhere, stuck, about
+    case windows, delay, targets, blocking, devices, elsewhere, stuck, about, whatsNew
 
     var id: String { rawValue }
 
@@ -26,6 +26,7 @@ enum HelpTopic: String, Identifiable, CaseIterable {
         case .elsewhere: "Outside the window"
         case .stuck: "If something gets stuck"
         case .about: "About"
+        case .whatsNew: "What's new"
         }
     }
 
@@ -39,6 +40,7 @@ enum HelpTopic: String, Identifiable, CaseIterable {
         case .elsewhere: "The menu bar, the widget, notifications"
         case .stuck: "What to try, and the one way out"
         case .about: "What it keeps, and what leaves this Mac"
+        case .whatsNew: ReleaseNotes.current().map { "\($0.version) · \($0.headline)" } ?? "What changed, version by version"
         }
     }
 
@@ -52,6 +54,7 @@ enum HelpTopic: String, Identifiable, CaseIterable {
         case .elsewhere: "menubar.arrow.up.rectangle"
         case .stuck: "wrench.and.screwdriver"
         case .about: "info.circle"
+        case .whatsNew: "sparkles"
         }
     }
 }
@@ -130,7 +133,7 @@ struct HelpWindow: View {
                 SectionLabel(text: "On this Mac")
                 card([.blocking, .elsewhere])
                 SectionLabel(text: "If you need it")
-                card([.stuck, .about])
+                card([.stuck, .about, .whatsNew])
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 24)
@@ -349,6 +352,7 @@ struct HelpPage: View {
         case .elsewhere: "Where Furlough shows up"
         case .stuck: "When a block will not lift"
         case .about: "About Furlough"
+        case .whatsNew: "What changed"
         }
     }
 
@@ -370,7 +374,19 @@ struct HelpPage: View {
             "Furlough re-derives every block from saved state once a second, so drift is rare and short. If something still looks wrong:"
         case .about:
             "A personal app blocker with no unblock button. It has no account, no server and no analytics. The one thing it writes off this Mac is the Anchor's state, to your own iCloud, so the iPhone and the Mac lock together."
+        case .whatsNew:
+            whatsNewLead
         }
+    }
+
+    /// Names the version in hand, since that is what someone opening this came to check. The
+    /// plain sentence on a build `release-notes.json` has no entry for — a Debug build off a
+    /// branch mid-version is exactly that, and it should not claim to be a release.
+    private var whatsNewLead: String {
+        guard let current = ReleaseNotes.current() else {
+            return "Each version of Furlough, newest first, and what it changed on this Mac."
+        }
+        return "You are on \(current.version). \(current.headline) Every version is below, newest first."
     }
 
     @ViewBuilder
@@ -384,6 +400,7 @@ struct HelpPage: View {
         case .elsewhere: elsewhere
         case .stuck: stuck
         case .about: about
+        case .whatsNew: whatsNew
         }
     }
 
@@ -599,6 +616,28 @@ struct HelpPage: View {
             .padding(.top, 2)
         Footnote(text: "With Reopen after a Force Quit on, a launchd agent opens Furlough again within about ten seconds. Force Quit still lifts every block; it just buys seconds rather than an evening.")
             .padding(.top, 8)
+    }
+
+    // MARK: What's new
+
+    /// The list is `ReleaseList` in `Shared/UI`, drawn the same way on the phone; the text
+    /// behind both is `release-notes.json`, which the site imports too. Nothing here interrupts:
+    /// no window opens itself after an update, because an app whose whole argument is that it
+    /// will not nag you into opening something has no business nagging you into reading its own
+    /// release notes.
+    @ViewBuilder
+    private var whatsNew: some View {
+        let releases = ReleaseNotes.all()
+        if releases.isEmpty {
+            // The resource is missing or would not decode. Say so rather than showing an empty
+            // page that reads as nothing having ever changed.
+            HelpProse("The notes for this build could not be read. furloughapp.com/releases has them.")
+                .padding(.top, 12)
+        } else {
+            ReleaseList(releases: releases)
+            Footnote(text: "Every version so far has gone to TestFlight rather than the App Store, and the Mac app is built from source. The same notes are at furloughapp.com/releases.")
+                .padding(.top, 14)
+        }
     }
 
     // MARK: About

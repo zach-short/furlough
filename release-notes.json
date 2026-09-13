@@ -1,0 +1,200 @@
+{
+  "$comment": "The one copy of what changed and when. The apps read it as a bundled resource (Shared/Core/ReleaseNotes.swift); the site imports it (site/src/pages/releases.astro). Nothing else may hold a second copy. The rules for the version numbers, and what has to happen before an entry is added, are the Versioning section of README.md. Newest first.",
+  "versions": [
+    {
+      "version": "1.1.0",
+      "date": "2026-09-11",
+      "channel": "testflight",
+      "headline": "Two halves, and a link between your devices.",
+      "lead": "The Anchor stopped being a feature hung off the rules and became the other half of the app: its own page, its own guide, its own way in. And the iPhone and the Mac learned to tell each other what you anchored.",
+      "changes": [
+        {
+          "kind": "new",
+          "platform": "both",
+          "title": "Home is two pages",
+          "detail": "Rules on one, the Anchor on the other. The intro asks which one you came for and opens there; each half carries a three-step guide until it is set up, and the + asks which half you are adding to rather than guessing."
+        },
+        {
+          "kind": "new",
+          "platform": "both",
+          "title": "A link you opt into, per device",
+          "detail": "Link a device and the Anchor crosses to it — down, since when, until when. What you add to the Anchor can cross too, by name, so anchoring Instagram on the phone anchors it on the Mac without either device knowing the other's identifier for it."
+        },
+        {
+          "kind": "new",
+          "platform": "both",
+          "title": "A starting rule, not just a tier",
+          "detail": "Adding an app opens its first rule already written: the name and the window Furlough knows for its hazard tier, there to accept or change rather than to invent."
+        },
+        {
+          "kind": "new",
+          "platform": "mac",
+          "title": "The web filter is offered at your first website",
+          "detail": "Not during the first run, where it was one permission too many. macOS hides its approval behind a By category step, so the offer now walks through the approval one control at a time, with a picture of each — and a refused extension is told apart from a refused filter permission instead of guessed at."
+        },
+        {
+          "kind": "new",
+          "platform": "mac",
+          "title": "Help is a window of its own",
+          "detail": "It was a fixed pane hanging off the bottom of the main window. It is now resizable, can sit beside the rules while they are read, and the window's own actions moved into the toolbar where the system draws them."
+        },
+        {
+          "kind": "better",
+          "platform": "both",
+          "title": "83 companion pairs, up from 33",
+          "detail": "Every one confirmed by a lookup rather than guessed. The utility table grew 35 apps as well — streaming, dating, gambling, AI chat and shopping, each tiered — so onboarding can name an app without waiting for the shield to learn it."
+        },
+        {
+          "kind": "better",
+          "platform": "iphone",
+          "title": "The usage page opens on real icons",
+          "detail": "Cards are drawn from the tables at once — the name, and a letter on the brand's colour — and Screen Time's own artwork takes over when it answers. The token map is kept, so the second visit opens on the real icons straight away."
+        },
+        {
+          "kind": "better",
+          "platform": "iphone",
+          "title": "Settings is a menu",
+          "detail": "Seven cards down one scroll became rows, each carrying the one fact you would have scrolled to read: what the app opens on, how long a loosening waits, whether the devices are linked, whether anything is wrong."
+        },
+        {
+          "kind": "better",
+          "platform": "both",
+          "title": "An applied change folds down to its verdict",
+          "detail": "With undo, edit and expand left on the line, and the whole line opening the card rather than just the word. A skipped change folds the same way, naming the rule it passed on."
+        },
+        {
+          "kind": "better",
+          "platform": "both",
+          "title": "Diagnostics say whether the devices are actually talking",
+          "detail": "Rather than leaving \"nothing happened\" as the whole answer. It asks the key-value store the Anchor really travels through, and says plainly when iCloud cannot carry it."
+        },
+        {
+          "kind": "better",
+          "platform": "both",
+          "title": "Reset everything goes all the way back",
+          "detail": "On both the phone and the Mac, a reset now returns to the first screen of the first run, which is the run worth reviewing."
+        },
+        {
+          "kind": "fixed",
+          "platform": "iphone",
+          "title": "Apply stopped spinning for ever",
+          "detail": "A Screen Time query that never answers no longer leaves the button turning. It has a deadline now, and says what happened when the deadline passes."
+        },
+        {
+          "kind": "fixed",
+          "platform": "both",
+          "title": "Linking stopped forgetting itself",
+          "detail": "A device that wrote to the link no longer dropped its own record of having been on it."
+        }
+      ]
+    },
+    {
+      "version": "1.0.1",
+      "date": "2026-09-09",
+      "channel": "testflight",
+      "headline": "Two fixes on the way out of 1.0.",
+      "lead": "Cut the same morning as the last 1.0 build, for two things found in it.",
+      "changes": [
+        {
+          "kind": "better",
+          "platform": "iphone",
+          "title": "The Control Center button says what it did",
+          "detail": "Dropping the Anchor from Control Center now shows the Anchor and names what it blocked, and the budget went onto the Dynamic Island."
+        },
+        {
+          "kind": "fixed",
+          "platform": "both",
+          "title": "A merged row kept its name",
+          "detail": "Joining an app and the website it is also at read the name off the row being taken away before it went, and a target is named the moment it is picked rather than whenever the shield next learns it."
+        }
+      ]
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-09-08",
+      "channel": "testflight",
+      "headline": "The first build.",
+      "lead": "A personal app blocker with no unblock button, on the iPhone and the Mac. No account, no server, no analytics, and no networking code at all.",
+      "changes": [
+        {
+          "kind": "new",
+          "platform": "both",
+          "title": "Rules: windows and budgets",
+          "detail": "Every app and site you add gets a daily budget and, if you want, the hours it is allowed. Whichever runs out first closes it until the next opening. Budgets can be seven different figures, one per weekday."
+        },
+        {
+          "kind": "new",
+          "platform": "both",
+          "title": "The delay",
+          "detail": "Tightening a rule applies the moment you save it. Loosening one waits out a delay you set, and you can cancel it while it waits. There is no unblock button anywhere in the app, and the way out is documented rather than hidden."
+        },
+        {
+          "kind": "new",
+          "platform": "both",
+          "title": "The Anchor",
+          "detail": "One tap locks a list, or the whole device, and the only thing that lifts it is an NFC tag you paired — up to three of them, so there can be one at home and one at work. It can also be set to drop on a schedule, or for a while."
+        },
+        {
+          "kind": "new",
+          "platform": "iphone",
+          "title": "Built on Screen Time",
+          "detail": "FamilyControls, ManagedSettings and DeviceActivity do the shielding, so a blocked app cannot be deleted to escape it. The shield is Furlough's own, and it says which rule closed the app and when it opens again."
+        },
+        {
+          "kind": "new",
+          "platform": "mac",
+          "title": "The Mac enforces on its own",
+          "detail": "Apple's Screen Time API does not exist on macOS, so Furlough shares the phone's rules engine and does the blocking itself: quitting apps, redirecting tabs, and a network filter for everything a browser will not report. Quit is refused while anything is blocked."
+        },
+        {
+          "kind": "new",
+          "platform": "both",
+          "title": "Tiers, and the warnings that come with them",
+          "detail": "Each target gets a hazard tier, and the tier decides how long its loosenings wait. A tier raised is a tightening; a tier lowered waits like everything else."
+        },
+        {
+          "kind": "new",
+          "platform": "both",
+          "title": "The first week, and fifteen minutes",
+          "detail": "Forgiveness for a mistake, never for a craving: while the first week runs, every loosening is capped at a short delay, and any change can be undone for fifteen minutes after it lands."
+        },
+        {
+          "kind": "new",
+          "platform": "both",
+          "title": "Companions",
+          "detail": "Adding the YouTube app offers youtube.com, and adding youtube.com offers the YouTube app, so one habit is one row rather than two rules that disagree."
+        },
+        {
+          "kind": "new",
+          "platform": "both",
+          "title": "The record",
+          "detail": "The streak, the minutes held, the loosenings queued and the loosenings cancelled — the contract kept, rather than a count of sessions."
+        },
+        {
+          "kind": "new",
+          "platform": "iphone",
+          "title": "Outside the app",
+          "detail": "Notifications at a window's edges, a Live Activity while one runs, home screen and lock screen widgets, a Control Center button that drops the Anchor, and a What's Open shortcut."
+        },
+        {
+          "kind": "new",
+          "platform": "mac",
+          "title": "The menu bar and the desktop",
+          "detail": "What is open and what is held, in the menu bar, and a widget that can sit on the desktop."
+        },
+        {
+          "kind": "new",
+          "platform": "both",
+          "title": "Your setup as a file",
+          "detail": "Download your rules, budgets, tiers and delay as JSON you keep, and restore from one. A restore is a proposal rather than a rewind: every rule goes through the same delay the editor does."
+        },
+        {
+          "kind": "new",
+          "platform": "both",
+          "title": "Help in the app",
+          "detail": "Nine pages behind the question mark, not on a website that might itself be shielded. Anything with a number in it reads the number out of your own config."
+        }
+      ]
+    }
+  ]
+}

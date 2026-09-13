@@ -22,7 +22,10 @@ settings:
     # target repeats it below. Removing those repeats silently ships a universal app,
     # which then makes App Store Connect demand a 13-inch iPad screenshot set.
     TARGETED_DEVICE_FAMILY: "1"
-    MARKETING_VERSION: "1.1"
+    # MAJOR.MINOR.PATCH, always three components, and never bumped without an entry for the
+    # new number in release-notes.json — scripts/archive.sh refuses to cut a build otherwise.
+    # What forces a major, a minor or a patch is README's Versioning section.
+    MARKETING_VERSION: "1.1.0"
     CURRENT_PROJECT_VERSION: "1"
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS: YES
@@ -41,6 +44,10 @@ targets:
       - path: Shared/UI
       - path: Shared/Usage
       - path: Shared/PrivacyInfo.xcprivacy
+        buildPhase: resources
+      # What changed in each version. One copy at the root of the repo, bundled here and
+      # imported by the site, so the app and furloughapp.com cannot disagree about a release.
+      - path: release-notes.json
         buildPhase: resources
     entitlements:
       path: Furlough/Furlough.entitlements
@@ -329,6 +336,10 @@ targets:
       - path: Shared/UI
       - path: Furlough/Fonts
         type: folder
+        buildPhase: resources
+      # What changed in each version. One copy at the root of the repo, bundled here and
+      # imported by the site, so the app and furloughapp.com cannot disagree about a release.
+      - path: release-notes.json
         buildPhase: resources
       # The watchdog agent. SMAppService.agent looks for it at this exact path inside the
       # bundle, and its Label must match the file name; see FurloughMac/Model/Watchdog.swift.

@@ -58,6 +58,7 @@ COMMANDS=(
   "phone:build Debug and run it on the connected iPhone"
   "mac:build the Mac app and put it in /Applications"
   "test:run the rules-engine tests here, no phone needed"
+  "version:the marketing version, and bumping it by the rules"
   "gen:regenerate Furlough.xcodeproj from project.yml"
   "open:open the project in Xcode"
   "archive:cut and audit a Release build, stopping at the .ipa"
@@ -218,6 +219,7 @@ case "${1:-help}" in
   mac)       shift; cmd_mac "$@" ;;
   test)      shift; xcodebuild test -project Furlough.xcodeproj -scheme FurloughCoreTests \
                       -destination 'platform=macOS,arch=arm64' "$@" ;;
+  version)   shift; scripts/version.sh "$@" ;;
   gen)       shift; xcodegen generate "$@" ;;
   open)      shift; open Furlough.xcodeproj ;;
   archive)   shift; run_logged scripts/archive.sh "$@" ;;

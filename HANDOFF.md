@@ -2648,6 +2648,66 @@ The plan for this stretch. Tick each phase off here as it lands.
     simulator** (the patched-`RootView` harness from the memory note, seeded with a phone nine
     days into a record): the menu, and all six screens behind its rows.
 
+41. **Release notes, and a rule for the version number.** Zach, 2026-09-12: a patch-notes
+    section in the website and the apps, backlogged, "ideally coinciding with the package
+    numbers", and a standard for when the number moves. Done the same day.
+
+    **One file.** `release-notes.json` at the root of the repo is the only copy. Both apps
+    bundle it as a resource (`project.yml`, the `Furlough` and `FurloughMac` targets only — no
+    extension shows a What's new screen) and read it through `Shared/Core/ReleaseNotes.swift`;
+    the site imports the same file at build time for `site/src/pages/releases.astro`. The help
+    pages are deliberately written twice, in the app and on the site, because they are prose in
+    one voice; a changelog is not, and two copies of one would disagree the first time somebody
+    edited one of them.
+
+    **Where it shows.** Help > What's new on both devices, in the "If you need it" card beside
+    About, its row carrying the version and its headline. On the phone, Settings > About has a
+    second door to the same screen, because the version number is already on that screen and
+    whoever is reading it back off a bug report is who wants this. Nothing interrupts: no sheet
+    opens itself after an update, and there is no unread dot — the one dot the menu rows have
+    means "something is wrong with this, untouched", and spending it on "you have not read this"
+    would muddy the only signal that screen has.
+
+    `ReleaseList` is in `Shared/UI` and drawn the same way on both, so it is self-contained the
+    way `LinkCards` is — Ember and the theme helpers only, no `SectionLabel`, `Footnote` or
+    `CardDivider`, because Shared/UI is compiled into extensions that carry none of each app's
+    own components. The platform is **passed** to it rather than read from `Platform.current`,
+    so a list filtered for the phone cannot badge its own rows "iPhone".
+
+    **The backlog is what actually shipped**, read off the ten archives in `build/` rather than
+    off the commit log: 1.0 (four builds, 8–9 Sep), 1.0.1 (two builds, 9 Sep), 1.1 (four builds,
+    10–11 Sep). That accounting matters — the 1.0.1 *string* was in `project.yml` for a day and
+    a half, but only two builds were cut under it, so the two-halves work that landed in that
+    window went out as 1.1 and is written down as 1.1.0. Every entry says `testflight`, because
+    nothing has been released: version 1.0 was submitted and is `REJECTED` (the local
+    `check-review-status` state file, still saying so on 2026-09-12).
+
+    **The standard** is README's new Versioning section. MAJOR.MINOR.PATCH, always three
+    numbers; patch is nothing to learn, minor is something new to find, major is something you
+    would want to be told before updating. Two rules of this app's own: a change to what
+    `Policy.decide` shields is never a patch even when it is a fix, and one version means one
+    batch — the number is bumped when a build is cut for other people, not on every merge.
+
+    **It is enforced rather than documented.** `scripts/version.sh` (also `furlough version`)
+    refuses a version that is not three numbers, one that does not rise, and one
+    `release-notes.json` has no entry for, then rewrites the single line in `project.yml`.
+    `scripts/archive.sh` runs `--check` before it archives, beside its other REFUSING TO SHIP
+    guards, so a build cannot be cut whose What's new screen would not mention the version it
+    is running. Neither commits anything.
+
+    `MARKETING_VERSION` went `1.1` -> `1.1.0` on Zach's call. No App Store version named 1.1
+    exists, so nothing in review is disturbed; the one side effect is that the next TestFlight
+    upload starts a new build train under `1.1.0` beside the existing `1.1` one. `Version`
+    compares numerically, so `1.1` and `1.1.0` are one version and a 1.1 build still finds its
+    own notes.
+
+    `Tests/Core/ReleaseNotesTests.swift`, ten tests, run against the real file found from
+    `#filePath` rather than a fixture — a fixture would only prove that a copy is well formed.
+    They hold it to three components, no duplicates, newest-first order, real dates, and
+    agreement with `project.yml`. Both apps build warning-free. **Seen** at the real
+    typography: `ReleaseList` rendered to PNG from a standalone `swiftc` harness over
+    `Shared/UI` + `Shared/Core` (the memory note's trick), and the site page in headless Chrome.
+
 ## Style rules
 
 Swift 6 language mode with approachable concurrency, SwiftUI, `@Observable`, async/await, no

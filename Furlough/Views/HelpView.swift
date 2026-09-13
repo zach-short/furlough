@@ -151,8 +151,23 @@ struct HelpView: View {
                 }
             }
             .buttonStyle(.plain)
+            CardDivider()
+            NavigationLink { WhatsNewView() } label: {
+                HelpRow(title: "What's new", detail: whatsNewDetail) {
+                    HelpTile(symbol: "sparkles")
+                }
+            }
+            .buttonStyle(.plain)
         }
         .emberCard()
+    }
+
+    /// The version in hand and what it was for, so the row says something before it is opened.
+    /// The plain sentence on a build `release-notes.json` has no entry for — a Debug build off a
+    /// branch mid-version is exactly that, and it should not claim to be a release.
+    private var whatsNewDetail: String {
+        guard let current = ReleaseNotes.current() else { return "What changed, version by version" }
+        return "\(current.version) · \(current.headline)"
     }
 }
 
