@@ -67,6 +67,18 @@ struct RootView: View {
         } message: {
             Text(model.notice ?? "")
         }
+        // Where to leave the first tag, the moment it is paired. Raised from here rather than
+        // from either pairing screen because there are two of them — the Anchor page's armed
+        // reader and the Tags screen's Pair a tag — and one of those is a screen pushed onto
+        // Home's own stack, which a sheet presented from the root covers either way.
+        .sheet(
+            isPresented: Binding(
+                get: { model.placingTagID != nil },
+                set: { if !$0 { model.placingTagID = nil } }
+            )
+        ) {
+            TagPlacementView(tagName: model.placingTagName)
+        }
     }
 
     /// Keeps the launch screen up for its fixed time, and a little longer only if iOS has not

@@ -625,6 +625,8 @@ struct SettingsSheet: View {
 
                 enforcementCard
 
+                recordCard
+
                 setupCard
 
                 diagnosticsCard
@@ -903,6 +905,49 @@ struct SettingsSheet: View {
         .emberCard()
         Footnote(text: "Furlough enforces by quitting blocked apps, so Quit is refused while anything is blocked. Force Quit is the one escape, and it is documented on purpose.")
             .padding(.top, 8)
+    }
+
+    // MARK: The record
+
+    /// The record, once a week, without opening the window. On unless it is turned off, and
+    /// about this Mac's own week: the record does not cross devices, so the phone sends its own
+    /// and this sends this one. The numbers themselves stay at the foot of the sidebar
+    /// (`MacRecordSection`); this is only whether Monday morning brings them.
+    @ViewBuilder
+    private var recordCard: some View {
+        SectionLabel(text: "The record")
+        VStack(spacing: 0) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Monday morning").emberBody(13).foregroundStyle(Ember.cream)
+                    Text(digestLine)
+                        .emberBody(11.5)
+                        .foregroundStyle(Ember.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer()
+                Toggle(
+                    "Monday morning",
+                    isOn: Binding(get: { model.weeklyDigest }, set: { model.setWeeklyDigest($0) })
+                )
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .tint(Ember.ember)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+        }
+        .emberCard()
+        Footnote(text: "This Mac's own week. Your iPhone keeps a record of its own and sends its own digest.")
+            .padding(.top, 8)
+    }
+
+    private var digestLine: String {
+        guard model.weeklyDigest else { return "The record stays at the foot of the sidebar." }
+        let week = "The last seven days, as a notification on Monday at \(TimeFormat.minute(Furlough.digestHour * 60))."
+        return model.notificationsGranted == true
+            ? week
+            : "\(week) Notifications are off, so nothing will arrive until they are allowed."
     }
 
     // MARK: Your setup

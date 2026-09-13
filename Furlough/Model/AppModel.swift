@@ -60,6 +60,30 @@ final class AppModel {
     /// must not wait out a loosening delay.
     private(set) var hasSeenUsageStep = UserDefaults.standard.bool(forKey: AppModel.usageStepKey)
     private static let usageStepKey = "furlough.sawUsageStep"
+    /// Whether Monday morning brings the record as a notification. On unless it has been turned
+    /// off — absent means never asked, and the answer to never asked is yes here, because a
+    /// record nobody is told about is the state this replaces.
+    ///
+    /// Whether Monday morning brings the record as a notification. Kept in the App Group rather
+    /// than beside the flags above, because the monitor extension re-plans the digest while the
+    /// app is closed and does not share the app's own defaults — see
+    /// `PendingNotifications.digestPreferenceKey`, which is where it lives and why.
+    private(set) var weeklyDigest = PendingNotifications.wantsWeeklyDigest
+    /// The where-to-leave-it screen has been shown. Beside the ones above for the same reason,
+    /// and the reason it is a flag at all rather than "the anchor has exactly one tag": forget
+    /// the tag and pair another and the count is one again, but the advice has already been
+    /// read. It is what makes this a first pairing rather than any pairing.
+    private(set) var hasSeenTagPlacement = UserDefaults.standard.bool(forKey: AppModel.tagPlacementKey)
+    private static let tagPlacementKey = "furlough.sawTagPlacement"
+    /// The tag just paired, while its where-to-leave-it screen is up. Set only on a first
+    /// pairing; cleared when the screen goes. The identifier rather than the tag, so the screen
+    /// reads whatever the tag ended up being called — both pairing paths name it after the
+    /// pairing itself, one of them from the alert the person just typed into.
+    var placingTagID: Data?
+    /// What that tag is called now, for the screen's first line.
+    var placingTagName: String? {
+        placingTagID.flatMap { state.config.anchor.tag(matching: $0)?.name }
+    }
     /// The half the intro was told to start on: the page Home opens on, and the guide that runs
     /// first. Beside the three above in the app's own defaults, for the same reason — it records
     /// what was asked for, not what is blocked, so it must not travel in an exported setup and
@@ -387,6 +411,17 @@ final class AppModel {
         return true
     }
 
+    /// Turns the weekly digest on or off. Enforcing is what re-plans it, so turning it off
+    /// withdraws the one already scheduled in the same breath — `sync` takes away anything of
+    /// Furlough's that is no longer planned.
+    func setWeeklyDigest(_ on: Bool) {
+        guard on != weeklyDigest else { return }
+        PendingNotifications.setWantsWeeklyDigest(on)
+        weeklyDigest = on
+        SharedStore.log("weekly digest \(on ? "on" : "off")")
+        enforce(reason: "weekly digest")
+    }
+
     func requestNotifications() async {
         do {
             notificationsGranted = try await UNUserNotificationCenter.current()
@@ -440,7 +475,7 @@ final class AppModel {
         ShieldReconciler.reconcile(reason: reason)
         // The warning before a loosening lands is the last chance to cancel it, so it is
         // rescheduled from the saved state on every enforce rather than only when queued.
-        PendingNotifications.sync(state: current, now: clock.now, drift: clock.drift)
+        PendingNotifications.sync(state: current, now: clock.now, drift: clock.drift, digest: weeklyDigest)
         WidgetCenter.shared.reloadAllTimelines()
         ControlCenter.shared.reloadControls(ofKind: Furlough.anchorControlKind)
         reload()
@@ -1811,12 +1846,35 @@ final class AppModel {
         if let already = current.config.anchor.tag(matching: scanned) {
             return .failed("That tag is already paired, as \(already.name).")
         }
+        let isFirst = current.config.anchor.tags.isEmpty
         let tag = PairedTag(id: scanned, name: current.config.anchor.nextTagName)
         current.config.anchor.tags.append(tag)
         SharedStore.save(current)
         SharedStore.log("paired an anchor tag: \(tag.name)")
         reload()
+        // The one moment where the tag is in hand and has not yet been put down anywhere. Both
+        // ways in — the armed reader on the Anchor page and Pair a tag on the Tags screen —
+        // land here, so the screen is raised once from the model rather than twice from two
+        // views. See `TagPlacementView`.
+        if isFirst, !hasSeenTagPlacement { noteTagPlacementShown(for: tag) }
         return .paired(tag)
+    }
+
+    /// The where-to-leave-it screen is owed, and owed only once. The flag is written now rather
+    /// than when the screen is dismissed: a sheet swiped away has still been seen, and a second
+    /// showing of advice is worse than none.
+    ///
+    /// Raised after a beat, like everything else this app presents on the heels of something
+    /// else: one of the two pairing paths is an alert, and a sheet asked for while an alert is
+    /// still dismissing is the one SwiftUI drops. The wait is also what lets the name the
+    /// person typed into that alert land before the screen reads it.
+    private func noteTagPlacementShown(for tag: PairedTag) {
+        UserDefaults.standard.set(true, forKey: Self.tagPlacementKey)
+        hasSeenTagPlacement = true
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(350))
+            placingTagID = tag.id
+        }
     }
 
     /// Names a paired tag. The name is the whole reason more than one is usable, so an empty one
@@ -1985,6 +2043,15 @@ final class AppModel {
         wantsBothHalves = false
         UserDefaults.standard.removeObject(forKey: Self.anchorPageAddsKey)
         anchorPageAdds = .anchor
+        // A reset takes the tags with it, so the next pairing is a first pairing again and the
+        // where-to-leave-it screen is owed again with it.
+        UserDefaults.standard.removeObject(forKey: Self.tagPlacementKey)
+        hasSeenTagPlacement = false
+        placingTagID = nil
+        // Removed rather than set true: absent is what a fresh install has, and a fresh
+        // install's answer is yes. In the App Group, so it goes with the state above.
+        PendingNotifications.forgetWeeklyDigest()
+        weeklyDigest = true
         // Removed rather than emptied: absent is what "never asked" means, so the next launch
         // seeds from a config that a reset has just emptied and both guides come round again.
         UserDefaults.standard.removeObject(forKey: Self.finishedGuidesKey)

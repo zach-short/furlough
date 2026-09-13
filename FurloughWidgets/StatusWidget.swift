@@ -48,7 +48,23 @@ struct StatusProvider: TimelineProvider {
 
 struct StatusWidgetView: View {
     @Environment(\.widgetFamily) private var family
+    /// False wherever the system has taken the wall away: StandBy, the iPad Lock Screen,
+    /// CarPlay. It is the only signal any of those give — there is no StandBy widget family and
+    /// no StandBy environment value — so it is what the enlarged layout is keyed on. StandBy
+    /// takes the **small** widget and scales it up to half the screen, which is why the layout
+    /// changes rather than a new family being declared.
+    @Environment(\.showsWidgetContainerBackground) private var showsBackground
+    /// `.vibrant` on the iPad Lock Screen and in StandBy Night Mode, where the widget is
+    /// desaturated and re-coloured by the system — red, after dark, in the stand. Colour says
+    /// nothing there, so anything that was carrying meaning in a hue has to carry it in
+    /// contrast instead.
+    @Environment(\.widgetRenderingMode) private var renderingMode
     let entry: StatusEntry
+
+    /// The wall is gone, so this is StandBy, CarPlay or an iPad Lock Screen: read from across a
+    /// room rather than from a hand. Type goes up, the secondary lines go, and the content
+    /// margins shrink on their own.
+    private var enlarged: Bool { !showsBackground }
 
     var body: some View {
         if family == .accessoryRectangular {
@@ -56,6 +72,8 @@ struct StatusWidgetView: View {
                 .containerBackground(.clear, for: .widget)
         } else {
             home
+                // Removable by default, which is exactly right: in StandBy the system drops the
+                // wall and puts the type on the dark screen beside the other widget.
                 .containerBackground(for: .widget) { EmberWall() }
         }
     }
@@ -71,8 +89,8 @@ struct StatusWidgetView: View {
         homeText
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .overlay(alignment: .bottomTrailing) {
-                HourglassView(state: .of(entry.summary, now: entry.date))
-                    .frame(width: 30, height: 40)
+                HourglassView(state: glass)
+                    .frame(width: enlarged ? 42 : 30, height: enlarged ? 56 : 40)
             }
             .overlay(alignment: .topTrailing) {
                 // The medium widget has room for one action, and there is only one Furlough
@@ -103,19 +121,19 @@ struct StatusWidgetView: View {
         let allDayOnly = !windowOpen && summary.nextOpenAt == nil && !summary.allDayNames.isEmpty
         return VStack(alignment: .leading, spacing: 0) {
             if windowOpen, let until = summary.openUntil {
-                Eyebrow(text: "Open now", color: Ember.amber)
+                Eyebrow(text: "Open now", color: Ember.amber, size: eyebrowSize)
                 name(headline(summary.openNames))
                 Text(timerInterval: entry.date...until, countsDown: true)
-                    .emberNumerals(22)
+                    .emberNumerals(numeralSize)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                     .padding(.top, 4)
                 detail("until \(until.formatted(date: .omitted, time: .shortened))")
             } else if let next = summary.nextOpenAt {
-                Eyebrow(text: nextEyebrow(next), color: Ember.amber)
+                Eyebrow(text: nextEyebrow(next), color: Ember.amber, size: eyebrowSize)
                 name(headline(summary.nextOpenNames))
                 Text(next.formatted(date: .omitted, time: .shortened))
-                    .emberNumerals(22)
+                    .emberNumerals(numeralSize)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                     .padding(.top, 4)
@@ -125,21 +143,24 @@ struct StatusWidgetView: View {
                     detail("\(summary.blockedCount) blocked")
                 }
             } else if allDayOnly {
-                Eyebrow(text: "Open all day", color: Ember.moss)
+                Eyebrow(text: "Open all day", color: Ember.moss, size: eyebrowSize)
                 name(headline(summary.allDayNames))
                 detail("budget resets at midnight")
             } else if summary.isEmpty {
-                Eyebrow(text: "Furlough", color: Ember.amber)
+                Eyebrow(text: "Furlough", color: Ember.amber, size: eyebrowSize)
                 name("Nothing managed")
                 detail("Open Furlough to add apps.")
             } else {
-                Eyebrow(text: "Blocked", color: Ember.muted)
+                Eyebrow(text: "Blocked", color: Ember.muted, size: eyebrowSize)
                 name("All blocked")
                 detail("\(summary.blockedCount) blocked all day")
             }
             Spacer(minLength: 0)
+            // With the wall gone the widget is being read from across a room, so only the line
+            // that changes what you would do stays: the anchor, which is the one state the
+            // glass alone could be mistaken about at that distance.
             Group {
-                if !summary.allDayNames.isEmpty, !allDayOnly {
+                if !summary.allDayNames.isEmpty, !allDayOnly, !enlarged {
                     Text("\(headline(summary.allDayNames)) open all day")
                         .emberBody(10.5, .semibold)
                         .foregroundStyle(Ember.moss)
@@ -147,18 +168,43 @@ struct StatusWidgetView: View {
                 }
                 if summary.isAnchored {
                     Text(anchoredLine(summary))
-                        .emberBody(10.5, .semibold)
+                        .emberBody(enlarged ? 13 : 10.5, .semibold)
                         .foregroundStyle(Ember.ember)
                 }
-                if summary.pendingCount > 0 {
+                if summary.pendingCount > 0, !enlarged {
                     Text("\(summary.pendingCount) change\(summary.pendingCount == 1 ? "" : "s") pending")
                         .emberBody(10.5, .semibold)
                         .foregroundStyle(Ember.pending)
                 }
             }
-            .padding(.trailing, 36)
+            .padding(.trailing, enlarged ? 48 : 36)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    // MARK: Sizes
+    //
+    // One set for a widget on a screen in your hand, one for a phone on a stand three feet
+    // away. Nothing conditional about *what* is said — the same lines, larger — because a
+    // widget that says something different in StandBy is a second widget to keep true.
+
+    private var eyebrowSize: CGFloat { enlarged ? 12 : 10 }
+    private var numeralSize: CGFloat { enlarged ? 36 : 22 }
+    private var nameSize: CGFloat { enlarged ? 24 : 15 }
+    private var detailSize: CGFloat { enlarged ? 13.5 : 11 }
+
+    /// The glass this moment draws, adjusted for a rendering mode that has taken the colour
+    /// out of it. Under `.vibrant` the system desaturates the whole widget and re-colours it,
+    /// so the dim and grey glasses — 4.5 % and 3.5 % white, chosen against the app's dark room —
+    /// come out as an outline with nothing in it, and the soft ember halo comes out as a
+    /// smudge. The brightest of the existing glasses and no halo is the same drawing with the
+    /// contrast it needs; no new colour is introduced, because the palette is settled.
+    private var glass: HourglassState {
+        var state = HourglassState.of(entry.summary, now: entry.date)
+        guard renderingMode == .vibrant else { return state }
+        state.glass = .cream
+        state.glow = nil
+        return state
     }
 
     /// Lock-screen rectangle: the system tints it, so only the type carries the look.
@@ -199,9 +245,10 @@ struct StatusWidgetView: View {
 
     private func name(_ text: String) -> some View {
         Text(text)
-            .emberDisplay(15)
+            .emberDisplay(nameSize)
             .foregroundStyle(Ember.cream)
             .lineLimit(family == .systemSmall ? 1 : 2)
+            .minimumScaleFactor(enlarged ? 0.7 : 1)
             .padding(.top, 3)
     }
 
@@ -224,9 +271,10 @@ struct StatusWidgetView: View {
 
     private func detail(_ text: String) -> some View {
         Text(text)
-            .emberBody(11)
+            .emberBody(detailSize)
             .foregroundStyle(Ember.muted)
             .lineLimit(1)
+            .minimumScaleFactor(enlarged ? 0.8 : 1)
             .padding(.top, 2)
     }
 
@@ -258,6 +306,10 @@ struct StatusWidget: Widget {
         }
         .configurationDisplayName("Furlough")
         .description("What is open now and when the next window starts.")
+        // Three families and no more. StandBy and CarPlay both take the **small** one and
+        // scale it up — there is no StandBy family and no StandBy API — so supporting StandBy
+        // is a layout question inside `systemSmall`, not a fourth entry here. `systemLarge`
+        // would be a new Home Screen tile nobody asked for and would not reach StandBy at all.
         .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular])
     }
 }

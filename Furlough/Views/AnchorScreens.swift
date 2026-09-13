@@ -159,6 +159,11 @@ struct AnchorTagsScreen: View {
     @State private var renaming: PairedTag?
     @State private var draftName = ""
     @State private var message: String?
+    /// The where-to-leave-it screen, asked for rather than owed. See `TagPlacementView`: it is
+    /// shown once by itself on a first pairing, and this is how anyone who paired a tag before
+    /// that screen existed — or read it in a hurry — gets back to it. One copy of the advice,
+    /// reachable from both places, rather than the same four sentences written twice.
+    @State private var placing = false
 
     private var anchor: AnchorProfile { model.state.config.anchor }
     private var tagCount: String { "\(anchor.tags.count) of \(Furlough.maxAnchorTags)" }
@@ -187,7 +192,10 @@ struct AnchorTagsScreen: View {
                 }
             }
             .emberCard()
+            placementRow
+                .padding(.top, 10)
         }
+        .sheet(isPresented: $placing) { TagPlacementView() }
         .confirmationDialog(
             "Forget this tag?",
             isPresented: Binding(get: { forgetting != nil }, set: { if !$0 { forgetting = nil } }),
@@ -221,6 +229,26 @@ struct AnchorTagsScreen: View {
         } message: {
             Text(message ?? "")
         }
+    }
+
+    /// The question mark under the card: where a key should live, which is the part of the
+    /// Anchor that no amount of pairing teaches.
+    private var placementRow: some View {
+        Button {
+            placing = true
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "questionmark.circle")
+                    .font(.system(size: 12, weight: .semibold))
+                Text("Where to leave it")
+                    .emberBody(12.5, .semibold)
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(Ember.muted)
+            .padding(.horizontal, 8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder

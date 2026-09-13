@@ -35,6 +35,14 @@ enum Furlough {
     /// How long after an edit lands it can be taken back, exactly as it was. Long enough for
     /// "wait, no", short enough that it cannot be used as a pause.
     static let undoWindowMinutes = 15
+    /// When the weekly digest goes out: Monday (Gregorian weekday 2) at nine in the morning,
+    /// on whatever clock the device keeps. Monday because the week it reports is the seven
+    /// days behind it, whole and finished; nine because a record is a thing to read once the
+    /// day has started, not a thing to be woken by. Two constants rather than a setting: the
+    /// notification can be turned off, and moving it is a one-line change here if it is ever
+    /// worth a screen.
+    static let digestWeekday = 2
+    static let digestHour = 9
     /// How many tags may release one anchor. More than one because a person can live in more
     /// than one place, and a key three hours away is not a stronger lock — it is a lock nobody
     /// dares close. Capped so the count cannot drift upward until one is always in a pocket.

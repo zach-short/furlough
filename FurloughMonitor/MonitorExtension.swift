@@ -241,7 +241,18 @@ final class MonitorExtension: DeviceActivityMonitor {
     private func reconcile(_ reason: String) {
         SharedStore.log(reason)
         ShieldReconciler.reconcile(reason: reason)
-        LiveActivityManager.sync(state: SharedStore.load(), canStart: false)
+        let state = SharedStore.load()
+        LiveActivityManager.sync(state: state, canStart: false)
+        // Re-planned here as well as in the app, because this is what is awake when the app is
+        // not: the day activity's own callbacks come round every midnight, so a week nobody
+        // opens Furlough still ends with a digest whose numbers are yesterday's rather than
+        // last Wednesday's. `sync` is idempotent and only ever touches Furlough's own
+        // scheduled notifications.
+        let clock = state.clock()
+        PendingNotifications.sync(
+            state: state, now: clock.now, drift: clock.drift,
+            digest: PendingNotifications.wantsWeeklyDigest
+        )
         WidgetCenter.shared.reloadAllTimelines()
     }
 }

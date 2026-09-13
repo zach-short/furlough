@@ -242,7 +242,8 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   `missingApp(forHost:knownAppNames:)` plus the `Half` they answer in; names carry their own
   case for showing and are matched without it),
   `PendingNotifications.swift` (`PlannedNotification`, the pure `plan`, `sync`, and the one
-  `Notifier` both platforms post through),
+  `Notifier` both platforms post through. Since step 42 it also plans the weekly digest, whose
+  on/off answer it keeps in the App Group at `digestPreferenceKey` so the monitor can read it),
   `ActivityLimit.swift` (how many DeviceActivity activities a save would need, and the same
   count for a whole import via `reason(applying:in:)`; `Monitoring.register` reads its `spans`
   rather than counting again, so what is refused ahead of time is what would be refused after.
@@ -272,7 +273,9 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   `Record.swift` (the record of the contract: `accumulate` counts minutes into
   `RuntimeState.days`, `markSpent`/`markWarned`/`queue`/`noteCancelled`/`noteLanded`/
   `noteAnchorReleased` write the events, `card` and the copy functions are what the two screens
-  read. Pure, capped at 60 days, and never read by `Policy.decide` — see step 25),
+  read. `week` is the same days as bars for the Mac's menu, and `weeklyDigest` is two or three
+  of those copy lines as a notification, both over whole days only — see step 42. Pure, capped
+  at 60 days, and never read by `Policy.decide` — see step 25),
   `RuleSuggestion.swift` (the rule a tier would start something on, and the two named exceptions
   to it: `Draft`, `suggestion(for:chosen:)`, `offer`. Judgements rather than facts, which is why
   they are not in `AppUtility`; offered by both editors and applied by neither — see step 28),
@@ -286,7 +289,8 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   see step 38).
 - `Shared/Intents`: `FurloughIntents.swift` (What's Open, both platforms), `StatusSpeech.swift`
   (its sentence, tested), `DropAnchorIntent.swift` (iOS; compiled into the app and the widget
-  extension, see step 8).
+  extension, see step 8), `AnchorFocusFilter.swift` (iOS; a system Focus drops the anchor, and
+  turning that Focus off does nothing at all — see step 42).
 - `Tests/Core` (target `FurloughCoreTests`, macOS, Swift Testing, no host app): `Support.swift`
   (the pinned calendar and the fixtures), `ModelsTests`, `PolicyStatusTests`,
   `PolicyPendingTests`, `PolicySummaryTests`, `NamingTests`, `DecodingTests`, `ClockTests`,
@@ -369,9 +373,14 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   because it moved out of the old in-app About on 2026-09-09 and the site cannot know which
   build is running), `RecordScreen` (the record, behind Settings' menu; its Mac twin is
   `FurloughMac/Views/MacRecord.swift`, where `MacRecordRows` is split out of
-  `MacRecordSection` so the sidebar's card can be rendered to a PNG with no app around it). Screens are
+  `MacRecordSection` so the sidebar's card can be rendered to a PNG with no app around it; the
+  weekly digest's toggle is on it, see step 42),
+  `TagPlacement` (`TagPlacementView`, where to leave the tag: shown once when the first one
+  pairs, and behind a row on the Tags screen after that). Screens are
   `ScrollView`s over `EmberWall`, not `List`/`Form`; the iOS 26 toolbar supplies the glass.
-- `FurloughMonitor/MonitorExtension.swift`: every callback reconciles from shared state.
+- `FurloughMonitor/MonitorExtension.swift`: every callback reconciles from shared state, and
+  since step 42 re-plans the scheduled notifications too, so a week the app is never opened
+  still ends with a digest whose numbers are yesterday's.
 - `FurloughShield/ShieldExtension.swift`: reads shared state, writes the copy via `ShieldText`,
   and records the name iOS gives the app it is covering (see the naming note below).
 - `FurloughWidgets/`: `StatusWidget.swift`, `WindowLiveActivity.swift`, bundle.
@@ -2707,6 +2716,157 @@ The plan for this stretch. Tick each phase off here as it lands.
     agreement with `project.yml`. Both apps build warning-free. **Seen** at the real
     typography: `ReleaseList` rendered to PNG from a standalone `swiftc` harness over
     `Shared/UI` + `Shared/Core` (the memory note's trick), and the site page in headless Chrome.
+
+42. **The six proposed features: five built, one settled as no.** `PASSOFF.md` items 15–20,
+    proposed 2026-09-12 by a session that was asked what else might be nice rather than told
+    what to build. None had Zach's go-ahead when they were written down; all six were put to him
+    at the start of this session and answered. Built the same day, in one session rather than
+    six, because none of them touches `Policy.decide` and only one adds a writer of
+    `Config.anchor`.
+
+    **15. The Apple Watch: no.** Zach's call, asked before any code, and recorded here so it is
+    not re-proposed as an oversight. No `FurloughWatch` target exists and none should be added
+    without a reason that answers this: watchOS is a separate device, not a second process
+    sharing the phone's App Group, so a complication needs real transport (`WCSession`) and
+    shows a status that is stale by whatever watchOS's delivery budget allows — beside a phone
+    widget and a Control Center control that already drop the anchor in one tap. It could never
+    release, either: Apple Pay's NFC is not open to third-party apps, so there is no tag reader
+    on the wrist and Unanchor would stay phone-only. A watch face that says "anchored" when the
+    phone knows better is worse than no watch face.
+
+    **16. StandBy.** The proposal's first step — "add `.systemLarge`" — was wrong, and the
+    documentation says so plainly: *"On iPhone in StandBy, the Lock Screen shows two widgets
+    side by side on a dark background... WidgetKit uses your `systemSmall` widget and scales it
+    to fit available space."* There is no StandBy family, no StandBy environment value and no
+    new extension; `systemLarge` would have been a new Home Screen tile that never reached
+    StandBy at all. So the families are unchanged and this is a layout pass inside the small
+    widget, keyed on the one signal StandBy does give: `showsWidgetContainerBackground`, false
+    wherever the system has taken the wall away (StandBy, the iPad Lock Screen, CarPlay). There,
+    `StatusWidgetView` goes up a size — eyebrow 10 → 12, name 15 → 24, numerals 22 → 36, the
+    glass 30 × 40 → 42 × 56 — and drops every secondary line except the anchor's, which is the
+    one a glass alone could be mistaken about from across a room. Content margins shrink on
+    their own.
+
+    **The night tint has an API after all.** StandBy Night Mode renders widgets in the
+    **vibrant** rendering mode (WWDC23 "Bring widgets to new places", in as many words), which
+    desaturates the whole widget and re-colours it — so Ember's hues carry nothing there, and
+    the question "does Ember Glass survive the tint" is answered before the phone is ever put on
+    a stand: no, and it cannot, for anybody. What that costs is contrast, not colour: the dim
+    and grey glasses are 4.5 % and 3.5 % white, chosen against the app's dark room, and under
+    vibrant they come out as an outline with nothing in it. So under `.vibrant` only, the glass
+    is drawn with the brightest preset already in the palette (`.cream`) and the ember halo is
+    dropped, since a soft glow renders as a grey smudge there. No new colour was added — Zach
+    was asked, 2026-09-12, and kept it. The Home Screen widget is untouched.
+
+    **17. The Focus Filter.** `Shared/Intents/AnchorFocusFilter.swift`, iOS only, compiled into
+    the app. A fourth caller of `AnchorDrop.drop` beside the app, the Control Center control and
+    `DropAnchorIntent` — so the anchor's writers are now: the app, the intent, the control, the
+    monitor's schedule, the Filter, and the tag. Nothing here can release.
+
+    Two things about it are worth not re-deriving. First, **the system performs a Focus Filter
+    twice** — once on activation with the parameters as configured, once on deactivation with
+    every parameter back at its default (Apple's own sample says so: `alwaysUseDarkMode: false`,
+    `status: nil`). So a Filter needs at least one parameter or it cannot tell the two calls
+    apart, and `dropsAnchor` is that parameter as well as the switch. The off-case returns
+    without writing anything, and the comment there says why: wiring it to a release is the one
+    edit that would turn this into an unblock button on a schedule.
+
+    Second, **there is no scope parameter**, Zach's call. The proposal had one — pick the
+    chosen-apps list or everything-except at activation — but applying a shape means writing
+    `Config.anchor.scope` from a new process, and chosen → everything-except is as easy to run
+    backwards as forwards, which would let a Focus narrow what the anchor holds. The Anchor
+    screen owns the list and the scope; the Filter only decides *when*.
+
+    The essential-app warning was the other decision (also Zach's): `Config.anchorWarning`'s
+    sheet cannot appear at activation, so it appears at **configuration** instead —
+    `displayRepresentation` is an instance property, so the Filter's own row under Settings >
+    Focus reads the live anchor and says "Anchors Everything except 3" with
+    `UtilityText.anchoring`'s own sentence under it, naming the essential apps it would take.
+    Not a static sentence, and not nothing.
+
+    **18. The Mac's menu bar trend.** Zach said yes, with the measurement first. The numbers, 20
+    runs each on this Mac after a warm-up: **0.17 ms** to read the week and build the section,
+    against **2.1 ms** to render one hourglass image — and `menuNeedsUpdate` already renders one
+    of those per target row. The chart is the cheapest thing in the rebuild, so it went in.
+
+    `Record.week(_:upTo:calendar:)` is the whole of the arithmetic: seven `DayBar`s, oldest
+    first, each with its weekday, its shielded minutes and a fraction against the tallest day of
+    the seven. Relative rather than absolute, because there is no natural ceiling — a day can
+    hold one app shut for an hour or everything shut for twenty-four. No new accumulation and no
+    new `Config` field; it reads what `Record.accumulate` already counted. `MenuTrend` (in
+    `MenuBar.swift`) draws it hand-rolled — seven capsules need no Swift Charts, and a menu that
+    links a framework to draw them is a dependency bought for a row — hosted in an `NSMenuItem`
+    through `NSHostingView`, because a status item's button takes an image and a menu item takes
+    a view. It is drawn in `Color.primary`/`.secondary` rather than Ember's cream: a menu
+    follows the system's theme, not the bar's, and cream on a light menu is a bar with nothing
+    in it. The section is left out entirely until some day in the seven held something.
+
+    **19. The weekly digest.** On by default (Zach's call), Monday at nine, through the existing
+    planned-notification path rather than a one-off request.
+
+    `Record.weeklyDigest(_:upTo:calendar:)` is pure and answers a title and two or three lines,
+    each one a row of the record screen with that screen's own label — "No budget spent: 6 days
+    in a row.", "Held shut: 7 hours · 3 h 30 min anchored", "Loosenings: 2 cancelled, 1 landed"
+    — so the digest cannot word the week differently from the screen it came from. It is nil
+    when the week held nothing shut and nothing waited, so a fresh install is never told
+    anything. **Every number is about whole days**: `lastSevenDayKeys(before:)`, the seven days
+    ending yesterday, and the streak counted back from yesterday rather than through today,
+    because a local notification's words are fixed when it is *scheduled* and a streak counted
+    through today would be claiming a day that has not happened.
+
+    That last fact is the one that shaped the rest. A notification cannot compute anything when
+    it fires, so the digest is re-planned on every enforce **and on every monitor reconcile**
+    (`MonitorExtension.reconcile` now calls `PendingNotifications.sync`) — the day activity's
+    callbacks come round every midnight, so a week nobody opens Furlough still ends with a
+    digest whose numbers are yesterday's rather than last Wednesday's. Its identifier carries an
+    FNV-1a fingerprint of its own copy, so a re-plan with different words replaces the request
+    instead of being taken for the one already scheduled; Swift's own `hashValue` is seeded per
+    process and would have rescheduled the same digest on every launch. `nextDigestDate` uses
+    `Calendar.nextDate(after:matching:)`, so the clocks going back move it by an hour rather
+    than by 604,800 seconds — tested both ways across a real New York DST boundary.
+
+    The preference lives in the **App Group** (`PendingNotifications.digestPreferenceKey`), not
+    in `Config`: the record is this device's own, so the preference about it is too — it must
+    not travel in an exported setup or wait out a loosening delay — and an app extension does
+    not share the app's `UserDefaults.standard`, which the monitor needs to read. The phone and
+    the Mac keep separate answers about separate weeks, and each digest is about the device it
+    fires on. The toggle is on the phone's Record screen and in the Mac's Settings > The record,
+    each saying what will arrive and whether notifications are allowed at all. The hour and the
+    weekday are two constants in `Furlough.swift` rather than a screen; a missed digest is not
+    caught up, the same way a missed midnight callback is not.
+
+    **20. Where to leave the tag.** `Furlough/Views/TagPlacementView.swift`, shown once, after
+    the **first** tag pairs — `AppModel.pair(identifier:)` is the one place both pairing paths
+    meet, so the screen is raised from the model rather than from two views, and presented from
+    `RootView` because one of those paths is a screen pushed onto Home's own stack. Raised after
+    350 ms for the same reason everything else in this app is: the other path is an alert, and a
+    sheet asked for while an alert is dismissing is the one SwiftUI drops. The wait is also what
+    lets the name typed into that alert land before the screen reads it.
+
+    Four places — a drawer at home, work or a locker, someone you live with, something with a
+    journey attached — each a different kind of distance, and a footnote for the one that is not
+    a place: not your keyring and not your wallet, because a tag you carry is a button and not a
+    lock. The why is the site's own reason for a tag over a code, condensed to a sentence.
+
+    "First pairing, not any pairing" needs a flag, since forgetting a tag and pairing another
+    puts the count back to one. `furlough.sawTagPlacement` sits beside `furlough.sawUsageStep`
+    in the app's own defaults — what has been shown, not what is blocked — and the testing reset
+    clears it with the rest. `AnchorProfile` and `Config` are untouched, which is what the
+    "no new persisted state" in the prompt was protecting.
+
+    The `?` link is a **Where to leave it** row under the card on the Tags screen, opening the
+    same view, rather than a link to `furloughapp.com/help/nfc-tags/`. On main the app still
+    carries all nine help topics in the binary and opens no URLs at all — there is no
+    `Furlough.helpURL` here yet, whatever the code map above says — so a first outbound link
+    invented in this file would have collided with the lane-D work when it lands. One copy of
+    the advice, reachable from both places; when the help-to-site move lands, that row is where
+    a site link goes.
+
+    **What is not verified.** 715 tests in 102 suites pass, both builds are warning-free, and
+    the Mac's trend was rendered to PNG in both appearances with the `swiftc` harness from the
+    memory note. Nothing here has been seen on the phone: the StandBy layout, the Focus Filter's
+    two calls, the digest actually firing and the placement screen all need the device, and the
+    tests at the end of `PASSOFF.md` items 16–20 say what to do.
 
 ## Style rules
 

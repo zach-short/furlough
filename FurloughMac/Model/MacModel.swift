@@ -69,6 +69,11 @@ final class MacModel {
     /// no and changes their mind, and a prompt that comes back every time a site is added is the
     /// thing people learn to click past.
     private(set) var hasOfferedWebFilter = SharedStore.defaults.bool(forKey: MacModel.filterOfferedKey)
+    /// Whether Monday morning brings this Mac's record as a notification. This Mac's own,
+    /// about this Mac's own week: the record does not cross devices, so neither does the
+    /// preference, and the phone keeps a separate one about its own. See
+    /// `PendingNotifications.digestPreferenceKey`.
+    private(set) var weeklyDigest = PendingNotifications.wantsWeeklyDigest
 
     private static let onboardedKey = "furlough.mac.onboarded"
     private static let filterOfferedKey = "furlough.mac.filterOffered"
@@ -497,6 +502,17 @@ final class MacModel {
         return state.config.hasAnyHost
     }
 
+    /// Turns the weekly digest on or off. The enforce is what re-plans it, so turning it off
+    /// also withdraws the one already scheduled: `sync` takes away anything of Furlough's that
+    /// is no longer planned.
+    func setWeeklyDigest(_ on: Bool) {
+        guard on != weeklyDigest else { return }
+        PendingNotifications.setWantsWeeklyDigest(on)
+        weeklyDigest = on
+        SharedStore.log("weekly digest \(on ? "on" : "off")")
+        enforce(reason: "weekly digest")
+    }
+
     /// The offer has been made, whichever way it was answered.
     func noteWebFilterOffered() {
         guard !hasOfferedWebFilter else { return }
@@ -596,7 +612,7 @@ final class MacModel {
         current.runtime.lastRegistration = now
         SharedStore.save(current)
         enforcer.reconcile(reason: reason)
-        PendingNotifications.sync(state: current, now: now, drift: clock.drift)
+        PendingNotifications.sync(state: current, now: now, drift: clock.drift, digest: weeklyDigest)
         WidgetCenter.shared.reloadAllTimelines()
         reload()
     }
@@ -993,6 +1009,10 @@ final class MacModel {
         wantsBothHalves = false
         anchorHalfAdds = .anchor
         finishedGuides = []
+        // Removed rather than written true: absent is what a fresh install has, and its answer
+        // is yes.
+        PendingNotifications.forgetWeeklyDigest()
+        weeklyDigest = true
         SharedStore.log("reset everything (Debug build)")
         enforce(reason: "reset")
     }

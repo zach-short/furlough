@@ -33,12 +33,12 @@ on 1. Read the Done prompts only as history, or where one says a later item shou
 | 12 | Suggested rules by hazard tier, and an audit for quality-of-life defaults like it | Done — HANDOFF 28 | Opus | G | nothing | new `Shared/Core/RuleSuggestion.swift`, `RuleEditorView`, `Tests/Core` |
 | 13 | The link contract: schemas, test vectors and tables a port can be built against | **Open** — added 2026-09-10 | Opus | H | nothing; HANDOFF 37 landed | new `protocol/`, new `Tests/Core/ProtocolFixturesTests.swift`, `HANDOFF.md` |
 | 14 | Cache the token map, so the usage page's icons are instant on later visits | **Open** — added 2026-09-10 | Opus | I | the tables-and-monograms commit on main | new `Shared/Core/TokenCache.swift`, `SharedStore`, `UsageReader`, `UsageView.load`, `AppModel.nameUnnamedTargets`, new `Tests/Core/TokenCacheTests.swift`, `HANDOFF.md` |
-| 15 | Apple Watch complication and a wrist-only Drop Anchor | **Open** — proposed 2026-09-12, needs Zach's go-ahead | Fable | J | nothing | new `FurloughWatch` target(s), `AnchorDrop.swift`, `project.yml` |
-| 16 | A StandBy-friendly widget | **Open** — proposed 2026-09-12 | Opus | K | nothing | `FurloughWidgets/StatusWidget.swift`, `Shared/UI/Hourglass.swift` |
-| 17 | Focus Filter: drop the Anchor when a Focus turns on | **Open** — proposed 2026-09-12 | Fable | L | nothing | new `Shared/Intents/AnchorFocusFilter.swift`, `project.yml` |
-| 18 | A trend view in the Mac's menu bar | **Open** — proposed 2026-09-12 | Opus | M | nothing | `FurloughMac/MenuBar.swift`, `Shared/Core/Record.swift` |
-| 19 | A weekly digest notification | **Open** — proposed 2026-09-12 | Opus | N | nothing | `Shared/Core/Record.swift`, `Shared/Core/PendingNotifications.swift`, `AppModel`, `MacModel` |
-| 20 | Onboarding: where to put the tag | **Open** — proposed 2026-09-12 | Sonnet | O | nothing | `Furlough/Views/Onboarding`, `site/src/pages/help/nfc-tags.astro` |
+| 15 | Apple Watch complication and a wrist-only Drop Anchor | **Settled as no** — HANDOFF 42 | — | J | — | nothing; no target was added |
+| 16 | A StandBy-friendly widget | Done — HANDOFF 42 | Opus | K | nothing | `FurloughWidgets/StatusWidget.swift` |
+| 17 | Focus Filter: drop the Anchor when a Focus turns on | Done — HANDOFF 42 | Opus | L | nothing | new `Shared/Intents/AnchorFocusFilter.swift` |
+| 18 | A trend view in the Mac's menu bar | Done — HANDOFF 42 | Opus | M | nothing | `FurloughMac/Views/MenuBar.swift`, `Shared/Core/Record.swift` |
+| 19 | A weekly digest notification | Done — HANDOFF 42 | Opus | N | nothing | `Shared/Core/Record.swift`, `Shared/Core/PendingNotifications.swift`, `AppModel`, `MacModel`, `MonitorExtension` |
+| 20 | Onboarding: where to put the tag | Done — HANDOFF 42 | Opus | O | nothing | new `Furlough/Views/TagPlacementView.swift`, `AppModel`, `RootView`, `AnchorScreens` |
 
 **Two things landed that this board never planned**, so look for them in HANDOFF rather than
 here: the first week with capped delays and the 15-minute undo (HANDOFF 27, the lane-f
@@ -49,7 +49,7 @@ going all the way back to a first run (HANDOFF 31, with the detail in its "The M
 
 **Item 14 was added 2026-09-10**, the third step of the usage-page speed-up whose first two (cards drawn from the tables, letters for icons, a deadline on the token query) landed the same day: keep Screen Time's answer in the App Group store so the next visit opens on it. Small, iOS only, and it waits only on that commit being on main.
 
-**Items 15 through 20 were added 2026-09-12**, from a session that was asked what else might be nice on iOS or the Mac rather than told what to build. None of them have Zach's go-ahead yet the way items 1–14 did before they were written down; each prompt says up front what still needs deciding. They are lanes J–O: independent of each other and of A–I, so any can be picked up whenever, but 15 and 17 both put a new process in a position to write `Config.anchor` (even though both are tightening-only), which is why they carry the Fable rule rather than Opus.
+**Items 15 through 20 were added 2026-09-12**, from a session that was asked what else might be nice on iOS or the Mac rather than told what to build, and **all six were answered and closed the same day** — see HANDOFF 42. Five were built in one session; 15 is settled as no and should not be re-proposed without a reason that answers what is written there. Do not paste sections 15–20: like the other Done prompts they describe work that now exists, and two of them describe it wrongly. Item 16's first step ("add `.systemLarge`") rests on a false premise — StandBy scales the **small** widget and there is no StandBy family — and item 17's configurable scope was dropped on Zach's call, because applying a scope means writing `Config.anchor.scope` from a new process and could narrow the hold as easily as widen it. Both were Opus in the end rather than Fable: the Watch never happened, and the Focus Filter turned out to add no new anchor logic at all, only a fourth caller of `AnchorDrop.drop`.
 
 **Lanes run in parallel with each other; tasks inside a lane run one after another.**
 A, B, C, D and E can all be open at once, each in its own worktree. Inside A the order is

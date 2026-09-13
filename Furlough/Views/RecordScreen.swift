@@ -32,7 +32,46 @@ struct RecordScreen: View {
                 row("Longest anchor", Record.anchorLine(card))
             }
             .emberCard()
+            digestCard
+                .padding(.top, 12)
         }
+    }
+
+    /// The record, once a week, without opening this screen. On unless it is turned off: a
+    /// record nobody is told about is what it is for. Its own card under the numbers rather
+    /// than a row among them — everything above is something that happened, and this is a
+    /// preference about being told.
+    private var digestCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 12) {
+                Text("Monday morning")
+                    .emberBody(13)
+                    .foregroundStyle(Ember.cream)
+                Spacer(minLength: 8)
+                Toggle(
+                    "Monday morning",
+                    isOn: Binding(get: { model.weeklyDigest }, set: { model.setWeeklyDigest($0) })
+                )
+                .labelsHidden()
+                .tint(Ember.ember)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            Text(digestLine)
+                .emberBody(11.5)
+                .foregroundStyle(Ember.muted)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 10)
+        }
+        .emberCard()
+    }
+
+    private var digestLine: String {
+        guard model.weeklyDigest else { return "These numbers stay on this screen." }
+        let allowed = model.notificationsGranted == true
+        let week = "The last seven days, as a notification on Monday at \(TimeFormat.minute(Furlough.digestHour * 60))."
+        return allowed ? week : "\(week) Notifications are off, so nothing will arrive until they are allowed."
     }
 
     /// A number is set in Geist Mono, as every number that counts is; a sentence saying there

@@ -208,6 +208,23 @@ enum Record {
         return spentAnything(days[Policy.dayKey(yesterday, calendar: calendar)])
     }
 
+    /// The seven whole days before today, most recent first: yesterday back to a week ago.
+    ///
+    /// Not `weekKeys`, which runs from the start of this week to right now and would be one
+    /// morning long on the day a digest goes out. Seven whole days is the same span wherever
+    /// the week is taken to start, and it is finished — nothing in it can still change, which
+    /// is what makes a number in the digest one that will still be true when it is read.
+    static func lastSevenDayKeys(before now: Date, calendar: Calendar = .current) -> [String] {
+        var keys: [String] = []
+        var day = calendar.startOfDay(for: now)
+        for _ in 0..<7 {
+            guard let previous = calendar.date(byAdding: .day, value: -1, to: day) else { break }
+            day = previous
+            keys.append(Policy.dayKey(day, calendar: calendar))
+        }
+        return keys
+    }
+
     /// The day keys from the start of this week through today, most recent first. Never a day
     /// in the future: a week is what has happened, not what is scheduled.
     static func weekKeys(upTo now: Date, calendar: Calendar = .current) -> [String] {
@@ -258,6 +275,102 @@ enum Record {
 
     static func anchorLine(_ card: Card) -> String {
         card.longestAnchorMinutes > 0 ? TimeFormat.budget(card.longestAnchorMinutes) : "Never anchored."
+    }
+
+    // MARK: - The week as bars
+
+    /// One day of the last seven, for a chart: which day it is, what it held shut, and how tall
+    /// that is against the tallest day of the seven.
+    struct DayBar: Equatable, Identifiable {
+        var id: String { key }
+        /// The `yyyy-MM-dd` key, which is also the identity.
+        var key: String
+        /// Calendar weekday, 1…7, for the letter under the bar.
+        var weekday: Int
+        var shieldedMinutes = 0
+        /// 0…1 against the tallest day in the seven, so a quiet week is not drawn as a flat
+        /// line and a busy one is not drawn off the top. Zero for every day of a week that
+        /// held nothing.
+        var fraction: Double = 0
+        var isToday = false
+    }
+
+    /// The last seven days, oldest first, ending today. Pure, and the only arithmetic the menu
+    /// bar's trend does: the minutes are the ones `accumulate` already counted.
+    ///
+    /// Relative rather than absolute heights. There is no natural ceiling — a day can hold one
+    /// app shut for an hour or everything shut for twenty-four — so the week is drawn against
+    /// its own tallest day, which is what makes one week comparable inside itself rather than
+    /// against a scale nobody chose.
+    static func week(_ days: [String: DayRecord], upTo now: Date, calendar: Calendar = .current) -> [DayBar] {
+        var bars: [DayBar] = []
+        let today = calendar.startOfDay(for: now)
+        for ago in stride(from: 6, through: 0, by: -1) {
+            guard let date = calendar.date(byAdding: .day, value: -ago, to: today) else { continue }
+            let key = Policy.dayKey(date, calendar: calendar)
+            let minutes = (days[key]?.targets.values).map { $0.reduce(0) { $0 + $1.shieldedMinutes } } ?? 0
+            bars.append(DayBar(
+                key: key,
+                weekday: Policy.weekday(date, calendar: calendar),
+                shieldedMinutes: minutes,
+                isToday: ago == 0
+            ))
+        }
+        let tallest = bars.map(\.shieldedMinutes).max() ?? 0
+        guard tallest > 0 else { return bars }
+        for index in bars.indices {
+            bars[index].fraction = Double(bars[index].shieldedMinutes) / Double(tallest)
+        }
+        return bars
+    }
+
+    // MARK: - The weekly digest
+
+    /// The week just gone, as a notification: a title and two or three lines.
+    struct Digest: Equatable {
+        var title: String
+        var body: String
+    }
+
+    /// What the last seven whole days came to, in the same words the two record screens use —
+    /// each line is that screen's row, its label and its value, so the digest cannot say the
+    /// week differently from the screen it came from.
+    ///
+    /// Nil when the week held nothing shut, nothing waited and nothing landed: a fresh install
+    /// and a week Furlough spent doing nothing both read the same, and neither is worth a
+    /// notification.
+    ///
+    /// Every number, the streak included, is about whole days: the run is counted back from
+    /// the last one, not from `now`. A digest is written before it is read — it is scheduled
+    /// hours or days ahead, because a local notification's words are fixed when it is
+    /// scheduled — and a streak counted through today would be claiming a day that has not
+    /// happened yet.
+    static func weeklyDigest(
+        _ days: [String: DayRecord], upTo now: Date, calendar: Calendar = .current
+    ) -> Digest? {
+        let lastWholeDay = calendar.date(byAdding: .day, value: -1, to: calendar.startOfDay(for: now)) ?? now
+        var card = Card()
+        card.streakDays = streak(days, upTo: lastWholeDay, calendar: calendar)
+        card.brokeYesterday = brokeYesterday(days, upTo: lastWholeDay, calendar: calendar)
+        for key in lastSevenDayKeys(before: now, calendar: calendar) {
+            guard let day = days[key] else { continue }
+            for entry in day.targets.values {
+                card.shieldedMinutes += entry.shieldedMinutes
+                card.anchoredMinutes += entry.anchoredMinutes
+            }
+            card.cancelled += day.cancelled
+            card.landed += day.landed
+        }
+        guard card.shieldedMinutes > 0 || card.cancelled > 0 || card.landed > 0 else { return nil }
+        var lines = ["No budget spent: \(streakLine(card))"]
+        if card.shieldedMinutes > 0 {
+            let anchored = anchoredLine(card).map { " · \($0) anchored" } ?? ""
+            lines.append("Held shut: \(shieldedLine(card))\(anchored)")
+        }
+        if card.cancelled > 0 || card.landed > 0 {
+            lines.append("Loosenings: \(looseningLine(card))")
+        }
+        return Digest(title: "Last week", body: lines.joined(separator: "\n"))
     }
 
     /// How far back the numbers go, for the line under the card.
