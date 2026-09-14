@@ -39,6 +39,8 @@ on 1. Read the Done prompts only as history, or where one says a later item shou
 | 18 | A trend view in the Mac's menu bar | Done — HANDOFF 42 | Opus | M | nothing | `FurloughMac/Views/MenuBar.swift`, `Shared/Core/Record.swift` |
 | 19 | A weekly digest notification | Done — HANDOFF 42 | Opus | N | nothing | `Shared/Core/Record.swift`, `Shared/Core/PendingNotifications.swift`, `AppModel`, `MacModel`, `MonitorExtension` |
 | 20 | Onboarding: where to put the tag | Done — HANDOFF 42 | Opus | O | nothing | new `Furlough/Views/TagPlacementView.swift`, `AppModel`, `RootView`, `AnchorScreens` |
+| 21 | The hero phone becomes a phone you can page through | **Open** — added 2026-09-14 | Opus | P | the homepage demos being on main | `site/src/components/HeroPage.astro`, `site/src/lib/hourglass.ts` |
+| 22 | Drag the week grid: windows edited where they are drawn, on both apps | **Open** — added 2026-09-14 | Opus | Q | nothing | new `Shared/Core/WeekDraft.swift`, new `Shared/UI/WeekGrid.swift`, `Furlough/Views/WeekView.swift`, `FurloughMac/Views/MacWeekView.swift`, new `Tests/Core/WeekDraftTests.swift`, `project.yml`, `HANDOFF.md` |
 
 **Two things landed that this board never planned**, so look for them in HANDOFF rather than
 here: the first week with capped delays and the 15-minute undo (HANDOFF 27, the lane-f
@@ -50,6 +52,15 @@ going all the way back to a first run (HANDOFF 31, with the detail in its "The M
 **Item 14 was added 2026-09-10**, the third step of the usage-page speed-up whose first two (cards drawn from the tables, letters for icons, a deadline on the token query) landed the same day: keep Screen Time's answer in the App Group store so the next visit opens on it. Small, iOS only, and it waits only on that commit being on main.
 
 **Items 15 through 20 were added 2026-09-12**, from a session that was asked what else might be nice on iOS or the Mac rather than told what to build, and **all six were answered and closed the same day** — see HANDOFF 42. Five were built in one session; 15 is settled as no and should not be re-proposed without a reason that answers what is written there. Do not paste sections 15–20: like the other Done prompts they describe work that now exists, and two of them describe it wrongly. Item 16's first step ("add `.systemLarge`") rests on a false premise — StandBy scales the **small** widget and there is no StandBy family — and item 17's configurable scope was dropped on Zach's call, because applying a scope means writing `Config.anchor.scope` from a new process and could narrow the hold as easily as widen it. Both were Opus in the end rather than Fable: the Watch never happened, and the Focus Filter turned out to add no new anchor logic at all, only a fourth caller of `AnchorDrop.drop`.
+
+**Items 21 and 22 were added 2026-09-14**, out of the session that made the homepage's demos
+real — the budget slider drags, the week grid is edited by hand, the utility tiers move the
+delay, the Anchor wants a held press. Both items come from the same observation: a control that
+can be touched teaches what a rule is faster than a paragraph does. They are two prompts and not
+one because they share no file and no language — 21 is Astro and TypeScript in `site/`, 22 is
+SwiftUI in two app targets — so they run in parallel, in their own worktrees. Take 22 first if
+only one gets run: it is the one Zach has wanted for a while, and it is the app rather than the
+page about the app.
 
 **Lanes run in parallel with each other; tasks inside a lane run one after another.**
 A, B, C, D and E can all be open at once, each in its own worktree. Inside A the order is
@@ -1313,3 +1324,219 @@ Tests: none — pure SwiftUI copy; nothing in `Shared/Core` changes.
 
 Hand back: the screen, seen once during a fresh pairing on the phone, and the Anchor screen's
 new link.
+
+---
+
+## 21. The hero phone becomes a phone you can page through
+
+**Model: Opus. Lane P. Waits on the homepage-demos commit being on main — check
+`git log --oneline -5` for "make the homepage demos work". No Xcode build: the site is
+`bun install`, `bun run build` in `site/`, never npm. Parallel-safe with everything in the
+app; it owns `site/src/components/HeroPage.astro` and may add to `site/src/lib/hourglass.ts`.
+Another session may be inside `site/src/pages/index.astro` — do not rewrite that file.**
+
+You are picking up Furlough, Zach's iOS and Mac app blocker, and its site at furloughapp.com.
+Read `HANDOFF.md`, then `README.md`, then `design/DESIGN.md` for Ember Glass, then the memory
+note "Browser pane hides the document; use headless Chrome". Session rules: never commit or
+push; when done, run `git status --short` and print `git add <only your files>` and a lowercase
+`git commit -m "..."` for Zach, with no Co-Authored-By and no "Generated with" line. Use bun,
+never npm. Another session is usually mid-edit in this tree, so work in a throwaway worktree
+(`git worktree add --detach <your scratchpad>/wt-hero HEAD`) and copy only your own files back
+once it builds. Zach is interactive: the two questions marked below are his, not yours.
+
+**Why this exists.** The phone in the hero plays one evening on a loop, twelve seconds to the
+half hour, and has two buttons under it: Fast-forward and View Anchor Mode. Everything *below*
+it on the page became real on 2026-09-14 — the budget slider is dragged, the week grid is drawn
+by hand, the utility tiers move the delay from six hours to four days, the Anchor is lifted by
+holding the tag button the way you would hold a phone against a tag. The hero is now the least
+interactive thing on a page that is otherwise a working demo of the app, and it is the first
+thing anyone sees. The five dots under the hero page say there are five pages. There is one,
+plus a walkthrough hidden behind a button.
+
+**What is fixed.** Read these in the code before changing anything.
+
+- `HeroPage.astro` is one component: markup, scoped styles and one module script. The evening
+  is `todayBeat(t)` — `PRE` 5 s before the window, `WINDOW` 1800/`SPEED`, `DONE` 8 s after,
+  `WARN_AT` where the five-minute budget warning starts — and the Anchor walkthrough is
+  `anchorBeat(t)` over `STEPS`/`ENDS`. `Mode` is `'today' | 'anchor'`; `origin[mode]` is why
+  leaving one loop does not restart it; `clock(now, m)` is the only clock.
+- Commit `cf15f5b` split the frame loop into `render(now)` and `loop`, with `keepTime` on a
+  250 ms timer and on `scroll`, because Safari hands out no animation frames for the length of
+  a scroll and the countdown froze. Keep that shape. Anything new that ticks goes through
+  `render`, not its own `requestAnimationFrame`.
+- `LivingHourglass` draws its first frame synchronously, pauses off screen, and takes a state;
+  `blendStates(a, b, k)` is how one state gives way to another (800 ms in the hero);
+  `setMotion(on)` was added 2026-09-14 for the legend swatches. `States` is the whole
+  vocabulary: `open(level, warned)`, `comingSoon(minutes)`, `doneForToday`, `usedUp`,
+  `alwaysBlocked`, `unconfigured`, `anchored`. Do not invent an eighth.
+- The five `.indicator` canvases already name the five pages, in order: the live one
+  (`data-hero-mini`, Instagram), YouTube at 8, Reddit at 9, TikTok always blocked, and the
+  Anchor (`data-hero-anchor-dot`). They are `aria-hidden` and `data-still` today. The rows under
+  them (`[data-today-list]`) are the same apps, with Netflix as a fifth row that has no dot
+  because it is tomorrow's.
+- The Browser pane keeps `document.hidden` true: rAF never fires, CSS transitions do not
+  advance, and canvases come back blank. That is the pane, not your code. Verify with headless
+  Chrome (the command is in the memory note) or hand it to Zach.
+- `index.astro` learned three things on 2026-09-14 that apply here: `touch-action` goes on the
+  small draggable thing and never on a whole column, or a finger cannot scroll the page past
+  it; `setPointerCapture` comes last in a `pointerdown` handler, so a throw cannot leave the
+  control dead; and each demo carries one `.cue` line saying what there is to touch.
+
+Do these, in order:
+
+1. **Make the indicator a real pager.** Clicking a dot turns the phone to that page, the dots
+   get a keyboard (left/right arrows, Home/End), and the live one is whichever page is showing.
+   The tablist/tab pattern is the honest markup; the phone itself stops being `role="img"` the
+   moment it is a control, so give it a role that matches what it now is.
+2. **Give the other four pages their own beats on the same clock.** YouTube opens at 8 and runs
+   two hours on 30 minutes; Reddit opens at 9 on 20; TikTok is `alwaysBlocked` and has no
+   countdown to draw, which is the interesting page, because it has to look right with nothing
+   moving. Write each from the row that already describes it, so the page and the row cannot
+   disagree — one table of targets that both the rows and the beats read.
+3. **Let the page be dragged.** A horizontal pointer drag across the hero page moves between
+   pages and the glass follows through `blendStates`. `touch-action: pan-y` on the page area so
+   a finger scrolling the site still scrolls it.
+4. **Make the rows the other end of the same control.** Click a row and the phone turns to that
+   app; the row whose page is showing carries a quiet marker. The rows are `aria-hidden` today;
+   if they become controls they stop being decoration and need labels.
+5. **The evening's clock gets a scrub.** Fast-forward stays — it is what teaches that the loop
+   is twelve times life — and beside it goes a thin scrubber for the evening, draggable both
+   ways, showing where the window opens and closes. Dragging it pauses the loop; letting go
+   resumes from where it was left.
+6. **Ask Zach before building**: (a) whether `View Anchor Mode` survives as a labelled button
+   once the fifth dot pages to the Anchor — it is redundant, but it is also the only word
+   "Anchor" in the hero, and discovery is worth more than tidiness; (b) whether the phone should
+   resume its own loop after a visitor has been driving it, and after how long.
+7. **Keep the costs where they are.** No framework, no library, no image: the page is
+   hand-written CSS and one canvas module, and it stays that way. `prefers-reduced-motion` must
+   still get a phone that is legible and still. Nothing new goes into a live region — a
+   countdown that announces every second is a page a screen-reader user leaves.
+
+Not in scope, whoever asks: the toolbar's gear and `+`; a second phone or a device frame; video
+or a recorded demo; any change to the four demos on `index.astro` (they landed the day before
+this was written), except to lift a helper both pages plainly want into `site/src/lib/`; a
+router, a store, or any state that outlives the page.
+
+Hand back: `bun run build` clean in `site/`; a headless Chrome capture of the hero on two
+different pages, cropped to the phone; and exactly what Zach should click — a dot, a row, the
+scrubber, the Anchor page — and what he should see when he does.
+
+---
+
+## 22. Drag the week grid: windows edited where they are drawn, on both apps
+
+**Model: Opus. Lane Q. Waits on nothing. It is the one open item that changes a view both apps
+compile, so run it alone in a worktree and expect to touch `project.yml`: `git worktree add
+--detach <your scratchpad>/wt-week HEAD`, `xcodegen generate` there, build with
+`-derivedDataPath` under your scratchpad, and copy only your own files back once both builds
+and the tests are green — `git status --short` on each one first.**
+
+You are picking up Furlough, Zach's iOS and Mac app blocker. Read `HANDOFF.md` (the build and
+test commands, the invariants and the code map are there; do not re-derive them), then
+`README.md`, then `design/DESIGN.md`. Session rules: never commit or push; when done print
+`git add <your files>` and a lowercase `git commit -m "..."` for Zach, with no Co-Authored-By;
+run `xcodegen generate` after adding a file; keep the build warning-free in our own code; every
+change to `Shared/Core` gets tests in `Tests/Core`; nothing can screenshot the phone, so end
+with exactly what Zach should tap and see, on both devices, then wait for his report.
+
+**Why this exists.** Zach has wanted this for a while. The week grid in the rule editor
+(`WeekSheet` → `WeekGrid`) draws the windows beautifully and cannot change one of them: tapping
+a day pushes `DayEditor`, a list of rows with time pickers, which is where every edit actually
+happens. So the picture and the editing are two different screens, and the picture — the thing
+that makes a schedule obvious at a glance — is the one you cannot touch. The site's homepage got
+the editable version on 2026-09-14: drag a window to move it, drag its edges to resize, tap
+empty track to add one, delete it, keyboard for all of it, and a sentence underneath that
+rewrites itself as you drag. That is the interaction this grid should have had, and it should
+work the same on the phone and on the Mac.
+
+**What is fixed.** Read these before changing anything; do not relitigate them.
+
+- `WeekDraft`, `WeekSheet`, `WeekGrid`, `DayColumn`, `WindowBlock`, `DayEditor` and `DayBar` are
+  **duplicated verbatim** in `Furlough/Views/WeekView.swift` (410 lines) and
+  `FurloughMac/Views/MacWeekView.swift` (392 lines); the Mac copy's header says it is "kept
+  separate so that file stays untouched". Two targets, so the names do not collide today — and
+  they will the moment one copy moves to `Shared`, so a hoist deletes both copies in the same
+  change.
+- Both apps already compile all of `Shared/UI`, which is where the cross-platform SwiftUI views
+  live (`AddChoice.swift`, `PendingDelta.swift`, `UtilityPicker.swift`, `LinkCards.swift`). A
+  shared grid belongs there. `WeekDraft` is pure and belongs in `Shared/Core`, with tests.
+- A **stored** `TimeWindow` never crosses midnight. `isNight`, `split` and `folded` are the
+  draft-only fold, and `WeekDraft` is per-day clock-time spans — which is exactly the shape a
+  grid edit produces, and the reason this is a smaller job than it looks.
+  `TimeWindow.joined` merges touching spans, `WeekDraft.set(_:on:)` already calls it, and
+  `WeekDraft.windows` regroups identical spans across days back into one window per span.
+- `Furlough.minimumWindowMinutes` is 15 and `minutesPerDay` is 1440. `TimeWindow.isValid` wants
+  start ≥ 0, end ≤ 1440, and at least the minimum.
+- The two editors bind the draft the same way (`RuleEditorView.swift:158`,
+  `MacRuleEditor.swift:133`): the getter builds a `WeekDraft` from the draft windows, the setter
+  folds and groups them back and sets the same-every-day flag. The sheet edits a **draft**;
+  nothing is enforced until the editor saves, and a loosening still goes through
+  `Policy.classify` and waits the delay. A grid edit must land in that same
+  `Binding<WeekDraft>` and change nothing else about that path.
+- `Furlough/Views/BudgetSlider.swift` is the house precedent for a control built by hand:
+  `DragGesture(minimumDistance: 0)`, a `dragging` flag, `.sensoryFeedback(.selection, trigger:
+  value) { _, _ in dragging }`, and an `accessibilityAdjustableAction` so VoiceOver can change
+  the value without the gesture. Follow it rather than inventing a second style.
+- The Mac has no touch: a drag is a mouse drag, and a resize edge should say so with
+  `NSCursor.resizeUpDown` under `onContinuousHover`. Haptics are iOS only.
+
+Do these, in order:
+
+1. **Hoist the pure part.** `Shared/Core/WeekDraft.swift`, deleted from both view files, plus
+   `Tests/Core/WeekDraftTests.swift`: the round trip (windows → per-day spans → windows), a
+   window that crosses midnight surviving it, touching spans joining into one, `apply(from:to:)`
+   adding hours on top of what a day already had, `isAllDay`, and a day emptied to nothing.
+2. **One grid.** `Shared/UI/WeekGrid.swift`, taking a `Binding<WeekDraft>` and whether it is
+   editable, with the hour height and gutter as parameters — the phone uses 19 and 40, the Mac
+   17 and 44, and both keep their current metrics. Both view files import it and lose their
+   copies; `WeekSheet` on each side keeps its own chrome.
+3. **The gestures, on both.** Drag a block to move it inside its day; drag its top or bottom
+   edge to resize; delete it. Snap to 15 minutes, and clamp against the neighbours so two
+   windows in a day can never overlap — the site does this with one function that returns the
+   previous block's end and the next block's start as the bounds, and it is worth copying
+   because it makes every case fall out of the same two numbers.
+4. **Adding one.** Tap or click empty track. On the phone, decide between a tap and a long-press
+   and say in HANDOFF why — a tap is discoverable and a long-press cannot be triggered by a
+   scroll that stops on the grid; the site chose the click rather than the press for exactly
+   that reason, which is a smaller problem in a sheet that does not scroll under the finger.
+5. **Write every edit through `WeekDraft.set(_:on:)`** so joining and the merge back into
+   windows stay in the one place that already knows how. `DayEditor` stays: the grid is for the
+   shape, the list of pickers is for the exact minute, and a block that is dragged should be
+   reachable there afterwards without surprise.
+6. **VoiceOver and the keyboard.** Each block gets a label ("8 PM to midnight on Wednesday"), an
+   adjustable action that moves it by 15 minutes, and a delete action; on the Mac, arrow keys
+   move a focused block and shift-arrows resize it. The grid's existing per-day
+   `accessibilityLabel`/`accessibilityValue` should not simply disappear — a schedule has to
+   stay readable to someone who will never drag anything.
+7. **The sentence keeps up.** `WeekSheet` already prints `TimeFormat.schedule` under the grid;
+   make sure it is rewritten as a block is dragged, not only when the drag ends. That sentence
+   is how a person checks what they just drew, and it is the part the site demo proved carries
+   the whole interaction.
+8. **Haptics** at each snap on the phone, gated on the drag the way the slider gates its own.
+   Nothing on the Mac.
+9. **HANDOFF.** One step at the next free number (43 is the last as of 2026-09-14, and another
+   session may have taken 44 — check): the hoist and the two new files, the snap and the clamp
+   rules, what stayed in `DayEditor`, and the tap-or-press decision with its reason. Add
+   `Shared/Core/WeekDraft.swift` and `Shared/UI/WeekGrid.swift` to the code map. Do not edit a
+   step you did not write.
+
+Ask Zach before building: whether a block should be draggable **across days** (it is the
+obvious next gesture and it is not in the model — a window belongs to the days it applies to,
+and `apply(from:to:)` is how hours reach another day today), and whether the scheduled Anchor's
+drop and lift (`Shared/Core/AnchorSchedule.swift`, a `minuteOfDay` and an optional
+`liftMinuteOfDay`, not a `TimeWindow`) should eventually be drawn and dragged on the same grid.
+Both are his calls, and the answer to either may be no.
+
+Not in scope, whoever asks: changing what a window means or how it is enforced; per-day budgets
+(they landed, HANDOFF 11); a pinch or a zoom on the grid; a month view; making the read-only
+grid on any other screen editable by accident — check every caller of `WeekGrid` before you
+change its signature.
+
+Hand back: `xcodebuild test -project Furlough.xcodeproj -scheme FurloughCoreTests -destination
+'platform=macOS,arch=arm64'` green with the new count; the iOS device build and the Mac build
+both green; the app installed on the phone and the Mac app running; the two git blocks. What
+Zach should do: open a rule with windows on the phone, tap Week, drag the Wednesday block an
+hour later and watch the sentence under it change, drag its bottom edge to 11, tap empty track
+on Thursday to add one, then open the day from the same grid and check the pickers say what the
+grid said. Then the same three gestures on the Mac, with the cursor changing over an edge. Then
+save the rule and confirm a loosening still asks for the delay rather than landing at once.
