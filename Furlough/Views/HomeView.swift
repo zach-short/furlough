@@ -89,7 +89,8 @@ struct HomeView: View {
             .sheet(isPresented: $showHelp) { HelpView() }
             .overlay(alignment: .bottom) {
                 HalfTabBar(half: $half)
-                    .padding(.bottom, 8)
+                    .padding(.bottom, 6)
+                    .ignoresSafeArea(edges: .bottom)
             }
         }
     }
@@ -110,18 +111,16 @@ struct HalfTabBar: View {
                 } label: {
                     VStack(spacing: 3) {
                         Image(systemName: value.icon)
-                            .font(.system(size: 18, weight: .semibold))
+                            .font(.system(size: 17, weight: .semibold))
+                            .frame(width: 22, height: 20)
                         Text(value.title)
                             .emberBody(10.5, .bold)
+                            .frame(height: 13)
                     }
-                    .foregroundStyle(value == half ? Ember.cream : Ember.muted)
+                    .foregroundStyle(value == half ? Ember.amber : Ember.muted)
                     .frame(width: 68)
                     .padding(.vertical, 9)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(value == half ? Color.white.opacity(0.14) : .clear)
-                    )
-                    .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(value.title)
@@ -129,7 +128,7 @@ struct HalfTabBar: View {
             }
         }
         .padding(5)
-        .glassEffect(.regular, in: .rect(cornerRadius: 21, style: .continuous))
+        .glassEffect(.regular, in: .capsule)
     }
 }
 

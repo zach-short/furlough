@@ -19,4 +19,12 @@ enum Half: String, CaseIterable, Codable, Sendable {
 
     /// The other one.
     var other: Half { self == .rules ? .anchor : .rules }
+
+    /// SF Symbol for the bottom navbar's tab icon.
+    var icon: String {
+        switch self {
+        case .rules: "hourglass"
+        case .anchor: "wave.3.right"
+        }
+    }
 }
