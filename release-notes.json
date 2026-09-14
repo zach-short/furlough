@@ -2,6 +2,21 @@
   "$comment": "The one copy of what changed and when. The apps read it as a bundled resource (Shared/Core/ReleaseNotes.swift); the site imports it (site/src/pages/releases.astro). Nothing else may hold a second copy. The rules for the version numbers, and what has to happen before an entry is added, are the Versioning section of README.md. Newest first.",
   "versions": [
     {
+      "version": "1.3.0",
+      "date": "2026-09-14",
+      "channel": "unreleased",
+      "headline": "The Anchor learns a schedule on the Mac.",
+      "lead": "The iPhone's Anchor has dropped itself on a schedule since the start; the Mac gets the same page now.",
+      "changes": [
+        {
+          "kind": "new",
+          "platform": "mac",
+          "title": "The Anchor can drop itself on a schedule",
+          "detail": "A new Schedule row on the Anchor pane sets one or more drop times, each with its own days and its own lift — at a time you choose, or not until the tag. Adding a time takes hold at once; removing or shortening one waits out the usual delay, and can be cancelled from Pending until then. A drop that fell while the Mac was asleep is caught the moment it wakes, the way the phone has always caught one."
+        }
+      ]
+    },
+    {
       "version": "1.2.0",
       "date": "2026-09-14",
       "channel": "appstore",
