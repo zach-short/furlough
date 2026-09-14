@@ -130,11 +130,17 @@ struct ReleaseNotesTests {
             )
             #expect(kept == expected)
         }
-        // 1.2.0 changed nothing on the Mac, so it's absent from the Mac's list entirely;
-        // `bundleRelease()` is what stops the Mac's page reading as if still on 1.1.0.
-        let macVersions = ReleaseNotes.filter(Self.releases, to: .mac).map(\.version)
-        #expect(!macVersions.contains("1.2.0"))
-        #expect(ReleaseNotes.filter(Self.releases, to: .iphone).map(\.version).contains("1.2.0"))
+        // A version with nothing for a platform is absent from that platform's list entirely —
+        // `bundleRelease()` is what then stops the Mac's page reading as if still on the version
+        // before it. Built rather than asserted about a real entry, which went stale once: this
+        // named 1.2.0, and 1.2.0 later grew a Mac change.
+        let phoneOnly = ReleaseNotes.Release(
+            version: "9.9.9", date: "2026-01-01", channel: .unreleased,
+            headline: "", lead: "",
+            changes: [ReleaseNotes.Change(kind: .fixed, platform: .iphone, title: "t", detail: "d")]
+        )
+        #expect(ReleaseNotes.filter([phoneOnly], to: .mac).isEmpty)
+        #expect(ReleaseNotes.filter([phoneOnly], to: .iphone).map(\.version) == ["9.9.9"])
     }
 
     @Test("a date is written the way the rest of Furlough writes one")
