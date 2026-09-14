@@ -60,6 +60,7 @@ COMMANDS=(
   "mac-release:sign and notarize the Mac app as a DMG other people can install"
   "mac-check:what this Mac still needs before it can cut a Mac release"
   "test:run the rules-engine tests here, no phone needed"
+  "deploy:build the site and push it to Cloudflare Pages"
   "version:the marketing version, and bumping it by the rules"
   "gen:regenerate Furlough.xcodeproj from project.yml"
   "open:open the project in Xcode"
@@ -179,6 +180,17 @@ cmd_mac() {
   open /Applications/Furlough.app
 }
 
+# --- the site --------------------------------------------------------------------------------
+#
+# site/package.json already knows the recipe (astro build, then wrangler pages deploy); this
+# just gives it a name next to everything else instead of one more "cd site && bun run ..." to
+# remember. Deploys are direct wrangler uploads, not git-linked, so this is the only path a
+# change to the site takes to reach furloughapp.com.
+cmd_deploy() {
+  say "Building and deploying the site"
+  (cd site && bun run deploy "$@")
+}
+
 # --- everything else ------------------------------------------------------------------------
 
 cmd_log() {
@@ -230,6 +242,7 @@ case "${1:-help}" in
   mac-check) shift; scripts/archive-mac.sh --check ;;
   test)      shift; xcodebuild test -project Furlough.xcodeproj -scheme FurloughCoreTests \
                       -destination 'platform=macOS,arch=arm64' "$@" ;;
+  deploy)    shift; cmd_deploy "$@" ;;
   version)   shift; scripts/version.sh "$@" ;;
   gen)       shift; xcodegen generate "$@" ;;
   open)      shift; open Furlough.xcodeproj ;;
