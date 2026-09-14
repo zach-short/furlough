@@ -6,13 +6,25 @@
       "date": "2026-09-14",
       "channel": "unreleased",
       "headline": "The Anchor learns a schedule on the Mac.",
-      "lead": "The iPhone's Anchor has dropped itself on a schedule since the start; the Mac gets the same page now.",
+      "lead": "The iPhone's Anchor has dropped itself on a schedule since the start; the Mac gets the same page now. On the phone, two fixes to the shield that stands in front of a closed app: the square it drew around itself in the App Switcher, and a Close button that came out the system's blue rather than Furlough's.",
       "changes": [
         {
           "kind": "new",
           "platform": "mac",
           "title": "The Anchor can drop itself on a schedule",
           "detail": "A new Schedule row on the Anchor pane sets one or more drop times, each with its own days and its own lift — at a time you choose, or not until the tag. Adding a time takes hold at once; removing or shortening one waits out the usual delay, and can be cancelled from Pending until then. A drop that fell while the Mac was asleep is caught the moment it wakes, the way the phone has always caught one."
+        },
+        {
+          "kind": "fixed",
+          "platform": "iphone",
+          "title": "The shield is a rounded panel in the App Switcher",
+          "detail": "It laid Furlough's own ground over the blur behind it. iOS masks that blur to the screen's corners but fills the colour to the square window, so the card in the App Switcher showed a black square around a rounded shield. The tint was all but invisible over that material anyway, and it is gone."
+        },
+        {
+          "kind": "fixed",
+          "platform": "iphone",
+          "title": "The shield's Close button is Furlough's colour",
+          "detail": "It asked for a faint white fill, which iOS ignored in favour of the default blue — loud, for the one thing there is to do on that screen. The same quiet fill, written as a solid colour, is honoured."
         }
       ]
     },
