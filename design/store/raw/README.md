@@ -16,62 +16,98 @@ to get 9:41 in the status bar: Furlough watches for clock changes and holds pend
 changes while the clock disagrees, so you would capture its clock banner instead of
 the screen. Real times are fine; Apple does not care.
 
-At the moment you shoot you need two things at once:
+Set the phone up once, before the first shot:
 
-- an app that is **closed right now**, with a window later today (frame 1);
-- a **queued loosening** (frame 6).
+- **Eight to twelve targets** with rules, so no list looks like a first run.
+- **One app closed right now** with a window later today (frame 1).
+- **One queued loosening** (frame 8) — raise a budget and save, before you begin.
+- **Two or three tags paired**, named for the place each one lives (frame 3).
+- **One app tiered Hazard** (frame 9), a couple tiered Essential (they seed frame 4).
+- Nicknames render in the display face, system names in SF. Either is fine; use
+  the same choice in all ten.
 
-So give one app a window that has not started yet today, and make one loosening
-edit before you begin; frames 2, 9 and 10 were shot with the anchor on. Nicknames render in the
-display face, system names in SF; either is fine, but use the same choice in all ten.
+**Shoot in three passes, in this order.** The Anchor locks its own settings while
+it is down — the scope chips are disabled and both leads change to "Unanchor with
+your tag to change …" — so anything that needs an editable Anchor has to be shot
+before it drops:
+
+| Pass | State | Frames |
+|---|---|---|
+| A | Anchor up, scope **Chosen apps** | 1, 3, 5, 6, 7, 8, 9 |
+| B | Drop the anchor | 2, 10 |
+| C | Lift with the tag, switch scope, rebuild a short list, drop again | 4 |
+
+Frame 1 belongs in pass A rather than beside the other Home shot: with the anchor
+down, everything on its list reads as anchored, and the hero would show that
+instead of the timed state the caption is about.
+
+Pass C costs a couple of minutes and there is no way around it: switching scope
+**starts the list again** and does not carry the old one over, so the "Held" list
+in frame 2 and the "Stays open" list in frame 4 cannot both exist at once. Do
+frame 2 first, then switch and build four apps for frame 4.
+
+## The set
+
+**Rebalanced 2026-09-13.** The old set gave Rules six frames and the Anchor one,
+which is the app as it was before the two halves — the Anchor as a feature. It is
+half the product now, so it carries half the set: frames 2, 3, 4, 5 and the shield
+at 10 against 1, 6, 7, 8, 9. The first two images, which are all most people ever
+see, are now one of each half with the segment visible in both.
+
+Two frames were cut to pay for it: **Allowed windows**, because the week grid at 7
+says the same thing in a better picture, and **the widget**, which is a surface
+every competitor also has. It stays in the description.
+
+**Websites was kept, and the Anchor's schedule dropped instead** (Zach's call,
+2026-09-13). Websites is a differentiator most blockers do not have, and the
+scheduled drop is the one Anchor frame whose work is invisible in a still — a
+screenshot of a time picker does not show a phone locking itself at ten.
 
 ## What each frame wants, in order
 
-**Reordered 2026-09-09:** the Anchor moved from ninth to second, so the two or three images most
-people ever see carry both halves of the app rather than only the timed one. Everything between
-shifted down by one, and the files here were renumbered to match.
-
-1. **`01.png` · No unblock button.** Home, hero paged to the closed app. It reads
-   "Next window", a countdown, and "opens at 8:00 PM · 30 min a day". "Used up
-   today" in ember works too. The list sits below.
-2. **`02.png` · Locked till you tap the tag.** Open the Anchor screen from its card
-   on Home, with a tag paired and apps chosen, and tap Anchor. The state card reads
-   "Anchored" and "6 apps since 3:12 PM" with the Unanchor button, apps grid below.
-   Skip the NFC scan sheet; that is a system overlay.
-3. **`03.png` · Fifty-five minutes. Then it's gone.** The rule editor, scrolled so the
-   **Daily budget** card sits at the top: "55 MIN for the whole day" over the slider,
-   the tier card under it. The headline names the number on the slider, so if the
-   budget changes, change the headline in `../board.html` with it.
-4. **`04.png` · Open only when you said so.** The top of the same editor, **Allowed
-   windows**, with **Same every day** off so the day strips show. Two rows: Sun to
-   Thu 8:00 to 10:00 PM, and Fri to Sat 8:00 PM to 2:00 AM as one night row. That
-   is what the caption says.
-5. **`05.png` · Draw the whole week.** Tap **Visualize windows** in that editor. The
-   grid shows the evening blocks with the later nights on Fri and Sat, and **In
-   words** underneath. Do not tap a column; that opens the day editor.
-6. **`06.png` · Loosening waits a day.** Raise a budget from 30 to 45 and save, then
-   tap **1 pending** in the home toolbar. The card shows Now over Becomes, "Takes
-   effect …", and Cancel change.
-7. **`07.png` · The worst apps wait longest.** The same editor, scrolled so **How
-   much it is worth** is centred, with Hazard selected. The card reads "The reason
-   you installed Furlough." and "Loosening this one waits 4 days." at the default
-   delay. Do it on TikTok or similar so the choice looks true.
-8. **`08.png` · Websites, too.** Home, +, Website. Type an address so the button
+1. **`01.png` · No unblock button.** Home on the **Rules** page, hero paged to the
+   closed app. It reads "Next window", a countdown, and "opens at 8:00 PM · 30 min
+   a day". "Used up today" in ember works too. The list sits below, and the
+   **Rules | Anchor** segment sits in the toolbar — leave it in shot, it is doing
+   the work of teaching that there are two halves.
+2. **`02.png` · Locked till you tap the tag.** Swipe to the **Anchor** page with a
+   tag paired, apps chosen and the anchor down. The state card reads "Anchored" in
+   ember over "6 apps since 3:12 PM" with the Unanchor button; "Held" labels the
+   grid below. Skip the NFC sheet; that is a system overlay.
+3. **`03.png` · Any sticker will do.** Anchor page → Settings → **Tags**, with two
+   or three paired and named for where they live ("Kitchen drawer", "By the door").
+   The lead reads "Anchoring works without a tag. Weighing anchor needs one …" and
+   names the cap of three. This frame is also what App Review asked to see, so it
+   earns its slot twice.
+4. **`04.png` · Everything but four.** The Anchor page again, in
+   **Everything except** scope, anchored, so the label over the grid reads **Stays
+   open** and the footnote reads "Everything not listed here is blocked while
+   anchored." Four apps in the list is the right number: enough to read as a
+   deliberate allowlist, few enough that the point lands.
+5. **`05.png` · Websites, too.** Home, **+**, Website. Type an address so the button
    reads "Add reddit.com". The keyboard being up is fine and is what real use looks
    like. If you would rather not show it, the home list with a website row in it
    also fits the caption.
-9. **`09.png` · One glass, every status.** The **home screen** with the small Furlough
-   widget placed, everything anchored, so it reads "Blocked · All blocked · 20 blocked
-   all day · 20 anchored" with the hourglass stopped. Captured from the home screen,
-   not from Furlough. Any state fits the caption; an open window would show "Open now"
-   and a countdown instead.
-10. **`10.png` · Nothing to tap but Close.** From the home screen, open an anchored app.
-    iOS shows "Instagram is anchored", "Unanchor with your tag in Furlough." and Close.
-    The timed shield fits the caption too: "Instagram opens at 8:00 PM" over "You get
-    30 min per day." Together with frame 2 this is the Anchor story, the lock and then
-    the wall.
+6. **`06.png` · Fifty-five minutes. Then it's gone.** The rule editor, scrolled so
+   the **Daily budget** card sits at the top: "55 MIN for the whole day" over the
+   slider, the tier card under it. The headline names the number on the slider, so
+   if the budget changes, change the headline in `../board.html` with it.
+7. **`07.png` · Draw the whole week.** Tap **Visualize windows** in that editor.
+   The grid shows evening blocks with the later nights on Fri and Sat, and **In
+   words** underneath. Do not tap a column; that opens the day editor.
+8. **`08.png` · Loosening waits a day.** With the loosening you queued before you
+   started, tap **1 pending** in the home toolbar. The card shows Now over Becomes,
+   "Takes effect …", and Cancel change.
+9. **`09.png` · The worst apps wait longest.** The same editor, scrolled so **How
+   much it is worth** is centred, with Hazard selected. The card reads "The reason
+   you installed Furlough." and "Loosening this one waits 4 days." at the default
+   delay. Do it on TikTok or similar so the choice looks true.
+10. **`10.png` · Nothing to tap but Close.** From the home screen, open an anchored
+    app. iOS shows "Instagram is anchored", "Unanchor with your tag in Furlough."
+    and Close. Shoot the **anchored** wording rather than the timed one: with
+    frames 2 and 3 it closes the Anchor story, the key and the lock and the wall.
 
-Frames 3, 4 and 7 are the same editor at three scroll positions. That is fine; the
+Frames 6, 7 and 9 are the same editor at three scroll positions. That is fine; the
 frame around each phone carries the difference.
 
 ## Getting them here
