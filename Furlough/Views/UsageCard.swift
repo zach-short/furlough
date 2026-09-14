@@ -49,21 +49,25 @@ enum UsageCardState: Equatable {
         /// True when the rule loosened and must sit out the delay; the collapsed line names the
         /// time directly instead of hiding it behind a tap.
         var waiting = false
-        /// True when Screen Time hasn't handed over the token yet, so the write is still in
-        /// flight. The card still folds and marks itself, but amber, with the line saying what's
-        /// still owed rather than claiming it's done; see `UsageView.land`.
-        var pending = false
+        /// Where the answer will land once Screen Time hands over the token, or nil once it has
+        /// been written. The card says Applied either way (Zach's call, 2026-09-14: the press has
+        /// to answer at once, and the Done button is where the double-check waits); `rules` and
+        /// `holds` read the intent, so the folded line and the closing count describe the same
+        /// thing before and after the write. `UsageView.land` finishes it.
+        var owed: UsageDestination?
 
-        var holds: Bool { !heldKinds.isEmpty }
+        var pending: Bool { owed != nil }
+        var rules: Bool { targetID != nil || owed?.writesRule == true }
+        var holds: Bool { !heldKinds.isEmpty || owed?.holds == true }
 
         /// Only a freshly-created rule or an anchor-only change can be undone here; a loosened
-        /// pre-existing rule belongs in the editor instead. Nothing to undo while still pending.
-        var canUndo: Bool { !pending && (fresh || targetID == nil) }
+        /// pre-existing rule belongs in the editor instead. A card still owed has written
+        /// nothing, so it is always undoable — `UsageView.undo` just lets the write go.
+        var canUndo: Bool { fresh || targetID == nil }
 
         func line(for item: Recommendation) -> String {
-            if pending { return "Screen Time has not handed this app over yet. Furlough is still asking — you can keep going." }
             if waiting { return message }
-            let rule = targetID != nil ? item.consequence() : nil
+            let rule = rules ? item.consequence() : nil
             let held = holds ? "Out of reach the moment you drop the anchor." : nil
             return [rule, held].compactMap { $0 }.joined(separator: " ")
         }
@@ -214,10 +218,11 @@ struct UsageSuggestionCard: View {
         case .applied(let done):
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 7) {
-                    UsageAppliedMark(pending: done.pending)
+                    UsageAppliedMark()
                     Spacer()
                     if done.canUndo { UsageUndoButton(action: undo) }
                 }
+                // No outcome to quote until the write lands; until then the line says what was asked.
                 Text(done.pending ? done.line(for: item) : done.message)
                     .emberBody(12)
                     .foregroundStyle(Ember.muted)
@@ -339,7 +344,7 @@ struct UsageAppliedLine: View {
                 Spacer(minLength: 8)
                 // Shows which half this landed on without reopening the card.
                 if done.holds { AnchorGlyph(isAnchored: false, size: 20) }
-                UsageAppliedMark(pending: done.pending, size: 12)
+                UsageAppliedMark(size: 12)
             }
             Text(done.line(for: item))
                 .emberBody(11.5)
@@ -409,26 +414,84 @@ struct UsageSkippedLine: View {
     }
 }
 
-/// Shared by folded and open cards so "Applied" can't drift between the two.
+/// Shared by folded and open cards so "Applied" can't drift between the two. Says Applied
+/// even while the write is still owed to Screen Time (`UsageCardState.Applied.owed`): the
+/// press answers at once, and a write that never lands is taken back with the toast instead.
 struct UsageAppliedMark: View {
-    /// See `UsageCardState.Applied.pending`.
-    let pending: Bool
     var size: CGFloat = 13
 
     var body: some View {
-        HStack(spacing: pending ? 7 : 5) {
-            if pending {
-                ProgressView()
-                    .controlSize(.small)
-                    .tint(Ember.amber)
-                    .frame(width: size + 3, height: size + 3)
-            } else {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: size, weight: .semibold))
-                    .foregroundStyle(Ember.moss)
-            }
-            Eyebrow(text: pending ? "Adding" : "Applied", color: pending ? Ember.amber : Ember.moss)
+        HStack(spacing: 5) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: size, weight: .semibold))
+                .foregroundStyle(Ember.moss)
+            Eyebrow(text: "Applied", color: Ember.moss)
         }
+    }
+}
+
+/// The onboarding step's Done button. While the last applies are still being confirmed with
+/// Screen Time it becomes the wait itself — a running hourglass and a line that changes every
+/// couple of seconds — so a slow answer reads as work going on rather than a hang. The lines
+/// are deliberately silly (Zach's call, 2026-09-14); the hourglass is the honest part.
+struct UsageFinishButton: View {
+    let title: String
+    let finishing: Bool
+    let action: () -> Void
+
+    /// Read in order from the first, so the wait always opens on the same line.
+    static let quips = [
+        "Accessing the mainframe…",
+        "Asking Screen Time nicely…",
+        "Reticulating splines…",
+        "Counting the hours twice…",
+        "Checking every door…",
+        "Waiting on Cupertino…",
+        "Turning the glass over…",
+        "Reading the fine print…",
+    ]
+    static let quipSeconds: TimeInterval = 2.4
+
+    var body: some View {
+        Button(action: action) {
+            Group {
+                if finishing {
+                    UsageFinishingLabel()
+                } else {
+                    Text(title).emberBody(14.5, .bold)
+                }
+            }
+            .foregroundStyle(Ember.cream)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 4)
+        }
+        .emberGlassButton(prominent: true, tint: Ember.ember)
+        .controlSize(.large)
+        // Not `.disabled` while working: that dims the glass, and a dimmed "Accessing the
+        // mainframe…" reads as stuck rather than busy. `UsageView.finish` ignores a second press.
+        .animation(.easeInOut(duration: 0.2), value: finishing)
+    }
+}
+
+/// Its own view so `started` is set the moment the wait begins, not when the button first drew.
+private struct UsageFinishingLabel: View {
+    @State private var started = Date.now
+
+    var body: some View {
+        TimelineView(.periodic(from: started, by: UsageFinishButton.quipSeconds)) { context in
+            let elapsed = max(0, context.date.timeIntervalSince(started))
+            let index = Int(elapsed / UsageFinishButton.quipSeconds) % UsageFinishButton.quips.count
+            HStack(spacing: 9) {
+                LivingHourglass(state: .open(level: 0.55, warned: false))
+                    .frame(width: 14, height: 19)
+                Text(UsageFinishButton.quips[index])
+                    .emberBody(14.5, .bold)
+                    .contentTransition(.opacity)
+            }
+            .animation(.easeInOut(duration: 0.3), value: index)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Finishing up")
     }
 }
 

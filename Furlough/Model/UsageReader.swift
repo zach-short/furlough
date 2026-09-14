@@ -216,6 +216,15 @@ enum UsageReader {
         return cache.entries
     }
 
+    /// Starts the installed-apps walk without waiting on it. `Enumeration` lets a later
+    /// `fillingTokens` join the same walk, and one that has already finished has refreshed
+    /// `TokenCache` on its way past — so this costs nothing the page would not have paid anyway,
+    /// only sooner.
+    @available(iOS 26.4, *)
+    static func warmTokens() {
+        Task.detached(priority: .userInitiated) { _ = try? await encodedKinds() }
+    }
+
     /// Everything installed and visited, keyed like `UsageCollector` keys an entry, as encoded
     /// `TargetKind`s — cached on the way past so the next visit skips the query. Deduplicated
     /// through `Enumeration`: several callers (usage page, activation, arrivals) each walk

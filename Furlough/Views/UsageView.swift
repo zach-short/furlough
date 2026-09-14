@@ -37,9 +37,10 @@ struct UsageView: View {
     // Retries for Screen Time's token query: 3, a second apart — enough to ride out a query
     // that just didn't answer, short enough not to stall. See `nameApps`.
     private static let namingAttempts = 3
-    // Kept short: naming has almost always finished by the time cards are read, and a card
-    // still owed keeps resolving after the step closes anyway — only the toast is given up on.
-    private static let finishPatience: Duration = .seconds(3)
+    // Long enough to outlast `nameApps` (every attempt, plus the ask `land` makes after them):
+    // a card says Applied from the press, so the Done button is where the wait for Screen Time
+    // is spent. Only a ceiling — `land` settles every card well inside it.
+    private static let finishPatience: Duration = .seconds(60)
 
     // `done` set: written on a cache-supplied token Screen Time hasn't confirmed — `confirm`
     // checks it. `done` nil: no token yet, `land` is waiting for one. The name is kept either
@@ -412,8 +413,9 @@ struct UsageView: View {
             .emberCard()
         }
         if role == .onboarding {
-            // Settles anything still owed from optimistic applies before the step can close.
-            ProminentButton(title: finishTitle, isBusy: finishing) { Task { await finish() } }
+            // Settles anything still owed from optimistic applies before the step can close;
+            // the button itself is the wait while it does.
+            UsageFinishButton(title: finishTitle, finishing: finishing) { Task { await finish() } }
                 .padding(.top, 4)
             Footnote(
                 text: "You can run this again any time from Settings › Where the time goes.",
@@ -422,15 +424,13 @@ struct UsageView: View {
         }
     }
 
-    private var finishTitle: String {
-        if finishing { return "Finishing up…" }
-        return applied.isEmpty ? "Skip for now" : "Done"
-    }
+    private var finishTitle: String { applied.isEmpty ? "Skip for now" : "Done" }
 
-    // Excludes pending cards: their work hasn't actually been written yet.
+    // Counts cards still owed to Screen Time too: they say Applied, so the closing line and the
+    // Done button have to agree with them. `finish` is what waits for the writes themselves.
     private var applied: [Recommendation] {
         advice.filter {
-            if case .applied(let done) = states[$0.key] { return !done.pending }
+            if case .applied = states[$0.key] { return true }
             return false
         }
     }
@@ -444,7 +444,7 @@ struct UsageView: View {
     // kept separate since a card can land on both.
     private var closingLine: String {
         var lines: [String] = []
-        let ruled = applied.filter { done($0)?.targetID != nil }
+        let ruled = applied.filter { done($0)?.rules == true }
         if !ruled.isEmpty {
             let apps = ruled.count == 1 ? "1 app" : "\(ruled.count) apps"
             let saved = ruled.reduce(0) { total, item in
@@ -468,6 +468,10 @@ struct UsageView: View {
     private func load() async {
         guard #available(iOS 26.4, *), hasDataAccess, summary == nil else { return }
         phase = .reading
+        // Asked now, alongside the read, rather than after it: the token walk is what an Apply
+        // without a token waits on, so the earlier it starts the likelier the first press finds
+        // its token in hand. `nameApps` joins this same walk if it is still going.
+        UsageReader.warmTokens()
         do {
             // Folded now for pairs a key alone can join (a typed site beside its app's row);
             // folded again in `nameApps` once tokens confirm which entry is which app.
@@ -563,7 +567,9 @@ struct UsageView: View {
     // Applies instantly on whatever token is in hand (no wait on Screen Time), then verifies
     // afterwards: `confirm` reads Screen Time's actual answer back once `nameApps` has it, and
     // undoes anything built on a token for an app since deleted. If there's no token at all yet
-    // (first visit, before the first answer), the card is marked `pending` and `land` finishes it.
+    // (first visit, before the first answer), the card still says Applied — the press has to
+    // answer at once — and `land` writes it the moment Screen Time names the app. Only a name
+    // that never comes takes the card back, with the toast saying so.
     private func apply(_ item: Recommendation, _ entry: UsageEntry) {
         guard #available(iOS 26.4, *) else { return }
         // Re-answering clears any toast entry — it was about the previous answer.
@@ -571,7 +577,7 @@ struct UsageView: View {
 
         guard let kind = entry.targetKind else {
             var done = UsageCardState.Applied(message: "")
-            done.pending = true
+            done.owed = landing()
             settle(item, done)
             optimistic[item.key] = Optimistic(name: entry.plainName, done: nil)
             Task { await land(item, entry) }
@@ -705,8 +711,9 @@ struct UsageView: View {
         return !done.pending
     }
 
+    // Reads what was written, not what `holds` promises: a card still owed has written nothing.
     private func takeBack(_ done: UsageCardState.Applied) {
-        if done.holds { model.stopHolding(done.heldKinds) }
+        if !done.heldKinds.isEmpty { model.stopHolding(done.heldKinds) }
         if let targetID = done.targetID, done.fresh { _ = model.undoFreshTarget(targetID) }
     }
 
@@ -730,8 +737,12 @@ struct UsageView: View {
         }
     }
 
-    // Bounded by `finishPatience`: a card still owing keeps resolving after the step closes anyway.
+    // Waits out every card still owed to Screen Time (`finishPatience` is only the ceiling): a
+    // card says Applied from the press, so this is the one place the write itself is waited
+    // for, and a write that fails here keeps the step open with the toast naming the app.
     private func finish() async {
+        // A second press while the first is still waiting would run this twice over.
+        guard !finishing else { return }
         let known = Set(trouble.map(\.key))
         if !optimistic.isEmpty {
             finishing = true
@@ -756,9 +767,12 @@ struct UsageView: View {
 
     // Only undoes what this run itself did — a rule on a pre-existing row is a loosening like
     // any other and belongs in the rule editor; `Applied.canUndo` keeps the button off those cards.
+    // A card still owed has written nothing: dropping it from `optimistic` is the whole undo,
+    // and `land` finds the card no longer pending and lets it go.
     private func undo(_ item: Recommendation) {
         guard case .applied(let done) = states[item.key], done.canUndo else { return }
-        if done.holds { model.stopHolding(done.heldKinds) }
+        if done.pending { optimistic[item.key] = nil }
+        if !done.heldKinds.isEmpty { model.stopHolding(done.heldKinds) }
         if let targetID = done.targetID, !model.undoFreshTarget(targetID) {
             states[item.key] = .failed("Furlough has held this rule too long to take it straight back. Loosen it from the rule editor instead.")
             return
