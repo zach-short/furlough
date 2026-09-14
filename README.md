@@ -151,7 +151,7 @@ xcrun devicectl device install app --device <UDID> build/DerivedData/Build/Produ
 
 ## Installing on another phone
 
-Any iPhone on iOS 26 or later can run Furlough from this Mac. Development signing under the paid team covers it; nothing in the project is tied to one device.
+Any iPhone on iOS 18 or later can run Furlough from this Mac. Development signing under the paid team covers it; nothing in the project is tied to one device.
 
 1. On the phone: **Settings > Privacy & Security > Developer Mode**, turn it on, and restart when asked.
 2. Plug the phone into the Mac and unlock it. Tap **Trust** on the phone when it asks about the computer.
