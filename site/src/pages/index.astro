@@ -233,8 +233,9 @@ const legend = [
         <p class="lede">Free of accounts, free of servers, and free of an unblock button. It only works if you mean it.</p>
         <div class="cactions">
           <StoreButton />
+          <a class="glass" href={site.macDownloadURL} rel="noopener">Download for Mac</a>
         </div>
-        <p class="fine faint">Furlough for Mac is open source. <a href={site.githubURL} rel="noopener">Build it from GitHub.</a></p>
+        <p class="fine faint">Signed with a Developer ID and notarized by Apple, v{site.macVersion}. Furlough for Mac is also open source. <a href={site.githubURL} rel="noopener">Build it from GitHub.</a></p>
       </div>
     </div>
   </section>
@@ -412,7 +413,7 @@ const legend = [
   .cta { display: flex; align-items: center; gap: 28px; padding: 34px 36px; background-image: radial-gradient(ellipse 60% 120% at 0% 100%, rgba(229, 86, 61, 0.18), transparent 60%); }
   .appicon { width: 96px; height: 96px; border-radius: 22%; flex: 0 0 auto; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), 0 0 60px rgba(229, 86, 61, 0.25); }
   .cta .lede { margin-top: 10px; font-size: 16.5px; }
-  .cactions { margin-top: 20px; }
+  .cactions { margin-top: 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .cta .fine { font-size: 13px; margin-top: 14px; }
   @media (max-width: 640px) { .cta { flex-direction: column; align-items: flex-start; padding: 26px 22px; } }
 </style>

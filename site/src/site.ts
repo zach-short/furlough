@@ -7,6 +7,10 @@ export const site = {
   // Set this once the App Store record exists. Until then the download button says so.
   appStoreURL: null as string | null,
   githubURL: 'https://github.com/zach-short/furlough',
+  // The notarized Developer ID build. Bump the filename (and this path) each time
+  // scripts/archive-mac.sh cuts a new one — public/downloads/ keeps only the latest.
+  macDownloadURL: '/downloads/Furlough-1.2.0.dmg',
+  macVersion: '1.2.0',
   // Cloudflare Email Routing forwards this to the real inbox — domain address, not personal.
   email: 'support@furloughapp.com',
   author: 'Zach Short',

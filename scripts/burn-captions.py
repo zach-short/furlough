@@ -11,7 +11,7 @@ transparent PNG with Pillow and composited with ffmpeg's own `overlay`, gated by
 
 Why burn in at all rather than ship a sidecar .srt: App Review's player may start
 muted and may ignore a caption track, and the narration is the part that explains
-what the tag is. See design/store/DEMO-VIDEO.md.
+what the tag is. See ~/Projects/archive/furlough/demo-video/DEMO-VIDEO.md.
 """
 
 import re

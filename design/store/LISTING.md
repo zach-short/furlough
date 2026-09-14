@@ -430,9 +430,9 @@ heading, before anything a reviewer has to do — and the section says in plain 
 is a commodity sticker, that nothing ships or is sold with the app, and that it is not paired to
 any particular product, because "designated hardware" is the framing the rejection came in.
 
-**How to shoot the video is written down separately**, in
-[`DEMO-VIDEO.md`](DEMO-VIDEO.md): what Apple's four bullets require, the camera rig that keeps
-the tag and the screen in one frame, and a shot list.
+**How to shoot the video is written down separately**, archived now that the video shipped, in
+`~/Projects/archive/furlough/demo-video/DEMO-VIDEO.md`: what Apple's four bullets require, the
+camera rig that keeps the tag and the screen in one frame, and a shot list.
 
 **The URL is a placeholder.** The block below holds
 `[PASTE THE VIDEO URL HERE BEFORE SUBMITTING]`, and `store-submit.sh` reads the notes straight out
