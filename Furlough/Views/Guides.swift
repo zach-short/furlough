@@ -22,7 +22,6 @@ extension HalfGuide {
                 detail: hasUsageNumbers
                     ? "Furlough has read the last \(UsageReader.days) days. Start from the app you spend the most on."
                     : "Apps and categories, from Apple's picker. Furlough is never told which ones you picked.",
-                footnote: "Websites work too, typed by name. The + button offers both.",
                 isDone: !config.targets.isEmpty
             ),
             Step(
@@ -56,7 +55,6 @@ extension HalfGuide {
             Step(
                 title: "Pair a tag",
                 detail: "Any NTAG sticker, or the tag that came with another blocking product. Hold it to the top of your phone.",
-                footnote: "Leave it somewhere that makes you think — a drawer at home, a desk you have to walk to.",
                 isDone: anchor.isPaired
             ),
             Step(
