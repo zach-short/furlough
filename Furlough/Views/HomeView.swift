@@ -49,9 +49,6 @@ struct HomeView: View {
                     Button("Help", systemImage: "questionmark.circle.fill") { showHelp = true }
                         .tint(Ember.cream)
                 }
-                ToolbarItem(placement: .principal) {
-                    HalfSegment(half: $half)
-                }
                 if !model.state.pending.isEmpty {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button { showPending = true } label: {
@@ -90,40 +87,49 @@ struct HomeView: View {
             .sheet(isPresented: $showPending) { PendingChangesView() }
             .sheet(isPresented: $showSettings) { SettingsView() }
             .sheet(isPresented: $showHelp) { HelpView() }
+            .overlay(alignment: .bottom) {
+                HalfTabBar(half: $half)
+                    .padding(.bottom, 8)
+            }
         }
     }
 }
 
-/// Rules/Anchor segment shown in the toolbar's title position; glass style matches the
-/// buttons beside it.
-struct HalfSegment: View {
+/// Rules/Anchor switcher, floating over the bottom of the page rather than spanning it —
+/// an icon over a label per side, so it reads as a compact nav control, not a full tab bar.
+struct HalfTabBar: View {
     @Binding var half: Half
 
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 4) {
             ForEach(Half.allCases, id: \.self) { value in
                 Button {
                     guard value != half else { return }
                     // withAnimation needed: a page TabView jumps (doesn't slide) on a plain assignment.
                     withAnimation(.snappy(duration: 0.3)) { half = value }
                 } label: {
-                    Text(value.title)
-                        .emberBody(12.5, .bold)
-                        .foregroundStyle(value == half ? Ember.cream : Ember.muted)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 5)
-                        .background(
-                            Capsule().fill(value == half ? Color.white.opacity(0.14) : .clear)
-                        )
-                        .contentShape(Capsule())
+                    VStack(spacing: 3) {
+                        Image(systemName: value.icon)
+                            .font(.system(size: 18, weight: .semibold))
+                        Text(value.title)
+                            .emberBody(10.5, .bold)
+                    }
+                    .foregroundStyle(value == half ? Ember.cream : Ember.muted)
+                    .frame(width: 68)
+                    .padding(.vertical, 9)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(value == half ? Color.white.opacity(0.14) : .clear)
+                    )
+                    .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(value.title)
                 .accessibilityAddTraits(value == half ? [.isButton, .isSelected] : .isButton)
             }
         }
-        .padding(3)
-        .glassEffect(.regular, in: .capsule)
+        .padding(5)
+        .glassEffect(.regular, in: .rect(cornerRadius: 21, style: .continuous))
     }
 }
 
@@ -316,6 +322,27 @@ struct HeroPager: View {
     private var pages: [Target] { groups.ordered }
     private var landing: UUID? { groups.open.first?.target.id ?? pages.first?.id }
 
+    /// One entry per scroll position: the real pages, plus (when there's more than one) a
+    /// trailing duplicate of the first page so swiping right past the last one lands on
+    /// something — its id is snapped back to the real first page immediately after.
+    private struct LoopPage: Identifiable {
+        let id: UUID
+        let target: Target
+    }
+
+    private var loopPages: [LoopPage] {
+        let real = pages.map { LoopPage(id: $0.id, target: $0) }
+        guard pages.count > 1, let first = pages.first else { return real }
+        return real + [LoopPage(id: Self.loopSentinelID(for: first.id), target: first)]
+    }
+
+    /// A stable id, distinct from any real target id, for the trailing loop duplicate of `id`.
+    private static func loopSentinelID(for id: UUID) -> UUID {
+        var bytes = id.uuid
+        bytes.0 ^= 0xFF
+        return UUID(uuid: bytes)
+    }
+
     var body: some View {
         if pages.isEmpty {
             if showsEmptyHero { EmptyHero() }
@@ -323,9 +350,9 @@ struct HeroPager: View {
             VStack(spacing: 0) {
                 ScrollView(.horizontal) {
                     LazyHStack(spacing: 0) {
-                        ForEach(pages) { target in
-                            NavigationLink(value: target.id) {
-                                HeroPage(target: target, status: statuses[target.id] ?? .unconfigured, runtime: runtime, anchor: anchor)
+                        ForEach(loopPages) { page in
+                            NavigationLink(value: page.target.id) {
+                                HeroPage(target: page.target, status: statuses[page.target.id] ?? .unconfigured, runtime: runtime, anchor: anchor)
                                     .padding(.horizontal, 22)
                             }
                             .buttonStyle(.plain)
@@ -349,6 +376,15 @@ struct HeroPager: View {
             }
             .onChange(of: pages.map(\.id)) { _, ids in
                 if let current = featured, !ids.contains(current) { featured = landing }
+            }
+            .onChange(of: featured) { _, new in
+                guard let new, let first = pages.first, pages.count > 1,
+                      new == Self.loopSentinelID(for: first.id) else { return }
+                // Landed on the trailing loop duplicate: snap to the real first page without
+                // animation so the wrap reads as continuous instead of a visible rewind.
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) { featured = first.id }
             }
         }
     }
