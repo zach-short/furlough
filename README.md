@@ -107,7 +107,7 @@ macOS asks once per browser whether Furlough may control it, the first time Furl
 
 The web filter is the second half, and it is optional. Onboarding offers it and Settings > Web installs it: a network content filter that macOS runs as a system extension, which sees every connection the Mac opens and refuses the ones to a blocked site, whatever app opened them. macOS asks twice, once to allow the extension under System Settings > General > Login Items & Extensions and once to let it filter, and it can be switched off there at any time; Settings > Web says so when it has been, and the tab reader keeps enforcing regardless. The filter reads a site's name off the connection (the name the app asked for, or the one in the TLS hello), and while anything is blocked it refuses nameless QUIC connections so the browser falls back to the kind it can read. It blocks nothing past the moment the rules say a status could change, so a list left behind by a force quit lapses on its own.
 
-Getting it is a download rather than a build. **[Download Furlough for Mac](https://furloughapp.com/#download)** — a disk image for Apple silicon, signed with a Developer ID and notarized, so it opens on a Mac that has never seen Xcode and Gatekeeper asks for no detour. [Releasing the Mac app](#releasing-the-mac-app) is how that image is made.
+Getting it is a download rather than a build. **[Download Furlough for Mac](https://furloughapp.com/#download)** — a disk image for Apple silicon on macOS 15 or newer, signed with a Developer ID and notarized, so it opens on a Mac that has never seen Xcode and Gatekeeper asks for no detour. [Releasing the Mac app](#releasing-the-mac-app) is how that image is made.
 
 Open the image and drag Furlough onto the Applications folder beside it. It has to live in `/Applications`: macOS loads a system extension from nowhere else, and the login item and the watchdog agent both point there. The first launch is onboarding — the browsers Furlough may control, and the web filter if you want it. A new version is the same drag over the top, and the filter already installed is recognised as a replacement rather than read as a first install, so the next launch puts it back by itself.
 
@@ -130,7 +130,7 @@ Or open the project in Xcode, pick the `FurloughMac` scheme and My Mac, and pres
 Everything below is for building Furlough. Running the Mac app needs none of it: the [download](#furlough-on-the-mac) is a finished, notarized app.
 
 - A paid Apple Developer account (Family Controls is not available to Personal Teams). The Mac app on its own can be built without one — see [Building the Mac app without a developer account](#building-the-mac-app-without-a-developer-account).
-- Xcode 26 or newer, a physical iPhone. The Screen Time API does not work in the Simulator. The Mac app needs macOS 26.
+- Xcode 26 or newer, a physical iPhone. The Screen Time API does not work in the Simulator. The Mac app it builds runs on macOS 15 or newer.
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen): `brew install xcodegen`
 
 ## Install from Xcode
