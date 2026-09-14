@@ -114,6 +114,12 @@ final class AppModel {
     private static var storedAnchorPageAdds: Half {
         UserDefaults.standard.string(forKey: anchorPageAddsKey).flatMap(Half.init(rawValue:)) ?? .anchor
     }
+    /// Whether arriving on the Anchor page arms the reader on its own. Off by default: Apple's
+    /// scan sheet showing up unasked the first time someone swipes to this half is the surprise
+    /// this setting exists to prevent — the reader row and the guide's first step still arm it by
+    /// hand either way. Stored beside the rest in the app's own defaults, for the same reason.
+    private(set) var autoArmsReader = UserDefaults.standard.bool(forKey: AppModel.autoArmsReaderKey)
+    private static let autoArmsReaderKey = "furlough.autoArmsReader"
     /// The halves whose three-step guide has been walked to the end. Beside the rest in the
     /// app's own defaults, for the same reason.
     ///
@@ -214,6 +220,13 @@ final class AppModel {
         guard half != anchorPageAdds else { return }
         UserDefaults.standard.set(half.rawValue, forKey: Self.anchorPageAddsKey)
         anchorPageAdds = half
+    }
+
+    /// Turns the Anchor page's arm-on-sight behavior on or off. See `autoArmsReader`.
+    func setAutoArmsReader(_ on: Bool) {
+        guard on != autoArmsReader else { return }
+        UserDefaults.standard.set(on, forKey: Self.autoArmsReaderKey)
+        autoArmsReader = on
     }
 
     /// Where a + press lands, given the page it was pressed over. Rules always adds a rule;
@@ -2043,6 +2056,8 @@ final class AppModel {
         wantsBothHalves = false
         UserDefaults.standard.removeObject(forKey: Self.anchorPageAddsKey)
         anchorPageAdds = .anchor
+        UserDefaults.standard.removeObject(forKey: Self.autoArmsReaderKey)
+        autoArmsReader = false
         // A reset takes the tags with it, so the next pairing is a first pairing again and the
         // where-to-leave-it screen is owed again with it.
         UserDefaults.standard.removeObject(forKey: Self.tagPlacementKey)

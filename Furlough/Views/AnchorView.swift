@@ -5,8 +5,10 @@ import SwiftUI
 /// segment in the toolbar is how you get here.
 ///
 /// `isCurrent` is whether this is the page in front. A page-style `TabView` builds the page next
-/// to the one you are looking at, and this one arms an NFC reader on sight: without the flag,
+/// to the one you are looking at, and this one can arm an NFC reader on sight: without the flag,
 /// opening Home on Rules would put Apple's scan sheet in front of someone who never asked for it.
+/// Whether it does is itself a setting — off until turned on in Tags, see `AppModel.autoArmsReader`
+/// — so `isCurrent` alone no longer decides it.
 struct AnchorPage: View {
     /// Whether this is the half on screen. See above.
     let isCurrent: Bool
@@ -71,11 +73,12 @@ struct AnchorPage: View {
             // page in front, and only when the scan has something to do: someone who came here to
             // choose apps has no tag in hand, and a system sheet in the face every time this page
             // arrives would be the price of a convenience they are not using yet. The guide's first
-            // step and the reader row both arm it by hand.
+            // step and the reader row both arm it by hand regardless — this only governs whether
+            // arriving does it too, off until asked for in Tags. See `AppModel.autoArmsReader`.
             //
             // Keyed on `isCurrent` so a swipe onto this page arms it, the way arriving used to.
             .task(id: isCurrent) {
-                guard isCurrent, anchor.isAnchored || anchor.canAnchor else { return }
+                guard isCurrent, model.autoArmsReader, anchor.isAnchored || anchor.canAnchor else { return }
                 await listen()
             }
             // Core NFC reads for the foreground app only, and the sheet belongs to this page.

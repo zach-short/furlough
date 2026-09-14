@@ -194,6 +194,8 @@ struct AnchorTagsScreen: View {
             .emberCard()
             placementRow
                 .padding(.top, 10)
+            SectionLabel(text: "Scanner")
+            autoArmCard
         }
         .sheet(isPresented: $placing) { TagPlacementView() }
         .confirmationDialog(
@@ -249,6 +251,35 @@ struct AnchorTagsScreen: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    /// Whether arriving on the Anchor page arms the reader on its own, so holding a tag up is
+    /// the whole of it. Off by default: the reader row above and the guide's first step already
+    /// arm it by hand, and a scan sheet nobody asked for is the surprise this leaves off.
+    private var autoArmCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 12) {
+                Text("Open the scanner when Anchor opens")
+                    .emberBody(13)
+                    .foregroundStyle(Ember.cream)
+                Spacer(minLength: 8)
+                Toggle(
+                    "Open the scanner when Anchor opens",
+                    isOn: Binding(get: { model.autoArmsReader }, set: { model.setAutoArmsReader($0) })
+                )
+                .labelsHidden()
+                .tint(Ember.ember)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            Text("Off, arriving here waits for you to tap Hold a tag up. On, it starts listening the moment there is a tag to pair or an anchor to lift.")
+                .emberBody(11.5)
+                .foregroundStyle(Ember.muted)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 10)
+        }
+        .emberCard()
     }
 
     @ViewBuilder
