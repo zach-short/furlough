@@ -27,6 +27,89 @@ enum PickerCopy {
     static let companionFooter = "It gets the same hours as the site it belongs with. Nothing else here changes."
 }
 
+/// Apple's picker in a sheet of Furlough's own, so that it has a Cancel. The system
+/// `familyActivityPicker` modifier's sheet has only Done, its binding changes with every tick,
+/// and a swipe down ends it the same way Done does — so a picker waved away after a few ticks
+/// still went through (Zach, 2026-09-14). Here the picker edits a working copy: Done hands it
+/// back, Cancel and a swipe down throw it away.
+struct ActivityPickerSheet: View {
+    let header: String
+    let footer: String
+    let done: (FamilyActivitySelection) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var working: FamilyActivitySelection
+
+    init(
+        header: String,
+        footer: String,
+        initial: FamilyActivitySelection,
+        done: @escaping (FamilyActivitySelection) -> Void
+    ) {
+        self.header = header
+        self.footer = footer
+        self.done = done
+        _working = State(initialValue: initial)
+    }
+
+    var body: some View {
+        NavigationStack {
+            FamilyActivityPicker(headerText: header, footerText: footer, selection: $working)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { dismiss() }
+                            .tint(Ember.cream)
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") {
+                            done(working)
+                            dismiss()
+                        }
+                        .tint(Ember.cream)
+                    }
+                }
+        }
+    }
+}
+
+/// Presents `ActivityPickerSheet` and hands the answer back only once the sheet has fully
+/// gone, so what follows it (an editor push, an alert) never races the sheet on its way out.
+private struct ActivityPickerPresentation: ViewModifier {
+    @Binding var isPresented: Bool
+    let header: String
+    let footer: String
+    let initial: FamilyActivitySelection
+    let done: (FamilyActivitySelection) -> Void
+    /// Set by Done, read once the sheet is down. Cancel and a swipe down never set it.
+    @State private var answer: FamilyActivitySelection?
+
+    func body(content: Content) -> some View {
+        content.sheet(isPresented: $isPresented, onDismiss: {
+            guard let picked = answer else { return }
+            answer = nil
+            done(picked)
+        }) {
+            ActivityPickerSheet(header: header, footer: footer, initial: initial) { answer = $0 }
+        }
+    }
+}
+
+extension View {
+    /// Apple's picker with a real Cancel — see `ActivityPickerSheet`. `done` runs on Done only,
+    /// with what was picked, after the sheet is down; `initial` is what the sheet opens showing.
+    func activityPicker(
+        isPresented: Binding<Bool>,
+        header: String,
+        footer: String,
+        initial: FamilyActivitySelection,
+        done: @escaping (FamilyActivitySelection) -> Void
+    ) -> some View {
+        modifier(ActivityPickerPresentation(
+            isPresented: isPresented, header: header, footer: footer, initial: initial, done: done
+        ))
+    }
+}
+
 // Routes by choice and destination: Application goes straight to Apple's picker; Website lands
 // on AddSiteSheet (typed address) first, with AddWebsiteGuideView + picker as the path to a
 // daily budget. destination == .anchor shows what's already blocked, then the picker, landing
@@ -57,24 +140,22 @@ struct AddTargetsFlow: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .familyActivityPicker(
-                headerText: pickerHeader,
-                footerText: pickerFooter,
+            .activityPicker(
                 isPresented: $showPicker,
-                selection: $selection
-            )
-            .onChange(of: showPicker) { _, presented in
-                guard !presented else { return }
+                header: pickerHeader,
+                footer: pickerFooter,
+                initial: selection
+            ) { picked in
                 if pickerDestination == .anchor {
-                    model.setAnchorSelection(selection)
+                    model.setAnchorSelection(picked)
                     return
                 }
                 if let companion = pickerCompanion {
                     pickerCompanion = nil
-                    companionOutcome = model.addCompanionApps(selection, for: companion).message
+                    companionOutcome = model.addCompanionApps(picked, for: companion).message
                     return
                 }
-                let result = model.applyPicker(selection)
+                let result = model.applyPicker(picked)
                 if result.added > 0 || result.removalsScheduled > 0 {
                     outcome = result
                 }

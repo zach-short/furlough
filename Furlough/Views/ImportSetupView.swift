@@ -15,8 +15,9 @@ struct ImportSetupView: View {
 
     /// One per row of the file, in order; starts unanswered until Import is pressed.
     @State private var resolutions: [ImportResolution]
+    /// The row the picker was last opened for; read back when Done hands the answer over.
     @State private var picking: Int?
-    @State private var selection = FamilyActivitySelection()
+    @State private var showPicker = false
     @State private var review: ImportPlan?
     @State private var problem: String?
     /// The sheet stays up behind this alert and closes on OK, since part of an import may not
@@ -76,17 +77,15 @@ struct ImportSetupView: View {
             }
         }
         .presentationBackground(Ember.ground)
-        .familyActivityPicker(
-            headerText: picking.map { "Which app is \(matches[$0].name)?" } ?? "Which app is this?",
-            footerText: "Its schedule, budget and tier come from the file. Only which app it is is yours to say.",
-            isPresented: Binding(get: { picking != nil }, set: { if !$0 { picking = nil } }),
-            selection: $selection
-        )
-        .onChange(of: picking) { was, now in
-            // No single-select mode in Apple's picker, so the answer is read on the way out.
-            guard was != nil, now == nil else { return }
-            if let index = was { answer(index) }
-            selection = FamilyActivitySelection()
+        // Opens empty every time: each row is its own question. No single-select mode in
+        // Apple's picker, so the answer is judged on the way out.
+        .activityPicker(
+            isPresented: $showPicker,
+            header: picking.map { "Which app is \(matches[$0].name)?" } ?? "Which app is this?",
+            footer: "Its schedule, budget and tier come from the file. Only which app it is is yours to say.",
+            initial: FamilyActivitySelection()
+        ) { picked in
+            if let index = picking { answer(index, picked) }
         }
         .alert("Restore from a file", isPresented: Binding(get: { problem != nil }, set: { if !$0 { problem = nil } }), presenting: problem) { _ in
             Button("OK") { problem = nil }
@@ -159,7 +158,10 @@ struct ImportSetupView: View {
                         .emberBody(12, .semibold)
                         .foregroundStyle(Ember.muted)
                 } else {
-                    Button(exported.kind == .website ? "Choose the website" : "Choose the app") { picking = index }
+                    Button(exported.kind == .website ? "Choose the website" : "Choose the app") {
+                        picking = index
+                        showPicker = true
+                    }
                         .buttonStyle(.plain)
                         .emberBody(12.5, .bold)
                         .foregroundStyle(Ember.ember)
@@ -183,11 +185,11 @@ struct ImportSetupView: View {
         }
     }
 
-    private func answer(_ index: Int) {
+    private func answer(_ index: Int, _ picked: FamilyActivitySelection) {
         var kinds: [TargetKind] = []
-        kinds += selection.applicationTokens.map(TargetKind.application)
-        kinds += selection.webDomainTokens.map(TargetKind.webDomain)
-        kinds += selection.categoryTokens.map(TargetKind.category)
+        kinds += picked.applicationTokens.map(TargetKind.application)
+        kinds += picked.webDomainTokens.map(TargetKind.webDomain)
+        kinds += picked.categoryTokens.map(TargetKind.category)
         guard let chosen = kinds.first else { return }
         guard kinds.count == 1 else {
             problem = "Choose one app for \(matches[index].name). Each rule in the file belongs to one."

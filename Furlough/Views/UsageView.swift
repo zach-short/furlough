@@ -78,7 +78,6 @@ struct UsageView: View {
     @State private var destination = UsageDestination.both
     @State private var position = 1
     @State private var showPicker = false
-    @State private var selection = FamilyActivitySelection(includeEntireCategory: true)
     @State private var editing: EditingTarget?
 
     private struct EditingTarget: Identifiable, Hashable { let id: UUID }
@@ -144,18 +143,17 @@ struct UsageView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(item: $editing) { RuleEditorView(targetID: $0.id) }
         .task(id: model.authorization) { await load() }
-        .familyActivityPicker(
-            headerText: "Choose the app this card is about",
-            footerText: offer == .anchor
+        // Seeded with the existing selection: both destinations replace the whole list rather
+        // than add to it. Cancel hands nothing back, so a cancelled trip changes nothing.
+        .activityPicker(
+            isPresented: $showPicker,
+            header: "Choose the app this card is about",
+            footer: offer == .anchor
                 ? "Pick the one the card names. It goes on the Anchor's list."
                 : "Pick the one the card names. The next screen is where its rule is written.",
-            isPresented: $showPicker,
-            selection: $selection
+            initial: offer == .anchor ? model.anchorSelection : model.pickerSelection,
+            done: addPicked
         )
-        .onChange(of: showPicker) { _, presented in
-            guard !presented else { return }
-            addPicked()
-        }
     }
 
     // MARK: The page's own words
@@ -363,9 +361,7 @@ struct UsageView: View {
         }
     }
 
-    // Seeded with the existing selection: both destinations replace the whole list rather than add to it.
     private func openPicker() {
-        selection = offer == .anchor ? model.anchorSelection : model.pickerSelection
         showPicker = true
     }
 
@@ -388,14 +384,14 @@ struct UsageView: View {
         .disabled(!enabled)
     }
 
-    private func addPicked() {
+    private func addPicked(_ picked: FamilyActivitySelection) {
         // No editor afterwards for the anchor case: a held app has no hours to write.
         guard offer != .anchor else {
-            model.setAnchorSelection(selection)
+            model.setAnchorSelection(picked)
             return
         }
         let before = Set(model.state.config.targets.map(\.id))
-        let result = model.applyPicker(selection)
+        let result = model.applyPicker(picked)
         guard result.added > 0 else { return }
         model.reload()
         editing = model.state.config.targets.first { !before.contains($0.id) }.map { EditingTarget(id: $0.id) }
