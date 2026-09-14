@@ -57,7 +57,9 @@ struct HomeView: View {
                         }
                         .tint(Ember.pending)
                     }
-                    ToolbarSpacer(.fixed, placement: .topBarTrailing)
+                    if #available(iOS 26.0, *) {
+                        ToolbarSpacer(.fixed, placement: .topBarTrailing)
+                    }
                 }
                 // The + targets whichever page it's on, unless Settings overrides the
                 // destination (see `addDestination`). Anchor add skips the App/Website
@@ -128,7 +130,7 @@ struct HalfTabBar: View {
             }
         }
         .padding(5)
-        .glassEffect(.regular, in: .capsule)
+        .emberGlass(in: .capsule)
     }
 }
 
@@ -321,9 +323,10 @@ struct HeroPager: View {
     private var pages: [Target] { groups.ordered }
     private var landing: UUID? { groups.open.first?.target.id ?? pages.first?.id }
 
-    /// One entry per scroll position: the real pages, plus (when there's more than one) a
-    /// trailing duplicate of the first page so swiping right past the last one lands on
-    /// something — its id is snapped back to the real first page immediately after.
+    /// One entry per scroll position: the real pages, bracketed (when there's more than one)
+    /// by a duplicate of the last page before the first and a duplicate of the first page
+    /// after the last, so swiping past either end lands on something instead of stopping
+    /// dead — each duplicate's id is snapped to the real page it mirrors immediately after.
     private struct LoopPage: Identifiable {
         let id: UUID
         let target: Target
@@ -331,15 +334,35 @@ struct HeroPager: View {
 
     private var loopPages: [LoopPage] {
         let real = pages.map { LoopPage(id: $0.id, target: $0) }
-        guard pages.count > 1, let first = pages.first else { return real }
-        return real + [LoopPage(id: Self.loopSentinelID(for: first.id), target: first)]
+        guard pages.count > 1, let first = pages.first, let last = pages.last else { return real }
+        let leading = LoopPage(id: Self.loopSentinelID(for: last.id), target: last)
+        let trailing = LoopPage(id: Self.loopSentinelID(for: first.id), target: first)
+        return [leading] + real + [trailing]
     }
 
-    /// A stable id, distinct from any real target id, for the trailing loop duplicate of `id`.
+    /// A stable id, distinct from any real target id, for the loop duplicate of `id`.
     private static func loopSentinelID(for id: UUID) -> UUID {
         var bytes = id.uuid
         bytes.0 ^= 0xFF
         return UUID(uuid: bytes)
+    }
+
+    /// Maps a scroll position back to the real page it should read as — a sentinel duplicate
+    /// reads as the page it mirrors — so the indicator strip stays lit on the matching
+    /// hourglass through the whole wrap instead of blanking out while `featured` briefly
+    /// holds a sentinel id.
+    private static func displayID(for id: UUID?, pages: [Target]) -> UUID? {
+        guard let id, pages.count > 1, let first = pages.first, let last = pages.last else { return id }
+        if id == loopSentinelID(for: first.id) { return first.id }
+        if id == loopSentinelID(for: last.id) { return last.id }
+        return id
+    }
+
+    private var displayFeatured: Binding<UUID?> {
+        Binding(
+            get: { Self.displayID(for: featured, pages: pages) },
+            set: { featured = $0 }
+        )
     }
 
     var body: some View {
@@ -368,7 +391,7 @@ struct HeroPager: View {
                 .scrollClipDisabled()
                 .clipShape(SpillingRect(spill: HeroPage.glowSpill))
                 .padding(.horizontal, -16)
-                HeroIndicator(pages: pages, glasses: glasses, featured: $featured)
+                HeroIndicator(pages: pages, glasses: glasses, featured: displayFeatured)
             }
             .onAppear {
                 if !pages.contains(where: { $0.id == featured }) { featured = landing }
@@ -377,13 +400,21 @@ struct HeroPager: View {
                 if let current = featured, !ids.contains(current) { featured = landing }
             }
             .onChange(of: featured) { _, new in
-                guard let new, let first = pages.first, pages.count > 1,
-                      new == Self.loopSentinelID(for: first.id) else { return }
-                // Landed on the trailing loop duplicate: snap to the real first page without
+                guard let new, pages.count > 1, let first = pages.first, let last = pages.last else { return }
+                let landed: UUID?
+                if new == Self.loopSentinelID(for: first.id) {
+                    landed = first.id
+                } else if new == Self.loopSentinelID(for: last.id) {
+                    landed = last.id
+                } else {
+                    landed = nil
+                }
+                guard let landed else { return }
+                // Landed on a loop duplicate: snap to the real page it mirrors without
                 // animation so the wrap reads as continuous instead of a visible rewind.
                 var transaction = Transaction()
                 transaction.disablesAnimations = true
-                withTransaction(transaction) { featured = first.id }
+                withTransaction(transaction) { featured = landed }
             }
         }
     }
