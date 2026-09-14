@@ -190,6 +190,50 @@ The master stays in `build/` (gitignored). The deployed 19.4 MiB copy is committ
 `site/public/review/`, because wrangler deploys what is built from `public/` and the source
 `.MOV` is not in the repo — without it a fresh clone could not rebuild the site as served.
 
+## The Resolution Center reply
+
+Apple asked for a reply to their message on submission `d1fe0e5e-be41-4aed-9377-7af5aaad2398`,
+not a fresh thread. Resolution Center has no API, so this is pasted by hand. Kept here as the
+record of what was said.
+
+```
+Thank you. The demo video is now linked in App Review Information, and here:
+
+https://furloughapp.com/review/anchor
+
+It is one continuous take, 3:15, recorded on a physical iPhone running the build
+attached to this version (1.2.0, build 202609140523). It is not a screen recording,
+and nothing is simulated — Family Controls does not function in the Simulator.
+
+Against the four points in your message:
+
+1. The current version in use on a physical device: the whole video.
+
+2. The initial pairing process: at 1:29. No tag is paired when the video begins, so
+   this is a first pairing, carried out from the Anchor's own setup guide.
+
+3. The entire workflow: pairing, choosing what the Anchor holds, dropping it, a
+   blocked app showing its shield at 2:20, a second unpaired tag being refused at
+   2:45, and the paired tag releasing the anchor so the app opens normally again at
+   3:01.
+
+4. Both the hardware and the app in the same frame: the tag is in shot and in contact
+   with the iPhone at every scan. It is held against the front of the device on
+   purpose so that it stays visible throughout rather than disappearing behind it.
+
+One clarification on the "designated hardware". There is none. The tag in the video
+is an ordinary NTAG sticker from a pack of fifty bought online for about ten dollars.
+No hardware ships with Furlough, none is sold with it, and the app is not paired to
+any particular product — any NFC tag works, including one the person already owns.
+Furlough reads a tag's hardware identifier only, in the foreground, on the person's
+own action; it never writes to a tag and never reads one in the background.
+
+The Anchor is also optional. Every other feature works without a tag, and the setup
+step can be skipped.
+
+Happy to provide anything else that would help.
+```
+
 ## After
 
 Put the URL in `design/store/LISTING.md` over the placeholder and check it took:

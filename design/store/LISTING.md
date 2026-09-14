@@ -452,7 +452,7 @@ https://furloughapp.com/review/anchor
 
 One take on a physical iPhone, the tag and the screen in the same frame: the tag paired at 1:29, the shield over a blocked app at 2:20, and the tag lifting it at 3:01.
 
-The tag is an ordinary NTAG sticker out of a pack of ten. No hardware ships or is sold with this app, and it is not paired to any particular product. Furlough reads a tag's hardware identifier, in the foreground, on the person's own action, and never writes to a tag or reads one in the background.
+The tag is an ordinary NTAG sticker out of a pack of fifty. No hardware ships or is sold with this app, and it is not paired to any particular product. Furlough reads a tag's hardware identifier, in the foreground, on the person's own action, and never writes to a tag or reads one in the background.
 
 BEFORE YOU START
 
