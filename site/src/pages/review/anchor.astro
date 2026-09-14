@@ -1,0 +1,107 @@
+---
+import Base from '../../layouts/Base.astro';
+
+// Unlisted on purpose: this page exists for App Review, is linked only from the App Review
+// Information notes, and is in no nav and no sitemap. It stays reachable without a sign-in,
+// which is the one thing Apple's request actually requires of the host.
+const marks = [
+  ['1:29', 'The tag is held to the top of the iPhone and paired, tag and screen in the same frame.'],
+  ['2:20', 'A blocked app shows the shield: “Instagram is anchored · Unanchor with your tag in Furlough.”'],
+  ['3:01', 'The same tag lifts the anchor and the app opens normally again.'],
+];
+---
+
+<Base
+  title="Demo video · the Anchor and its NFC tag"
+  description="A demo for App Review: pairing an ordinary NFC tag with Furlough, anchoring apps, and releasing them with the tag."
+>
+  <meta slot="head" name="robots" content="noindex, nofollow" />
+
+  <section class="wrap page">
+    <header class="head" data-reveal>
+      <div class="eyebrow amber">For App Review</div>
+      <h1 class="display">The Anchor, and the tag that lifts it.</h1>
+      <p class="sub">Submission 1.2.0 · recorded on a physical iPhone</p>
+    </header>
+
+    <article class="card prose body" data-reveal style="--d: .1s">
+      <p>
+        One continuous take, filmed so that the tag and the iPhone's screen are visible together
+        throughout. It covers the initial pairing and the whole workflow: pairing a tag, choosing
+        what the Anchor holds, dropping it, a blocked app showing its shield, and the tag
+        releasing it.
+      </p>
+
+      <div class="player">
+        <video controls playsinline preload="metadata" poster="/review/anchor-poster.jpg">
+          <source src="/review/anchor.mp4" type="video/mp4" />
+          <p>Your browser cannot play this video. <a href="/review/anchor.mp4">Download it instead</a>.</p>
+        </video>
+      </div>
+
+      <h2>Where to look</h2>
+      <dl class="marks">
+        {marks.map(([at, what]) => (
+          <>
+            <dt>{at}</dt>
+            <dd>{what}</dd>
+          </>
+        ))}
+      </dl>
+
+      <div class="note">
+        <p>
+          <strong>The tag is an ordinary NFC sticker.</strong> The one in the video came from a
+          pack bought online for about ten dollars. No hardware ships with Furlough, none is sold
+          with it, and the app is not paired to any particular product — it reads a tag's hardware
+          identifier, in the foreground, on the person's own action, and never writes to one.
+        </p>
+        <p>
+          The Anchor is optional. Everything else in Furlough works without a tag, and the feature
+          can be skipped entirely.
+        </p>
+      </div>
+    </article>
+  </section>
+</Base>
+
+<style>
+  .player {
+    margin: 1.6rem 0;
+    display: flex;
+    justify-content: center;
+  }
+  .player video {
+    width: 100%;
+    max-width: 380px;
+    max-height: 76vh;
+    border-radius: 18px;
+    border: 1px solid rgba(245, 239, 230, 0.12);
+    background: #0a0908;
+    display: block;
+  }
+  .marks {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.5rem 1rem;
+    margin: 0.5rem 0 0;
+  }
+  .marks dt {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    white-space: nowrap;
+    opacity: 0.85;
+  }
+  .marks dd {
+    margin: 0;
+  }
+  @media (max-width: 460px) {
+    .marks {
+      grid-template-columns: 1fr;
+      gap: 0.15rem;
+    }
+    .marks dd {
+      margin-bottom: 0.6rem;
+    }
+  }
+</style>

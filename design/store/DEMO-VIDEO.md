@@ -171,13 +171,28 @@ A quiet voiceover plus burnt-in captions is the belt-and-braces version, and it 
   `design/anchor-puck/`, say on camera that it is a 3D-printed case around the same sticker —
   otherwise it reads as the "designated hardware" the rejection was about.
 
+## Where it is hosted
+
+**Live at <https://furloughapp.com/review/anchor> since 2026-09-14.** The page is
+`site/src/pages/review/anchor.astro`: the video, the three timestamps above, and the paragraph
+saying the tag is a commodity sticker. It carries `noindex, nofollow`, sits in no nav and no
+sitemap, and needs no sign-in — which is the one thing Apple's request actually demands of a host.
+
+**Cloudflare Pages refuses any single file over 25 MiB**, and the captioned master is 86 MiB. It
+ships re-encoded at `-crf 31 -preset slow`, audio down to 64 kbps mono, which lands at **19.4 MiB**
+with the phone's screen still legible — the "Pair this tag?" alert, "Kitchen drawer" and both
+buttons were compared against the master frame by frame before choosing that number. Do not push
+the quality lower without checking those again; the screen being readable is the point of the
+video. If it ever will not fit, put the file in R2 and leave the page on Pages rather than
+degrade it further.
+
+The master stays in `build/` (gitignored). The deployed 19.4 MiB copy is committed under
+`site/public/review/`, because wrangler deploys what is built from `public/` and the source
+`.MOV` is not in the repo — without it a fresh clone could not rebuild the site as served.
+
 ## After
 
-Host it where a reviewer can open it with no account: `furloughapp.com/review/anchor` on the
-existing Cloudflare Pages deploy, or an unlisted YouTube link. Not Drive, not iCloud, nothing
-behind a sign-in.
-
-Then put the URL in `design/store/LISTING.md` over the placeholder and check it took:
+Put the URL in `design/store/LISTING.md` over the placeholder and check it took:
 
 ```bash
 grep -n "PASTE THE VIDEO URL" design/store/LISTING.md

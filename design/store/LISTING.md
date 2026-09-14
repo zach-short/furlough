@@ -448,7 +448,7 @@ A self-restriction tool: one person sets rules for the apps on their own iPhone.
 
 DEMO VIDEO OF THE NFC TAG
 
-[PASTE THE VIDEO URL HERE BEFORE SUBMITTING]
+https://furloughapp.com/review/anchor
 
 One take on a physical iPhone, the tag and the screen in the same frame: the tag paired at 1:29, the shield over a blocked app at 2:20, and the tag lifting it at 3:01.
 
