@@ -420,6 +420,8 @@ const legend = [
   .appicon { width: 96px; height: 96px; border-radius: 22%; flex: 0 0 auto; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), 0 0 60px rgba(229, 86, 61, 0.25); }
   .cta .lede { margin-top: 10px; font-size: 16.5px; }
   .cactions { margin-top: 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  /* On a Mac, lead with the Mac download instead of the App Store button. */
+  :global(html.is-mac) .cactions > :nth-child(2) { order: -1; }
   .cta .fine { font-size: 13px; margin-top: 14px; }
   @media (max-width: 640px) { .cta { flex-direction: column; align-items: flex-start; padding: 26px 22px; } }
 </style>

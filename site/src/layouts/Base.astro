@@ -39,6 +39,16 @@ const canonical = origin ? `${origin}${Astro.url.pathname}` : undefined;
     <meta name="twitter:card" content="summary" />
     <link rel="preload" href="/fonts/BricolageGrotesque_72pt-Bold.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/Onest-Regular.woff2" as="font" type="font/woff2" crossorigin />
+    <script is:inline>
+      // Runs before the body paints, so the download buttons never flash in the wrong order.
+      // iPadOS also reports "Macintosh" in its UA, so it's only a Mac if there's no touch input.
+      try {
+        var ua = navigator.userAgent;
+        if (/Macintosh/.test(ua) && !/iPhone|iPad|iPod/.test(ua) && (navigator.maxTouchPoints || 0) <= 1) {
+          document.documentElement.classList.add('is-mac');
+        }
+      } catch (e) {}
+    </script>
     <slot name="head" />
   </head>
   <body>
