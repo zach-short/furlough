@@ -10,7 +10,7 @@ struct MacAnchorPane: View {
     @State private var message: String?
     @State private var asking = false
 
-    private enum Screen: String, Identifiable { case scope, phone; var id: String { rawValue } }
+    private enum Screen: String, Identifiable { case schedule, scope, phone; var id: String { rawValue } }
 
     private var anchor: AnchorProfile { model.state.config.anchor }
     private var isHolding: Bool { anchor.isHolding(at: model.now) }
@@ -34,6 +34,7 @@ struct MacAnchorPane: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         switch screen {
+                        case .schedule: MacAnchorScheduleScreen(onBack: { screen = nil })
                         case .scope: MacAnchorScopeScreen(onBack: { screen = nil })
                         case .phone: MacAnchorPhoneScreen(onBack: { screen = nil }, onExplainDevices: onExplainDevices)
                         case nil: setUpPane
@@ -156,6 +157,8 @@ struct MacAnchorPane: View {
 
     private var settingsCard: some View {
         VStack(spacing: 0) {
+            settingsRow(title: "Schedule", detail: scheduleSummary) { screen = .schedule }
+            CardDivider()
             settingsRow(title: "Scope", detail: scopeSummary) { screen = .scope }
             CardDivider()
             settingsRow(title: "Devices", detail: phoneSummary, dot: phoneDot) { screen = .phone }
@@ -189,6 +192,16 @@ struct MacAnchorPane: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    /// "10:00 PM weekdays · lifts 7:00 AM". More than one drop time is a count: a row has space
+    /// for a fact, and the screen behind it has space for the list.
+    private var scheduleSummary: String {
+        let all = anchor.schedules.sorted { ($0.minuteOfDay, $0.days.rawValue) < ($1.minuteOfDay, $1.days.rawValue) }
+        guard let first = all.first else { return "No drop times" }
+        guard all.count == 1 else { return "\(all.count) drop times" }
+        let lift = first.liftMinuteOfDay.map { "lifts \(TimeFormat.minute($0))" } ?? "until the tag"
+        return "\(TimeFormat.minute(first.minuteOfDay)) \(TimeFormat.daysInline(first.days)) · \(lift)"
     }
 
     private var scopeSummary: String {
@@ -253,6 +266,272 @@ private struct MacAnchorScreen<Content: View>: View {
             content
                 .padding(.top, 10)
         }
+    }
+}
+
+private struct MacAnchorScheduleScreen: View {
+    @Environment(MacModel.self) private var model
+    let onBack: () -> Void
+    @State private var editing = false
+
+    private var anchor: AnchorProfile { model.state.config.anchor }
+    private var isHolding: Bool { anchor.isHolding(at: model.now) }
+    private var sorted: [AnchorSchedule] {
+        anchor.schedules.sorted { ($0.minuteOfDay, $0.days.rawValue) < ($1.minuteOfDay, $1.days.rawValue) }
+    }
+
+    var body: some View {
+        MacAnchorScreen(title: "Schedule", lead: lead, onBack: onBack) {
+            VStack(alignment: .leading, spacing: 0) {
+                if anchor.schedules.isEmpty {
+                    Text("No scheduled drops.")
+                        .emberBody(13)
+                        .foregroundStyle(Ember.muted)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 11)
+                } else {
+                    ForEach(Array(sorted.enumerated()), id: \.element.id) { index, schedule in
+                        if index > 0 { CardDivider() }
+                        row(schedule)
+                    }
+                }
+                if !isHolding {
+                    CardDivider()
+                    Button {
+                        editing = true
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: anchor.schedules.isEmpty ? "plus" : "clock")
+                                .font(.system(size: 12, weight: .bold))
+                            Text(anchor.schedules.isEmpty ? "Add a drop time" : "Change the schedule")
+                                .emberBody(13, .semibold)
+                        }
+                        .foregroundStyle(Ember.ember)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 11)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .emberCard()
+        }
+        .sheet(isPresented: $editing) {
+            MacAnchorScheduleSheet(schedules: anchor.schedules)
+        }
+    }
+
+    private func row(_ schedule: AnchorSchedule) -> some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(TimeFormat.minute(schedule.minuteOfDay)) · \(TimeFormat.days(schedule.days))")
+                    .emberBody(13)
+                    .monospacedDigit()
+                    .foregroundStyle(Ember.cream)
+                Text(schedule.liftMinuteOfDay.map { "Lifts at \(TimeFormat.minute($0))" } ?? "Until the tag")
+                    .emberBody(11.5)
+                    .foregroundStyle(Ember.muted)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+    }
+
+    private var lead: String {
+        if isHolding { return "The anchor is down. Scan your tag on your iPhone to change the schedule." }
+        let rule = "Adding a time applies at once. Removing or shortening one waits out the delay, and can be cancelled from Pending until then."
+        guard let next = anchor.schedules.nextDrop(after: model.now) else {
+            return "The anchor drops by itself at each time, on its days. \(rule)"
+        }
+        return "Next drop \(nextDropWords(next)). \(rule)"
+    }
+
+    /// "today at 10:00 PM", "tomorrow at 10:00 PM", "Monday at 10:00 PM".
+    private func nextDropWords(_ date: Date) -> String {
+        let calendar = Calendar.current
+        let time = TimeFormat.clock(date)
+        if calendar.isDateInToday(date) { return "today at \(time)" }
+        if calendar.isDateInTomorrow(date) { return "tomorrow at \(time)" }
+        return "\(date.formatted(.dateTime.weekday(.wide))) at \(time)"
+    }
+}
+
+/// Edits the anchor's drop times as one draft with one Save; the whole set is classified at
+/// once, so a looser change queues behind the delay while a tightening lands now.
+private struct MacAnchorScheduleSheet: View {
+    @Environment(MacModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    @State private var drafts: [AnchorSchedule]
+    @State private var message: String?
+    private let original: [AnchorSchedule]
+
+    init(schedules: [AnchorSchedule]) {
+        original = schedules
+        _drafts = State(initialValue: schedules)
+    }
+
+    private var validationError: String? {
+        if drafts.contains(where: { $0.days.isEmpty }) { return "Each drop needs at least one day." }
+        if drafts.contains(where: { $0.liftMinuteOfDay == $0.minuteOfDay }) { return "A lift has to come after its drop." }
+        return ActivityLimit.reason(schedules: drafts, in: model.state)
+    }
+
+    private var canSave: Bool { drafts != original && validationError == nil }
+
+    var body: some View {
+        SheetFrame(title: "Schedule", width: 480, height: 560) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("At each time, on its days, the anchor drops by itself. It holds until the tag, or until the lift you give it.")
+                    .emberBody(13)
+                    .foregroundStyle(Ember.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.bottom, 12)
+                ScrollView {
+                    VStack(spacing: 0) {
+                        if drafts.isEmpty {
+                            Text("No drop times yet.")
+                                .emberBody(13)
+                                .foregroundStyle(Ember.muted)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 11)
+                        }
+                        ForEach(drafts) { draft in
+                            MacScheduleDraftRow(schedule: binding(for: draft)) {
+                                withAnimation(.snappy) { drafts.removeAll { $0.id == draft.id } }
+                            }
+                            CardDivider()
+                        }
+                        Button {
+                            withAnimation(.snappy) {
+                                drafts.append(AnchorSchedule(minuteOfDay: 22 * 60, days: .weekdays))
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 12, weight: .bold))
+                                Text("Add a drop time")
+                                    .emberBody(13, .semibold)
+                            }
+                            .foregroundStyle(Ember.ember)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 11)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .emberCard()
+                }
+                .scrollBounceBehavior(.basedOnSize)
+                if let validationError {
+                    Text(validationError)
+                        .emberBody(12)
+                        .foregroundStyle(Ember.ember)
+                        .padding(.horizontal, 8)
+                        .padding(.top, 8)
+                }
+                ProminentButton(title: "Save") { save() }
+                    .disabled(!canSave)
+                    .keyboardShortcut(.defaultAction)
+                    .padding(.top, 12)
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 20)
+        }
+        .alert("Schedule", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
+            Button("OK") {
+                message = nil
+                dismiss()
+            }
+        } message: {
+            Text(message ?? "")
+        }
+    }
+
+    /// By id, not index: a removed row's binding could otherwise briefly go out of range.
+    private func binding(for draft: AnchorSchedule) -> Binding<AnchorSchedule> {
+        Binding(
+            get: { drafts.first { $0.id == draft.id } ?? draft },
+            set: { edited in
+                guard let index = drafts.firstIndex(where: { $0.id == draft.id }) else { return }
+                drafts[index] = edited
+            }
+        )
+    }
+
+    private func save() {
+        switch model.setAnchorSchedules(drafts) {
+        case .unchanged, .appliedNow:
+            dismiss()
+        case .scheduled(let date):
+            message = ProposalResult.scheduled(date).message
+        }
+    }
+}
+
+/// One drop time in the schedule editor: when, on which days, and whether it lifts by itself.
+private struct MacScheduleDraftRow: View {
+    @Binding var schedule: AnchorSchedule
+    let onRemove: () -> Void
+
+    private static let defaultLift = 7 * 60
+
+    private var liftsBySelf: Binding<Bool> {
+        Binding(
+            get: { schedule.liftMinuteOfDay != nil },
+            set: { on in schedule.liftMinuteOfDay = on ? (schedule.liftMinuteOfDay ?? Self.defaultLift) : nil }
+        )
+    }
+
+    private var liftMinute: Binding<Int> {
+        Binding(
+            get: { schedule.liftMinuteOfDay ?? Self.defaultLift },
+            set: { schedule.liftMinuteOfDay = $0 }
+        )
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text("Drops at")
+                    .emberBody(12)
+                    .foregroundStyle(Ember.muted)
+                TimeField(minute: $schedule.minuteOfDay, allowsMidnight: false)
+                Spacer(minLength: 8)
+                Button(action: onRemove) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Ember.faint)
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Remove this drop time")
+            }
+            DayStrip(days: $schedule.days)
+            HStack(spacing: 8) {
+                Text("Lifts")
+                    .emberBody(12)
+                    .foregroundStyle(Ember.muted)
+                if schedule.liftMinuteOfDay != nil {
+                    TimeField(minute: liftMinute, allowsMidnight: true)
+                } else {
+                    Text("with the tag")
+                        .emberBody(12, .semibold)
+                        .foregroundStyle(Ember.cream)
+                }
+                Spacer(minLength: 8)
+                Toggle("Lifts by itself", isOn: liftsBySelf.animation(.snappy))
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .tint(Ember.ember)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
     }
 }
 

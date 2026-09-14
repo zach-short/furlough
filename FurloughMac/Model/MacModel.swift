@@ -415,6 +415,46 @@ final class MacModel {
         enforce(reason: "anchor scope")
     }
 
+    /// Replaces anchor drop schedules. Tightening (more/longer) applies now; loosening queues
+    /// behind `anchorDelayHours`. Re-saving the current schedule cancels any queued change.
+    func setAnchorSchedules(_ schedules: [AnchorSchedule]) -> ProposalResult {
+        var current = SharedStore.load()
+        let now = current.now
+        Policy.liftExpiredAnchor(&current.config, now: now)
+        guard !current.config.anchor.isAnchored else { return .unchanged }
+        let before = current.pending.count
+        current.pending.removeAll { if case .setAnchorSchedules = $0.kind { return true }; return false }
+        let dropped = before - current.pending.count
+        guard schedules != current.config.anchor.schedules else {
+            guard dropped > 0 else { return .unchanged }
+            // True cancellation (vs. replacing a queued value) — counted the same way
+            // cancelPending does.
+            Record.noteCancelled(dropped, in: &current, now: now)
+            SharedStore.save(current)
+            SharedStore.log("anchor schedule: cancelled the queued change")
+            enforce(reason: "anchor schedule")
+            return .unchanged
+        }
+        let result: ProposalResult
+        switch Policy.classify(newSchedules: schedules, against: current.config.anchor.schedules) {
+        case .tightening:
+            current.config.anchor.schedules = schedules
+            result = .appliedNow
+        case .loosening:
+            let effectiveAt = now.addingTimeInterval(TimeInterval(current.config.anchorDelayHours) * 3600)
+            Record.queue(
+                PendingChange(kind: .setAnchorSchedules(schedules), effectiveAt: effectiveAt),
+                in: &current,
+                now: now
+            )
+            result = .scheduled(effectiveAt)
+        }
+        SharedStore.save(current)
+        SharedStore.log("anchor schedule: \(TimeFormat.anchorSchedules(schedules)) (\(result == .appliedNow ? "now" : "queued"))")
+        enforce(reason: "anchor schedule")
+        return result
+    }
+
     func finishOnboarding() {
         SharedStore.defaults.set(true, forKey: Self.onboardedKey)
         isOnboarded = true

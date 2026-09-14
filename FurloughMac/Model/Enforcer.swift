@@ -21,6 +21,10 @@ final class Enforcer {
     private var observers: [any NSObjectProtocol] = []
     private var ledger = UsageLedger.load()
     private var lastTick = Date.now
+    /// No DeviceActivity callback on Mac to fire exactly at a drop minute; each tick instead
+    /// checks whether a scheduled drop fell between this mark and now, which also catches one
+    /// missed while the Mac was asleep.
+    private var lastScheduleCheck = Date.now
     private var grace = QuitGrace()
     /// Debounces repeated shield flashes from a relaunch loop.
     private var lastShield: [UUID: Date] = [:]
@@ -118,6 +122,7 @@ final class Enforcer {
         if Policy.applyDuePending(&state, now: now) {
             SharedStore.log("applied due pending changes")
         }
+        checkScheduledDrop(&state, now: now)
         if Policy.liftExpiredAnchor(&state.config, now: now) {
             SharedStore.log("a timed anchor's time had passed; lifted it")
         }
@@ -126,6 +131,20 @@ final class Enforcer {
             SharedStore.save(state)
             onChange?()
         }
+    }
+
+    /// Applies a schedule's drop, if one fell in the window since the last tick.
+    /// `Policy.scheduledDrop` is idempotent, matching the phone's monitor extension behavior.
+    private func checkScheduledDrop(_ state: inout SharedState, now: Date) {
+        defer { lastScheduleCheck = now }
+        guard let due = state.config.anchor.schedules.nextDrop(after: lastScheduleCheck), due <= now,
+              Policy.scheduledDrop(&state.config, minute: Policy.minuteOfDay(due), now: now) != nil
+        else { return }
+        let dropped = state.config.anchor
+        let lift = dropped.until.map { " until \(TimeFormat.clock($0))" } ?? " until you scan your tag"
+        SharedStore.log("dropped anchor on schedule: \(dropped.heldDescription)\(lift)")
+        Notifier.post(id: "anchor-dropped", title: "Anchor dropped", body: "\(dropped.heldDescription) locked\(lift).")
+        AnchorSync.publish(dropped, origin: .drop, now: now)
     }
 
     @discardableResult
