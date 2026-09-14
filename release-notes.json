@@ -79,6 +79,30 @@
           "platform": "mac",
           "title": "An update no longer switches the web filter off",
           "detail": "A system extension belongs to the copy of Furlough that installed it, so replacing the app with an update — which is how every Mac build lands — left macOS holding the old bundle's copy: activated and enabled by its own account, filtering nothing, with no way for Furlough to tell that apart from a filter nobody had installed yet. Furlough now recognizes its own extension was replaced and reinstalls this build's without being asked."
+        },
+        {
+          "kind": "better",
+          "platform": "iphone",
+          "title": "Rules and the Anchor switch from the bottom",
+          "detail": "The toggle between them lived in the toolbar as a small pill. It's a floating bar across the bottom of the page now, an icon over a label on each side, with the current half picked out in amber."
+        },
+        {
+          "kind": "better",
+          "platform": "iphone",
+          "title": "The hero carousel loops back to the first app",
+          "detail": "Swiping past the last app on Rules' hero used to stop there. One more swipe left now wraps around to the first."
+        },
+        {
+          "kind": "new",
+          "platform": "iphone",
+          "title": "A second swipe left on the Anchor opens the tag reader",
+          "detail": "Anchor sits at the end of the row, so a further swipe had nowhere to go. It now arms Apple's NFC sheet directly, the same one the reader row and the guide's first step already open by hand."
+        },
+        {
+          "kind": "fixed",
+          "platform": "iphone",
+          "title": "Furlough can no longer end up in its own shield",
+          "detail": "A category rule, or the Anchor set to hold everything except a list, could in principle sweep Furlough in with everything else — locking away the one app that could undo it. Policy.decide now refuses to shield it regardless of how it got there, and the Anchor won't accept it onto its list to begin with."
         }
       ]
     },
