@@ -65,6 +65,19 @@ struct AnchorPage: View {
             .onChange(of: scenePhase) { _, phase in
                 if phase == .background { model.stopReadingTags() }
             }
+            // Anchor is the last page, so a further swipe left has nowhere to go in the
+            // TabView; simultaneous so it doesn't steal the page-back swipe toward Rules.
+            // Rules -> swipe left -> Anchor -> swipe left -> the NFC sheet.
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 40)
+                    .onEnded { value in
+                        guard isCurrent, !listening, TagScanner.isAvailable else { return }
+                        let horizontal = value.translation.width
+                        let vertical = value.translation.height
+                        guard horizontal < -60, abs(horizontal) > abs(vertical) * 1.5 else { return }
+                        Task { await listen() }
+                    }
+            )
         )
     }
 
