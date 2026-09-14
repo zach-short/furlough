@@ -6,7 +6,7 @@
       "date": "2026-09-12",
       "channel": "unreleased",
       "headline": "Settings became a menu.",
-      "lead": "Settings was every setting at once, which made the two things people come here to change as hard to find as the five they do not. It is a menu now. Beside it, the last of the two-halves work on the usage screen, and the pass that made it feel as quick as it always was. Most of this went out on 11 September inside the final 1.1 builds; this is that batch given the number it should have had.",
+      "lead": "Settings was every setting at once, which made the two things people come here to change as hard to find as the five they do not. It is a menu now. Beside it, the last of the two-halves work on the usage screen, and the pass that made it feel as quick as it always was. Most of this went out on 11 September inside the final 1.1 builds; this is that batch given the number it should have had. It also drops the floor to iOS 18 and macOS 15, so a device does not need this year's OS just to install it.",
       "changes": [
         {
           "kind": "better",
@@ -89,8 +89,8 @@
         {
           "kind": "better",
           "platform": "iphone",
-          "title": "The hero carousel loops back to the first app",
-          "detail": "Swiping past the last app on Rules' hero used to stop there. One more swipe left now wraps around to the first."
+          "title": "The hero carousel loops in both directions",
+          "detail": "Swiping past the last app on Rules' hero used to stop there, and swiping back past the first did too. Both ends wrap now, forward to the first app and back to the last."
         },
         {
           "kind": "new",
@@ -103,6 +103,12 @@
           "platform": "iphone",
           "title": "Furlough can no longer end up in its own shield",
           "detail": "A category rule, or the Anchor set to hold everything except a list, could in principle sweep Furlough in with everything else — locking away the one app that could undo it. Policy.decide now refuses to shield it regardless of how it got there, and the Anchor won't accept it onto its list to begin with."
+        },
+        {
+          "kind": "new",
+          "platform": "both",
+          "title": "Furlough now installs on iOS 18 and macOS 15, not only this year's release",
+          "detail": "The floor was iOS 26 and macOS 26, so a device had to already be on this year's OS to install Furlough at all. Both floors are 18 and 15 now. Below 26, glass buttons, panels and the half switcher draw a hand-built stand-in for Liquid Glass instead of the real material, so they read the same without needing it. One thing does step back on the older systems: a Live Activity that would announce a window ahead of time now only appears once the window opens."
         }
       ]
     },
