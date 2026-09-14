@@ -281,9 +281,8 @@ struct ApplyRuleSheet: View {
                             selected = allChosen ? [] : Set(candidates.map(\.id))
                         }
                     }
-                    .buttonStyle(.glass)
+                    .emberGlassButton(tint: Ember.cream)
                     .controlSize(.small)
-                    .tint(Ember.cream)
                 }
                 .padding(.bottom, 8)
                 ScrollView {

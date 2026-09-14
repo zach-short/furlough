@@ -99,7 +99,6 @@ struct GuideButton: View {
             .foregroundStyle(Ember.cream)
             .padding(.horizontal, 4)
         }
-        .buttonStyle(.glassProminent)
-        .tint(Ember.ember)
+        .emberGlassButton(prominent: true, tint: Ember.ember)
     }
 }

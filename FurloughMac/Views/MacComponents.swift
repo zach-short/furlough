@@ -18,8 +18,7 @@ struct ProminentButton: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 6)
         }
-        .buttonStyle(.glassProminent)
-        .tint(Ember.ember)
+        .emberGlassButton(prominent: true, tint: Ember.ember)
         .controlSize(.large)
     }
 }
@@ -215,8 +214,7 @@ struct SheetFrame<Content: View>: View {
                         .foregroundStyle(Ember.cream)
                     Spacer()
                     Button("Done") { dismiss() }
-                        .buttonStyle(.glass)
-                        .tint(Ember.cream)
+                        .emberGlassButton(tint: Ember.cream)
                         .keyboardShortcut(.cancelAction)
                 }
                 .padding(.horizontal, 20)
@@ -296,16 +294,14 @@ struct FilterDirections: View {
                     perform(action)
                     if !isLast { index += 1 }
                 }
-                .buttonStyle(.glassProminent)
-                .tint(Ember.ember)
+                .emberGlassButton(prominent: true, tint: Ember.ember)
             } else if !isLast {
                 Button("Next") { index += 1 }
-                    .buttonStyle(.glassProminent)
-                    .tint(Ember.ember)
+                    .emberGlassButton(prominent: true, tint: Ember.ember)
             }
             if index > 0 {
                 Button("Back") { index -= 1 }
-                    .buttonStyle(.glass)
+                    .emberGlassButton()
             }
             Spacer(minLength: 0)
         }
@@ -527,6 +523,6 @@ struct MacHalfSegment: View {
             }
         }
         .padding(3)
-        .glassEffect(.regular, in: .capsule)
+        .emberGlass(in: .capsule)
     }
 }

@@ -220,6 +220,6 @@ struct GuideButton: View {
 
 extension View {
     func guideButton() -> some View {
-        buttonStyle(.glassProminent).tint(Ember.ember)
+        emberGlassButton(prominent: true, tint: Ember.ember)
     }
 }

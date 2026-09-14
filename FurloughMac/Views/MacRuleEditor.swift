@@ -420,9 +420,8 @@ struct MacRuleEditor: View {
                 HStack(spacing: 6) {
                     ForEach([15, 30, 60, 120], id: \.self) { preset in
                         Button("\(preset)") { withAnimation(.snappy) { budget = preset } }
-                            .buttonStyle(.glass)
+                            .emberGlassButton(tint: budget == preset ? Ember.amber : Ember.cream)
                             .controlSize(.small)
-                            .tint(budget == preset ? Ember.amber : Ember.cream)
                     }
                     Spacer()
                 }
@@ -694,7 +693,7 @@ struct BudgetSlider: View {
                     Circle()
                         .fill(Color.white.opacity(0.55))
                         .frame(width: knob, height: knob)
-                        .glassEffect(.regular.interactive(), in: .circle)
+                        .emberGlass(interactive: true, in: .circle)
                         .shadow(color: .black.opacity(0.4), radius: 4, y: 2)
                         .scaleEffect(dragging ? 1.12 : 1)
                         .offset(x: x)

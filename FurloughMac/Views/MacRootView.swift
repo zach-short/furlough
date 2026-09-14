@@ -163,7 +163,11 @@ struct MacHomeView: View {
     private var windowActions: some ToolbarContent {
         let summary = toolbarSummary
         // No title bar text, so items pack left by default; this spacer pushes them right.
-        ToolbarSpacer(.flexible, placement: .primaryAction)
+        if #available(macOS 26.0, *) {
+            ToolbarSpacer(.flexible, placement: .primaryAction)
+        } else {
+            ToolbarItem(placement: .primaryAction) { Spacer() }
+        }
         ToolbarItem(placement: .primaryAction) {
             // Toolbar items can't carry a badge, so the count is in words.
             if summary.pendingCount > 0 {
@@ -186,7 +190,11 @@ struct MacHomeView: View {
                 .tint(Ember.cream)
                 .help("Help")
         }
-        ToolbarSpacer(.fixed, placement: .primaryAction)
+        // Below macOS 26, toolbar items don't merge into Liquid Glass groups, so there's
+        // nothing to separate.
+        if #available(macOS 26.0, *) {
+            ToolbarSpacer(.fixed, placement: .primaryAction)
+        }
         ToolbarItem(placement: .primaryAction) {
             Button("Add", systemImage: "plus") { add(on: half) }
                 .tint(Ember.cream)
@@ -665,13 +673,12 @@ struct MacHomeView: View {
                     addDestination = .rules
                     showAddApp = true
                 }
-                .buttonStyle(.glassProminent)
-                .tint(Ember.ember)
+                .emberGlassButton(prominent: true, tint: Ember.ember)
                 Button("Add website…") {
                     addDestination = .rules
                     showAddSite = true
                 }
-                .buttonStyle(.glass)
+                .emberGlassButton()
             }
             .controlSize(.large)
             .padding(.top, 8)

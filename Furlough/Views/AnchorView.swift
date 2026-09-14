@@ -927,7 +927,7 @@ struct AnchorToggleButton: View {
                         .emberBody(13, .bold)
                         .foregroundStyle(Ember.cream)
                 }
-                .buttonStyle(.glass)
+                .emberGlassButton()
             } else {
                 Button {
                     if caution != nil { confirmAnchor = true } else { drop() }
@@ -937,8 +937,7 @@ struct AnchorToggleButton: View {
                         .foregroundStyle(Ember.cream)
                         .padding(.horizontal, 6)
                 }
-                .buttonStyle(.glassProminent)
-                .tint(Ember.ember)
+                .emberGlassButton(prominent: true, tint: Ember.ember)
                 .disabled(!anchor.canAnchor)
             }
         }

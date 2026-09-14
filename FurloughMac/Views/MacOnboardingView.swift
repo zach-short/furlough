@@ -98,8 +98,7 @@ struct MacOnboardingView: View {
                         withAnimation(.snappy(duration: 0.25)) { pane = .start }
                     }
                 }
-                .buttonStyle(.glassProminent)
-                .tint(Ember.ember)
+                .emberGlassButton(prominent: true, tint: Ember.ember)
                 .controlSize(.large)
                 .disabled(requesting)
                 .keyboardShortcut(.defaultAction)
@@ -171,14 +170,13 @@ struct MacOnboardingView: View {
                     model.chooseStart(half: chosen, both: wantsBoth)
                     model.finishOnboarding()
                 }
-                .buttonStyle(.glassProminent)
-                .tint(Ember.ember)
+                .emberGlassButton(prominent: true, tint: Ember.ember)
                 .controlSize(.large)
                 .keyboardShortcut(.defaultAction)
                 Button("Back") {
                     withAnimation(.snappy(duration: 0.25)) { pane = .promise }
                 }
-                .buttonStyle(.glass)
+                .emberGlassButton()
                 .controlSize(.large)
             }
             .padding(.top, 24)

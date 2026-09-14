@@ -60,22 +60,19 @@ struct WebFilterOfferSheet: View {
             switch filter.status {
             case .notInstalled, .failed:
                 Button("Install the web filter") { filter.install() }
-                    .buttonStyle(.glassProminent)
-                    .tint(Ember.ember)
+                    .emberGlassButton(prominent: true, tint: Ember.ember)
                     .keyboardShortcut(.defaultAction)
                 // .glass alone inherits the window's ember tint; untinted explicitly so it
                 // doesn't read as a second prominent button.
                 Button("Not now") { dismiss() }
-                    .buttonStyle(.glass)
-                    .tint(Ember.muted)
+                    .emberGlassButton(tint: Ember.muted)
             case .awaitingApproval, .disabledInSettings, .filterOff, .filterDenied, .installing:
                 Button("Done") { dismiss() }
-                    .buttonStyle(.glass)
+                    .emberGlassButton()
                     .keyboardShortcut(.defaultAction)
             case .on, .notInApplications:
                 Button("Done") { dismiss() }
-                    .buttonStyle(.glassProminent)
-                    .tint(Ember.ember)
+                    .emberGlassButton(prominent: true, tint: Ember.ember)
                     .keyboardShortcut(.defaultAction)
             }
         }

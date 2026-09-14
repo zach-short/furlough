@@ -37,7 +37,7 @@ struct BudgetSlider: View {
                     Circle()
                         .fill(Color.white.opacity(0.55))
                         .frame(width: knob, height: knob)
-                        .glassEffect(.regular.interactive(), in: .circle)
+                        .emberGlass(interactive: true, in: .circle)
                         .shadow(color: .black.opacity(0.4), radius: 4, y: 2)
                         .scaleEffect(dragging ? 1.12 : 1)
                         .offset(x: x)

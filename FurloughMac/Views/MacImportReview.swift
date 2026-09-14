@@ -33,11 +33,9 @@ struct MacImportReview: View {
             HStack(spacing: 10) {
                 Spacer()
                 Button("Cancel") { onBack() }
-                    .buttonStyle(.glass)
-                    .tint(Ember.muted)
+                    .emberGlassButton(tint: Ember.muted)
                 Button(plan.isEmpty ? "Nothing to apply" : "Apply this setup") { onApply() }
-                    .buttonStyle(.glassProminent)
-                    .tint(Ember.ember)
+                    .emberGlassButton(prominent: true, tint: Ember.ember)
                     .disabled(!plan.canApply)
             }
             .padding(.horizontal, 20)

@@ -932,7 +932,7 @@ struct WindowRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
-                GlassEffectContainer(spacing: 8) {
+                EmberGlassEffectContainer(spacing: 8) {
                     HStack(spacing: 8) {
                         TimeChip(minute: window.startMinute) { editing = .start }
                         Image(systemName: "arrow.right")
@@ -1307,7 +1307,7 @@ struct TimeChip: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 10))
+        .emberGlass(interactive: true, in: .rect(cornerRadius: 10))
     }
 }
 

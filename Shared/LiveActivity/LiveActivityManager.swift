@@ -87,6 +87,10 @@ enum LiveActivityManager {
             guard canStart else { continue }
             do {
                 if let start = item.start {
+                    // Below iOS 26, Activity.request has no `start:` — an activity can only be
+                    // requested for right now, so the next window just waits for a later sync
+                    // (when it opens and takes the `else` branch below) instead of staging ahead.
+                    guard #available(iOS 26.0, *) else { continue }
                     _ = try Activity.request(
                         attributes: item.attributes,
                         content: item.content,

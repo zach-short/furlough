@@ -137,8 +137,7 @@ struct MacAnchorPane: View {
                 .foregroundStyle(Ember.cream)
                 .padding(.horizontal, 6)
         }
-        .buttonStyle(.glassProminent)
-        .tint(Ember.ember)
+        .emberGlassButton(prominent: true, tint: Ember.ember)
         .disabled(!anchor.hasSomethingToHold)
     }
 

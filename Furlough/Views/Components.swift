@@ -209,8 +209,7 @@ struct ProminentButton: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 4)
         }
-        .buttonStyle(.glassProminent)
-        .tint(Ember.ember)
+        .emberGlassButton(prominent: true, tint: Ember.ember)
         .controlSize(.large)
     }
 }
