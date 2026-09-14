@@ -10,6 +10,8 @@ Either half works on its own; neither needs the other.
 
 Built on Apple's Screen Time API (FamilyControls, ManagedSettings, DeviceActivity) and Core NFC. Swift, SwiftUI, no third-party dependencies.
 
+**Furlough for Mac is a download** — [furloughapp.com](https://furloughapp.com/#download) — signed with a Developer ID and notarized by Apple, so nothing has to be built to run it. The iPhone app is not on the App Store yet; it installs from Xcode, and [Install from Xcode](#install-from-xcode) is how.
+
 ## How it works
 
 | Piece | What it does |
@@ -105,7 +107,11 @@ macOS asks once per browser whether Furlough may control it, the first time Furl
 
 The web filter is the second half, and it is optional. Onboarding offers it and Settings > Web installs it: a network content filter that macOS runs as a system extension, which sees every connection the Mac opens and refuses the ones to a blocked site, whatever app opened them. macOS asks twice, once to allow the extension under System Settings > General > Login Items & Extensions and once to let it filter, and it can be switched off there at any time; Settings > Web says so when it has been, and the tab reader keeps enforcing regardless. The filter reads a site's name off the connection (the name the app asked for, or the one in the TLS hello), and while anything is blocked it refuses nameless QUIC connections so the browser falls back to the kind it can read. It blocks nothing past the moment the rules say a status could change, so a list left behind by a force quit lapses on its own.
 
-Build and install from the command line:
+Getting it is a download rather than a build. **[Download Furlough for Mac](https://furloughapp.com/#download)** — a disk image for Apple silicon, signed with a Developer ID and notarized, so it opens on a Mac that has never seen Xcode and Gatekeeper asks for no detour. [Releasing the Mac app](#releasing-the-mac-app) is how that image is made.
+
+Open the image and drag Furlough onto the Applications folder beside it. It has to live in `/Applications`: macOS loads a system extension from nowhere else, and the login item and the watchdog agent both point there. The first launch is onboarding — the browsers Furlough may control, and the web filter if you want it. A new version is the same drag over the top, and the filter already installed is recognised as a replacement rather than read as a first install, so the next launch puts it back by itself.
+
+Building it instead — to change it, or to fork it — is three lines:
 
 ```bash
 xcodebuild -project Furlough.xcodeproj -scheme FurloughMac -configuration Release \
@@ -115,11 +121,13 @@ rm -rf /Applications/Furlough.app && ditto build/DerivedDataMac/Build/Products/R
 open /Applications/Furlough.app
 ```
 
-Or open the project in Xcode, pick the `FurloughMac` scheme and My Mac, and press Run. The app has to live in `/Applications` for the login item to point at it, and macOS will only load the web filter from there.
+Or open the project in Xcode, pick the `FurloughMac` scheme and My Mac, and press Run. `/Applications` is where a build has to land too, for the same two reasons. Without a paid developer account, five lines have to come out of `project.yml` first — see [Building the Mac app without a developer account](#building-the-mac-app-without-a-developer-account).
 
 `scripts/furlough mac` runs those three lines and stamps a rising build number over `CURRENT_PROJECT_VERSION`, which matters to the web filter rather than to bookkeeping — see [Releasing the Mac app](#releasing-the-mac-app).
 
 ## Requirements
+
+Everything below is for building Furlough. Running the Mac app needs none of it: the [download](#furlough-on-the-mac) is a finished, notarized app.
 
 - A paid Apple Developer account (Family Controls is not available to Personal Teams). The Mac app on its own can be built without one — see [Building the Mac app without a developer account](#building-the-mac-app-without-a-developer-account).
 - Xcode 26 or newer, a physical iPhone. The Screen Time API does not work in the Simulator. The Mac app needs macOS 26.
@@ -314,6 +322,8 @@ Three things have to exist on the Mac doing the release, and two of them only th
 
 ## Building the Mac app without a developer account
 
+The signed [download](#furlough-on-the-mac) is the ordinary way onto a Mac, and it is the whole app. This is the other one: building it yourself, from this repo, without paying Apple for a membership first.
+
 The Mac app is the half of Furlough that never touches the Screen Time API, so nothing it does needs Family Controls — and with five lines out of `project.yml` it does not need an Apple Developer account either. Rules, windows, budgets, the quitting of blocked apps, the tab reader and its shield page, and the menu bar hourglass all work under an ad-hoc signature.
 
 You need macOS 26, Xcode 26 from the App Store, and Homebrew.
@@ -358,7 +368,7 @@ You need macOS 26, Xcode 26 from the App Store, and Homebrew.
    ```
 8. Say yes to the permission prompts. macOS asks once per browser whether Furlough may control it — that is how sites get blocked. Refusing means that browser is not enforced. You can change it later under System Settings > Privacy & Security > Automation.
 
-Two things are not in a build made this way, since both ride on entitlements only a paid team can grant:
+Two things are not in a build made this way, since both ride on entitlements only a paid team can grant. The download has them, which is the reason to prefer it unless you mean to change the code:
 
 - **The web filter.** The tab reader is the whole of web enforcement, so Safari and the Chromium browsers are covered and Firefox, a site saved to the Dock as an app, and anything else that loads a site outside a scriptable browser are not.
 - **The Anchor's lock.** It crosses between devices on the iCloud key-value store, which needs the first entitlement removed above, so nothing crosses at all. A Mac refuses to drop an anchor unless an iPhone is on the link — only that phone's tag could ever release one — and in this build none ever will be, so **Drop anchor** stays refused. Nothing can get stuck: that refusal is the guard against a lock with no key, and it is doing its job.
