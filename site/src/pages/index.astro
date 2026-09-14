@@ -14,6 +14,15 @@ const legend = [
   { state: 'unconfigured', label: 'Needs a schedule', note: 'Added, nothing enforced yet' },
   { state: 'anchored', label: 'Anchored', note: 'The stream stopped dead until the tag' },
 ];
+
+// The four tiers from Shared/Core/Utility.swift, with the multiplier each one puts on the
+// delay and the line the rule editor prints under the chip.
+const tiers = [
+  { label: 'Essential', tone: 'moss', multiplier: 0.25 },
+  { label: 'Useful', tone: 'cream', multiplier: 1 },
+  { label: 'Idle', tone: 'amber', multiplier: 2 },
+  { label: 'Hazard', tone: 'ember', multiplier: 4 },
+];
 ---
 
 <Base>
@@ -65,24 +74,29 @@ const legend = [
       <p class="lede">A second list of apps you lock in one tap, from anywhere. The only thing that unlocks it is holding your phone to an NFC tag you paired. Leave the tag at home and your phone stays anchored until you're back.</p>
     </div>
     <div class="demo" data-reveal style="--d: .1s">
-      <div class="card anchor">
+      <div class="card anchor anchored" data-anchor>
         <div class="ahero">
-          <canvas class="aglass" width="84" height="112" data-hourglass="anchored" aria-hidden="true"></canvas>
+          <canvas class="aglass" width="84" height="112" data-anchor-glass aria-hidden="true"></canvas>
           <div class="text">
-            <div class="eyebrow ember">Anchored · since 6:12 PM</div>
+            <div class="eyebrow ember" data-anchor-eyebrow>Anchored · since 6:12 PM</div>
             <div class="name">Anchor</div>
-            <div class="count mono" data-since>2:14:09</div>
-            <div class="sub">Instagram, Safari, YouTube +3</div>
+            <div class="count mono" data-anchor-count>2:14:09</div>
+            <div class="sub" data-anchor-sub>Instagram, Safari, YouTube +3</div>
           </div>
         </div>
         <div class="aactions">
-          <span class="glass prominent">
+          <button type="button" class="glass prominent alock" data-anchor-lock>
             <svg viewBox="0 0 80 100" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="40" cy="15" r="10.5"/><path d="M40 26v56M17 38h46M12 58c0 16 12 26 28 26s28-10 28-26"/><path d="M7 41L2 59l16 9zM73 41l5 18-16 9z" fill="currentColor" stroke-width="2"/></svg>
             Anchor
-          </span>
-          <span class="glass">Unanchor with the tag</span>
+          </button>
+          <button type="button" class="glass atag" data-anchor-tag>
+            <span class="hold" aria-hidden="true"></span>
+            <span class="wave" aria-hidden="true"></span>
+            Hold the tag to unanchor
+          </button>
         </div>
       </div>
+      <p class="cue" data-anchor-cue>Hold that button down, the way you'd hold the phone against the tag.</p>
     </div>
   </section>
 
@@ -96,17 +110,31 @@ const legend = [
     <div class="demo" data-reveal style="--d: .1s">
       <div class="card budget">
         <div class="eyebrow">Daily budget</div>
-        <div class="value"><span class="mono big">30</span><span class="eyebrow unit">min</span></div>
-        <div class="hint">across all windows</div>
-        <div class="slider" aria-hidden="true">
+        <div class="value"><span class="mono big" data-budget-value>30</span><span class="eyebrow unit">min</span></div>
+        <div class="hint" data-budget-hint>across all windows</div>
+        <!-- The track is piecewise-linear between the ticks, exactly like the app's own
+             BudgetSlider, so the sub-hour range everyone actually uses gets half the width. -->
+        <div
+          class="slider"
+          data-budget-slider
+          role="slider"
+          tabindex="0"
+          aria-label="Daily budget"
+          aria-valuemin="5"
+          aria-valuemax="240"
+          aria-valuenow="30"
+          aria-valuetext="30 min a day"
+          style="--p: 25"
+        >
           <div class="track"></div>
           <div class="fill"></div>
           <div class="knob"></div>
           <div class="ticks">
-            <span style="left: 0%">5</span><span style="left: 10.64%">30</span><span style="left: 23.4%">60</span><span style="left: 48.94%">120</span><span style="left: 100%">240</span>
+            <span style="left: 0%">5</span><span style="left: 25%">30</span><span style="left: 50%">60</span><span style="left: 75%">120</span><span style="left: 100%">240</span>
           </div>
         </div>
       </div>
+      <p class="cue">Drag it. Five minutes to four hours, in steps of five.</p>
     </div>
   </section>
 
@@ -118,7 +146,7 @@ const legend = [
       <p class="lede">Eight to ten on school nights. Later on weekends. A window can run past midnight, and each one can have its own days. Outside the windows, the app is shielded.</p>
     </div>
     <div class="demo" data-reveal style="--d: .1s">
-      <div class="card week" aria-label="A week of windows: 8 PM to midnight most nights, until 2 AM on Friday and Saturday" role="img">
+      <div class="card week" data-week>
         <div class="days">
           <span class="eyebrow">M</span><span class="eyebrow">T</span><span class="eyebrow amber">W</span><span class="eyebrow">T</span><span class="eyebrow">F</span><span class="eyebrow">S</span><span class="eyebrow">S</span>
         </div>
@@ -126,18 +154,26 @@ const legend = [
           <div class="gutter mono">
             <span style="top: 0%">12a</span><span style="top: 12.5%">3</span><span style="top: 25%">6</span><span style="top: 37.5%">9</span><span style="top: 50%">12p</span><span style="top: 62.5%">3</span><span style="top: 75%">6</span><span style="top: 87.5%">9</span>
           </div>
-          <div class="cols">
-            <div class="col"><i class="w" style="--s: 20; --e: 24">8:00</i></div>
-            <div class="col"><i class="w" style="--s: 20; --e: 24">8:00</i></div>
-            <div class="col today"><i class="w" style="--s: 20; --e: 24">8:00</i></div>
-            <div class="col"><i class="w" style="--s: 20; --e: 24">8:00</i></div>
-            <div class="col"><i class="w" style="--s: 20; --e: 24">8:00</i></div>
-            <div class="col"><i class="w" style="--s: 0; --e: 2"></i><i class="w" style="--s: 20; --e: 24">8:00</i></div>
-            <div class="col"><i class="w" style="--s: 0; --e: 2"></i><i class="w" style="--s: 20; --e: 24">8:00</i></div>
+          <div class="cols" data-week-cols>
+            <div class="col"><div class="w" role="button" tabindex="0" style="--s: 20; --e: 24"><span class="t">8:00</span><span class="x" aria-hidden="true">×</span></div></div>
+            <div class="col"><div class="w" role="button" tabindex="0" style="--s: 20; --e: 24"><span class="t">8:00</span><span class="x" aria-hidden="true">×</span></div></div>
+            <div class="col today"><div class="w" role="button" tabindex="0" style="--s: 20; --e: 24"><span class="t">8:00</span><span class="x" aria-hidden="true">×</span></div></div>
+            <div class="col"><div class="w" role="button" tabindex="0" style="--s: 20; --e: 24"><span class="t">8:00</span><span class="x" aria-hidden="true">×</span></div></div>
+            <div class="col"><div class="w" role="button" tabindex="0" style="--s: 20; --e: 24"><span class="t">8:00</span><span class="x" aria-hidden="true">×</span></div></div>
+            <div class="col"><div class="w" role="button" tabindex="0" style="--s: 0; --e: 2"><span class="t">12:00</span><span class="x" aria-hidden="true">×</span></div><div class="w" role="button" tabindex="0" style="--s: 20; --e: 24"><span class="t">8:00</span><span class="x" aria-hidden="true">×</span></div></div>
+            <div class="col"><div class="w" role="button" tabindex="0" style="--s: 0; --e: 2"><span class="t">12:00</span><span class="x" aria-hidden="true">×</span></div><div class="w" role="button" tabindex="0" style="--s: 20; --e: 24"><span class="t">8:00</span><span class="x" aria-hidden="true">×</span></div></div>
           </div>
         </div>
-        <div class="words">8 PM to midnight on Sun–Thu · 8 PM to 2 AM on Fri and Sat</div>
+        <div class="words" data-week-words aria-live="polite">8 PM to midnight on Mon–Fri · midnight to 2 AM and 8 PM to midnight on Sat and Sun</div>
+        <div class="wfoot">
+          <span class="whint">Drag a window, or its edges. Tap empty track to add one.</span>
+          <button type="button" class="glass tiny" data-week-reset>Reset</button>
+        </div>
       </div>
+      <!-- Cloned for windows added after load, so they carry the same markup as the seven shipped. -->
+      <template data-week-template>
+        <div class="w" role="button" tabindex="0"><span class="t"></span><span class="x" aria-hidden="true">×</span></div>
+      </template>
     </div>
   </section>
 
@@ -149,11 +185,11 @@ const legend = [
       <p class="lede">A longer window, a bigger budget, removing an app: each waits out a delay you set in advance, and you can cancel it while it does. Apps you mark <strong>Hazard</strong> wait four times as long. Apps you mark <strong>Essential</strong> wait a quarter.</p>
     </div>
     <div class="demo" data-reveal style="--d: .1s">
-      <div class="card pending-card">
-        <div class="eyebrow pending">Pending · lands in <span class="mono" data-lands>22:41:06</span></div>
+      <div class="card pending-card" data-delay>
+        <div class="eyebrow pending" data-delay-head>Pending · lands in <span class="mono" data-lands>22:41:06</span></div>
         <div class="prow">
           <span class="tile ig"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" aria-hidden="true"><rect x="2.6" y="2.6" width="18.8" height="18.8" rx="5.6"/><circle cx="12" cy="12" r="4.6"/><circle cx="17.5" cy="6.5" r="1.35" fill="#fff" stroke="none"/></svg></span>
-          <span class="who"><span class="n">Instagram</span><span class="r">More time, so it waits 1 day</span></span>
+          <span class="who"><span class="n">Instagram</span><span class="r" data-delay-reason>More time, so it waits 1 day</span></span>
         </div>
         <div class="delta">
           <div class="side">
@@ -168,9 +204,17 @@ const legend = [
             <div class="small">8:00–9:00 PM</div>
           </div>
         </div>
-        <div class="bar" aria-hidden="true"><div class="prog"></div></div>
-        <div class="pactions"><span class="glass">Cancel</span></div>
+        <div class="bar" aria-hidden="true"><div class="prog" data-delay-prog></div></div>
+        <div class="eyebrow tlabel">What Instagram is worth to you</div>
+        <div class="tiers">
+          {tiers.map((t) => (
+            <button type="button" class="tier" data-tier={t.multiplier} data-tone={t.tone} aria-pressed={t.multiplier === 1 ? 'true' : 'false'}>{t.label}</button>
+          ))}
+        </div>
+        <div class="tsummary" data-delay-summary>Worth having. Nothing breaks if it waits.</div>
+        <div class="pactions"><button type="button" class="glass" data-delay-cancel>Cancel</button></div>
       </div>
+      <p class="cue">Move the tier and the wait moves with it: six hours to four days.</p>
     </div>
   </section>
 
@@ -182,12 +226,63 @@ const legend = [
       <p class="lede">The block screen says which app is closed and when it opens next. That is the whole conversation. No snooze, no "one more minute", no code to type. The app can't be deleted while it's shielded, either.</p>
     </div>
     <div class="demo" data-reveal style="--d: .1s">
-      <div class="shield" role="img" aria-label="The shield: Instagram opens tomorrow at 8:00 PM, you get 30 min per day, one Close button">
-        <canvas class="sglass" width="90" height="120" data-hourglass="doneForToday" aria-hidden="true"></canvas>
-        <div class="stitle">Instagram opens tomorrow at 8:00 PM</div>
-        <div class="ssub">You get 30 min per day.</div>
-        <div class="close">Close</div>
+      <div class="shieldbox shielded" data-shield-box>
+        <!-- The Home Screen the shield sits on: one app held, two that aren't in any rule. -->
+        <div class="sbhome" data-shield-home-screen>
+          <div class="sbar" aria-hidden="true"><span class="mono">9:41</span><span class="sbsig"><i></i><i></i><i></i><i></i></span></div>
+          <div class="sbapps">
+            <button type="button" class="sbapp held" data-shield-locked>
+              <span class="sbwrap">
+                <span class="sbicon ig"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" aria-hidden="true"><rect x="2.6" y="2.6" width="18.8" height="18.8" rx="5.6"/><circle cx="12" cy="12" r="4.6"/><circle cx="17.5" cy="6.5" r="1.35" fill="#fff" stroke="none"/></svg></span>
+                <span class="sbbadge"><canvas width="13" height="17" data-hourglass="doneForToday" data-still aria-hidden="true"></canvas></span>
+              </span>
+              <span class="sblabel">Instagram</span>
+            </button>
+            <button type="button" class="sbapp" data-shield-app="messages" data-shield-name="Messages">
+              <span class="sbwrap">
+                <span class="sbicon ms"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M12 4C6.9 4 3 7.2 3 11.2c0 2.2 1.2 4.2 3.1 5.5.1 1.5-.5 2.8-1.8 3.9 2.1-.1 3.9-.8 5.2-1.9.8.2 1.6.3 2.5.3 5.1 0 9-3.2 9-7.8S17.1 4 12 4Z"/></svg></span>
+              </span>
+              <span class="sblabel">Messages</span>
+            </button>
+            <button type="button" class="sbapp" data-shield-app="notes" data-shield-name="Notes">
+              <span class="sbwrap">
+                <span class="sbicon nt"><svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" fill="#FBCF3B"/><rect width="24" height="5.4" fill="#FFF7E2"/><g stroke="#B98A12" stroke-width="1.4" stroke-linecap="round"><path d="M5 10.4h14M5 14.4h14M5 18.4h9"/></g></svg></span>
+              </span>
+              <span class="sblabel">Notes</span>
+            </button>
+          </div>
+          <div class="sbdots" aria-hidden="true"><i class="on"></i><i></i></div>
+          <div class="hbar" aria-hidden="true"></div>
+        </div>
+
+        <!-- Anything outside the rules opens the way it always did. -->
+        <div class="avview" data-shield-view>
+          <div class="sbar" aria-hidden="true"><span class="mono">9:41</span><span class="sbsig"><i></i><i></i><i></i><i></i></span></div>
+          <div class="avpane" data-pane="messages" hidden>
+            <div class="avtitle">Messages</div>
+            <div class="avrow"><span class="avface" style="--c: #8C6FE0">J</span><span class="avwho"><b>Jules</b><i>Bringing the hitch Saturday</i></span><span class="avwhen">9:12 AM</span></div>
+            <div class="avrow"><span class="avface" style="--c: #C2643E">M</span><span class="avwho"><b>Mom</b><i>Call when you get a minute</i></span><span class="avwhen">Yesterday</span></div>
+          </div>
+          <div class="avpane" data-pane="notes" hidden>
+            <div class="avtitle">Notes</div>
+            <div class="avnote">
+              <b>Saturday</b>
+              <span>Trailer hitch from Dave</span>
+              <span>Coffee — the good bag</span>
+              <span>Call the vet back</span>
+            </div>
+          </div>
+          <button type="button" class="hbtn" data-shield-home aria-label="Back to the Home Screen"><span class="hbar"></span></button>
+        </div>
+
+        <div class="shield" data-shield-screen>
+          <canvas class="sglass" width="90" height="120" data-hourglass="doneForToday" aria-hidden="true"></canvas>
+          <div class="stitle">Instagram opens tomorrow at 8:00 PM</div>
+          <div class="ssub">You get 30 min per day.</div>
+          <button type="button" class="close" data-shield-close>Close</button>
+        </div>
       </div>
+      <p class="cue" data-shield-cue>Go on, tap Close. It is the only button on the screen.</p>
     </div>
   </section>
 
@@ -197,13 +292,14 @@ const legend = [
       <div class="eyebrow">The living hourglass</div>
       <h2 class="display">One glass, every status.</h2>
       <p class="lede">The top bulb is the window and drains with the countdown. The pile carries the budget: sand while there's plenty, amber after the warning, ember once it's spent. The same glass sits in every row, the widget and the Live Activity.</p>
+      <p class="cue left">Point at one, or press it, to watch that state run.</p>
     </div>
     <div class="swatches">
       {legend.map((l, i) => (
-        <div class="swatch" data-reveal style={`--d: ${(i % 4) * 0.07}s`}>
-          <canvas width="60" height="80" data-hourglass={l.state} aria-hidden="true"></canvas>
-          <div class="l"><b>{l.label}</b>{l.note}</div>
-        </div>
+        <button type="button" class="swatch" data-swatch aria-pressed="false" data-reveal style={`--d: ${(i % 4) * 0.07}s`}>
+          <canvas width="60" height="80" data-hourglass={l.state} data-still aria-hidden="true"></canvas>
+          <span class="l"><b>{l.label}</b>{l.note}</span>
+        </button>
       ))}
     </div>
   </section>
@@ -247,26 +343,564 @@ const legend = [
   </section>
 
   <script>
-    // Two small clocks on the page: the pending change landing, and the anchor counting up.
+    // Four demos on this page are the real controls rather than pictures of them: the budget
+    // slider, the week of windows, the pending change and the Anchor. Each keeps the numbers
+    // the app itself would use, so nothing here promises behaviour the phone doesn't have.
+    import { LivingHourglass, States, blendStates, type HourglassState } from '../lib/hourglass';
+
     const two = (n: number) => String(n).padStart(2, '0');
-    const fmt = (s: number) => {
-      const t = Math.max(0, Math.floor(s));
-      const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), sec = t % 60;
-      return h > 0 ? `${h}:${two(m)}:${two(sec)}` : `${m}:${two(sec)}`;
+    const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+    const setText = (el: HTMLElement, text: string) => { if (el.textContent !== text) el.textContent = text; };
+    /** h:mm:ss, with a leading day count once the wait is longer than one. */
+    const duration = (seconds: number) => {
+      const t = Math.max(0, Math.floor(seconds));
+      const d = Math.floor(t / 86400), h = Math.floor((t % 86400) / 3600);
+      const m = Math.floor((t % 3600) / 60), s = t % 60;
+      return d ? `${d}d ${two(h)}:${two(m)}:${two(s)}` : `${h}:${two(m)}:${two(s)}`;
     };
-    const lands = document.querySelector<HTMLElement>('[data-lands]');
-    const since = document.querySelector<HTMLElement>('[data-since]');
-    const t0 = Date.now();
-    const set = (el: HTMLElement | null, text: string) => { if (el && el.textContent !== text) el.textContent = text; };
-    const tick = () => {
-      const dt = (Date.now() - t0) / 1000;
-      set(lands, fmt(22 * 3600 + 41 * 60 + 6 - dt));
-      set(since, fmt(2 * 3600 + 14 * 60 + 9 + dt));
+    /** "8 PM", "8:30 PM", and the two hours everyone names instead of numbering. */
+    const clockTime = (hour: number) => {
+      const t = ((hour % 24) + 24) % 24;
+      if (t === 0) return 'midnight';
+      if (t === 12) return 'noon';
+      const whole = Math.floor(t);
+      const h = whole % 12 === 0 ? 12 : whole % 12;
+      const m = Math.round((t - whole) * 60);
+      return m ? `${h}:${two(m)} ${t < 12 ? 'AM' : 'PM'}` : `${h} ${t < 12 ? 'AM' : 'PM'}`;
     };
-    tick();
-    setInterval(tick, 1000);
-    // A scroll can hold the timer up on Safari; the scroll itself keeps these two honest.
-    addEventListener('scroll', tick, { passive: true });
+    // Safari hands out no timers or animation frames for the length of a scroll, which leaves
+    // a countdown frozen until the page comes to rest. The scroll itself keeps the clocks honest.
+    const everySecond = (tick: () => void) => {
+      setInterval(tick, 1000);
+      addEventListener('scroll', tick, { passive: true });
+    };
+
+    // MARK: The budget slider
+    //
+    // Ported from Furlough/Views/BudgetSlider.swift: the same five stops, the same 5-minute
+    // step, and the same piecewise track, so a drag here lands on a figure the app offers.
+
+    const slider = document.querySelector<HTMLElement>('[data-budget-slider]');
+    if (slider) {
+      const valueEl = document.querySelector<HTMLElement>('[data-budget-value]')!;
+      const hintEl = document.querySelector<HTMLElement>('[data-budget-hint]')!;
+      const STOPS = [5, 30, 60, 120, 240];
+      const STEP = 5;
+      const FIRST = STOPS[0], LAST = STOPS[STOPS.length - 1];
+
+      const fractionFor = (value: number) => {
+        if (value >= LAST) return 1;
+        const v = clamp(value, FIRST, LAST);
+        for (let i = 0; i < STOPS.length - 1; i++) {
+          const lo = STOPS[i], hi = STOPS[i + 1];
+          if (v <= hi) return (i + (v - lo) / (hi - lo)) / (STOPS.length - 1);
+        }
+        return 1;
+      };
+      const valueFor = (fraction: number) => {
+        const segments = STOPS.length - 1;
+        const scaled = clamp(fraction, 0, 1) * segments;
+        const i = Math.min(Math.floor(scaled), segments - 1);
+        const lo = STOPS[i], hi = STOPS[i + 1];
+        return Math.round((lo + (scaled - i) * (hi - lo)) / STEP) * STEP;
+      };
+      // TimeFormat.budget, so 90 reads the way the app would print it.
+      const label = (m: number) => {
+        if (m >= 60 && m % 60 === 0) return m === 60 ? '1 hour' : `${m / 60} hours`;
+        return m > 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`;
+      };
+
+      let minutes = 30;
+      const set = (next: number) => {
+        const m = clamp(Math.round(next / STEP) * STEP, FIRST, LAST);
+        if (m === minutes) return;
+        minutes = m;
+        slider.style.setProperty('--p', String(fractionFor(m) * 100));
+        setText(valueEl, String(m));
+        setText(hintEl, m > 60 ? `${label(m)} across all windows` : 'across all windows');
+        slider.setAttribute('aria-valuenow', String(m));
+        slider.setAttribute('aria-valuetext', `${label(m)} a day`);
+      };
+      /** Full width: the knob overhangs the ends, so 0 % and 100 % sit under the outer ticks. */
+      const valueAt = (clientX: number) => {
+        const box = slider.getBoundingClientRect();
+        return valueFor((clientX - box.left) / Math.max(1, box.width));
+      };
+
+      slider.addEventListener('pointerdown', (e) => {
+        slider.setPointerCapture(e.pointerId);
+        slider.classList.add('live', 'dragging');
+        set(valueAt(e.clientX));
+        e.preventDefault();
+      });
+      slider.addEventListener('pointermove', (e) => {
+        if (slider.hasPointerCapture(e.pointerId)) set(valueAt(e.clientX));
+      });
+      const release = () => slider.classList.remove('dragging');
+      slider.addEventListener('pointerup', release);
+      slider.addEventListener('pointercancel', release);
+      slider.addEventListener('keydown', (e) => {
+        const stopPast = (dir: number) =>
+          dir > 0
+            ? STOPS.find((s) => s > minutes) ?? LAST
+            : [...STOPS].reverse().find((s) => s < minutes) ?? FIRST;
+        let next: number | null = null;
+        switch (e.key) {
+          case 'ArrowRight': case 'ArrowUp': next = minutes + STEP; break;
+          case 'ArrowLeft': case 'ArrowDown': next = minutes - STEP; break;
+          case 'PageUp': next = stopPast(1); break;
+          case 'PageDown': next = stopPast(-1); break;
+          case 'Home': next = FIRST; break;
+          case 'End': next = LAST; break;
+        }
+        if (next === null) return;
+        e.preventDefault();
+        slider.classList.add('live');
+        set(next);
+      });
+    }
+
+    // MARK: The week of windows
+    //
+    // Windows are dragged and resized on the grid, snapped to the half hour, and the sentence
+    // underneath is written from whatever ends up on it. No window may run into its neighbour.
+
+    const week = document.querySelector<HTMLElement>('[data-week]');
+    if (week) {
+      const colsEl = week.querySelector<HTMLElement>('[data-week-cols]')!;
+      const cols = Array.from(colsEl.querySelectorAll<HTMLElement>('.col'));
+      const wordsEl = week.querySelector<HTMLElement>('[data-week-words]')!;
+      const template = document.querySelector<HTMLTemplateElement>('[data-week-template]')!;
+      const resetBtn = week.querySelector<HTMLButtonElement>('[data-week-reset]')!;
+      const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      const SNAP = 0.5, MIN = 0.5, ADDED = 2;
+      const DEFAULT: [number, number][][] = [
+        [[20, 24]], [[20, 24]], [[20, 24]], [[20, 24]], [[20, 24]],
+        [[0, 2], [20, 24]], [[0, 2], [20, 24]],
+      ];
+
+      const snap = (h: number) => Math.round(h / SNAP) * SNAP;
+      const startOf = (el: HTMLElement) => Number(el.style.getPropertyValue('--s'));
+      const endOf = (el: HTMLElement) => Number(el.style.getPropertyValue('--e'));
+      const windowsIn = (day: number) =>
+        Array.from(cols[day].querySelectorAll<HTMLElement>('.w')).sort((a, b) => startOf(a) - startOf(b));
+      /** The short start the app prints in a row: "8:00", "12:30". */
+      const shortTime = (hour: number) => {
+        const whole = Math.floor(hour);
+        return `${whole % 12 === 0 ? 12 : whole % 12}:${two(Math.round((hour - whole) * 60))}`;
+      };
+
+      const place = (el: HTMLElement, day: number, s: number, e: number) => {
+        el.style.setProperty('--s', String(s));
+        el.style.setProperty('--e', String(e));
+        setText(el.querySelector<HTMLElement>('.t')!, shortTime(s));
+        el.setAttribute('aria-label',
+          `Window, ${clockTime(s)} to ${clockTime(e)} on ${DAYS[day]}. Arrows move it, shift and the arrows resize it, Delete removes it.`);
+      };
+
+      const add = (day: number, s: number, e: number, fresh = false) => {
+        const el = template.content.firstElementChild!.cloneNode(true) as HTMLElement;
+        // A window added by hand skips the stagger the seven columns first animate in with.
+        if (fresh) el.style.transitionDelay = '0s';
+        place(el, day, s, e);
+        cols[day].appendChild(el);
+        return el;
+      };
+
+      // The sentence. Days carrying the same windows are grouped, in the order they're shown.
+      const describe = () => {
+        const keyed = cols.map((_, day) =>
+          windowsIn(day).map((el) => `${startOf(el)}-${endOf(el)}`).join(','));
+        const groups: { key: string; days: number[] }[] = [];
+        keyed.forEach((key, day) => {
+          const last = groups[groups.length - 1];
+          if (last && last.key === key) last.days.push(day);
+          else groups.push({ key, days: [day] });
+        });
+        if (groups.length === 1 && groups[0].key === '') {
+          return 'No windows at all: the app is shielded every hour of the week.';
+        }
+        const named = (days: number[]) => {
+          if (days.length === 1) return DAYS[days[0]];
+          if (days.length === 2) return `${DAYS[days[0]]} and ${DAYS[days[1]]}`;
+          return `${DAYS[days[0]]}–${DAYS[days[days.length - 1]]}`;
+        };
+        return groups.map(({ key, days }) => {
+          const when = days.length === 7 ? 'every day' : `on ${named(days)}`;
+          if (!key) return `blocked all day ${when}`;
+          const spans = key.split(',').map((pair) => {
+            const [s, e] = pair.split('-').map(Number);
+            return `${clockTime(s)} to ${clockTime(e)}`;
+          });
+          return `${spans.length > 2 ? spans.join(', ') : spans.join(' and ')} ${when}`;
+        }).join(' · ');
+      };
+      const refresh = () => setText(wordsEl, describe());
+
+      /** How far a window may reach either way before it meets a neighbour. */
+      const room = (el: HTMLElement, day: number) => {
+        const start = startOf(el);
+        let lo = 0, hi = 24;
+        for (const other of windowsIn(day)) {
+          if (other === el) continue;
+          if (endOf(other) <= start) lo = Math.max(lo, endOf(other));
+          else hi = Math.min(hi, startOf(other));
+        }
+        return [lo, hi] as const;
+      };
+
+      const dayOf = (el: HTMLElement) => cols.indexOf(el.closest('.col') as HTMLElement);
+      const hourAt = (clientY: number) => {
+        const box = colsEl.getBoundingClientRect();
+        return ((clientY - box.top) / Math.max(1, box.height)) * 24;
+      };
+
+      let drag: { el: HTMLElement; day: number; mode: 'move' | 'top' | 'bottom'; grab: number } | null = null;
+
+      const moveTo = (clientY: number) => {
+        if (!drag) return;
+        const { el, day, mode } = drag;
+        const [lo, hi] = room(el, day);
+        const hour = hourAt(clientY);
+        if (mode === 'move') {
+          const span = endOf(el) - startOf(el);
+          const s = clamp(snap(hour - drag.grab), lo, hi - span);
+          place(el, day, s, s + span);
+        } else if (mode === 'top') {
+          place(el, day, clamp(snap(hour), lo, endOf(el) - MIN), endOf(el));
+        } else {
+          place(el, day, startOf(el), clamp(snap(hour), startOf(el) + MIN, hi));
+        }
+        refresh();
+      };
+
+      colsEl.addEventListener('pointerdown', (e) => {
+        const target = e.target as HTMLElement;
+        const el = target.closest('.w') as HTMLElement | null;
+        if (!el) return;
+        if (target.classList.contains('x')) {
+          const next = windowsIn(dayOf(el)).find((w) => w !== el);
+          el.remove();
+          refresh();
+          next?.focus();
+          e.preventDefault();
+          return;
+        }
+        const box = el.getBoundingClientRect();
+        const edge = Math.min(9, box.height / 3);
+        drag = {
+          el,
+          day: dayOf(el),
+          mode: e.clientY - box.top <= edge ? 'top' : box.bottom - e.clientY <= edge ? 'bottom' : 'move',
+          grab: hourAt(e.clientY) - startOf(el),
+        };
+        el.classList.add('dragging');
+        el.focus();
+        el.setPointerCapture(e.pointerId);
+        e.preventDefault();
+      });
+
+      colsEl.addEventListener('pointermove', (e) => { if (drag) moveTo(e.clientY); });
+      const drop = () => {
+        if (!drag) return;
+        drag.el.classList.remove('dragging');
+        drag = null;
+      };
+      colsEl.addEventListener('pointerup', drop);
+      colsEl.addEventListener('pointercancel', drop);
+
+      // Empty track adds one. On the click rather than the press, so a finger scrolling the
+      // page past the grid doesn't leave a window behind it.
+      colsEl.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement;
+        if (target.closest('.w')) return;
+        const col = target.closest('.col') as HTMLElement | null;
+        if (!col) return;
+        const day = cols.indexOf(col);
+        const hour = hourAt(e.clientY);
+        let lo = 0, hi = 24;
+        for (const w of windowsIn(day)) {
+          if (endOf(w) <= hour) lo = Math.max(lo, endOf(w));
+          else if (startOf(w) >= hour) hi = Math.min(hi, startOf(w));
+          else return;
+        }
+        if (hi - lo < MIN) return;
+        const span = Math.min(ADDED, hi - lo);
+        const s = clamp(snap(hour - span / 2), lo, hi - span);
+        add(day, s, s + span, true).focus();
+        refresh();
+      });
+
+      colsEl.addEventListener('keydown', (e) => {
+        const el = (e.target as HTMLElement).closest('.w') as HTMLElement | null;
+        if (!el) return;
+        const day = dayOf(el);
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+          const next = windowsIn(day).find((w) => w !== el);
+          el.remove();
+          refresh();
+          next?.focus();
+          e.preventDefault();
+          return;
+        }
+        const step = e.key === 'ArrowUp' ? -SNAP : e.key === 'ArrowDown' ? SNAP : 0;
+        if (!step) return;
+        e.preventDefault();
+        const [lo, hi] = room(el, day);
+        const s = startOf(el), span = endOf(el) - s;
+        if (e.shiftKey) place(el, day, s, clamp(endOf(el) + step, s + MIN, hi));
+        else {
+          const moved = clamp(s + step, lo, hi - span);
+          place(el, day, moved, moved + span);
+        }
+        refresh();
+      });
+
+      resetBtn.addEventListener('click', () => {
+        cols.forEach((col, day) => {
+          col.querySelectorAll('.w').forEach((w) => w.remove());
+          for (const [s, e] of DEFAULT[day]) add(day, s, e, true);
+        });
+        refresh();
+      });
+
+      // The markup ships the default week; this only gives those seven their labels.
+      cols.forEach((_, day) => windowsIn(day).forEach((el) => place(el, day, startOf(el), endOf(el))));
+      refresh();
+    }
+
+    // MARK: The pending change
+    //
+    // The tier carries the multiplier from Utility.delayMultiplier, against the 24-hour base
+    // delay a new install starts with: six hours for essential, four days for a hazard.
+
+    const delay = document.querySelector<HTMLElement>('[data-delay]');
+    if (delay) {
+      const headEl = delay.querySelector<HTMLElement>('[data-delay-head]')!;
+      const landsEl = delay.querySelector<HTMLElement>('[data-lands]')!;
+      const reasonEl = delay.querySelector<HTMLElement>('[data-delay-reason]')!;
+      const progEl = delay.querySelector<HTMLElement>('[data-delay-prog]')!;
+      const summaryEl = delay.querySelector<HTMLElement>('[data-delay-summary]')!;
+      const cancelBtn = delay.querySelector<HTMLButtonElement>('[data-delay-cancel]')!;
+      const tierBtns = Array.from(delay.querySelectorAll<HTMLButtonElement>('.tier'));
+      // Utility.summary, the line the rule editor prints under the chip.
+      const SUMMARY: Record<string, string> = {
+        '0.25': "The phone's own job. Blocking it is the risk.",
+        '1': 'Worth having. Nothing breaks if it waits.',
+        '2': 'Passes the time.',
+        '4': 'The reason you installed Furlough.',
+      };
+      const BASE = 24 * 3600;
+      // Far enough in that the bar has moved, and the useful tier reads the 22:41:06 it always did.
+      const ELAPSED = 3600 + 18 * 60 + 54;
+
+      let multiplier = 1;
+      let cancelled = false;
+      const started = Date.now() - ELAPSED * 1000;
+      const total = () => BASE * multiplier;
+      const waited = () => {
+        const hours = Math.round(total() / 3600);
+        if (hours % 24 === 0) return hours === 24 ? '1 day' : `${hours / 24} days`;
+        return hours === 1 ? '1 hour' : `${hours} hours`;
+      };
+
+      const tick = () => {
+        if (cancelled) return;
+        const left = total() - (Date.now() - started) / 1000;
+        setText(landsEl, duration(left));
+        progEl.style.width = `${clamp((1 - left / total()) * 100, 0, 100)}%`;
+      };
+      const paint = () => {
+        delay.classList.toggle('cancelled', cancelled);
+        setText(reasonEl, cancelled
+          ? 'Cancelled while it waited, so nothing changed'
+          : `More time, so it waits ${waited()}`);
+        setText(cancelBtn, cancelled ? 'Ask again' : 'Cancel');
+        if (cancelled) {
+          headEl.textContent = 'Nothing pending · the rule is unchanged';
+          progEl.style.width = '0%';
+        } else {
+          headEl.textContent = 'Pending · lands in ';
+          headEl.appendChild(landsEl);
+          tick();
+        }
+      };
+
+      for (const btn of tierBtns) {
+        btn.addEventListener('click', () => {
+          multiplier = Number(btn.dataset.tier);
+          for (const other of tierBtns) other.setAttribute('aria-pressed', String(other === btn));
+          setText(summaryEl, SUMMARY[btn.dataset.tier!] ?? '');
+          paint();
+        });
+      }
+      cancelBtn.addEventListener('click', () => { cancelled = !cancelled; paint(); });
+
+      paint();
+      everySecond(tick);
+    }
+
+    // MARK: The Anchor card
+    //
+    // Anchoring is one tap. The way out is holding the phone to the tag, so the button that
+    // ends it wants a real hold rather than a click.
+
+    const anchor = document.querySelector<HTMLElement>('[data-anchor]');
+    if (anchor) {
+      const canvas = anchor.querySelector<HTMLCanvasElement>('[data-anchor-glass]')!;
+      const eyebrowEl = anchor.querySelector<HTMLElement>('[data-anchor-eyebrow]')!;
+      const countEl = anchor.querySelector<HTMLElement>('[data-anchor-count]')!;
+      const subEl = anchor.querySelector<HTMLElement>('[data-anchor-sub]')!;
+      const lockBtn = anchor.querySelector<HTMLButtonElement>('[data-anchor-lock]')!;
+      const tagBtn = anchor.querySelector<HTMLButtonElement>('[data-anchor-tag]')!;
+      const cueEl = document.querySelector<HTMLElement>('[data-anchor-cue]')!;
+      const HOLD = 900;
+      const HOLD_CUE = "Hold that button down, the way you'd hold the phone against the tag.";
+      const TAP_CUE = 'One tap puts all six out of reach. No delay, no countdown, no code.';
+
+      const glass = new LivingHourglass(canvas, States.anchored);
+      let anchored = true;
+      let since = Date.now() - (2 * 3600 + 14 * 60 + 9) * 1000;
+      // The glass crosses between the two states rather than cutting, the way the app's does.
+      let from: HourglassState | null = null;
+      let changedAt = 0;
+      let crossing = 0;
+
+      const target = () => (anchored ? States.anchored : States.open(0.62));
+      const step = (now: number) => {
+        crossing = 0;
+        const k = (now - changedAt) / 700;
+        glass.set(from && k < 1 ? blendStates(from, target(), k) : target());
+        if (k < 1) crossing = requestAnimationFrame(step);
+      };
+      const cross = () => {
+        from = glass.state;
+        changedAt = performance.now();
+        if (!crossing) crossing = requestAnimationFrame(step);
+      };
+
+      const tick = () => setText(countEl, anchored ? duration((Date.now() - since) / 1000) : '6 apps');
+      const paint = () => {
+        anchor.classList.toggle('anchored', anchored);
+        setText(eyebrowEl, anchored
+          ? `Anchored · since ${new Date(since).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+          : 'Not anchored');
+        eyebrowEl.className = anchored ? 'eyebrow ember' : 'eyebrow moss';
+        setText(subEl, anchored ? 'Instagram, Safari, YouTube +3' : 'Six apps, one switch');
+        setText(cueEl, anchored ? HOLD_CUE : TAP_CUE);
+        tick();
+      };
+
+      lockBtn.addEventListener('click', () => {
+        anchored = true;
+        since = Date.now();
+        cross();
+        paint();
+        tagBtn.focus();
+      });
+
+      let holding = 0;
+      let pressedAt = 0;
+      const unanchor = () => {
+        anchored = false;
+        cross();
+        paint();
+        lockBtn.focus();
+      };
+      const endHold = (completed: boolean) => {
+        clearTimeout(holding);
+        holding = 0;
+        tagBtn.classList.remove('holding');
+        if (!completed && anchored) setText(cueEl, 'Hold it there — the tag wants a second against the phone.');
+      };
+      tagBtn.addEventListener('pointerdown', (e) => {
+        pressedAt = Date.now();
+        tagBtn.classList.add('holding');
+        holding = window.setTimeout(() => { endHold(true); unanchor(); }, HOLD);
+        tagBtn.setPointerCapture(e.pointerId);
+      });
+      tagBtn.addEventListener('pointerup', () => endHold(false));
+      tagBtn.addEventListener('pointercancel', () => endHold(false));
+      // Keyboard and assistive clicks arrive with no pointer behind them; those go straight through.
+      tagBtn.addEventListener('click', () => { if (Date.now() - pressedAt > 2000) unanchor(); });
+
+      paint();
+      everySecond(tick);
+    }
+
+    // MARK: The shield
+    //
+    // Close is the only button, and all it does is put you back on the Home Screen, where
+    // Instagram sits grey under the glass. Open it again and the shield is straight back;
+    // the two apps that aren't in a rule open the way they always did.
+
+    const shieldBox = document.querySelector<HTMLElement>('[data-shield-box]');
+    if (shieldBox) {
+      const cueEl = document.querySelector<HTMLElement>('[data-shield-cue]')!;
+      const homeScreen = shieldBox.querySelector<HTMLElement>('[data-shield-home-screen]')!;
+      const view = shieldBox.querySelector<HTMLElement>('[data-shield-view]')!;
+      const screen = shieldBox.querySelector<HTMLElement>('[data-shield-screen]')!;
+      const panes = Array.from(view.querySelectorAll<HTMLElement>('[data-pane]'));
+
+      const HOME_CUE = 'Instagram stays grey until tomorrow at 8:00 PM. Tap it and see; the other two open like always.';
+
+      // `inert` takes the layers that are off screen out of the tab order and off the
+      // accessibility tree, while leaving them in place to animate.
+      const show = (state: 'shield' | 'home' | 'app') => {
+        shieldBox.classList.toggle('shielded', state === 'shield');
+        shieldBox.classList.toggle('inapp', state === 'app');
+        for (const [el, on] of [[homeScreen, 'home'], [view, 'app'], [screen, 'shield']] as const) {
+          if (state === on) el.removeAttribute('inert'); else el.setAttribute('inert', '');
+        }
+      };
+      show('shield');
+
+      const goHome = () => {
+        show('home');
+        setText(cueEl, HOME_CUE);
+      };
+      shieldBox.querySelector<HTMLButtonElement>('[data-shield-close]')!.addEventListener('click', goHome);
+      view.querySelector<HTMLButtonElement>('[data-shield-home]')!.addEventListener('click', goHome);
+      shieldBox.querySelector<HTMLButtonElement>('[data-shield-locked]')!.addEventListener('click', () => {
+        show('shield');
+        setText(cueEl, 'Straight back. There is no attempt counter to run down, and nothing here hands the app over.');
+      });
+      addEventListener('keydown', (e) => { if (e.key === 'Escape' && shieldBox.classList.contains('inapp')) goHome(); });
+
+      for (const btn of shieldBox.querySelectorAll<HTMLButtonElement>('[data-shield-app]')) {
+        btn.addEventListener('click', () => {
+          const which = btn.dataset.shieldApp;
+          for (const pane of panes) pane.hidden = pane.dataset.pane !== which;
+          // The app grows out of its own icon, the way it does on the phone.
+          const icon = btn.getBoundingClientRect(), box = shieldBox.getBoundingClientRect();
+          view.style.setProperty('--ox', `${((icon.left + icon.width / 2 - box.left) / box.width) * 100}%`);
+          view.style.setProperty('--oy', `${((icon.top + icon.height / 2 - box.top) / box.height) * 100}%`);
+          show('app');
+          setText(cueEl, `${btn.dataset.shieldName} opens like always — only what you put in a rule is held. Tap the bar at the bottom to go back.`);
+        });
+      }
+    }
+
+    // MARK: The legend
+    //
+    // The eight swatches are drawn still, so they don't all fight for the frame. Point at one
+    // and it runs; press it and it keeps running.
+
+    for (const swatch of document.querySelectorAll<HTMLElement>('[data-swatch]')) {
+      const canvas = swatch.querySelector<HTMLCanvasElement>('canvas')!;
+      // Base's mountHourglasses owns these canvases, and has run by the time anyone points.
+      const held = () => swatch.getAttribute('aria-pressed') === 'true';
+      const run = (on: boolean) =>
+        (canvas as HTMLCanvasElement & { hourglass?: LivingHourglass }).hourglass?.setMotion(on);
+      swatch.addEventListener('pointerenter', () => run(true));
+      swatch.addEventListener('pointerleave', () => run(held()));
+      swatch.addEventListener('focus', () => run(true));
+      swatch.addEventListener('blur', () => run(held()));
+      swatch.addEventListener('click', () => {
+        swatch.setAttribute('aria-pressed', String(!held()));
+        run(true);
+      });
+    }
   </script>
 </Base>
 
@@ -311,19 +945,23 @@ const legend = [
   .feature.flip .copy { order: 2; }
   .feature .copy h2 { margin-top: 12px; }
   .feature .copy .lede { margin-top: 16px; font-size: 17px; }
-  .feature .demo { display: flex; justify-content: center; }
+  .feature .demo { display: flex; flex-direction: column; align-items: center; }
   @media (max-width: 820px) {
     .feature { grid-template-columns: 1fr; gap: 28px; }
     .feature.flip .copy { order: 0; }
   }
 
-  .tile { width: 34px; height: 34px; border-radius: 9px; background: var(--c); display: grid; place-items: center; font-family: var(--display); font-weight: 700; font-size: 15px; color: #fff; flex: 0 0 auto; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1); }
+  /* One line under each demo, saying what there is to touch. */
+  .cue { margin-top: 14px; max-width: 420px; font-size: 12.5px; line-height: 1.45; color: var(--faint); text-align: center; }
+  .cue.left { text-align: left; margin-top: 16px; }
+
+  .tile { width: 34px; height: 34px; border-radius: 9px; background: var(--c); display: grid; place-items: center; font-family: var(--display); font-weight: 700; font-size: 15px; color: #fff; flex: 0 0 auto; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1); transition: opacity 0.3s var(--ease); }
   .tile svg { display: block; width: 21px; height: 21px; }
   /* Instagram's own mark, so the pending card names a real app the way the phone's rows do. */
   .tile.ig { background: radial-gradient(circle at 28% 108%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285aeb 90%); }
   .who { display: flex; flex-direction: column; }
   .n { font-family: var(--display-small); font-weight: 600; font-size: 14px; color: var(--cream); }
-  .r { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .r { font-size: 12px; color: var(--muted); margin-top: 2px; transition: color 0.3s var(--ease); }
 
   /* Budget */
   .budget { width: min(420px, 100%); padding: 20px 22px 26px; }
@@ -331,12 +969,20 @@ const legend = [
   .budget .big { font-size: 34px; line-height: 1; color: var(--cream); }
   .budget .unit { color: var(--amber); }
   .budget .hint { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
-  .slider { position: relative; height: 28px; margin: 22px 0 18px; }
+  /* pan-y: a finger dragging up the page still scrolls; one dragging sideways sets the budget. */
+  .slider { position: relative; height: 28px; margin: 22px 0 18px; cursor: grab; touch-action: pan-y; }
+  .slider.dragging { cursor: grabbing; }
   .slider .track { position: absolute; left: 0; right: 0; top: 11px; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.08); }
   .slider .fill { position: absolute; left: 0; top: 11px; height: 6px; border-radius: 3px; width: 0; background: linear-gradient(90deg, var(--ember), var(--amber)); transition: width 1.2s var(--ease) 0.3s; }
-  .slider .knob { position: absolute; top: 0; left: 0; width: 28px; height: 28px; margin-left: -14px; border-radius: 50%; background: linear-gradient(160deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.1)); border: 1px solid rgba(255, 255, 255, 0.5); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4); transition: left 1.2s var(--ease) 0.3s; }
-  :global([data-reveal].in) .slider .fill { width: 10.64%; }
-  :global([data-reveal].in) .slider .knob { left: 10.64%; }
+  .slider .knob { position: absolute; top: 0; left: 0; width: 28px; height: 28px; margin-left: -14px; border-radius: 50%; background: linear-gradient(160deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.1)); border: 1px solid rgba(255, 255, 255, 0.5); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+    transition: left 1.2s var(--ease) 0.3s, transform 0.15s var(--ease), box-shadow 0.2s var(--ease); }
+  :global([data-reveal].in) .slider .fill { width: calc(var(--p) * 1%); }
+  :global([data-reveal].in) .slider .knob { left: calc(var(--p) * 1%); }
+  /* Once it's in use, the long ease the reveal wanted would lag the finger. */
+  .slider.live .fill, .slider.live .knob { transition-duration: 0.09s; transition-delay: 0s; }
+  .slider:hover .knob, .slider:focus-visible .knob { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4), 0 0 0 6px rgba(245, 158, 74, 0.16); }
+  .slider.dragging .knob { transform: scale(1.12); }
+  .slider:focus-visible { outline-offset: 6px; }
   .ticks { position: absolute; left: 0; right: 0; top: 30px; }
   .ticks span { position: absolute; transform: translateX(-50%); font-family: var(--mono); font-size: 10.5px; color: var(--faint); }
   .ticks span::before { content: ''; position: absolute; left: 50%; top: -9px; width: 1px; height: 5px; background: var(--faint); opacity: 0.6; }
@@ -352,29 +998,57 @@ const legend = [
   .gutter span:first-child { transform: none; }
   .cols { position: relative; display: grid; grid-template-columns: repeat(7, 1fr); gap: 0; border-left: 1px solid var(--edge);
     background-image: repeating-linear-gradient(180deg, var(--edge) 0 1px, transparent 1px 12.5%); }
-  .col { position: relative; border-right: 1px solid var(--edge); }
+  .col { position: relative; border-right: 1px solid var(--edge); cursor: copy; }
   .col.today { background: rgba(245, 158, 74, 0.07); }
-  .w { position: absolute; left: 2px; right: 2px; top: calc(var(--s) / 24 * 100%); height: calc((var(--e) - var(--s)) / 24 * 100%); border-radius: 5px; background: rgba(245, 158, 74, 0.92);
-    font-family: var(--mono); font-style: normal; font-size: 8px; color: var(--ground); padding: 2px 0 0 3px; overflow: hidden;
-    transform: scaleY(0); transform-origin: top; transition: transform 0.7s var(--ease); }
-  .col:nth-child(1) .w { transition-delay: 0.1s; } .col:nth-child(2) .w { transition-delay: 0.17s; } .col:nth-child(3) .w { transition-delay: 0.24s; } .col:nth-child(4) .w { transition-delay: 0.31s; }
-  .col:nth-child(5) .w { transition-delay: 0.38s; } .col:nth-child(6) .w { transition-delay: 0.45s; } .col:nth-child(7) .w { transition-delay: 0.52s; }
-  :global([data-reveal].in) .w { transform: scaleY(1); }
-  .words { margin-top: 12px; font-size: 12.5px; color: var(--muted); text-align: center; }
+  /* Windows added after load are cloned, so their rules have to reach outside the scope. */
+  .col :global(.w) { position: absolute; left: 2px; right: 2px; top: calc(var(--s) / 24 * 100%); height: calc((var(--e) - var(--s)) / 24 * 100%);
+    border-radius: 5px; background: rgba(245, 158, 74, 0.92); overflow: hidden; cursor: grab; touch-action: none;
+    transform: scaleY(0); transform-origin: top; transition: transform 0.7s var(--ease), background 0.2s var(--ease), box-shadow 0.2s var(--ease); }
+  .col :global(.w .t) { display: block; font-family: var(--mono); font-size: 8px; color: var(--ground); padding: 2px 0 0 3px; pointer-events: none; }
+  /* Two grab bars, so the edges that resize are the edges that say so. */
+  .col :global(.w::before), .col :global(.w::after) { content: ''; position: absolute; left: 0; right: 0; height: 7px; cursor: ns-resize; }
+  .col :global(.w::before) { top: 0; }
+  .col :global(.w::after) { bottom: 0; }
+  .col :global(.w:hover), .col :global(.w:focus-visible) { background: var(--amber); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4); }
+  .col :global(.w.dragging) { cursor: grabbing; background: var(--amber); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45); }
+  .col :global(.w .x) { position: absolute; top: 0; right: 0; width: 15px; height: 15px; display: none; place-items: center; font-size: 12px; line-height: 1;
+    color: var(--ground); background: rgba(255, 255, 255, 0.4); border-bottom-left-radius: 5px; cursor: pointer; }
+  .col :global(.w:hover .x), .col :global(.w:focus-visible .x) { display: grid; }
+  .col:nth-child(1) :global(.w) { transition-delay: 0.1s; } .col:nth-child(2) :global(.w) { transition-delay: 0.17s; } .col:nth-child(3) :global(.w) { transition-delay: 0.24s; } .col:nth-child(4) :global(.w) { transition-delay: 0.31s; }
+  .col:nth-child(5) :global(.w) { transition-delay: 0.38s; } .col:nth-child(6) :global(.w) { transition-delay: 0.45s; } .col:nth-child(7) :global(.w) { transition-delay: 0.52s; }
+  :global([data-reveal].in) .col :global(.w) { transform: scaleY(1); }
+  .words { margin-top: 12px; font-size: 12.5px; color: var(--muted); text-align: center; min-height: 36px; }
+  .wfoot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; }
+  .whint { font-size: 11px; color: var(--faint); line-height: 1.35; }
+  .glass.tiny { min-height: 30px; padding: 0 12px; font-size: 12px; flex: 0 0 auto; }
 
   /* Pending */
   .pending-card { width: min(420px, 100%); padding: 18px 20px 20px; }
   .prow { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
-  .delta { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; margin-top: 16px; padding: 14px 16px; border-radius: 14px; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--edge); }
+  .delta { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; margin-top: 16px; padding: 14px 16px; border-radius: 14px; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--edge); transition: opacity 0.3s var(--ease); }
   .delta .v { font-size: 20px; color: var(--cream); margin-top: 4px; }
   .delta .small { font-size: 12px; color: var(--muted); margin-top: 2px; }
   .delta .then .v { color: var(--pending); }
   .delta .arrow { width: 20px; height: 20px; color: var(--faint); }
   .bar { position: relative; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.08); margin-top: 16px; overflow: hidden; }
   .bar .prog { height: 100%; width: 0; background: var(--pending); transition: width 1.4s var(--ease) 0.3s; }
-  :global([data-reveal].in) .bar .prog { width: 5.5%; }
+  .tlabel { margin-top: 18px; }
+  .tiers { display: flex; gap: 6px; margin-top: 8px; }
+  .tier { flex: 1 1 0; min-height: 32px; padding: 0 4px; border-radius: 999px; border: 1px solid var(--edge); background: rgba(255, 255, 255, 0.04);
+    font-family: var(--body); font-weight: 600; font-size: 12px; color: var(--muted); cursor: pointer; white-space: nowrap;
+    transition: color 0.2s var(--ease), background 0.2s var(--ease), border-color 0.2s var(--ease); }
+  .tier:hover { color: var(--cream); border-color: var(--edge-strong); }
+  .tier[data-tone='moss'] { --tone: var(--moss); }
+  .tier[data-tone='cream'] { --tone: var(--cream); }
+  .tier[data-tone='amber'] { --tone: var(--amber); }
+  .tier[data-tone='ember'] { --tone: var(--ember); }
+  .tier[aria-pressed='true'] { color: var(--ground); background: var(--tone); border-color: transparent; }
+  .tsummary { font-size: 12px; color: var(--faint); margin-top: 8px; min-height: 18px; }
   .pactions { display: flex; justify-content: flex-end; margin-top: 14px; }
-  .pactions .glass { color: var(--ember); cursor: default; }
+  .pactions .glass { color: var(--ember); }
+  .pending-card.cancelled .delta, .pending-card.cancelled .tile { opacity: 0.4; }
+  .pending-card.cancelled .r { color: var(--faint); }
+  .pending-card.cancelled .pactions .glass { color: var(--pending); }
 
   /* Anchor */
   .anchor { width: min(420px, 100%); padding: 22px 22px 20px; }
@@ -384,17 +1058,97 @@ const legend = [
   .anchor .count { font-size: 36px; line-height: 1; margin-top: 8px; }
   .anchor .sub { font-size: 12px; color: var(--muted); margin-top: 8px; }
   .aactions { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
-  .aactions .glass { cursor: default; }
-  .aactions .glass:hover { transform: none; }
+  /* One action at a time, as in the app: anchor it, or hold the tag that ends it. */
+  .anchor .atag, .anchor.anchored .alock { display: none; }
+  .anchor.anchored .atag { display: inline-flex; }
+  .atag { position: relative; overflow: hidden; }
+  /* The hold: a bar crossing the button in the second the tag wants. */
+  .atag .hold { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: rgba(229, 86, 61, 0.35); pointer-events: none; }
+  .atag.holding .hold { width: 100%; transition: width 0.9s linear; }
+  .wave { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--ember); border-left-color: transparent; border-bottom-color: transparent; transform: rotate(-45deg); flex: 0 0 auto; }
+  @media (prefers-reduced-motion: no-preference) {
+    .anchor.anchored .atag { animation: tag 3.4s var(--ease) infinite; }
+    .anchor.anchored .atag.holding { animation: none; }
+    @keyframes tag { 0%, 70%, 100% { box-shadow: 0 0 0 0 rgba(229, 86, 61, 0); } 18% { box-shadow: 0 0 0 0 rgba(229, 86, 61, 0.45); } 45% { box-shadow: 0 0 0 10px rgba(229, 86, 61, 0); } }
+  }
 
-  /* Shield */
-  .shield { width: min(300px, 100%); height: 440px; border-radius: 36px; padding: 40px 28px 28px; display: flex; flex-direction: column; align-items: center; text-align: center;
+  /* Shield. The box is the phone itself now: a Home Screen, an app that can open over it,
+     and the shield on top of both. */
+  .shieldbox { position: relative; width: min(300px, 100%); height: 440px; overflow: hidden; border-radius: 36px;
+    border: 1px solid rgba(255, 255, 255, 0.16); background: var(--ground);
+    background-image:
+      radial-gradient(ellipse 72% 44% at 26% 106%, rgba(229, 86, 61, 0.55), transparent 62%),
+      radial-gradient(ellipse 62% 40% at 92% -6%, rgba(245, 158, 74, 0.16), transparent 60%);
+    box-shadow: 0 30px 70px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(0, 0, 0, 0.6); }
+  .shield { position: absolute; inset: 0; border-radius: 36px; padding: 40px 28px 28px; display: flex; flex-direction: column; align-items: center; text-align: center;
     background: rgba(229, 86, 61, 0.22); border: 1px solid rgba(255, 255, 255, 0.14); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px);
-    box-shadow: 0 30px 70px rgba(0, 0, 0, 0.5); }
+    transform: translateY(28px) scale(0.94); opacity: 0; pointer-events: none;
+    transition: transform 0.45s var(--ease), opacity 0.45s var(--ease); }
+  .shieldbox.shielded .shield { transform: none; opacity: 1; pointer-events: auto; }
+
+  /* The Home Screen behind it. */
+  .sbhome { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 0 20px 12px; }
+  .sbar { display: flex; justify-content: space-between; align-items: center; padding: 15px 4px 0; font-size: 13px; font-weight: 600; color: var(--cream); flex: 0 0 auto; }
+  .sbsig { display: inline-flex; gap: 2px; align-items: flex-end; }
+  .sbsig i { width: 3px; background: var(--cream); border-radius: 1px; }
+  .sbsig i:nth-child(1) { height: 4px; } .sbsig i:nth-child(2) { height: 6px; } .sbsig i:nth-child(3) { height: 8px; } .sbsig i:nth-child(4) { height: 10px; }
+  .sbapps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 30px 0 0; }
+  .sbapp { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; }
+  .sbwrap { position: relative; display: block; }
+  .sbicon { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 15px; overflow: hidden;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.42), inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+    transition: transform 0.22s var(--ease), filter 0.3s var(--ease); }
+  .sbicon svg { display: block; width: 32px; height: 32px; }
+  .sbapp:hover .sbicon { transform: translateY(-2px); }
+  .sbapp:active .sbicon { transform: scale(0.93); }
+  .sbicon.ig { background: radial-gradient(circle at 28% 108%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285aeb 90%); }
+  .sbicon.ms { background: linear-gradient(180deg, #5DF77A, #08C42C); }
+  .sbicon.ms svg { width: 34px; height: 34px; }
+  .sbicon.nt { background: #FBCF3B; }
+  .sbicon.nt svg { width: 100%; height: 100%; }
+  .sblabel { font-size: 11px; letter-spacing: -0.01em; color: var(--cream); }
+  /* What Screen Time does to a held app: the icon goes grey and the glass sits on its corner. */
+  .sbapp.held .sbicon { filter: grayscale(1) brightness(0.62) contrast(0.92); }
+  .sbapp.held .sblabel { color: var(--faint); }
+  .sbbadge { position: absolute; right: -5px; bottom: -5px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
+    background: rgba(15, 13, 11, 0.94); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2); }
+  .sbbadge canvas { width: 13px; height: 17px; }
+  .sbdots { margin-top: auto; display: flex; justify-content: center; gap: 6px; }
+  .sbdots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(245, 239, 230, 0.25); }
+  .sbdots i.on { background: rgba(245, 239, 230, 0.75); }
+  .hbar { display: block; width: 108px; height: 4px; margin: 16px auto 0; border-radius: 2px; background: rgba(245, 239, 230, 0.4); }
+
+  /* An app that isn't in a rule, opening out of its own icon. */
+  .avview { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 0 18px 4px; background: var(--ground);
+    transform: scale(0.34); transform-origin: var(--ox, 50%) var(--oy, 30%); opacity: 0; pointer-events: none;
+    transition: transform 0.4s var(--ease), opacity 0.24s var(--ease); }
+  .shieldbox.inapp .avview { transform: none; opacity: 1; pointer-events: auto; }
+  .avpane[hidden] { display: none; }
+  .avtitle { font-family: var(--display); font-weight: 700; font-size: 26px; letter-spacing: -0.025em; color: var(--cream); padding: 22px 4px 14px; }
+  .avrow { display: flex; align-items: center; gap: 10px; padding: 11px 4px; border-top: 1px solid var(--edge); }
+  .avface { width: 34px; height: 34px; border-radius: 50%; background: var(--c); display: grid; place-items: center; flex: 0 0 auto; font-family: var(--display-small); font-weight: 600; font-size: 14px; color: #fff; }
+  .avwho { display: flex; flex-direction: column; min-width: 0; }
+  .avwho b { font-family: var(--display-small); font-weight: 600; font-size: 13.5px; color: var(--cream); }
+  .avwho i { font-style: normal; font-size: 11.5px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .avwhen { margin-left: auto; align-self: flex-start; padding-top: 2px; font-size: 10.5px; color: var(--faint); flex: 0 0 auto; }
+  .avnote { display: flex; flex-direction: column; gap: 9px; padding: 14px 14px 16px; border-radius: 14px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--edge); }
+  .avnote b { font-family: var(--display-small); font-weight: 600; font-size: 14px; color: var(--cream); }
+  .avnote span { font-size: 12.5px; color: var(--muted); }
+  .hbtn { margin-top: auto; width: 100%; padding: 14px 0 12px; border: 0; background: none; cursor: pointer; }
+  .hbtn .hbar { margin: 0 auto; transition: background 0.2s var(--ease); }
+  .hbtn:hover .hbar { background: var(--cream); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .shield, .avview, .sbicon { transition-duration: 0.01ms; }
+    .avview { transform: none; }
+  }
   .sglass { width: 90px; height: 120px; margin-top: 36px; }
   .stitle { font-family: var(--display-small); font-weight: 600; font-size: 20px; color: var(--cream); margin-top: 28px; }
   .ssub { font-size: 14px; color: var(--muted); margin-top: 6px; }
-  .close { margin-top: auto; width: 100%; padding: 14px 0; border-radius: 999px; background: var(--cream); color: var(--ground); font-weight: 600; font-size: 15px; }
+  .close { margin-top: auto; width: 100%; padding: 14px 0; border: 0; border-radius: 999px; background: var(--cream); color: var(--ground);
+    font-family: var(--body); font-weight: 600; font-size: 15px; cursor: pointer; transition: transform 0.2s var(--ease), background 0.2s var(--ease); }
+  .close:hover { background: #fff; transform: translateY(-1px); }
+  .close:active { transform: translateY(0) scale(0.985); }
 
   /* Legend */
   .legend { padding-top: clamp(64px, 10vh, 120px); }
@@ -402,7 +1156,10 @@ const legend = [
   .legend .head .lede { margin-top: 14px; max-width: 64ch; }
   .swatches { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 32px; }
   .swatch { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 20px 12px 16px; border-radius: 16px; background: var(--ground); border: 1px solid rgba(255, 255, 255, 0.07);
-    background-image: radial-gradient(ellipse 90% 60% at 30% 115%, rgba(229, 86, 61, 0.22), transparent 60%); }
+    background-image: radial-gradient(ellipse 90% 60% at 30% 115%, rgba(229, 86, 61, 0.22), transparent 60%);
+    font: inherit; color: inherit; cursor: pointer; transition: border-color 0.2s var(--ease), transform 0.2s var(--ease); }
+  .swatch:hover, .swatch:focus-visible { border-color: rgba(255, 255, 255, 0.2); transform: translateY(-2px); }
+  .swatch[aria-pressed='true'] { border-color: rgba(245, 158, 74, 0.5); }
   .swatch canvas { width: 60px; height: 80px; }
   .swatch .l { font-size: 12px; color: var(--muted); text-align: center; line-height: 1.35; }
   .swatch .l b { display: block; color: var(--cream); font-weight: 600; font-size: 13px; margin-bottom: 2px; }
