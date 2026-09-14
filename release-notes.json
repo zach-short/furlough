@@ -61,6 +61,24 @@
           "platform": "iphone",
           "title": "The checklist shows what you picked",
           "detail": "The second step of each setting-up checklist now carries the apps it is about: the ones on your list under Rules, the ones the Anchor holds under the Anchor. Coming back from the usage suggestions, that is where you see they landed."
+        },
+        {
+          "kind": "new",
+          "platform": "iphone",
+          "title": "Tags can arm the reader on arrival",
+          "detail": "Swiping to the Anchor page can now put Apple's scan sheet up the moment it opens, so the tag needs no tap of its own first. Off until you turn it on in Tags — the reader row and the guide's first step still arm it by hand either way."
+        },
+        {
+          "kind": "better",
+          "platform": "iphone",
+          "title": "Two setup footnotes came out",
+          "detail": "Adding apps no longer adds that websites work too, and pairing a tag no longer suggests where to leave it. Both said less than they cost the step they sat under."
+        },
+        {
+          "kind": "fixed",
+          "platform": "mac",
+          "title": "An update no longer switches the web filter off",
+          "detail": "A system extension belongs to the copy of Furlough that installed it, so replacing the app with an update — which is how every Mac build lands — left macOS holding the old bundle's copy: activated and enabled by its own account, filtering nothing, with no way for Furlough to tell that apart from a filter nobody had installed yet. Furlough now recognizes its own extension was replaced and reinstalls this build's without being asked."
         }
       ]
     },
