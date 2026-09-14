@@ -1,0 +1,104 @@
+1
+00:00:00,000 --> 00:00:06,440
+All right. Good afternoon. My name is Zachary Short. I'm the primary developer of Furlough.
+
+2
+00:00:07,360 --> 00:00:14,140
+I'm going to demonstrate some of the functionality behind the NFC tags. These are three example NFC
+
+3
+00:00:14,140 --> 00:00:22,260
+tags that I purchased. You can buy them in a case of 50 for about $10. So they're about 25 to 50
+
+4
+00:00:22,260 --> 00:00:29,360
+cents per count. And all I'm going to do is run through the functionality that is required to
+
+5
+00:00:29,360 --> 00:00:33,460
+utilize the NFC tags. There is functionality that is not required to use the NFC tags,
+
+6
+00:00:33,980 --> 00:00:42,720
+but none of that is an issue today. So what I have here is the Furlough app. I can close out of it
+
+7
+00:00:42,720 --> 00:00:49,300
+fully and go back to it. So right now we just have the Furlough app and then an example app of the
+
+8
+00:00:49,300 --> 00:00:53,900
+functionality once it's been implemented. Right now I can open this because nothing's happened to it.
+
+9
+00:00:54,760 --> 00:01:02,320
+And if I go back to Furlough, you notice that I'm primarily being prompted to hold up an NFC tag to
+
+10
+00:01:02,320 --> 00:01:07,040
+the device. You can either scan the NFC tag from the front or from the back, but for the sake of
+
+11
+00:01:07,040 --> 00:01:12,780
+compliancy, I will show the NFC tag breaching the front of the device so that you can see it in view
+
+12
+00:01:12,780 --> 00:01:22,440
+the entire time. So right now, if I click "Hold a tag up", you can see that it is iOS's native NFC detection
+
+13
+00:01:22,440 --> 00:01:31,060
+sheet. And I will bring the tag in view up to the front of the device and it will detect it. And I
+
+14
+00:01:31,060 --> 00:01:42,460
+will give it a name like tag and I will pair it and it will suggest for me some places to put it such as a
+
+15
+00:01:42,460 --> 00:01:51,660
+bedroom or work, et cetera, et cetera. Now I can drop the anchor, which means that the NFC tag will block the
+
+16
+00:01:51,660 --> 00:01:59,220
+apps from opening and they can only be reopened by scanning the NFC tag. You do not need the NFC tag to
+
+17
+00:01:59,220 --> 00:02:07,800
+initially block the apps. So I will anchor it and I will decline these prompts, which are related to
+
+18
+00:02:07,800 --> 00:02:16,200
+sending the apps to my Mac. If I have one and now I will go back out of the app. You'll notice that
+
+19
+00:02:16,200 --> 00:02:23,920
+Instagram is now blocked. If I open it, it explains to me why I need to unanchor with my tag in
+
+20
+00:02:23,920 --> 00:02:31,520
+Furlough. So we'll do that now. We'll close the app, go back to Furlough and you'll notice here, I can
+
+21
+00:02:31,520 --> 00:02:37,240
+either click unanchor or I can click "Hold a tag up" for the sake of demonstration. I'll show you what
+
+22
+00:02:37,240 --> 00:02:42,880
+happens if you try to use a tag that has not been anchored before or paired. For example, this one,
+
+23
+00:02:44,440 --> 00:02:52,280
+bring it up. It says that it failed because that is not a known anchor. Now, if I go to unanchor the
+
+24
+00:02:52,280 --> 00:03:02,120
+original tag that we paired earlier, the apps unlock and I go back to my Instagram and I can open it.
+
+25
+00:03:04,200 --> 00:03:10,840
+This is the totality of the functionality involving NFC tags, which are commoditized and not proprietary
+
+26
+00:03:10,840 --> 00:03:14,680
+hardware with Furlough. Thank you.
+
