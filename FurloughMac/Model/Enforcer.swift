@@ -18,6 +18,13 @@ final class Enforcer {
     let browsers = Browsers()
     let webFilter = WebFilter()
     var onChange: (() -> Void)?
+    /// The day just turned over on this Mac's own clock. There is no midnight DeviceActivity
+    /// callback here the way there is on the phone, so this — the usage ledger's own
+    /// day-boundary check, which already runs once a day whether or not anyone opens Furlough —
+    /// is what stands in for it. It is what keeps a planned weekly digest
+    /// (`PendingNotifications.weeklyDigests`) from firing with a streak counted through days
+    /// that had not happened yet when it was last planned: see `MacModel.start()`.
+    var onDayRollover: ((SharedState) -> Void)?
 
     private var timer: Timer?
     private var observers: [any NSObjectProtocol] = []
@@ -151,6 +158,7 @@ final class Enforcer {
             ledger = UsageLedger(dayKey: dayKey)
             ledger.save()
             windowWarned = [:]
+            onDayRollover?(state)
         }
         var decision = Policy.decide(config: state.config, runtime: state.runtime, now: now)
         let front = Front.current(browsers: browsers, readsAddress: state.config.targets.contains { $0.kind.isHost })

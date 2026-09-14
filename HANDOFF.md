@@ -2886,6 +2886,22 @@ The plan for this stretch. Tick each phase off here as it lands.
     two calls, the digest actually firing and the placement screen all need the device, and the
     tests at the end of `PASSOFF.md` items 16–20 say what to do.
 
+    **Fixed 2026-09-13: the digest could go stale on the Mac, in exactly the case it exists
+    for.** A review of this step found that `PendingNotifications.sync` — the thing that keeps
+    a planned digest converging on the truth as its target week actually happens — was reached
+    on the Mac only from `MacModel.enforce()`, and `enforce()` runs only at launch and on a
+    person's own edits. The phone gets a free correction the Mac never did: the DeviceActivity
+    day boundary wakes `MonitorExtension` every midnight regardless of whether anyone opens
+    Furlough, so its last replan before a Monday-morning fire always lands after the reported
+    week is real. A Mac nobody touches a rule on between a Tuesday and the following Monday had
+    nothing waking it the same way, and `Record.streak` reads a day with no entry as clean — so
+    a digest last planned mid-week could fire having counted the rest of that week, still in the
+    future when it was computed, as an unbroken run. `Enforcer` already runs a day-boundary
+    check once a day for the usage ledger, on its own, whether Furlough is opened or not: it now
+    exposes that moment as `Enforcer.onDayRollover(SharedState)`, and `MacModel.start()` wires it
+    straight to `PendingNotifications.sync`. No new state, no change to `Record` or to the plan
+    itself — the Mac now gets the same guaranteed pre-fire correction the phone already had.
+
 ## Style rules
 
 Swift 6 language mode with approachable concurrency, SwiftUI, `@Observable`, async/await, no

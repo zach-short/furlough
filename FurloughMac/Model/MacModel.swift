@@ -111,6 +111,17 @@ final class MacModel {
             self?.reload()
             WidgetCenter.shared.reloadAllTimelines()
         }
+        // The one touch a week nobody opens Furlough still gets: `enforce(reason:)` is what
+        // re-plans the weekly digest everywhere else, but it only runs on launch and on a
+        // person's own edits, and this Mac has no midnight callback waking it the way the
+        // phone's monitor extension does. The usage ledger's own day-boundary check inside the
+        // enforcer's tick is the thing that already happens once a day regardless, so it is
+        // what stands in for one here — see `Enforcer.onDayRollover`.
+        enforcer.onDayRollover = { [weak self] state in
+            guard let self else { return }
+            let clock = state.clock()
+            PendingNotifications.sync(state: state, now: clock.now, drift: clock.drift, digest: self.weeklyDigest)
+        }
         enforcer.start()
         startTicking()
         reload()
