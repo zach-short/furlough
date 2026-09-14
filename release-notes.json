@@ -6,7 +6,7 @@
       "date": "2026-09-12",
       "channel": "unreleased",
       "headline": "Settings became a menu.",
-      "lead": "Settings was every setting at once, which made the two things people come here to change as hard to find as the five they do not. It is a menu now. Beside it, the last of the two-halves work on the usage screen. These went out on 11 September inside the final 1.1 builds; this is that batch given the number it should have had.",
+      "lead": "Settings was every setting at once, which made the two things people come here to change as hard to find as the five they do not. It is a menu now. Beside it, the last of the two-halves work on the usage screen, and the pass that made it feel as quick as it always was. Most of this went out on 11 September inside the final 1.1 builds; this is that batch given the number it should have had.",
       "changes": [
         {
           "kind": "better",
@@ -42,7 +42,25 @@
           "kind": "fixed",
           "platform": "iphone",
           "title": "Apply stopped spinning for ever",
-          "detail": "A Screen Time query that never answers no longer leaves the button turning. It has a deadline now, and says what happened when the deadline passes."
+          "detail": "A Screen Time query that never answers no longer leaves the button turning. It had a deadline first; now it has no wait at all — see “Apply happens when you press it” below."
+        },
+        {
+          "kind": "fixed",
+          "platform": "iphone",
+          "title": "Apply happens when you press it",
+          "detail": "The suggestions on Where the time went wrote the rule straight away and then sat there spinning, because the button was waiting on a question to Screen Time that the work did not need an answer to. The card is answered in the frame you press it now. Furlough puts the question afterwards, and if anything turns out not to have gone through it says which app and offers it again."
+        },
+        {
+          "kind": "better",
+          "platform": "iphone",
+          "title": "The Anchor's button says what it does",
+          "detail": "A suggestion bound for the Anchor used to offer “Hold it”, which read as something happening on the spot. It says “Add to the Anchor’s list”, because that is all it does — nothing is out of reach until you drop the anchor."
+        },
+        {
+          "kind": "better",
+          "platform": "iphone",
+          "title": "The checklist shows what you picked",
+          "detail": "The second step of each setting-up checklist now carries the apps it is about: the ones on your list under Rules, the ones the Anchor holds under the Anchor. Coming back from the usage suggestions, that is where you see they landed."
         }
       ]
     },

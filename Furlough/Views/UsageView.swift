@@ -33,28 +33,63 @@ struct UsageView: View {
     /// Applied cards asked to open back up, by `Recommendation.key`. Applying folds a card, so
     /// this is the set that overrides that — empty is the ordinary case.
     @State private var expanded: Set<String> = []
-    @State private var busy: String?
+    /// Cards answered before Screen Time had the last word on their token, by
+    /// `Recommendation.key`. See `Optimistic`, `confirm` and `land`.
+    @State private var optimistic: [String: Optimistic] = [:]
+    /// What this run could not finish, in the order it gave up on them. The toast's whole
+    /// content; emptied by Dismiss or by Try again.
+    @State private var trouble: [Trouble] = []
+    /// The Done button is settling the last of `optimistic` before it lets the step close.
+    @State private var finishing = false
     /// Where Path A has got to; see `Phase`.
     @State private var phase = Phase.reading
     /// Screen Time is still being asked for the tokens (`nameApps`). While this is true a card
     /// whose app the tables did not know is held back, because there is nothing to call it yet,
-    /// and Apply waits for the answer rather than asking the same slow question a second time —
-    /// over a token out of the cache too, while `fromCache` says so.
+    /// and a card answered before its token arrived waits on this answer rather than asking the
+    /// same slow question a second time — see `land`.
     @State private var naming = false
     /// The tokens on the page came out of `TokenCache` and Screen Time has not confirmed them
     /// yet. True from the moment the cache is folded in until the first answered pass of
-    /// `nameApps`; it is what holds Apply back over a token that may name an app deleted since
-    /// the last visit — see `apply`.
+    /// `nameApps`; it is what makes an Apply over one of those tokens worth checking afterwards
+    /// — see `apply` and `confirm`.
     @State private var fromCache = false
     /// How many times to ask Screen Time for the tokens before giving up on them, each ask given
     /// `UsageReader.patience`. Three, a second apart: long enough to ride out a query that simply
     /// did not answer, short enough that the icons stop changing under the reader within the
     /// minute. Nothing on the page waits on this; see `nameApps`.
     private static let namingAttempts = 3
-    /// How long Apply waits for `nameApps` to confirm a token before going with the one it has.
-    /// Shorter than the naming can run, on purpose: the wait is worth something, and a button
-    /// that has been spinning for ten seconds is already worse than the thing the wait prevents.
-    private static let applyPatience: Duration = .seconds(10)
+    /// How long the Done button will settle outstanding work before it closes the step anyway.
+    /// Short, because by the time a screenful of cards has been read the naming answered long
+    /// ago and this is nearly always zero — and because a card still owed at the end keeps
+    /// finishing on its own after the step closes; the only thing given up on is the toast.
+    private static let finishPatience: Duration = .seconds(3)
+
+    /// A card answered before Screen Time had the last word on its token.
+    ///
+    /// Two cases, one shape. `done` set: the work is written, on a token the cache supplied and
+    /// Screen Time has not confirmed — `confirm` reads the answer back against it. `done` nil:
+    /// there was no token at all, so nothing could be written yet and `land` is waiting for one.
+    /// Either way the name is kept here, because a card whose app Screen Time ends up disowning
+    /// is gone from `advice` by the time there is anything to say about it, and the toast has to
+    /// be able to say which app.
+    private struct Optimistic {
+        var name: String
+        var done: UsageCardState.Applied?
+    }
+
+    /// Why the work could not be done, in the words the card says back. A type of its own
+    /// because `Result` wants an `Error` on the losing side and the reason is a sentence.
+    private struct Refusal: Error {
+        var reason: String
+        init(_ reason: String) { self.reason = reason }
+    }
+
+    /// One app this run could not finish, and the card to put back as a question.
+    private struct Trouble: Identifiable {
+        let key: String
+        let name: String
+        var id: String { key }
+    }
 
     /// What the page is doing where the app reads the numbers itself. Nothing is shown until the
     /// hours are in; the cards are drawn the moment they are, named from the tables (`Brand`),
@@ -126,9 +161,27 @@ struct UsageView: View {
             }
             .padding(.horizontal, 16)
             .padding(.top, role == .onboarding ? 8 : 0)
-            .padding(.bottom, 40)
+            // Room for the toast while there is one, so the last thing on the page — which on
+            // the way out of the intro is the Done button — never ends up underneath it.
+            .padding(.bottom, trouble.isEmpty ? 40 : 190)
+            .animation(.easeInOut(duration: 0.2), value: trouble.isEmpty)
         }
         .background(EmberWall())
+        // Over the page rather than in it: what could not be finished is news about a card that
+        // has already been folded and scrolled past, and a line appearing somewhere up the list
+        // is a line nobody reads.
+        .overlay(alignment: .bottom) {
+            if !trouble.isEmpty {
+                UsageTroubleToast(
+                    names: trouble.map(\.name),
+                    retry: retryTrouble,
+                    dismiss: { withAnimation(.easeInOut(duration: 0.2)) { trouble = [] } }
+                )
+                .padding(.horizontal, 16)
+                .padding(.bottom, 12)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
         .navigationTitle(role == .onboarding ? "" : "Usage")
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(item: $editing) { RuleEditorView(targetID: $0.id) }
@@ -309,8 +362,7 @@ struct UsageView: View {
                 state: state,
                 offer: offer,
                 destination: $destination,
-                isBusy: busy == item.key,
-                apply: { Task { await apply(item, entry) } },
+                apply: { apply(item, entry) },
                 skip: { withAnimation(.easeInOut(duration: 0.2)) { states[item.key] = .skipped } },
                 undo: { undo(item) },
                 collapse: { withAnimation(.easeInOut(duration: 0.2)) { _ = expanded.remove(item.key) } }
@@ -422,7 +474,10 @@ struct UsageView: View {
             .emberCard()
         }
         if role == .onboarding {
-            ProminentButton(title: applied.isEmpty ? "Skip for now" : "Done") { model.finishUsageStep() }
+            // The check Zach asked for, at the one place there is a step after this one: the
+            // flow has been applying optimistically all the way down the page, and this is
+            // where anything still owed is settled before the step can close on it.
+            ProminentButton(title: finishTitle, isBusy: finishing) { Task { await finish() } }
                 .padding(.top, 4)
             Footnote(
                 text: "You can run this again any time from Settings › Where the time goes.",
@@ -431,10 +486,17 @@ struct UsageView: View {
         }
     }
 
-    /// The suggestions taken this run, in the order they were offered.
+    private var finishTitle: String {
+        if finishing { return "Finishing up…" }
+        return applied.isEmpty ? "Skip for now" : "Done"
+    }
+
+    /// The suggestions taken this run, in the order they were offered. A card whose work is
+    /// still on its way in is not one of them: the closing count says what was done, and a
+    /// pending card has had nothing written for it yet.
     private var applied: [Recommendation] {
         advice.filter {
-            if case .applied = states[$0.key] { return true }
+            if case .applied(let done) = states[$0.key] { return !done.pending }
             return false
         }
     }
@@ -519,6 +581,10 @@ struct UsageView: View {
         summary = nil
         advice = []
         fromCache = false
+        // Nothing on the old page is owed a check any more: the cards it was about are gone,
+        // and whatever those tasks were waiting on will find no card to finish.
+        optimistic = [:]
+        trouble = []
         await load()
     }
 
@@ -585,6 +651,9 @@ struct UsageView: View {
         // Time: there is nothing to show. An honestly empty fortnight is not this.
         phase = (!advice.isEmpty && named.isEmpty) ? .nameless : .ready
         advice = named
+        // Screen Time has had its say, so anything answered on the cache's word before it can be
+        // checked against it. Last, because it reads `advice` and `summary` as they now stand.
+        confirm()
     }
 
     /// Suggestions the tables had no name for.
@@ -598,56 +667,57 @@ struct UsageView: View {
 
     /// Do what the card offered, wherever the card said it lands: write the suggested rule,
     /// adding the app to Rules first when Furlough does not manage it yet; put it on the
-    /// Anchor's list; or both. A usage entry may arrive without a token; then the token is
-    /// looked up among what is installed — the anchor needs one exactly as much as a rule does,
-    /// since its list is tokens too. Adding to Rules goes through the picker path with
-    /// everything already chosen kept in the selection, because `applyPicker` schedules a
-    /// removal for whatever it does not see.
-    private func apply(_ item: Recommendation, _ entry: UsageEntry) async {
+    /// Anchor's list; or both.
+    ///
+    /// Nothing here waits. Every line of the work itself is a write to the App Group and a
+    /// redraw (`write`), so the card can be answered in the frame the button was pressed in —
+    /// and until 2026-09-13 it was not, because Apply asked Screen Time a question first and
+    /// Screen Time is the slowest thing on the phone. That wait bought one guarantee: a token
+    /// out of the cache names what was installed at the *last* visit, and an app deleted since
+    /// is the case where it is wrong. The guarantee is worth having; paying for it in front of
+    /// the button was not. So the work goes in now on the token in hand, and the check moves
+    /// behind it — `confirm` reads Screen Time's answer back the moment `nameApps` has it, and
+    /// anything it disowns is taken off again and named in the toast.
+    ///
+    /// The one case with nothing to go on is a card Screen Time has handed no token for at all,
+    /// which is the first visit before the first answer. There the card is still answered on the
+    /// spot and marked `pending`, and `land` finishes it when the token arrives.
+    private func apply(_ item: Recommendation, _ entry: UsageEntry) {
         guard #available(iOS 26.4, *) else { return }
-        busy = item.key
-        defer { busy = nil }
+        // Answering a card again takes it out of the toast: whatever it says about this app is
+        // about the previous answer, and there is a new one now.
+        withAnimation(.easeInOut(duration: 0.2)) { trouble.removeAll { $0.key == item.key } }
 
-        var entry = entry
-        if naming, entry.targetKind == nil || fromCache {
-            // `nameApps` is asking Screen Time this very question for every card at once, and
-            // asking it again for this one would be a second slow query racing the first. Wait
-            // for that answer instead; the button reads "Applying…" meanwhile.
-            //
-            // A token out of the cache waits too, even though it is right here. It says what was
-            // installed at the last visit, and an app deleted since is exactly the case where it
-            // is wrong — writing a rule on it would leave a target nothing can name and no shield
-            // will ever cover, past the half hour `undoFreshTarget` allows. So the one place the
-            // cache is not trusted is the place where being wrong outlives the screen.
-            //
-            // Bounded, though, because `nameApps` is waiting on Screen Time and Screen Time is
-            // not obliged to answer at all: a wait that ended only when the naming did is what
-            // left "Applying…" on this button for good. Past `applyPatience` the button goes
-            // with the token it has — a rule on a stale token is wrong for half an hour and
-            // `undo` is on the card, where a button that never comes back is wrong for ever.
-            let deadline = ContinuousClock.now.advanced(by: Self.applyPatience)
-            while naming, !Task.isCancelled, ContinuousClock.now < deadline {
-                try? await Task.sleep(for: .milliseconds(200))
-            }
-            entry = summary?.entry(for: item) ?? entry
-            if naming {
-                SharedStore.log("usage: apply for \(entry.key) went ahead while Screen Time was still being asked")
-            }
-        }
-        var kind = entry.targetKind
-        if kind == nil {
-            do {
-                kind = try await UsageReader.kind(forKey: entry.key, within: UsageReader.patience)
-            } catch {
-                states[item.key] = .failed(error.localizedDescription)
-                return
-            }
-        }
-        guard let kind else {
-            states[item.key] = .failed("Screen Time counted \(entry.plainName) but gave no token for it, so there is nothing for Furlough to act on.")
+        guard let kind = entry.targetKind else {
+            var done = UsageCardState.Applied(message: "")
+            done.pending = true
+            settle(item, done)
+            optimistic[item.key] = Optimistic(name: entry.plainName, done: nil)
+            Task { await land(item, entry) }
             return
         }
+        switch write(item, entry, on: kind) {
+        case .success(let done):
+            settle(item, done)
+            // Cached, so it says what was installed last visit and Screen Time has not been
+            // heard from since. `confirm` is where that is read back.
+            if fromCache { optimistic[item.key] = Optimistic(name: entry.plainName, done: done) }
+        case .failure(let refusal):
+            states[item.key] = .failed(refusal.reason)
+        }
+    }
 
+    /// The work itself, on a token already in hand: the rule, the place on the anchor's list, or
+    /// both. Every line is a write to the App Group and an enforce — no query and no await — so
+    /// this is what makes an instant Apply honest rather than optimistic.
+    ///
+    /// Adding to Rules goes through the picker path with everything already chosen kept in the
+    /// selection, because `applyPicker` schedules a removal for whatever it does not see.
+    private func write(
+        _ item: Recommendation,
+        _ entry: UsageEntry,
+        on kind: TargetKind
+    ) -> Result<UsageCardState.Applied, Refusal> {
         let landing = landing()
         var done = UsageCardState.Applied(message: "")
 
@@ -670,8 +740,7 @@ struct UsageView: View {
                 fresh = true
             }
             guard let target = model.state.config.targets.first(where: { $0.kind == kind }) else {
-                states[item.key] = .failed("Could not add \(entry.plainName).")
-                return
+                return .failure(Refusal("Could not add \(entry.plainName)."))
             }
             let outcome = model.apply(rule: item.rule, nickname: target.nickname, for: target.id, andTo: [])
             done.targetID = target.id
@@ -686,20 +755,155 @@ struct UsageView: View {
             // there is not. An anchor-only person gets no rules row out of this at all.
             let doors = model.state.config.target(kind: kind)?.kinds ?? [kind]
             guard model.hold(doors) else {
-                states[item.key] = .failed("The Anchor cannot take anything in while it is down.")
-                return
+                return .failure(Refusal("The Anchor cannot take anything in while it is down."))
             }
             done.heldKinds = doors
             let held = "On the Anchor's list: out of reach the moment you drop it."
             done.message = done.message.isEmpty ? held : "\(done.message)\n\n\(held)"
         }
+        return .success(done)
+    }
 
+    /// Marks a card answered and folds it. Folded whatever it was doing before: this is the
+    /// answer to the question the card was asking, and the rest of it has been read by the time
+    /// Apply is pressed.
+    private func settle(_ item: Recommendation, _ done: UsageCardState.Applied) {
         withAnimation(.easeInOut(duration: 0.2)) {
-            // Folded, whatever the card was doing before: this is the answer to the question the
-            // card was asking, and the rest of it has been read by the time Apply is pressed.
             expanded.remove(item.key)
             states[item.key] = .applied(done)
         }
+    }
+
+    /// Finishes a card answered before Screen Time had handed a token over.
+    ///
+    /// It waits on `nameApps` rather than asking anything itself, because `nameApps` is putting
+    /// that very question to Screen Time for every card on the page at once, and a second walk
+    /// of every app on the phone would only queue up behind the first (`UsageReader.Enumeration`).
+    /// Its own ask is the fallback for a naming that came back with nothing at all.
+    ///
+    /// Nothing on screen is held up by any of this: the card was folded and marked the moment
+    /// the button was pressed, and the page below it is still a page.
+    private func land(_ item: Recommendation, _ entry: UsageEntry) async {
+        guard #available(iOS 26.4, *) else { return }
+        while naming, !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(150))
+        }
+        guard !Task.isCancelled else { return }
+        // The card may have been answered again, skipped, or taken back while this was waiting.
+        // Whatever it says now is a later answer than the one this task is carrying.
+        guard isPending(item) else {
+            optimistic[item.key] = nil
+            return
+        }
+        var found = summary?.entry(for: item)?.targetKind
+        if found == nil {
+            found = try? await UsageReader.kind(forKey: entry.key, within: UsageReader.patience)
+        }
+        optimistic[item.key] = nil
+        guard isPending(item) else { return }
+        guard let kind = found else {
+            SharedStore.log("usage: \(entry.key) was applied optimistically and Screen Time never named it")
+            giveUp(item, name: entry.plainName, done: nil)
+            return
+        }
+        switch write(item, summary?.entry(for: item) ?? entry, on: kind) {
+        case .success(let done): settle(item, done)
+        case .failure(let refusal): states[item.key] = .failed(refusal.reason)
+        }
+    }
+
+    /// Reads Screen Time's answer back against every card applied before it arrived.
+    ///
+    /// By the time this runs, `fillingTokens` has resolved every entry on the page against what
+    /// is installed *now* — it clears each token before it looks one up — so an entry that has
+    /// lost its token is an app that is no longer there. A card applied on the cache's word
+    /// about it was applied on a token nothing will ever name or shield, and the honest thing is
+    /// to take it back off and say which app it was.
+    ///
+    /// Cards still waiting for a first token are not this function's business: `land` is holding
+    /// them and is about to be let go.
+    private func confirm() {
+        guard let read = summary else { return }
+        let alive = Set(read.entries.compactMap { $0.targetKind != nil ? $0.key : nil })
+        for (key, pending) in optimistic {
+            guard let done = pending.done else { continue }
+            optimistic[key] = nil
+            guard !alive.contains(key) else { continue }
+            // Undone by hand, skipped, or answered again since: whatever the card says now is a
+            // later answer than the one being checked, and it is not this pass's to overrule.
+            guard isApplied(key) else { continue }
+            guard let item = advice.first(where: { $0.key == key }) else {
+                // The card is gone from the page with the app; take the work back all the same.
+                takeBack(done)
+                trouble.append(Trouble(key: key, name: pending.name))
+                continue
+            }
+            SharedStore.log("usage: took \(key) back — the cache's token named an app Screen Time no longer has")
+            giveUp(item, name: pending.name, done: done)
+        }
+    }
+
+    /// Undoes an optimistic answer and puts the card back as a question, with the app named in
+    /// the toast. Only what this flow made itself comes off: a rule written on a row that was
+    /// already there is a loosening like any other and belongs in the editor.
+    /// What a card says now, for the two passes that come back to a page which has moved on
+    /// without them. `land` carries an answer that is only still wanted while the card is
+    /// pending; `confirm` may only take back an answer the card is still standing on.
+    private func isPending(_ item: Recommendation) -> Bool {
+        guard case .applied(let done) = states[item.key] else { return false }
+        return done.pending
+    }
+
+    private func isApplied(_ key: String) -> Bool {
+        guard case .applied(let done) = states[key] else { return false }
+        return !done.pending
+    }
+
+    private func takeBack(_ done: UsageCardState.Applied) {
+        if done.holds { model.stopHolding(done.heldKinds) }
+        if let targetID = done.targetID, done.fresh { _ = model.undoFreshTarget(targetID) }
+    }
+
+    private func giveUp(_ item: Recommendation, name: String, done: UsageCardState.Applied?) {
+        if let done { takeBack(done) }
+        withAnimation(.easeInOut(duration: 0.2)) {
+            states[item.key] = .offered
+            trouble.removeAll { $0.key == item.key }
+            trouble.append(Trouble(key: item.key, name: name))
+        }
+    }
+
+    /// The toast's own button: offer every one of them again, on whatever Screen Time knows now.
+    private func retryTrouble() {
+        let again = trouble
+        withAnimation(.easeInOut(duration: 0.2)) { trouble = [] }
+        for one in again {
+            guard let item = advice.first(where: { $0.key == one.key }),
+                  let entry = summary?.entry(for: item)
+            else { continue }
+            apply(item, entry)
+        }
+    }
+
+    /// The Done button. Settles whatever is still on its way in before the step closes, which is
+    /// the check the optimistic Apply owes: anything that could not be finished is named here,
+    /// on the last screen that can still do something about it, rather than silently not being
+    /// there afterwards. Bounded by `finishPatience`, because a card left owing keeps finishing
+    /// on its own after the step closes and only the toast is given up on.
+    private func finish() async {
+        let known = Set(trouble.map(\.key))
+        if !optimistic.isEmpty {
+            finishing = true
+            let deadline = ContinuousClock.now.advanced(by: Self.finishPatience)
+            while !optimistic.isEmpty, ContinuousClock.now < deadline {
+                try? await Task.sleep(for: .milliseconds(150))
+            }
+            finishing = false
+        }
+        // Trouble the settle turned up is news, and the step stays open on it. Trouble that was
+        // already on the page has been read, and pressing Done over it means Done.
+        guard trouble.allSatisfy({ known.contains($0.key) }) else { return }
+        model.finishUsageStep()
     }
 
     /// Where this card's answer lands: the half on offer, or the segment's answer when both are.

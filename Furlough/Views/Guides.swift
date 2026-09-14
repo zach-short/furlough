@@ -29,6 +29,11 @@ extension HalfGuide {
                 title: "Give the first one a rule",
                 detail: "A minute budget, and allowed windows if you want them — the same every day, or different at weekends.",
                 footnote: "Adding an app enforces nothing on its own. Saving its first rule is what starts it.",
+                // What step one actually picked up, in icons. Most of these arrive from the
+                // fortnight's Apply button, which folds its card the moment it is pressed and
+                // then sends you here; without this the next thing you see says nothing at all
+                // about what you just agreed to.
+                kinds: config.targets.map(\.kind),
                 isDone: config.targets.contains { $0.rule != nil }
             ),
             Step(
@@ -58,6 +63,9 @@ extension HalfGuide {
                 title: "Choose what it holds",
                 detail: "A list you lock, or the whole phone with a few apps left open.",
                 footnote: "No delay applies to the Anchor. Dropping it only ever takes things away.",
+                // The list itself, so the step that is about a list shows one. The fortnight's
+                // cards add to it from a screen away, and this is where that lands.
+                kinds: anchor.kinds,
                 isDone: anchor.hasSomethingToHold
             ),
             Step(
@@ -123,14 +131,23 @@ private struct GuideStepRow<Action: View>: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             marker
+                .opacity(dimmed)
             VStack(alignment: .leading, spacing: 3) {
-                Text(step.title)
-                    .emberDisplaySmall(13.5)
-                    .foregroundStyle(Ember.cream)
-                Text(step.detail)
-                    .emberBody(11.5)
-                    .foregroundStyle(Ember.muted)
-                    .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(step.title)
+                        .emberDisplaySmall(13.5)
+                        .foregroundStyle(Ember.cream)
+                    Text(step.detail)
+                        .emberBody(11.5)
+                        .foregroundStyle(Ember.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .opacity(dimmed)
+                if !step.kinds.isEmpty {
+                    GuideStepEvidence(kinds: step.kinds)
+                        .padding(.top, 6)
+                }
                 if isLive {
                     action
                         .padding(.top, 8)
@@ -140,12 +157,17 @@ private struct GuideStepRow<Action: View>: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 12)
-        // Done and not-yet look different from live in the same way: they are not what you are
-        // being asked to do. A tick is still legible at this opacity; a dim number is the point.
-        .opacity(isLive ? 1 : 0.55)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Step \(number). \(step.title). \(step.isDone ? "Done" : (isLive ? "Now" : "Not yet"))")
     }
+
+    /// Done and not-yet look different from live in the same way: they are not what you are
+    /// being asked to do. A tick is still legible at this opacity; a dim number is the point.
+    ///
+    /// Carried by the marker and the words rather than by the row, because what the step has to
+    /// show for itself is the one thing on it that must not go dim: the icons are there to say
+    /// an app landed, and a step showing them is nearly always a step already done.
+    private var dimmed: Double { isLive ? 1 : 0.55 }
 
     private var marker: some View {
         ZStack {
@@ -164,6 +186,47 @@ private struct GuideStepRow<Action: View>: View {
             }
         }
         .frame(width: 24, height: 24)
+    }
+}
+
+/// What a step has to show for itself, in Apple's own icons: the apps picked, the list the
+/// anchor holds.
+///
+/// The checklist is where somebody arrives back from the fortnight, and the fortnight's Apply
+/// button folds its card and moves on — so without this, the screen you land on after agreeing
+/// to three suggestions says nothing about the three. Icons rather than a count, because the
+/// question being asked is "did TikTok go through", and a count cannot answer it.
+///
+/// Six, then a number: the same six across the Anchor's own grid uses, and few enough that the
+/// strip still fits beside a step number on the narrowest phone. It is feedback inside a
+/// checklist row and must not turn into the list itself, which is a scroll away on either half.
+struct GuideStepEvidence: View {
+    let kinds: [TargetKind]
+    private static let shown = 6
+
+    private var tiles: [TargetKind] { Array(kinds.prefix(Self.shown)) }
+    private var rest: Int { max(0, kinds.count - Self.shown) }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(Array(tiles.enumerated()), id: \.offset) { _, kind in
+                TokenTile(kind: kind, size: 26)
+            }
+            if rest > 0 {
+                Text("+\(rest)")
+                    .font(EmberFont.numerals(11))
+                    .foregroundStyle(Ember.muted)
+                    .frame(minWidth: 26, minHeight: 26)
+                    .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .strokeBorder(Ember.cardBorder, lineWidth: 1)
+                    )
+            }
+            Spacer(minLength: 0)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(kinds.count == 1 ? "1 app" : "\(kinds.count) apps")
     }
 }
 

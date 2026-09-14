@@ -21,6 +21,11 @@ struct HalfGuide {
         /// Sits under the whole card while this step is the live one, so the fact that belongs
         /// to a step arrives with the step rather than three screens earlier.
         var footnote: String?
+        /// What the step has to show for itself: the apps picked, the list the anchor holds.
+        /// Drawn as icons under the words, at full strength whether the step is live or long
+        /// done, because a tick says a step happened and this says what it did. It is the only
+        /// place the checklist answers "did that go through?" without being left.
+        var kinds: [TargetKind] = []
         var isDone: Bool
         var id: String { title }
     }

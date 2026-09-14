@@ -62,18 +62,29 @@ enum UsageCardState: Equatable {
         /// The rule loosened what was there and so has to sit out the delay — the one thing the
         /// collapsed line says for itself rather than keep behind a tap: it names a time.
         var waiting = false
+        /// The card was answered before Screen Time had handed a token over, so nothing has
+        /// been written yet and the work is on its way in behind it. The one case where an
+        /// answered card is not yet a done one; see `UsageView.land`.
+        ///
+        /// The card is folded and marked all the same, because the alternative — the button
+        /// spinning until Screen Time feels like answering — is a screen that says nothing for
+        /// ten seconds about something that will take one. What it does not do is claim the
+        /// work is finished: the mark is amber and the line says what is still owed.
+        var pending = false
 
         var holds: Bool { !heldKinds.isEmpty }
 
         /// Whether Undo can put everything back. A rule written on a row that was already there
         /// is a loosening like any other and belongs in the editor, where the delay is
-        /// explained; everything this flow made itself comes straight back off.
-        var canUndo: Bool { fresh || targetID == nil }
+        /// explained; everything this flow made itself comes straight back off. Nothing to take
+        /// back while the work is still on its way in.
+        var canUndo: Bool { !pending && (fresh || targetID == nil) }
 
-        /// What was done, in the one line the folded card carries. A waiting rule names its
-        /// time and that outranks everything; otherwise the rule as a sentence, the anchor as a
-        /// sentence, or both.
+        /// What was done, in the one line the folded card carries. Still being done outranks
+        /// everything, then a waiting rule, which names its time; otherwise the rule as a
+        /// sentence, the anchor as a sentence, or both.
         func line(for item: Recommendation) -> String {
+            if pending { return "Screen Time has not handed this app over yet. Furlough is still asking — you can keep going." }
             if waiting { return message }
             let rule = targetID != nil ? item.consequence() : nil
             let held = holds ? "Out of reach the moment you drop the anchor." : nil
@@ -101,7 +112,6 @@ struct UsageSuggestionCard: View {
     /// choosing for the run unless the next app deserves something else.
     var offer: UsageOffer = .rules
     @Binding var destination: UsageDestination
-    var isBusy = false
     let apply: () -> Void
     let skip: () -> Void
     let undo: () -> Void
@@ -220,12 +230,16 @@ struct UsageSuggestionCard: View {
 
     // MARK: What happens next
 
-    /// "Apply" writes something with hours in it; "Hold it" only ever puts a name on a list.
-    /// Two words rather than one, because the Anchor's button is not an apply — there is
-    /// nothing to apply — and calling it one would be the card's only dishonest word.
+    /// "Apply" writes something with hours in it; the Anchor's button only ever puts a name on
+    /// a list, and says so in the words the rest of the app calls that list by. Not "Hold it",
+    /// which read as the thing happening on the spot — nothing goes out of reach until the
+    /// anchor is dropped, and a button promising otherwise is the card's only dishonest word.
+    ///
+    /// No busy title, because there is no busy: Apply writes what it can the moment it is
+    /// pressed. What is not in hand yet is said on the folded card, where it can be read
+    /// without holding the page up — see `UsageCardState.Applied.pending`.
     private var applyTitle: String {
-        if isBusy { return landing == .anchor ? "Holding…" : "Applying…" }
-        return landing == .anchor ? "Hold it" : "Apply"
+        landing == .anchor ? "Add to the Anchor's list" : "Apply"
     }
 
     @ViewBuilder
@@ -237,8 +251,7 @@ struct UsageSuggestionCard: View {
                     UsageDestinationPicker(destination: $destination)
                 }
                 HStack(spacing: 12) {
-                    ProminentButton(title: applyTitle, isBusy: isBusy, action: apply)
-                        .disabled(isBusy)
+                    ProminentButton(title: applyTitle, action: apply)
                     GhostButton(title: "Skip", color: Ember.muted, action: skip)
                         .frame(width: 78)
                 }
@@ -246,14 +259,11 @@ struct UsageSuggestionCard: View {
         case .applied(let done):
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 7) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Ember.moss)
-                    Eyebrow(text: "Applied", color: Ember.moss)
+                    UsageAppliedMark(pending: done.pending)
                     Spacer()
                     if done.canUndo { UsageUndoButton(action: undo) }
                 }
-                Text(done.message)
+                Text(done.pending ? done.line(for: item) : done.message)
                     .emberBody(12)
                     .foregroundStyle(Ember.muted)
                     .fixedSize(horizontal: false, vertical: true)
@@ -384,12 +394,7 @@ struct UsageAppliedLine: View {
                 // The anchor's own mark where the anchor took it in, so a folded list says
                 // which half each line landed on without being read.
                 if done.holds { AnchorGlyph(isAnchored: false, size: 20) }
-                HStack(spacing: 5) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Ember.moss)
-                    Eyebrow(text: "Applied", color: Ember.moss)
-                }
+                UsageAppliedMark(pending: done.pending, size: 12)
             }
             // What was done, said in one line, so folding does not hide what was agreed to.
             Text(done.line(for: item))
@@ -466,6 +471,82 @@ struct UsageSkippedLine: View {
         // Anywhere at all: there is no other button on this line to take a tap first.
         .onTapGesture(perform: reopen)
         .emberCard()
+    }
+}
+
+/// Whether an answered card is done or still on its way: a moss tick, or an amber hourglass
+/// turning. One view for both places a card says so — open and folded — so the two cannot drift
+/// into disagreeing about what "Applied" looks like.
+struct UsageAppliedMark: View {
+    /// See `UsageCardState.Applied.pending`.
+    let pending: Bool
+    var size: CGFloat = 13
+
+    var body: some View {
+        HStack(spacing: pending ? 7 : 5) {
+            if pending {
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(Ember.amber)
+                    .frame(width: size + 3, height: size + 3)
+            } else {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: size, weight: .semibold))
+                    .foregroundStyle(Ember.moss)
+            }
+            Eyebrow(text: pending ? "Adding" : "Applied", color: pending ? Ember.amber : Ember.moss)
+        }
+    }
+}
+
+/// The apps this run could not finish, after the fact.
+///
+/// The flow applies on the spot and checks afterwards, because the check is a question to
+/// Screen Time and Screen Time answers when it feels like it. Nearly always it passes and this
+/// is never drawn; when it does not, what could not be managed is named here — not left as a
+/// number, because the whole point is knowing which one — put back as a question on the page,
+/// and offered again.
+struct UsageTroubleToast: View {
+    let names: [String]
+    let retry: () -> Void
+    let dismiss: () -> Void
+
+    private var line: String {
+        let list = names.formatted(.list(type: .and))
+        return names.count == 1
+            ? "Furlough could not finish \(list). Screen Time never handed the app over, so nothing was written for it."
+            : "Furlough could not finish \(list). Screen Time never handed those apps over, so nothing was written for them."
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 7) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Ember.ember)
+                Eyebrow(text: names.count == 1 ? "1 app did not go through" : "\(names.count) apps did not go through", color: Ember.ember)
+                Spacer(minLength: 8)
+            }
+            Text(line)
+                .emberBody(12)
+                .foregroundStyle(Ember.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 18) {
+                Button("Try again", action: retry)
+                    .emberBody(13, .semibold)
+                    .foregroundStyle(Ember.amber)
+                    .buttonStyle(.plain)
+                Button("Dismiss", action: dismiss)
+                    .emberBody(13, .semibold)
+                    .foregroundStyle(Ember.muted)
+                    .buttonStyle(.plain)
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(14)
+        .emberCard()
+        .shadow(color: .black.opacity(0.4), radius: 18, y: 6)
+        .accessibilityElement(children: .contain)
     }
 }
 
