@@ -82,6 +82,11 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+        # Every screen here (EmberWall's proportions, the fixed hourglass/list layouts) is
+        # portrait-only by design, same as the iPhone build. On iPad, that's only allowed
+        # alongside this key — otherwise Apple requires all four orientations for multitasking.
+        # Also opts out of Split View / Slide Over, which nothing here has been built to handle.
+        UIRequiresFullScreen: true
         UIAppFonts:
           - BricolageGrotesque_72pt-Bold.ttf
           - BricolageGrotesque_48pt-SemiBold.ttf
@@ -97,7 +102,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.zachshort.furlough
-        TARGETED_DEVICE_FAMILY: "1"
+        TARGETED_DEVICE_FAMILY: "1,2"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         ENABLE_PREVIEWS: YES
@@ -137,7 +142,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.zachshort.furlough.monitor
-        TARGETED_DEVICE_FAMILY: "1"
+        TARGETED_DEVICE_FAMILY: "1,2"
 
   FurloughShield:
     type: app-extension
@@ -173,7 +178,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.zachshort.furlough.shield
-        TARGETED_DEVICE_FAMILY: "1"
+        TARGETED_DEVICE_FAMILY: "1,2"
 
   # App Review's automated scan rejected build 202609090423 (2026-09-09, guideline 2.5.1)
   # because this target linked ManagedSettings — Shared/Core imports it for the token types
@@ -237,7 +242,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.zachshort.furlough.widgets
-        TARGETED_DEVICE_FAMILY: "1"
+        TARGETED_DEVICE_FAMILY: "1,2"
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
 
   # The rules engine on its own. Shared/Core is pure Foundation and already builds for macOS,
@@ -293,7 +298,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.zachshort.furlough.report
-        TARGETED_DEVICE_FAMILY: "1"
+        TARGETED_DEVICE_FAMILY: "1,2"
 
   FurloughCoreTests:
     type: bundle.unit-test

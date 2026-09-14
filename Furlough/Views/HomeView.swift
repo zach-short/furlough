@@ -161,6 +161,7 @@ private struct RulesPage: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 48)
+                .emberPageWidth()
             }
         }
     }
@@ -440,6 +441,10 @@ struct HeroPage: View {
     /// this far to avoid cutting off the halo.
     static let glowSpill: CGFloat = 3 * glowRadius
     private static let glowRadius: CGFloat = 20
+    /// Caps the hourglass-and-text row on iPad, where the page slot is the full container width:
+    /// without this the trailing `Spacer` stretches to fill it, stranding the content at the
+    /// leading edge. Wider than any iPhone's content width today, so this never engages there.
+    private static let maxContentWidth: CGFloat = 420
 
     private struct Line {
         enum Big {
@@ -476,7 +481,9 @@ struct HeroPage: View {
                 }
                 Spacer(minLength: 0)
             }
+            .frame(maxWidth: Self.maxContentWidth)
         }
+        .frame(maxWidth: .infinity)
         .padding(.top, 18)
         .padding(.bottom, 8)
         .contentShape(Rectangle())

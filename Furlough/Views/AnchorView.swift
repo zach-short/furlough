@@ -43,6 +43,7 @@ struct AnchorPage: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
                 .padding(.bottom, 48)
+                .emberPageWidth()
             }
             // No wall or title of its own: Home draws the wall behind the pager, and the
             // toolbar segment already names this page.

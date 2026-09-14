@@ -603,6 +603,14 @@ export class LivingHourglass {
     if (this.running) this.schedule(); else this.draw(performance.now());
   }
 
+  /** Lets a still glass run, and stop again: the legend plays one at a time under the pointer. */
+  setMotion(on: boolean) {
+    const motion = on && !reduceMotion();
+    if (motion === this.motion) return;
+    this.motion = motion;
+    if (motion) this.schedule(); else this.draw(performance.now());
+  }
+
   private get running() {
     return this.motion && isAnimated(this.state);
   }

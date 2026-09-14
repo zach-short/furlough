@@ -17,6 +17,11 @@ enum Ember {
     static let cardRadius: CGFloat = 20
     static let tileRadius: CGFloat = 9
     static let tileRadiusLarge: CGFloat = 13
+    /// Caps a single-column page's content on iPad, where the scroll view is otherwise as wide
+    /// as the whole screen: rows meant to be read at a glance (icon, name, chip) would stretch
+    /// across a 13-inch iPad rather than staying a comfortable width. Wider than any iPhone's
+    /// content width today, so `emberPageWidth()` never engages there.
+    static let pageMaxWidth: CGFloat = 700
 
     /// Ember to Amber, left to right: the budget slider fill.
     static let sliderFill = LinearGradient(colors: [ember, amber], startPoint: .leading, endPoint: .trailing)
@@ -80,6 +85,13 @@ extension View {
                 RoundedRectangle(cornerRadius: Ember.cardRadius, style: .continuous)
                     .strokeBorder(Ember.cardBorder, lineWidth: 1)
             )
+    }
+
+    /// Caps a page's content at `Ember.pageMaxWidth` and centers it, for a single-column
+    /// `ScrollView` that would otherwise stretch edge to edge on iPad.
+    func emberPageWidth() -> some View {
+        frame(maxWidth: Ember.pageMaxWidth)
+            .frame(maxWidth: .infinity)
     }
 }
 
