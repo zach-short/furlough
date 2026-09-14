@@ -29,13 +29,19 @@ struct WhatsNewView: View {
         }
     }
 
-    /// Names the version in hand, since that is what someone opening this came to check. The
-    /// plain sentence on a build `release-notes.json` has no entry for — a Debug build off a
-    /// branch mid-version is exactly that, and it should not claim to be a release.
+    /// Names the version in hand, since that is what someone opening this came to check.
+    ///
+    /// Three cases, all of them true ones: the version changed something here; the version
+    /// shipped on both devices and changed nothing on this one, where the list below starts at
+    /// an older number and would otherwise read as the version this phone is on; and a build
+    /// the file has no entry for at all, which a Debug build off a branch mid-version is.
     private var lead: String {
-        guard let current = ReleaseNotes.current() else {
-            return "Each version of Furlough, newest first, and what it changed on this phone."
+        if let current = ReleaseNotes.current() {
+            return "You are on \(current.version). \(current.headline) Every version is below, newest first."
         }
-        return "You are on \(current.version). \(current.headline) Every version is below, newest first."
+        if let build = ReleaseNotes.bundleRelease() {
+            return "You are on \(build.version), which changed nothing on the iPhone. Every version is below, newest first."
+        }
+        return "Each version of Furlough, newest first, and what it changed on this phone."
     }
 }

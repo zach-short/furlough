@@ -118,24 +118,49 @@ struct ReleaseNotesTests {
         #expect(ReleaseNotes.Platform.iphone.badge(on: .mac) == "iPhone")
     }
 
-    @Test("filtering to one platform drops the changes for the other, and any version left empty")
-    func filtering() {
-        let phone = ReleaseNotes.Platform.iphone
-        for release in Self.releases {
-            let shown = release.changes.filter { $0.platform.shows(on: phone) }
-            #expect(shown.allSatisfy { $0.platform != .mac })
+    @Test("filtering to one platform drops the other platform's changes", arguments: [ReleaseNotes.Platform.iphone, .mac])
+    func filtering(platform: ReleaseNotes.Platform) {
+        let other: ReleaseNotes.Platform = platform == .iphone ? .mac : .iphone
+        for release in ReleaseNotes.filter(Self.releases, to: platform) {
+            #expect(!release.changes.isEmpty, "\(release.version) survived filtering with nothing in it")
+            #expect(release.changes.allSatisfy { $0.platform != other })
         }
-        // Every version so far says something on both devices; a version that did not would be
-        // left out of that platform's list entirely rather than shown with an empty card.
-        #expect(Self.releases.allSatisfy { release in
-            release.changes.contains { $0.platform.shows(on: .mac) }
-                && release.changes.contains { $0.platform.shows(on: .iphone) }
-        })
+    }
+
+    @Test("a version survives filtering exactly when it has something to say there")
+    func filteringDropsEmptyVersions() {
+        for platform in [ReleaseNotes.Platform.iphone, .mac] {
+            let kept = Set(ReleaseNotes.filter(Self.releases, to: platform).map(\.number))
+            let expected = Set(
+                Self.releases
+                    .filter { release in release.changes.contains { $0.platform.shows(on: platform) } }
+                    .map(\.number)
+            )
+            #expect(kept == expected)
+        }
+        // The case that made this worth testing: 1.2.0 is the phone's Settings menu and the
+        // usage step, and changed nothing on the Mac, so it is not in the Mac's list at all.
+        // `bundleRelease()` is what stops the Mac's page reading as if it were on 1.1.0.
+        let macVersions = ReleaseNotes.filter(Self.releases, to: .mac).map(\.version)
+        #expect(!macVersions.contains("1.2.0"))
+        #expect(ReleaseNotes.filter(Self.releases, to: .iphone).map(\.version).contains("1.2.0"))
     }
 
     @Test("a date is written the way the rest of Furlough writes one")
-    func dayLabels() throws {
-        let release = try #require(Self.releases.first { $0.date == "2026-09-11" })
-        #expect(release.dayLabel == "11 September 2026")
+    func dayLabels() {
+        // Built rather than looked up: a fixed date in the file is a test that breaks whenever
+        // the file is edited, which is what happened when 1.1.0 was re-dated.
+        func label(_ date: String) -> String {
+            ReleaseNotes.Release(
+                version: "9.9.9", date: date, channel: .unreleased,
+                headline: "", lead: "", changes: []
+            ).dayLabel
+        }
+        #expect(label("2026-09-11") == "11 September 2026")
+        #expect(label("2026-01-01") == "1 January 2026")
+        // A date the file could not parse falls back to what it says, rather than to a wrong day.
+        #expect(label("soon") == "soon")
+        // And every date actually in the file is a real one, formatted rather than echoed.
+        #expect(Self.releases.allSatisfy { $0.dayLabel != $0.date })
     }
 }

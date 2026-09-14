@@ -2687,9 +2687,27 @@ The plan for this stretch. Tick each phase off here as it lands.
     off the commit log: 1.0 (four builds, 8–9 Sep), 1.0.1 (two builds, 9 Sep), 1.1 (four builds,
     10–11 Sep). That accounting matters — the 1.0.1 *string* was in `project.yml` for a day and
     a half, but only two builds were cut under it, so the two-halves work that landed in that
-    window went out as 1.1 and is written down as 1.1.0. Every entry says `testflight`, because
-    nothing has been released: version 1.0 was submitted and is `REJECTED` (the local
-    `check-review-status` state file, still saying so on 2026-09-12).
+    window went out as 1.1 and is written down as 1.1.0. The three 1.0/1.1 entries say
+    `testflight`, because nothing has been released: version 1.0 was submitted and is
+    `REJECTED` (the local `check-review-status` state file, still saying so on 2026-09-12).
+
+    **Then Zach split 1.1 in two, the same day**, which is the rule being used on the case that
+    produced it: 1.1's second day of feature work is now **1.2.0** (`scripts/version.sh minor`,
+    dogfooding the tool). 1.2.0 is Settings becoming a menu, the usage step offering the Anchor
+    rather than only a schedule, the Anchor page standing on Home's wall, the hourglass glow,
+    the busy button's height, and the Apply spinner fix. 1.1.0 keeps the 9–10 Sep work and is
+    re-dated 2026-09-10, the day of the only build that carried exactly what it lists. 1.2.0's
+    channel is `unreleased` — the work went out on 11 Sep inside the last three 1.1 builds, and
+    its lead says so, but no build exists under the number yet.
+
+    That split turned up the one case the first cut of this got wrong: **1.2.0 is iPhone-only.**
+    Filtering drops a release with nothing for a platform, which is right, but on the Mac it
+    left 1.1.0 at the top of the list with no "This build" badge — reading as though the Mac
+    were on 1.1.0. So `ReleaseNotes.bundleRelease()` returns this build's entry unfiltered, and
+    the page says "You are on 1.2.0, which changed nothing on the Mac." Three cases in the lead,
+    all true ones; the third is a Debug build off a branch the file has no entry for. The
+    filtering also moved into `ReleaseNotes.filter(_:to:)`, pure and testable, because `all(on:)`
+    reads a bundled resource the test bundle does not carry.
 
     **The standard** is README's new Versioning section. MAJOR.MINOR.PATCH, always three
     numbers; patch is nothing to learn, minor is something new to find, major is something you
@@ -2704,13 +2722,13 @@ The plan for this stretch. Tick each phase off here as it lands.
     guards, so a build cannot be cut whose What's new screen would not mention the version it
     is running. Neither commits anything.
 
-    `MARKETING_VERSION` went `1.1` -> `1.1.0` on Zach's call. No App Store version named 1.1
+    `MARKETING_VERSION` went `1.1` -> `1.1.0` on Zach's call, then `-> 1.2.0` with the split. No App Store version named 1.1
     exists, so nothing in review is disturbed; the one side effect is that the next TestFlight
     upload starts a new build train under `1.1.0` beside the existing `1.1` one. `Version`
     compares numerically, so `1.1` and `1.1.0` are one version and a 1.1 build still finds its
     own notes.
 
-    `Tests/Core/ReleaseNotesTests.swift`, ten tests, run against the real file found from
+    `Tests/Core/ReleaseNotesTests.swift`, eleven tests, run against the real file found from
     `#filePath` rather than a fixture — a fixture would only prove that a copy is well formed.
     They hold it to three components, no duplicates, newest-first order, real dates, and
     agreement with `project.yml`. Both apps build warning-free. **Seen** at the real

@@ -232,7 +232,8 @@ Two rules this app has that the general ones do not:
   person whose phone behaved differently this morning can see the reason in the version number.
 - **One version, one batch.** The version is bumped when a build is cut *for other people* — at
   `furlough beta`, not on every merge to `main` — and the batch it covers stops there. Do not
-  put a second day of feature work out under a version string that has already shipped.
+  put a second day of feature work out under a version string that has already shipped. This is
+  the rule 1.1 broke and 1.2.0 exists to correct; see below.
 
 Every bump needs an entry in `release-notes.json` **first**:
 
@@ -260,16 +261,23 @@ Newest first. Each entry is a version, a date, a channel (`appstore`, `testfligh
 somebody who uses Furlough and does not read this repo: what changed and what it means, not
 which file moved.
 
-### What the first three versions were
+### What the versions so far were
 
-Recorded as shipped, and worth knowing before reading the numbers:
+Worth knowing before reading the numbers:
 
 - **1.0** and **1.1** were written without the patch component. `release-notes.json` records
   them padded — `1.0.0`, `1.1.0` — and `Version` compares numerically, so `1.1` and `1.1.0` are
   the same version and a build of either finds its own notes.
-- **1.1 carried four builds across two days** of feature work under one version string. The
-  "one version, one batch" rule above is there because of it: the second day should have been
-  `1.2.0`.
+- **1.1 carried four builds across two days** of feature work under one version string, which
+  is what "one version, one batch" now forbids. The second day — Settings becoming a menu, the
+  usage step offering the Anchor, and the fixes beside them — is **1.2.0**, split back out on
+  2026-09-12. Those changes did go out on 11 September, inside the last three 1.1 builds; the
+  1.2.0 entry says so, and its channel is `unreleased` until a build is cut under that number.
+  1.1.0 is dated 2026-09-10, the day of the only build that carried exactly what it lists.
+- **1.2.0 is iPhone-only.** The Mac shipped it and nothing in it changed the Mac, so the Mac's
+  What's new leaves it out of the list entirely and says "You are on 1.2.0, which changed
+  nothing on the Mac" instead — otherwise the list would start at 1.1.0 and read as the version
+  that Mac is on. `ReleaseNotes.bundleRelease()` is what that sentence comes from.
 - Nothing has been released on the App Store. Version 1.0 was submitted and rejected; every
   build so far went to TestFlight, which is what the channel on each entry says.
 

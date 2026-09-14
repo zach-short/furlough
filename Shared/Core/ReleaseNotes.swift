@@ -150,9 +150,13 @@ enum ReleaseNotes {
 
     /// Only the releases with something to say on this platform, each carrying only the changes
     /// that apply here. A release whose every change was for the other device is left out
-    /// entirely rather than shown empty.
-    static func all(on platform: Platform = .current) -> [Release] {
-        loaded.compactMap { release in
+    /// entirely rather than shown empty — 1.2.0 is exactly that on the Mac.
+    static func all(on platform: Platform = .current) -> [Release] { filter(loaded, to: platform) }
+
+    /// The filtering on its own, so it can be tested against the real file. `all(on:)` reads a
+    /// bundled resource, which a test bundle does not carry; this takes the releases it is given.
+    static func filter(_ releases: [Release], to platform: Platform) -> [Release] {
+        releases.compactMap { release in
             let changes = release.changes.filter { $0.platform.shows(on: platform) }
             guard !changes.isEmpty else { return nil }
             return Release(
@@ -167,10 +171,20 @@ enum ReleaseNotes {
     }
 
     /// The notes for the version this build is, or nil when the file has none for it — which a
-    /// Debug build off a branch mid-version legitimately is.
+    /// Debug build off a branch mid-version legitimately is, and so is a version that changed
+    /// nothing on this device. `bundleRelease` tells those two apart.
     static func current(on platform: Platform = .current) -> Release? {
         guard let version = bundleVersion else { return nil }
         return all(on: platform).first { $0.number == version }
+    }
+
+    /// The entry for this build whatever platform it was for. The difference between this and
+    /// `current(on:)` is a version that shipped on both devices and changed something on only
+    /// one of them: dropping it from the list is right, but letting the screen imply this device
+    /// is on the version above it is not, so the page says which it is.
+    static func bundleRelease() -> Release? {
+        guard let version = bundleVersion else { return nil }
+        return loaded.first { $0.number == version }
     }
 
     /// The newest release with something to say here, for the places that want a line about the

@@ -2,8 +2,53 @@
   "$comment": "The one copy of what changed and when. The apps read it as a bundled resource (Shared/Core/ReleaseNotes.swift); the site imports it (site/src/pages/releases.astro). Nothing else may hold a second copy. The rules for the version numbers, and what has to happen before an entry is added, are the Versioning section of README.md. Newest first.",
   "versions": [
     {
+      "version": "1.2.0",
+      "date": "2026-09-12",
+      "channel": "unreleased",
+      "headline": "Settings became a menu.",
+      "lead": "Settings was every setting at once, which made the two things people come here to change as hard to find as the five they do not. It is a menu now. Beside it, the last of the two-halves work on the usage screen. These went out on 11 September inside the final 1.1 builds; this is that batch given the number it should have had.",
+      "changes": [
+        {
+          "kind": "better",
+          "platform": "iphone",
+          "title": "Every setting is behind a row",
+          "detail": "Seven cards down one scroll became eight rows in three cards, each opening a screen of its own. Every row carries the one fact you would have scrolled to read — what the app opens on, how long a loosening waits, whether the devices are linked, whether anything is wrong — so the screen grows by a row rather than by a screenful."
+        },
+        {
+          "kind": "new",
+          "platform": "iphone",
+          "title": "The usage step offers the Anchor, not only a schedule",
+          "detail": "Where a fortnight went is worth reading whichever half you came for, so the page is the same page either way. What changes is what a card offers to do about an app: hours and a budget if you came for rules, hold it or don't if you came for the Anchor, and both with a choice of where it lands if you asked for both."
+        },
+        {
+          "kind": "better",
+          "platform": "iphone",
+          "title": "The Anchor page stands on Home's wall",
+          "detail": "Rather than drawing a second one of its own behind it, which showed as a seam where the two pages met."
+        },
+        {
+          "kind": "better",
+          "platform": "iphone",
+          "title": "The hourglass glow falls past its page",
+          "detail": "The light under the hourglass on Home was clipped to the page it is drawn on. It spills now, the way light does."
+        },
+        {
+          "kind": "better",
+          "platform": "iphone",
+          "title": "A busy button keeps its height",
+          "detail": "The prominent button used to shrink when its label was replaced by a spinner, so the screen under it jumped at the moment you were watching it most closely."
+        },
+        {
+          "kind": "fixed",
+          "platform": "iphone",
+          "title": "Apply stopped spinning for ever",
+          "detail": "A Screen Time query that never answers no longer leaves the button turning. It has a deadline now, and says what happened when the deadline passes."
+        }
+      ]
+    },
+    {
       "version": "1.1.0",
-      "date": "2026-09-11",
+      "date": "2026-09-10",
       "channel": "testflight",
       "headline": "Two halves, and a link between your devices.",
       "lead": "The Anchor stopped being a feature hung off the rules and became the other half of the app: its own page, its own guide, its own way in. And the iPhone and the Mac learned to tell each other what you anchored.",
@@ -52,12 +97,6 @@
         },
         {
           "kind": "better",
-          "platform": "iphone",
-          "title": "Settings is a menu",
-          "detail": "Seven cards down one scroll became rows, each carrying the one fact you would have scrolled to read: what the app opens on, how long a loosening waits, whether the devices are linked, whether anything is wrong."
-        },
-        {
-          "kind": "better",
           "platform": "both",
           "title": "An applied change folds down to its verdict",
           "detail": "With undo, edit and expand left on the line, and the whole line opening the card rather than just the word. A skipped change folds the same way, naming the rule it passed on."
@@ -73,12 +112,6 @@
           "platform": "both",
           "title": "Reset everything goes all the way back",
           "detail": "On both the phone and the Mac, a reset now returns to the first screen of the first run, which is the run worth reviewing."
-        },
-        {
-          "kind": "fixed",
-          "platform": "iphone",
-          "title": "Apply stopped spinning for ever",
-          "detail": "A Screen Time query that never answers no longer leaves the button turning. It has a deadline now, and says what happened when the deadline passes."
         },
         {
           "kind": "fixed",
