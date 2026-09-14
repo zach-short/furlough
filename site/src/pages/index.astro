@@ -257,13 +257,16 @@ const legend = [
     const lands = document.querySelector<HTMLElement>('[data-lands]');
     const since = document.querySelector<HTMLElement>('[data-since]');
     const t0 = Date.now();
+    const set = (el: HTMLElement | null, text: string) => { if (el && el.textContent !== text) el.textContent = text; };
     const tick = () => {
       const dt = (Date.now() - t0) / 1000;
-      if (lands) lands.textContent = fmt(22 * 3600 + 41 * 60 + 6 - dt);
-      if (since) since.textContent = fmt(2 * 3600 + 14 * 60 + 9 + dt);
+      set(lands, fmt(22 * 3600 + 41 * 60 + 6 - dt));
+      set(since, fmt(2 * 3600 + 14 * 60 + 9 + dt));
     };
     tick();
     setInterval(tick, 1000);
+    // A scroll can hold the timer up on Safari; the scroll itself keeps these two honest.
+    addEventListener('scroll', tick, { passive: true });
   </script>
 </Base>
 

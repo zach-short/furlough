@@ -335,8 +335,8 @@ const anchorGlyph =
     let changedAt = 0;
     let lastMini = -1;
 
-    const frame = (now: number) => {
-      requestAnimationFrame(frame);
+    /** Everything the clock drives, at the moment `now`. */
+    const render = (now: number) => {
       const b = beatOf(mode, clock(now));
       if (b.key !== lastKey) {
         from = lastKey ? glass.state : null;
@@ -395,6 +395,26 @@ const anchorGlyph =
     modeBtn.addEventListener('click', () => show(mode === 'today' ? 'anchor' : 'today'));
 
     show('today');
-    requestAnimationFrame(frame);
+
+    // Safari hands out no animation frames for the length of a scroll, which left the
+    // countdown frozen until the page came to rest. A timer and the scroll itself keep the
+    // clock moving while the frames are away; the frame loop still owns the sand, and marking
+    // the time it ran keeps the slower two from doubling up on it.
+    let lastRender = 0;
+    const loop = (now: number) => {
+      requestAnimationFrame(loop);
+      lastRender = now;
+      render(now);
+    };
+    const keepTime = () => {
+      const now = performance.now();
+      if (now - lastRender < 220) return;
+      lastRender = now;
+      render(now);
+    };
+
+    requestAnimationFrame(loop);
+    setInterval(keepTime, 250);
+    addEventListener('scroll', keepTime, { passive: true });
   }
 </script>
