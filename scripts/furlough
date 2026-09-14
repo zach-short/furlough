@@ -90,6 +90,26 @@ menu() {
   printf '  %sso `furlough beta --tools` and `furlough status 20` do what you expect.%s\n' "$D" "$O"
 }
 
+# Bare `furlough` gets the arrow-key list instead of the static one above — fzf is already the
+# tool on this Mac for picking one line out of many, so this is a table, not a UI. Prints the
+# chosen name on stdout and nothing else, so the caller can drop it straight into "$@". Esc or
+# ctrl-C leaves fzf's exit status nonzero and prints nothing; both read the same as "cancelled"
+# to whatever called this, without this script's `set -e` treating it as a failure.
+interactive_pick() {
+  local entry name desc line
+  local -a lines=()
+  for entry in "${COMMANDS[@]}"; do
+    name="${entry%%:*}"
+    desc="${entry#*:}"
+    printf -v line '%-12s  %s' "$name" "$desc"
+    lines+=("$line")
+  done
+  printf '%s\n' "${lines[@]}" \
+    | fzf --prompt='furlough> ' --height='~70%' --reverse --no-info \
+          --header="$ROOT  (enter to run, esc to cancel)" \
+    | awk '{print $1}'
+}
+
 # --- the phone ------------------------------------------------------------------------------
 #
 # One device, named twice by two tools that do not agree on what to call it. xcodebuild wants
@@ -234,6 +254,15 @@ cmd_complete() {
   done
   printf 'cd:jump to the repo\n'
 }
+
+# Bare invocation, at a real terminal, with fzf on the PATH: hand it to the picker. Anything
+# else about the invocation — piped, cron, fzf missing — falls through to the static menu, same
+# as before this existed.
+if [[ $# -eq 0 && -t 0 && -t 1 ]] && command -v fzf >/dev/null 2>&1; then
+  picked="$(interactive_pick || true)"
+  [[ -n "$picked" ]] || exit 0
+  set -- "$picked"
+fi
 
 case "${1:-help}" in
   phone)     shift; cmd_phone "$@" ;;
