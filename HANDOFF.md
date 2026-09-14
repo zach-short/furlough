@@ -282,6 +282,10 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   `Brand.swift` (what an app is known by before Screen Time says: `name(forKey:)` over
   `Companions` then `AppUtility`, `color(forKey:)`, `monogram`, `isLight`, `ink`. What lets a
   usage card be drawn offline while the token is still being asked for — see step 38),
+  `WeekDraft.swift` (the week as one list of spans per day, both ways, plus the arithmetic a
+  drag on the grid obeys: `room(in:at:)` — the neighbours' edges, which every clamp falls out
+  of — `moved`, `resized`, `added`, `removed` and the 15-minute `snapped`. Hoisted out of the
+  two week views in step 44),
   `TokenCache.swift` (the map from a usage key to the encoded `TargetKind` behind it, kept
   between visits: `entries`, `savedAt`, the pure `refreshed(with:now:)` that replaces rather
   than merges and refuses an empty answer, and `age(at:)` for the log line. Generic over
@@ -298,7 +302,7 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   `ActivityLimitTests`, `PendingTextTests`, `CompanionsTests`, `ConfigImportTests`,
   `HostTargetTests`, `HostImportTests`, `AnchorCandidatesTests`, `AnchorScopeTests`,
   `AnchorScheduleTests`, `AnchorSyncTests`, `DeviceLinkTests`, `SharedAdditionsTests`,
-  `BrandTests`, `TokenCacheTests`. 664 tests in 94 suites. It builds for **macOS**, so it
+  `BrandTests`, `TokenCacheTests`, `WeekDraftTests`. 742 tests in 104 suites. It builds for **macOS**, so it
   reads the Mac's `TargetKind` and the Mac's `Decision`: the iOS `Decision.filteredHosts` and
   `ShieldReconciler.apply` cannot be reached from any test, which is why the nil-when-empty
   filter policy is a property of `Decision` rather than a line inside the reconciler.
@@ -312,6 +316,10 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   Both are compiled into the widgets, so neither may use `SectionLabel`, `Footnote`,
   `CardAction` or `CardDivider` — those exist only in the two apps, and reaching for one breaks
   the widget build and not the app build.
+- `Shared/UI/WeekGrid.swift` (`WeekMetrics`, the map between a minute and a point down a day
+  column; `WindowGrab`, which band of a block the pointer is in; `WeekGrid`, `DayHeader`,
+  `DayEdits`, `DayColumn`, `WindowBlock`) and `Shared/UI/DayBar.swift` — the editable week,
+  one view for both apps since step 44. `WeekSheet` and `DayEditor` stay per-platform.
 - `Shared/UI/Theme.swift` (app + widgets), `Shared/UI/Hourglass.swift` (`HourglassState`
   with its presets and `of(target:status:runtime:now:)`, `HourglassView(state:phase:)` pure,
   `LivingHourglass` animated, `TopSandShape`/`MoundShape` animatable).
@@ -356,8 +364,8 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   `Components` (`TokenLabel`, `TokenName`, `TokenTile`,
   `StatusChip`, `RowCopy`, `ProminentButton`, `GhostButton`, `SectionLabel`, `Footnote`,
   `CardDivider`), `RuleEditor` (`WindowRow` with `DayStrip`, `CopyRuleSheet`, `TimeChip`,
-  `TimePickerSheet`, `EffectBanner`), `WeekView` (`WeekDraft`, `WeekSheet`, `WeekGrid`,
-  `DayColumn`, `WindowBlock`, `DayEditor`, `DayBar`), `BudgetSlider` (piecewise
+  `TimePickerSheet`, `EffectBanner`), `WeekView` (`WeekSheet` and `DayEditor` only; the
+  draft and the grid are shared since step 44), `BudgetSlider` (piecewise
   linear over the 5/30/60/120/240 ticks), `PendingChanges`,
   `Help` (`HelpView` is the hub behind the question mark on Home; since 2026-09-09
   `HelpTopics.swift` holds only the two pages still in the binary — `DelayHelp`, which quotes
@@ -3027,6 +3035,95 @@ The plan for this stretch. Tick each phase off here as it lands.
     mechanism (Foqos uses Sparkle over a notarized DMG on GitHub), and nothing on the site
     explains what macOS will ask for — the extension approval, the filter permission, Automation
     per browser — before somebody downloads it.
+
+44. **The week grid is where windows are edited now (pass-off item 22).** Done 2026-09-14. The
+    grid in the rule editor drew the week beautifully and could not change any of it: tapping a
+    column pushed `DayEditor`, a list of pickers, which is where every edit happened. So the
+    picture and the editing were two screens and the picture — the thing that makes a schedule
+    obvious at a glance — was the one you could not touch. It is now direct: drag a window to
+    move it inside its day, drag its top or bottom edge to resize, tap (click) empty track to add
+    one, and the sentence under the grid rewrites itself while the block is still under the
+    finger. Identical on the phone and the Mac, because it is now one view.
+
+    **The hoist came first, and it deletes rather than adds.** `WeekDraft`, `WeekGrid`,
+    `DayColumn`, `WindowBlock` and `DayBar` were duplicated verbatim in
+    `Furlough/Views/WeekView.swift` and `FurloughMac/Views/MacWeekView.swift` (the Mac copy's
+    header said it was "kept separate so that file stays untouched"). Two targets, so the names
+    did not collide — and they would the moment one copy moved, so both copies went in the same
+    change. `WeekDraft` is pure and is now `Shared/Core/WeekDraft.swift` with
+    `Tests/Core/WeekDraftTests.swift`; the drawing is `Shared/UI/WeekGrid.swift` and
+    `Shared/UI/DayBar.swift`, which both apps already compile. `WeekSheet` and `DayEditor` stay
+    on each side: the sheet's chrome and the list of pickers are genuinely per-platform (the
+    phone has a `NavigationStack`, the Mac a `SheetFrame`; each binds its own `DraftWindow`).
+    `WeekGrid` takes a `Binding<WeekDraft>` and a `WeekMetrics` — the phone passes 19 and 40, the
+    Mac 17 and 44, both the numbers they already drew at. The only two callers are those two
+    sheets, so no read-only grid anywhere was made editable by accident.
+
+    **The rules a drag obeys.** Snap to 15 minutes, which is `Furlough.minimumWindowMinutes` on
+    purpose, so a snapped edit can never make a window too short to enforce. The clamp is one
+    function, `WeekDraft.room(in:at:)`, returning the previous span's end and the next one's
+    start; move, both resizes and the add all fall out of those two numbers, so two windows in a
+    day can never overlap. Every edit is written back through `WeekDraft.set(_:on:)`, which
+    joins — so a block dragged flush against its neighbour becomes one window, which is the house
+    rule everywhere else (`TimeWindow.joined`). Mid-drag the column is drawn from the drag's own
+    working copy, so the block keeps its identity under the finger and only merges when it is let
+    go. Nothing else about the path changed: the grid edits the same `Binding<WeekDraft>` the day
+    editor did, the editor still saves a draft, and a loosening still goes through
+    `Policy.classify` and waits the delay.
+
+    **Two things the Simulator caught that reading the code would not have.** Both are worth
+    knowing before writing another gesture in this app. One: `.offset(y:)` moves what is drawn
+    and leaves the view's coordinate space where the layout put it, so a gesture attached to an
+    offset block read a grab near its top as one at its bottom edge — the blocks are positioned
+    with `padding(.top:)` now, which is honest about where they are. Two, the subtler one: a
+    `DragGesture` in `.local` measures against the view it is attached to, and that view is the
+    thing being moved, so every frame subtracted the distance already travelled from the distance
+    still to go and the block crept to exactly half of where the finger was. The drag is measured
+    against the **column's** named coordinate space, which does not move. Related: the last
+    position before a lift arrives only in `onEnded`, so the end of a drag is run through the same
+    arithmetic before it is released, or the block lands a step short.
+
+    **Where each gesture went, and why.** The column is a drawing surface now, so the way into the
+    day's exact times moved to the **day's name** at the top of the column, which is a button on
+    both platforms (and hovers on the Mac); a tap on a window opens that day too, and so does
+    "Open Wednesday" in its context menu — three routes, because the old one was the whole column.
+    Adding is on the **tap, not a long press**: a press is invisible, and the argument for it —
+    a finger scrolling a page and stopping on the grid would leave a window behind — is small in
+    a sheet, and it cost the discoverable gesture. Verified on the Simulator: a finger starting on
+    empty track scrolls the page and adds nothing; a finger starting on a window drags it and the
+    page stays put. Deleting is the context menu (long press, right click) rather than an × on the
+    block: an hour of track is 19 points tall on the phone and there is no room for a control in
+    it. A window tapped onto empty track is **two hours**, not the hour `TimeWindow.nextFree`
+    starts one at in the day's list, because on the grid the block is the only answer you get and
+    an hour is too short to print its own start time.
+
+    **Not editable while the rule has no windows at all.** Every column then draws one all-day
+    block that is not in the model, and dragging it would invent a window on one day and silently
+    block the other six. The grid stays the picture it is today and the footnote points at the
+    day's name, which opens the editor whose copy already explains that consequence.
+
+    **VoiceOver and the keyboard.** Each block is an element with a label ("Window on Wednesday"),
+    a value ("8 PM to midnight"), an adjustable action that moves it a quarter hour, and Remove
+    and Open actions. The per-day label and value did not disappear with the column — they are on
+    the day's header button, which also carries an "Add a window" action, since neither VoiceOver
+    nor a keyboard can point at a place on the track; it adds at `TimeWindow.nextFree`, the same
+    slot the day's "Add window" button uses. On the Mac a focused block moves with the arrow keys,
+    resizes with shift-arrows and goes with delete, and the pointer turns into `resizeUpDown` over
+    an edge (pushed and popped in pairs, or the whole app keeps the cursor). Haptics tick at each
+    snap on the phone, gated on the drag the way `BudgetSlider` gates its own; nothing on the Mac.
+
+    **Zach's two calls, answered on 2026-09-14 when he handed them over rather than asking.**
+    Dragging a block **across days: no**, and deliberately so — a window belongs to the days it
+    applies to, and the block drawn on Wednesday may be one face of a window that also runs Monday
+    and Tuesday, so a sideways drag would have to split that window silently. Vertical only also
+    means the drop target is never in doubt. `apply(from:to:)` — "Apply to other days" — stays the
+    named, additive way to reach another day. The scheduled Anchor's drop and lift on this grid:
+    **eventually yes, but as a different mark, not a block.** `AnchorSchedule` is a `minuteOfDay`
+    and an optional `liftMinuteOfDay` — an instant, not a span — and it means the opposite of a
+    window, so drawing it as amber would read as "allowed". What was built for it is `WeekMetrics`,
+    the one map between a minute and a point down a column, so a line with the anchor glyph can be
+    laid over the same geometry later without deriving it again. Nothing more; it is not this
+    grid's screen.
 
 ## Style rules
 
