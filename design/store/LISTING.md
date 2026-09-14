@@ -1,6 +1,8 @@
-# Furlough 1.0: the App Store listing
+# Furlough 1.2.0: the App Store listing
 
-Every App Store Connect field for version 1.0, ready to paste. Character counts were taken with
+Every App Store Connect field for version 1.2.0, ready to paste. The record was renumbered
+from 1.0 on 2026-09-14, when build 202609140523 was attached and the version went back to
+PREPARE_FOR_SUBMISSION; 1.0 was never released. Character counts were taken with
 `printf '%s' "…" | wc -m` against the limits on Apple's own pages, not from memory:
 [product page](https://developer.apple.com/app-store/product-page/) (name 30, subtitle 30,
 promotional text 170, keywords 100, commas with no spaces),
@@ -148,7 +150,7 @@ No account, no server, no analytics, no third-party code. Apple's Screen Time AP
 
 REQUIREMENTS
 
-iPhone, iOS 26 or later. Screen Time access, which iOS grants only to an adult Apple Account. Furlough asks for individual authorization: the person setting the rules and the person kept to them are the same. Not a parental control app.
+iPhone, iOS 18 or later. Screen Time access, which iOS grants only to an adult Apple Account. Furlough asks for individual authorization: the person setting the rules and the person kept to them are the same. Not a parental control app.
 ```
 
 **What it deliberately does not say**, so nobody re-adds it later:
@@ -452,7 +454,7 @@ BEFORE YOU START
 
 Screen Time authorization must be granted by an ADULT Apple Account. A child account or a Managed Apple ID will be refused by the system, not by us.
 
-Family Controls does not function in the Simulator: Furlough cannot shield anything there. Please review on a physical iPhone running iOS 26 or later.
+Family Controls does not function in the Simulator: Furlough cannot shield anything there. Please review on a physical iPhone running iOS 18 or later.
 
 HOW TO SEE IT WORKING
 
