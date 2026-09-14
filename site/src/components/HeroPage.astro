@@ -1,7 +1,7 @@
 ---
-// The app's Home screen as a phone you can page through. Five pages — four apps and the
-// Anchor — with the dots under the page as their pager, the rows under them as the same
-// pager's index, and a scrubber beside Fast-forward for the evening the four apps share.
+// The app's Home screen as a phone you can use: `HeroPager`'s strip of status hourglasses
+// pages between the apps that have rules, and `HalfTabBar` — the same floating capsule the
+// app carries at the bottom of the screen — switches between Rules and the Anchor.
 //
 // `TARGETS` below is the only place a rule is written down. The rows are rendered from it
 // here, and the same rules go to the client as JSON, where each page's beat is derived the
@@ -19,6 +19,14 @@ const RD =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><g fill="#fff"><circle cx="16.4" cy="3.2" r="2"/><path d="M12.05 10.1 13.6 4a.75.75 0 0 1 .9-.55l1.6.35-.3 1.42-1-.22-1.35 5.32z"/><ellipse cx="12" cy="15.4" rx="7.5" ry="6.2"/><circle cx="3.1" cy="12.6" r="2.8"/><circle cx="20.9" cy="12.6" r="2.8"/></g><g fill="#ff4500"><circle cx="9" cy="14.6" r="1.6"/><circle cx="15" cy="14.6" r="1.6"/></g><path d="M8.8 17.9a4.5 4.5 0 0 0 6.4 0" fill="none" stroke="#ff4500" stroke-width="1.4" stroke-linecap="round"/></svg>';
 const TT =
   '<svg viewBox="-2 -2 28 28" aria-hidden="true"><g><path fill="#25f4ee" transform="translate(-1.3 -1)" d="M16.6 5.82A4.28 4.28 0 0 1 15.54 3h-3.09v12.4a2.59 2.59 0 1 1-1.84-2.48V9.66a5.66 5.66 0 1 0 4.93 5.61V8.99a7.3 7.3 0 0 0 4.27 1.37V7.27a4.29 4.29 0 0 1-3.21-1.45"/><path fill="#fe2c55" transform="translate(1.3 1)" d="M16.6 5.82A4.28 4.28 0 0 1 15.54 3h-3.09v12.4a2.59 2.59 0 1 1-1.84-2.48V9.66a5.66 5.66 0 1 0 4.93 5.61V8.99a7.3 7.3 0 0 0 4.27 1.37V7.27a4.29 4.29 0 0 1-3.21-1.45"/><path fill="#fff" d="M16.6 5.82A4.28 4.28 0 0 1 15.54 3h-3.09v12.4a2.59 2.59 0 1 1-1.84-2.48V9.66a5.66 5.66 0 1 0 4.93 5.61V8.99a7.3 7.3 0 0 0 4.27 1.37V7.27a4.29 4.29 0 0 1-3.21-1.45"/></g></svg>';
+
+// `Half.icon`: the two SF Symbols the app's bottom navbar uses, drawn rather than fetched.
+const HALVES = [
+  { key: 'rules', title: 'Rules',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.4 3h11.2M6.4 21h11.2M8.4 3v3.1c0 2 1.2 3.5 3.6 5.9 2.4-2.4 3.6-3.9 3.6-5.9V3M8.4 21v-3.1c0-2 1.2-3.5 3.6-5.9 2.4 2.4 3.6 3.9 3.6 5.9V21"/></svg>' },
+  { key: 'anchor', title: 'Anchor',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M8.2 8.6a4.8 4.8 0 0 1 0 6.8M12.3 5.7a9 9 0 0 1 0 12.6M16.4 2.9a13.2 13.2 0 0 1 0 18.2"/></svg>' },
+];
 
 interface Rule {
   /** Minutes of the day, the way `Rule.Window` stores them. */
@@ -41,6 +49,9 @@ interface Target {
   /** Tonight's half hour goes into this one, so its budget drains with its window and its
       five-minute warning fires. The others are open or closed but untouched. */
   spends?: boolean;
+  /** Also in the Anchor's list, so every line about the Anchor counts these rather than
+      claiming a number nothing on screen backs up. */
+  anchored?: boolean;
   section: string;
 }
 
@@ -57,11 +68,11 @@ const span = (a: number, b: number) =>
     : `${ampm(a)}–${ampm(b)}`;
 
 const TARGETS: Target[] = [
-  { key: 'instagram', name: 'Instagram', cls: 'ig', icon: IG, section: 'Tonight', spends: true,
+  { key: 'instagram', name: 'Instagram', cls: 'ig', icon: IG, section: 'Tonight', spends: true, anchored: true,
     rule: { open: 20 * 60, close: 20 * 60 + 30, budget: 30 } },
-  { key: 'youtube', name: 'YouTube', cls: 'yt', style: '--c: #fff', icon: YT, section: 'Tonight',
+  { key: 'youtube', name: 'YouTube', cls: 'yt', style: '--c: #fff', icon: YT, section: 'Tonight', anchored: true,
     rule: { open: 20 * 60, close: 22 * 60, budget: 30 } },
-  { key: 'reddit', name: 'Reddit', cls: 'rd', style: '--c: #ff4500', icon: RD, section: 'Tonight',
+  { key: 'reddit', name: 'Reddit', cls: 'rd', style: '--c: #ff4500', icon: RD, section: 'Tonight', anchored: true,
     rule: { open: 21 * 60, close: 22 * 60, budget: 20 } },
   { key: 'tiktok', name: 'TikTok', cls: 'tt', style: '--c: #000', icon: TT, section: 'Always blocked',
     rule: null, detail: 'Social · no windows' },
@@ -70,7 +81,7 @@ const TARGETS: Target[] = [
 const rows = TARGETS.map((t) => ({
   ...t,
   detail: t.detail ?? `${span(t.rule!.open, t.rule!.close)} · ${t.rule!.budget} min`,
-  // The first frame, before the script has a clock: the evening opens five seconds shy of 8.
+  // The first frame, before the script has a clock: the evening opens a minute shy of 8.
   chip: t.rule ? ampm(t.rule.open) : 'all day',
   tone: t.rule ? 'amber' : 'grey',
 }));
@@ -78,9 +89,7 @@ const SECTIONS = ['Tonight', 'Always blocked'].map((title) => ({
   title,
   rows: rows.filter((r) => r.section === title),
 }));
-
-/** The pager, in order. The four apps run on the evening's clock; the Anchor on its own. */
-const PAGES = [...TARGETS.map((t) => ({ key: t.key, label: t.name })), { key: 'anchor', label: 'Anchor' }];
+const HELD = rows.filter((r) => r.anchored);
 
 /** What the script needs of the table: rules, and the copy only `ampm` knows how to write. */
 const DATA = rows.map((r) => ({
@@ -92,21 +101,22 @@ const DATA = rows.map((r) => ({
         opensAt: ampm(r.rule.open), until: ampm(r.rule.close), spends: !!r.spends }
     : { blocked: true }),
 }));
+const ANCHOR = { count: HELD.length, names: HELD.map((h) => h.name).join(', ') };
 ---
 
 <div class="stack">
   <div class="phone" data-hero>
     <div class="statusbar" aria-hidden="true"><span class="mono" data-hero-clock>7:59</span><span class="signal"><i></i><i></i><i></i><i></i></span></div>
     <div class="toolbar" aria-hidden="true">
-      <span class="glass icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></span>
-      <span class="right">
-        <span class="glass pill" data-hero-pill>1 pending</span>
-        <span class="glass icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
+      <span class="left">
+        <span class="glass icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></span>
+        <span class="glass icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.2"/><path d="M9.6 9.4a2.5 2.5 0 1 1 2.9 2.7v1.4"/><circle cx="12.4" cy="16.8" r="0.9" fill="currentColor" stroke="none"/></svg></span>
       </span>
+      <span class="glass icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
     </div>
 
-    <!-- The page the pager turns. A tabpanel now that the dots select it, so it is no longer
-         an image of a screen; `pan-y` keeps a finger scrolling the site past it. -->
+    <!-- The page the strip turns. A tabpanel now that the strip and the tab bar select it, so
+         it is no longer an image of a screen; `pan-y` keeps a finger scrolling the site past it. -->
     <div
       class="hero-page"
       id="hero-panel"
@@ -124,20 +134,21 @@ const DATA = rows.map((r) => ({
       </div>
     </div>
 
-    <div class="indicator" role="tablist" aria-label="Pages on the phone">
-      {PAGES.map((p, i) => (
+    <!-- `HeroPager`'s indicator: one status hourglass per app with a rule, and it wraps. -->
+    <div class="indicator" role="tablist" aria-label="Apps with rules" data-strip>
+      {rows.map((r, i) => (
         <button
           type="button"
           class="dot"
           role="tab"
-          id={`hero-tab-${p.key}`}
-          data-tab={p.key}
+          id={`hero-tab-${r.key}`}
+          data-tab={r.key}
           aria-controls="hero-panel"
           aria-selected={i === 0 ? 'true' : 'false'}
           tabindex={i === 0 ? 0 : -1}
         >
-          <canvas width="11" height="15" data-tab-glass={p.key} aria-hidden="true"></canvas>
-          <span class="sr">{p.label}</span>
+          <canvas width="11" height="15" data-tab-glass={r.key} aria-hidden="true"></canvas>
+          <span class="sr">{r.name}</span>
         </button>
       ))}
     </div>
@@ -163,25 +174,17 @@ const DATA = rows.map((r) => ({
       ))}
     </div>
 
-    <!-- The Anchor's own page: the same rows, held together rather than each on its own rule. -->
+    <!-- The Anchor's half: the same apps, held together rather than each on its own rule. -->
     <div class="list anchor-list" data-anchor-list aria-hidden="true" hidden>
-      <div class="eyebrow seclabel">In the Anchor · 6 apps</div>
+      <div class="eyebrow seclabel">In the Anchor · {ANCHOR.count} apps</div>
       <div class="card rows">
-        <div class="row">
-          <span class="tile ig" set:html={IG} />
-          <span class="who"><span class="n">Instagram</span><span class="r">Held with the list</span></span>
-          <span class="chip achip"><span class="a-ready">ready</span><span class="a-held">held</span></span>
-        </div>
-        <div class="row">
-          <span class="tile yt" style="--c: #fff" set:html={YT} />
-          <span class="who"><span class="n">YouTube</span><span class="r">Held with the list</span></span>
-          <span class="chip achip"><span class="a-ready">ready</span><span class="a-held">held</span></span>
-        </div>
-        <div class="row">
-          <span class="tile rd" style="--c: #ff4500" set:html={RD} />
-          <span class="who"><span class="n">Reddit</span><span class="r">Held with the list</span></span>
-          <span class="chip achip"><span class="a-ready">ready</span><span class="a-held">held</span></span>
-        </div>
+        {HELD.map((r) => (
+          <div class="row">
+            <span class={`tile ${r.cls}`} style={r.style} set:html={r.icon} />
+            <span class="who"><span class="n">{r.name}</span><span class="r">Held with the list</span></span>
+            <span class="chip achip"><span class="a-ready">ready</span><span class="a-held">held</span></span>
+          </div>
+        ))}
       </div>
       <div class="aact">
         <span class="glass prominent abtn"><svg viewBox="0 0 80 100" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={anchorGlyph} />Anchor</span>
@@ -189,14 +192,29 @@ const DATA = rows.map((r) => ({
       </div>
     </div>
     <div class="fade"></div>
+
+    <!-- `HalfTabBar`: the app's own floating capsule, an icon over a label per side. -->
+    <div class="tabbar glass" role="tablist" aria-label="Rules or the Anchor" data-tabbar>
+      {HALVES.map((h, i) => (
+        <button
+          type="button"
+          class="half"
+          role="tab"
+          id={`hero-half-${h.key}`}
+          data-half={h.key}
+          aria-controls="hero-panel"
+          aria-selected={i === 0 ? 'true' : 'false'}
+          tabindex={i === 0 ? 0 : -1}
+        >
+          <span class="hicon" set:html={h.icon} />
+          <span class="htitle">{h.title}</span>
+        </button>
+      ))}
+    </div>
   </div>
 
+  <!-- The evening on a thread: the band is the window, the sliver its last five minutes. -->
   <div class="controls">
-    <button type="button" class="glass" data-hero-ff>
-      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.6v12.8L12.2 12zM12.6 5.6v12.8L21.8 12z"/></svg>
-      Fast-forward
-    </button>
-    <!-- The evening on a thread: the band is the window, the sliver its last five minutes. -->
     <div
       class="scrub"
       data-hero-scrub
@@ -214,40 +232,37 @@ const DATA = rows.map((r) => ({
       <span class="swarn"></span>
       <span class="sknob"></span>
     </div>
-    <button type="button" class="glass" data-hero-mode aria-pressed="false">
-      <svg viewBox="0 0 80 100" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={anchorGlyph} />
-      <span data-hero-mode-label>Anchor Mode</span>
-    </button>
   </div>
 
-  <p class="caption cue" data-hero-caption>Turn the page: a dot, a row, or a drag across the phone.</p>
+  <p class="caption cue" data-hero-caption>Turn the page: an hourglass, a row, or a drag across the phone. The bar at the bottom is the other half.</p>
 
-  <script type="application/json" data-hero-targets is:inline set:html={JSON.stringify(DATA)}></script>
+  <script type="application/json" data-hero-targets is:inline set:html={JSON.stringify({ targets: DATA, anchor: ANCHOR })}></script>
 </div>
 
 <style>
+  /* Nothing inside the phone is text to select: a swipe across it turns a page. */
   .phone {
-    position: relative; width: min(350px, 100%); height: 640px; margin-inline: auto; overflow: hidden;
+    position: relative; width: min(350px, 100%); height: 672px; margin-inline: auto; overflow: hidden;
     border-radius: 44px; border: 1px solid rgba(255, 255, 255, 0.16); background: var(--ground);
     background-image:
       radial-gradient(ellipse 70% 42% at 28% 104%, rgba(229, 86, 61, 0.6), transparent 62%),
       radial-gradient(ellipse 60% 40% at 90% -4%, rgba(245, 158, 74, 0.14), transparent 60%);
     box-shadow: 0 40px 90px rgba(0, 0, 0, 0.55), 0 0 120px rgba(229, 86, 61, 0.1), inset 0 0 0 1px rgba(0, 0, 0, 0.6);
     padding: 0 16px;
+    user-select: none; -webkit-user-select: none;
+    -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
   }
   .statusbar { display: flex; justify-content: space-between; align-items: center; padding: 18px 14px 0; font-size: 14px; font-weight: 600; }
   .signal { display: inline-flex; gap: 2px; align-items: flex-end; }
   .signal i { width: 3px; background: var(--cream); border-radius: 1px; }
   .signal i:nth-child(1) { height: 4px; } .signal i:nth-child(2) { height: 6px; } .signal i:nth-child(3) { height: 8px; } .signal i:nth-child(4) { height: 10px; }
   .toolbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 0 0; }
-  .toolbar .right { display: flex; gap: 8px; }
-  .toolbar .glass { min-height: 36px; font-size: 13px; cursor: default; }
+  .toolbar .left { display: flex; gap: 8px; }
+  .toolbar .glass { min-height: 36px; cursor: default; }
   .toolbar .glass:hover { transform: none; }
-  .toolbar .pill { color: var(--pending); padding: 0 12px; transition: color 0.3s var(--ease); }
-  .toolbar .pill.on { color: var(--ember); }
 
   /* pan-y so a finger dragging up the site still scrolls it; sideways turns the page. */
-  .hero-page { display: flex; align-items: center; gap: 16px; padding: 26px 6px 8px; touch-action: pan-y; user-select: none; -webkit-user-select: none; cursor: grab; }
+  .hero-page { display: flex; align-items: center; gap: 16px; padding: 24px 6px 6px; touch-action: pan-y; cursor: grab; }
   .hero-page:active { cursor: grabbing; }
   .hero-page:focus-visible { outline-offset: -2px; border-radius: 18px; }
   .glass-canvas { width: 96px; height: 128px; flex: 0 0 auto; }
@@ -258,7 +273,8 @@ const DATA = rows.map((r) => ({
   .count.quiet { font-size: 30px; color: var(--muted); }
   .sub { font-size: 12px; color: var(--muted); margin-top: 8px; }
 
-  .indicator { display: flex; justify-content: center; align-items: center; padding-bottom: 4px; }
+  .indicator { display: flex; justify-content: center; align-items: center; }
+  .indicator[hidden] { display: none; }
   .dot { display: grid; place-items: center; padding: 9px 7px; background: none; border: 0; cursor: pointer; border-radius: 8px; -webkit-appearance: none; appearance: none; }
   .dot canvas { width: 11px; height: 15px; opacity: 0.5; transition: transform 0.25s, opacity 0.25s; }
   .dot[aria-selected='true'] canvas { opacity: 1; transform: scale(1.35); }
@@ -266,7 +282,7 @@ const DATA = rows.map((r) => ({
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
   .list[hidden] { display: none; }
-  .seclabel { padding: 12px 8px 6px; }
+  .seclabel { padding: 10px 8px 6px; }
   .rows { display: flex; flex-direction: column; overflow: hidden; }
   .row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; width: 100%; text-align: left; background: none; border: 0; border-radius: 0; color: inherit; font: inherit; -webkit-appearance: none; appearance: none; }
   .row + .row { border-top: 1px solid var(--edge); }
@@ -287,23 +303,50 @@ const DATA = rows.map((r) => ({
   .chip { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; transition: color 0.3s var(--ease); }
   .chip.amber { color: var(--amber); } .chip.grey { color: var(--faint); } .chip.muted { color: var(--muted); } .chip.moss { color: var(--moss); }
   .chip canvas { width: 12px; height: 16px; }
-  .fade { position: absolute; left: 0; right: 0; bottom: 0; height: 72px; background: linear-gradient(180deg, transparent, rgba(15, 13, 11, 0.96)); pointer-events: none; }
+  .fade { position: absolute; left: 0; right: 0; bottom: 0; height: 96px; background: linear-gradient(180deg, transparent, rgba(15, 13, 11, 0.96) 62%); pointer-events: none; }
 
-  /* The Anchor page. One class on the list says whether it is held; the rows follow. */
+  /* The Anchor half. One class on the list says whether it is held; the rows follow. */
   .achip { color: var(--faint); }
   .achip .a-held, .anchor-list.held .achip .a-ready { display: none; }
   .anchor-list.held .achip .a-held { display: inline; }
   .anchor-list.held .achip { color: var(--ember); }
   .aact { display: flex; gap: 8px; padding: 14px 4px 0; }
-  .phone.anchoring .fade { height: 34px; }
   .aact .glass { min-height: 38px; font-size: 13px; cursor: default; transition: transform 0.25s var(--ease), box-shadow 0.35s var(--ease), background 0.25s var(--ease); }
   .aact .glass:hover { transform: none; }
   .atag, .anchor-list.held .abtn { display: none; }
   .anchor-list.held .atag { display: inline-flex; }
   .anchor-list.tapping .abtn { transform: scale(0.955); box-shadow: 0 0 0 7px rgba(229, 86, 61, 0.2), 0 10px 34px rgba(229, 86, 61, 0.32); }
   .wave { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--ember); border-left-color: transparent; border-bottom-color: transparent; transform: rotate(-45deg); }
+
+  /* `HalfTabBar`: floating over the bottom rather than spanning it, 68 pt a side. */
+  .tabbar {
+    position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
+    display: flex; gap: 4px; padding: 5px; min-height: 0; z-index: 2;
+  }
+  .tabbar:hover { transform: translateX(-50%); background: linear-gradient(160deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.05)); }
+  .half {
+    display: grid; justify-items: center; gap: 3px; width: 68px; padding: 9px 0;
+    background: none; border: 0; border-radius: 999px; cursor: pointer; color: var(--muted);
+    -webkit-appearance: none; appearance: none; transition: color 0.25s var(--ease);
+  }
+  .half[aria-selected='true'] { color: var(--amber); }
+  .hicon { display: grid; place-items: center; width: 22px; height: 20px; }
+  .hicon :global(svg) { width: 19px; height: 19px; }
+  .htitle { font-family: var(--body); font-weight: 700; font-size: 10.5px; line-height: 13px; letter-spacing: 0.01em; }
+
+  /* Until it has been used, the two controls say so: the strip breathes and the tab bar rings,
+     the second offset from the first. Both stop for good on the first real interaction. */
   @media (prefers-reduced-motion: no-preference) {
+    .stack:not(.used) .dot:not([aria-selected='true']) canvas { animation: breathe 2.8s var(--ease) infinite; }
+    .stack:not(.used) .dot:nth-child(2) canvas { animation-delay: 0.1s; }
+    .stack:not(.used) .dot:nth-child(3) canvas { animation-delay: 0.2s; }
+    .stack:not(.used) .dot:nth-child(4) canvas { animation-delay: 0.3s; }
+    .stack:not(.used) .tabbar { animation: ring 2.8s var(--ease) 1.4s infinite; }
+    .stack:not(.used) .half[aria-selected='false'] { animation: warm 2.8s var(--ease) 1.4s infinite; }
     .anchor-list.tagging .atag { animation: tag 1.15s var(--ease) infinite; }
+    @keyframes breathe { 0%, 100% { opacity: 0.45; } 50% { opacity: 0.95; } }
+    @keyframes ring { 0%, 58%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 74, 0); } 14% { box-shadow: 0 0 0 0 rgba(245, 158, 74, 0.36); } 44% { box-shadow: 0 0 0 11px rgba(245, 158, 74, 0); } }
+    @keyframes warm { 0%, 100% { background: rgba(245, 158, 74, 0); } 34% { background: rgba(245, 158, 74, 0.14); } }
     @keyframes tag { 0%, 100% { box-shadow: 0 0 0 0 rgba(229, 86, 61, 0.5); } 55% { box-shadow: 0 0 0 9px rgba(229, 86, 61, 0); } }
   }
 
@@ -311,19 +354,14 @@ const DATA = rows.map((r) => ({
      own children, so it is repeated here for the phone now that .stack sits between. */
   .stack { perspective: 1800px; }
   .caption {
-    max-width: 350px; margin: 18px auto 0; text-align: center;
+    max-width: 350px; margin: 14px auto 0; text-align: center;
     font-size: 13px; line-height: 1.45; color: var(--muted); min-height: 38px;
   }
   .caption.cue { color: var(--faint); font-size: 12.5px; }
-  .controls { display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 18px; width: min(420px, 100%); margin-inline: auto; }
-  .controls .glass { min-height: 38px; font-size: 13px; }
-  .controls .glass[aria-pressed='true'] {
-    background: linear-gradient(160deg, rgba(229, 86, 61, 0.28), rgba(229, 86, 61, 0.12));
-    color: var(--cream);
-  }
+  .controls { display: flex; justify-content: center; align-items: center; margin-top: 16px; }
 
   /* pan-y again: the scrubber is the small draggable thing, so the rule goes on it alone. */
-  .scrub { position: relative; flex: 1 1 128px; min-width: 112px; max-width: 190px; height: 28px; cursor: grab; touch-action: pan-y; }
+  .scrub { position: relative; width: min(300px, 100%); height: 28px; cursor: grab; touch-action: pan-y; }
   .scrub.dragging { cursor: grabbing; }
   .scrub span { position: absolute; top: 12px; height: 4px; pointer-events: none; }
   .strack { left: 0; right: 0; border-radius: 2px; background: rgba(255, 255, 255, 0.12); }
@@ -350,8 +388,11 @@ const DATA = rows.map((r) => ({
       spends?: boolean; blocked?: boolean;
     };
 
-    const data = JSON.parse(stack.querySelector('[data-hero-targets]')!.textContent!) as TargetData[];
+    const table = JSON.parse(stack.querySelector('[data-hero-targets]')!.textContent!) as
+      { targets: TargetData[]; anchor: { count: number; names: string } };
+    const data = table.targets;
     const byKey = Object.fromEntries(data.map((d) => [d.key, d])) as Record<string, TargetData>;
+    const HOLDS = table.anchor;
 
     const canvas = root.querySelector<HTMLCanvasElement>('[data-hero-glass]')!;
     const eyebrowEl = root.querySelector<HTMLElement>('[data-hero-eyebrow]')!;
@@ -359,40 +400,37 @@ const DATA = rows.map((r) => ({
     const countEl = root.querySelector<HTMLElement>('[data-hero-count]')!;
     const subEl = root.querySelector<HTMLElement>('[data-hero-sub]')!;
     const textEl = root.querySelector<HTMLElement>('[data-hero-text]')!;
-    const pillEl = root.querySelector<HTMLElement>('[data-hero-pill]')!;
     const clockEl = root.querySelector<HTMLElement>('[data-hero-clock]')!;
     const panel = root.querySelector<HTMLElement>('[data-hero-panel]')!;
+    const strip = root.querySelector<HTMLElement>('[data-strip]')!;
+    const tabbar = root.querySelector<HTMLElement>('[data-tabbar]')!;
     const todayList = root.querySelector<HTMLElement>('[data-today-list]')!;
     const anchorList = root.querySelector<HTMLElement>('[data-anchor-list]')!;
     const captionEl = stack.querySelector<HTMLElement>('[data-hero-caption]')!;
-    const ffBtn = stack.querySelector<HTMLButtonElement>('[data-hero-ff]')!;
-    const modeBtn = stack.querySelector<HTMLButtonElement>('[data-hero-mode]')!;
-    const modeLabel = stack.querySelector<HTMLElement>('[data-hero-mode-label]')!;
     const scrub = stack.querySelector<HTMLElement>('[data-hero-scrub]')!;
     const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-tab]'));
+    const halfBtns = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-half]'));
     const rowBtns = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-row]'));
     const PAGES = tabs.map((t) => t.dataset.tab!);
     const HOME = PAGES[0];
 
-    // One evening, played twelve times faster than life, from 7:59 PM. Instagram's window is
+    // One evening, played ten times faster than life, from 7:59 PM. Instagram's window is
     // 8:00–8:30 with a 30-minute budget spent all the way through it, so the last five minutes
     // carry the budget warning and its glass runs empty as the window closes. The other three
     // are what they are at that hour: YouTube open on an untouched budget, Reddit still an hour
     // off, TikTok blocked with nothing to count.
-    const SPEED = 12;
-    const PRE = 5, WINDOW = 1800 / SPEED, DONE = 8;
+    const SPEED = 10;
+    const LEAD_IN = 60;
+    const PRE = LEAD_IN / SPEED, WINDOW = 1800 / SPEED, DONE = 8;
     const CYCLE = PRE + WINDOW + DONE;
     const WARN = 300;
     const DAY = 86400;
-    /** The second of the day the loop starts on: `PRE` seconds of demo time before 8:00 PM. */
-    const EVENING = 20 * 3600 - PRE * SPEED;
+    /** The second of the day the loop starts on: a minute of app time before 8:00 PM. */
+    const EVENING = 20 * 3600 - LEAD_IN;
     const secondsAt = (t: number) => EVENING + t * SPEED;
-    // Fast-forward lands here rather than on the change itself, so the switch is watched rather
-    // than jumped over: three quarters of a minute on the clock the phone is showing.
-    const LEAD = 45 / SPEED;
     /** One page giving way to the next, and how long the phone waits before taking itself back. */
     const TURN = 380, IDLE = 20000;
-    const CUE = 'Turn the page: a dot, a row, or a drag across the phone.';
+    const CUE = 'Turn the page: an hourglass, a row, or a drag across the phone. The bar at the bottom is the other half.';
 
     const glass = new LivingHourglass(canvas, States.comingSoon(1));
     const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -408,13 +446,14 @@ const DATA = rows.map((r) => ({
       const h = Math.floor(sec / 3600) % 24;
       return `${h % 12 || 12}:${pad(Math.floor(sec / 60) % 60)}`;
     };
+    const clockText = (sec: number) => `${hhmm(sec)} ${Math.floor(sec / 3600) % 24 < 12 ? 'AM' : 'PM'}`;
     const setText = (el: HTMLElement, text: string) => { if (el.textContent !== text) el.textContent = text; };
     const setClass = (el: HTMLElement, cls: string) => { if (el.className !== cls) el.className = cls; };
     const setAttr = (el: Element, name: string, value: string) => { if (el.getAttribute(name) !== value) el.setAttribute(name, value); };
 
     type Beat = {
       key: string; state: HourglassState; eyebrow: string; color: string;
-      name: string; count: string; quiet: boolean; sub: string; pill: string; pillOn: boolean;
+      name: string; count: string; quiet: boolean; sub: string;
       caption: string; anchorClass: string; chip: string; chipTone: string;
     };
 
@@ -422,7 +461,7 @@ const DATA = rows.map((r) => ({
 
     /** `HomeView.line(now:)`, in TypeScript: the status decides all four lines and the chip. */
     const beatOf = (d: TargetData, t: number): Beat => {
-      const base = { name: d.name, pill: '1 pending', pillOn: false, caption: '', anchorClass: '', quiet: false };
+      const base = { name: d.name, caption: '', anchorClass: '', quiet: false };
       if (d.blocked) {
         return { ...base, key: `${d.key}:blocked`, state: States.alwaysBlocked, eyebrow: 'Always blocked',
           color: 'muted', count: 'all day', quiet: true, sub: d.detail, chip: 'all day', chipTone: 'grey' };
@@ -462,16 +501,19 @@ const DATA = rows.map((r) => ({
     const ANCHOR_CYCLE = ENDS[ENDS.length - 1];
     /** How long the phone has been held: the tap landed when that step ended. */
     const heldSince = (t: number) => (t - ENDS[0]) * SPEED;
+    const APPS = `${HOLDS.count} apps`;
 
-    const anchorBeat = (t: number): Beat => {
+    /** `evening` is the clock the status bar is showing, so "since" is a time the phone has
+        actually been on rather than a number typed into the copy. */
+    const anchorBeat = (t: number, evening: number): Beat => {
       let i = 0;
       while (i < ENDS.length - 1 && t >= ENDS[i]) i++;
-      const base = { name: 'Anchor', pill: 'Anchored', pillOn: true, count: '6 apps', quiet: false, chip: '', chipTone: '' };
+      const base = { name: 'Anchor', count: APPS, quiet: false, chip: '', chipTone: '' };
       switch (STEPS[i].key) {
         case 'ready':
           return {
             ...base, key: 'a-ready', state: States.open(0.62), eyebrow: 'Not anchored', color: 'moss',
-            pill: '1 pending', pillOn: false, sub: 'Six apps, one switch', anchorClass: '', quiet: true,
+            sub: `${APPS}, one switch`, anchorClass: '', quiet: true,
             caption: 'A second list, separate from the rules: the apps you want gone all at once.',
           };
         case 'tap':
@@ -482,8 +524,9 @@ const DATA = rows.map((r) => ({
           };
         case 'held':
           return {
-            ...base, key: 'a-held', state: States.anchored, eyebrow: 'Anchored · since 8:12 PM', color: 'ember',
-            count: countdown(heldSince(t)), sub: 'Instagram, YouTube, Reddit +3', anchorClass: 'held',
+            ...base, key: 'a-held', state: States.anchored, color: 'ember',
+            eyebrow: `Anchored · since ${clockText(secondsAt(evening) - heldSince(t))}`,
+            count: countdown(heldSince(t)), sub: HOLDS.names, anchorClass: 'held',
             caption: 'Every app in the list is held, and the glass stops mid-pour.',
           };
         case 'tag':
@@ -495,26 +538,23 @@ const DATA = rows.map((r) => ({
         default:
           return {
             ...base, key: 'a-freed', state: States.open(0.62), eyebrow: 'Unanchored', color: 'moss',
-            pill: '1 pending', pillOn: false, sub: 'Back to today’s rules', anchorClass: '', quiet: true,
+            sub: 'Back to today’s rules', anchorClass: '', quiet: true,
             caption: 'Tag tapped. Today’s windows and budgets take over again.',
           };
       }
     };
 
-    const beatFor = (key: string, t: number) => (key === 'anchor' ? anchorBeat(t) : beatOf(byKey[key], t));
-
     // MARK: The two clocks
 
     type Clock = 'today' | 'anchor';
-    const clockOf = (key: string): Clock => (key === 'anchor' ? 'anchor' : 'today');
     const cycleOf = (c: Clock) => (c === 'today' ? CYCLE : ANCHOR_CYCLE);
     /** Where each clock's loop began, so leaving the evening does not restart it. */
     const origin: Record<Clock, number> = { today: performance.now(), anchor: performance.now() };
     /** The demo-second a clock is being held at, while the scrubber has hold of it. */
     const held: Partial<Record<Clock, number>> = {};
-    const wrap = (t: number, c: Clock) => ((t % cycleOf(c)) + cycleOf(c)) % cycleOf(c);
-    const clock = (now: number, c: Clock) => held[c] ?? wrap((now - origin[c]) / 1000, c);
-    const putClock = (c: Clock, t: number) => { origin[c] = performance.now() - wrap(t, c) * 1000; };
+    const wrapT = (t: number, c: Clock) => ((t % cycleOf(c)) + cycleOf(c)) % cycleOf(c);
+    const clock = (now: number, c: Clock) => held[c] ?? wrapT((now - origin[c]) / 1000, c);
+    const putClock = (c: Clock, t: number) => { origin[c] = performance.now() - wrapT(t, c) * 1000; };
     const letClockGo = (c: Clock) => {
       const at = held[c];
       if (at === undefined) return;
@@ -522,60 +562,29 @@ const DATA = rows.map((r) => ({
       putClock(c, at);
     };
 
-    // MARK: The pager
+    // MARK: The two halves, and the pager inside Rules
 
-    /** The page the dots, the rows and the lists call current. */
+    type Half = 'rules' | 'anchor';
+    let half: Half = 'rules';
+    /** Which app the strip and the rows call current. */
     let selected = HOME;
     /** Mid-turn only: `page` is on its way out and `peek` on its way in, `p` of the way there. */
     let page = HOME;
     let peek: string | null = null;
-    let p = 0, dir = 1, pull = 0;
+    let p = 0, dir = 1;
     let anim: { from: number; to: number; at: number; ms: number } | null = null;
     let drag: { id: number; x: number; y: number; on: boolean } | null = null;
-    /** Where the Anchor button goes back to, and when the phone may take itself back. */
-    let cameFrom = HOME;
     let touchedAt = 0;
+    let lastSecond = -1;
     const touched = () => { touchedAt = performance.now(); };
+    /** A real interaction, as opposed to a pointer crossing the page: it ends the invitation. */
+    const used = () => { touched(); stack.classList.add('used'); };
     /** A keyboard is still on it. A mouse click leaves focus behind; that is not watching. */
     const watching = () => { try { return !!stack.querySelector(':focus-visible'); } catch { return false; } };
     const indexOf = (key: string) => PAGES.indexOf(key);
+    const clockNow = (): Clock => (half === 'anchor' ? 'anchor' : 'today');
 
-    const sync = () => {
-      for (const tab of tabs) {
-        const on = tab.dataset.tab === selected;
-        setAttr(tab, 'aria-selected', String(on));
-        tab.tabIndex = on ? 0 : -1;
-      }
-      for (const row of rowBtns) setAttr(row, 'aria-current', String(row.dataset.row === selected));
-      setAttr(panel, 'aria-labelledby', `hero-tab-${selected}`);
-      const anchoring = selected === 'anchor';
-      setAttr(modeBtn, 'aria-pressed', String(anchoring));
-      setText(modeLabel, anchoring ? 'Back to today' : 'Anchor Mode');
-      setAttr(scrub, 'aria-label', anchoring ? 'Scrub the Anchor walkthrough' : 'Scrub the evening');
-      scrub.classList.toggle('anchor', anchoring);
-      setMarks(clockOf(selected));
-      lastSecond = -1;
-    };
-
-    /** Turns to `key`. The dots and rows follow at once; the page itself takes `TURN` to arrive. */
-    const goTo = (key: string) => {
-      if (anim) { if (anim.to >= 1 && peek) page = peek; peek = null; p = 0; anim = null; }
-      if (key === selected && key === page) return;
-      if (selected !== 'anchor') cameFrom = selected;
-      selected = key;
-      if (key === 'anchor') origin.anchor = performance.now();
-      sync();
-      if (key === page) { peek = null; p = 0; return; }
-      dir = indexOf(key) > indexOf(page) ? 1 : -1;
-      peek = key;
-      if (reduceMotion()) { page = key; peek = null; p = 0; return; }
-      p = 0;
-      anim = { from: 0, to: 1, at: performance.now(), ms: TURN };
-    };
-
-    // MARK: The scrubber's marks
-
-    /** The window as a band on the thread, with its last five minutes picked out. */
+    /** The scrubber's window band, with the last five minutes picked out. */
     const setMarks = (c: Clock) => {
       const pct = (t: number) => clamp((t / cycleOf(c)) * 100, 0, 100);
       if (c === 'anchor') {
@@ -589,6 +598,54 @@ const DATA = rows.map((r) => ({
       scrub.style.setProperty('--w', String(pct(PRE + WINDOW - WARN / SPEED)));
     };
 
+    const sync = () => {
+      const anchoring = half === 'anchor';
+      for (const tab of tabs) {
+        setAttr(tab, 'aria-selected', String(!anchoring && tab.dataset.tab === selected));
+        tab.tabIndex = tab.dataset.tab === selected ? 0 : -1;
+      }
+      for (const row of rowBtns) setAttr(row, 'aria-current', String(!anchoring && row.dataset.row === selected));
+      for (const btn of halfBtns) {
+        const on = btn.dataset.half === half;
+        setAttr(btn, 'aria-selected', String(on));
+        btn.tabIndex = on ? 0 : -1;
+      }
+      setAttr(panel, 'aria-labelledby', anchoring ? 'hero-half-anchor' : `hero-tab-${selected}`);
+      if (strip.hidden !== anchoring) strip.hidden = anchoring;
+      setAttr(scrub, 'aria-label', anchoring ? 'Scrub the Anchor walkthrough' : 'Scrub the evening');
+      scrub.classList.toggle('anchor', anchoring);
+      setMarks(clockNow());
+      // The once-a-second lines are a second stale the moment the page changes under them.
+      lastSecond = -1;
+    };
+
+    const settle = () => {
+      if (anim && anim.to >= 1 && peek) page = peek;
+      peek = null; p = 0; anim = null;
+    };
+
+    /** Turns to `key`. The strip and rows follow at once; the page takes `TURN` to arrive. */
+    const goTo = (key: string, toward = 0) => {
+      settle();
+      if (half === 'anchor') { half = 'rules'; page = key; selected = key; sync(); return; }
+      if (key === selected && key === page) return;
+      selected = key;
+      sync();
+      if (key === page) return;
+      dir = toward || (indexOf(key) > indexOf(page) ? 1 : -1);
+      peek = key;
+      if (reduceMotion()) { page = key; peek = null; return; }
+      anim = { from: 0, to: 1, at: performance.now(), ms: TURN };
+    };
+
+    const setHalf = (next: Half) => {
+      if (next === half) return;
+      settle();
+      half = next;
+      if (next === 'anchor') origin.anchor = performance.now();
+      sync();
+    };
+
     /** What the scrubber says out loud: the evening's clock, or the step being walked through. */
     const SAID: Record<string, string> = {
       ready: 'not anchored', tap: 'anchoring', held: 'anchored', tag: 'at the tag', freed: 'unanchored',
@@ -599,8 +656,7 @@ const DATA = rows.map((r) => ({
         while (i < ENDS.length - 1 && t >= ENDS[i]) i++;
         return SAID[STEPS[i].key];
       }
-      const sec = secondsAt(t);
-      return `${hhmm(sec)} ${Math.floor(sec / 3600) % 24 < 12 ? 'AM' : 'PM'}`;
+      return clockText(secondsAt(t));
     };
 
     // MARK: The glasses under the page
@@ -608,8 +664,7 @@ const DATA = rows.map((r) => ({
     const dotGlass: Record<string, LivingHourglass> = {};
     for (const tab of tabs) {
       const key = tab.dataset.tab!;
-      const c = tab.querySelector<HTMLCanvasElement>('canvas')!;
-      dotGlass[key] = new LivingHourglass(c, key === 'anchor' ? States.anchored : beatOf(byKey[key], 0).state, { still: true });
+      dotGlass[key] = new LivingHourglass(tab.querySelector<HTMLCanvasElement>('canvas')!, beatOf(byKey[key], 0).state, { still: true });
     }
     const rowGlass: Record<string, LivingHourglass> = {};
     const rowChip: Record<string, HTMLElement> = {};
@@ -628,41 +683,39 @@ const DATA = rows.map((r) => ({
     let lastKey = '';
     let from: HourglassState | null = null;
     let changedAt = 0;
-    let lastSecond = -1;
+
+    const beatFor = (key: string, now: number) =>
+      key === 'anchor'
+        ? anchorBeat(clock(now, 'anchor'), clock(now, 'today'))
+        : beatOf(byKey[key], clock(now, 'today'));
 
     const render = (now: number) => {
       if (anim) {
         const k = clamp((now - anim.at) / anim.ms, 0, 1);
         p = anim.from + (anim.to - anim.from) * (1 - (1 - k) ** 3);
-        if (k >= 1) {
-          if (anim.to >= 1 && peek) page = peek;
-          peek = null; p = 0; anim = null;
-          from = null;
-        }
+        if (k >= 1) { settle(); from = null; }
       }
       // The page on screen swaps at the halfway point, where the words are invisible anyway.
-      const shownKey = peek && p >= 0.5 ? peek : page;
-      const tShown = clock(now, clockOf(shownKey));
-      const b = beatFor(shownKey, tShown);
+      const turning = !!peek && half === 'rules';
+      const shownKey = half === 'anchor' ? 'anchor' : turning && p >= 0.5 ? peek! : page;
+      const b = beatFor(shownKey, now);
 
       // The glass does not swap: it blends the page that is leaving into the one arriving,
       // and, when neither is moving, the state it is settling into.
       let target = b.state;
-      if (peek) {
-        target = blendStates(beatFor(page, clock(now, clockOf(page))).state, beatFor(peek, clock(now, clockOf(peek))).state, p);
-      }
+      if (turning) target = blendStates(beatFor(page, now).state, beatFor(peek!, now).state, p);
       if (b.key !== lastKey) {
         from = lastKey ? glass.state : null;
         changedAt = now;
         lastKey = b.key;
       }
-      const k = from && !peek ? (now - changedAt) / 800 : 1;
-      const shown = from && k < 1 ? blendStates(from, target, k) : target;
-      glass.set(shown);
+      const k = from && !turning ? (now - changedAt) / 800 : 1;
+      glass.set(from && k < 1 ? blendStates(from, target, k) : target);
+      const shown = glass.state;
 
       const fold = p < 0.5 ? p : p - 1;
-      textEl.style.transform = `translateX(${(-dir * fold * 40 + pull).toFixed(1)}px)`;
-      textEl.style.opacity = peek ? Math.abs(p - 0.5) * 2 + '' : '1';
+      textEl.style.transform = `translateX(${(-dir * fold * 40).toFixed(1)}px)`;
+      textEl.style.opacity = turning ? Math.abs(p - 0.5) * 2 + '' : '1';
 
       setText(eyebrowEl, b.eyebrow);
       setClass(eyebrowEl, `eyebrow ${b.color}`);
@@ -670,22 +723,19 @@ const DATA = rows.map((r) => ({
       setText(countEl, b.count);
       setClass(countEl, b.quiet ? 'count mono quiet' : 'count mono');
       setText(subEl, b.sub);
-      setText(pillEl, b.pill);
-      setClass(pillEl, b.pillOn ? 'glass pill on' : 'glass pill');
       setClass(anchorList, `list anchor-list ${b.anchorClass}`.trimEnd());
 
-      const anchoring = shownKey === 'anchor';
+      const anchoring = half === 'anchor';
       if (todayList.hidden !== anchoring) todayList.hidden = anchoring;
       if (anchorList.hidden === anchoring) anchorList.hidden = !anchoring;
-      root.classList.toggle('anchoring', anchoring);
       if (anchoring) { setText(captionEl, b.caption); setClass(captionEl, 'caption'); }
       else { setText(captionEl, CUE); setClass(captionEl, 'caption cue'); }
 
-      // The scrubber, the status bar and the ten small glasses only move once a second.
-      const second = Math.floor(now / 1000);
-      const c = clockOf(selected);
+      // The scrubber, the status bar and the eight small glasses only move once a second.
+      const c = clockNow();
       const at = clock(now, c);
       scrub.style.setProperty('--p', String((at / cycleOf(c)) * 100));
+      const second = Math.floor(now / 1000);
       if (second !== lastSecond) {
         lastSecond = second;
         const evening = clock(now, 'today');
@@ -693,13 +743,10 @@ const DATA = rows.map((r) => ({
         setAttr(scrub, 'aria-valuenow', String(Math.round((at / cycleOf(c)) * 100)));
         setAttr(scrub, 'aria-valuetext', scrubText(c, at));
         for (const key of PAGES) {
-          if (key === shownKey) { dotGlass[key].set(shown); continue; }
-          const st = key === 'anchor' ? States.anchored : beatOf(byKey[key], evening).state;
-          dotGlass[key].set(st);
-        }
-        for (const key of Object.keys(rowGlass)) {
           const rb = beatOf(byKey[key], evening);
           const sig = sigOf(rb);
+          if (key === shownKey) dotGlass[key].set(shown);
+          else if (lastSig[`dot:${key}`] !== sig) { lastSig[`dot:${key}`] = sig; dotGlass[key].set(rb.state); }
           if (lastSig[key] === sig) continue;
           lastSig[key] = sig;
           rowGlass[key].set(rb.state);
@@ -709,40 +756,52 @@ const DATA = rows.map((r) => ({
       }
 
       // Left alone for long enough, the phone goes back to playing the evening by itself.
-      if (touchedAt && now - touchedAt > IDLE && selected !== HOME && !anim && !drag
-          && !reduceMotion() && !watching()) {
+      if (touchedAt && now - touchedAt > IDLE && !anim && !drag && !reduceMotion()
+          && (half !== 'rules' || selected !== HOME) && !watching()) {
         touchedAt = 0;
-        goTo(HOME);
+        if (half === 'anchor') { half = 'rules'; page = HOME; selected = HOME; peek = null; p = 0; sync(); }
+        else goTo(HOME);
       }
     };
 
     // MARK: Turning the page
 
     for (const tab of tabs) {
-      tab.addEventListener('click', () => { touched(); goTo(tab.dataset.tab!); tab.focus(); });
+      tab.addEventListener('click', () => { used(); goTo(tab.dataset.tab!); tab.focus(); });
     }
     for (const row of rowBtns) {
-      row.addEventListener('click', () => { touched(); goTo(row.dataset.row!); });
+      row.addEventListener('click', () => { used(); goTo(row.dataset.row!); });
     }
-    root.querySelector('[role="tablist"]')!.addEventListener('keydown', (e) => {
-      const ev = e as KeyboardEvent;
+    for (const btn of halfBtns) {
+      btn.addEventListener('click', () => { used(); setHalf(btn.dataset.half as Half); btn.focus(); });
+    }
+    strip.addEventListener('keydown', (e) => {
       const i = indexOf(selected);
       let next = -1;
-      if (ev.key === 'ArrowRight' || ev.key === 'ArrowDown') next = (i + 1) % PAGES.length;
-      else if (ev.key === 'ArrowLeft' || ev.key === 'ArrowUp') next = (i - 1 + PAGES.length) % PAGES.length;
-      else if (ev.key === 'Home') next = 0;
-      else if (ev.key === 'End') next = PAGES.length - 1;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (i + 1) % PAGES.length;
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (i - 1 + PAGES.length) % PAGES.length;
+      else if (e.key === 'Home') next = 0;
+      else if (e.key === 'End') next = PAGES.length - 1;
       if (next < 0) return;
-      ev.preventDefault();
-      touched();
+      e.preventDefault();
+      used();
       goTo(PAGES[next]);
       tabs[next].focus();
     });
+    tabbar.addEventListener('keydown', (e) => {
+      if (!['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+      e.preventDefault();
+      used();
+      const next: Half = half === 'rules' ? 'anchor' : 'rules';
+      setHalf(next);
+      halfBtns.find((b) => b.dataset.half === next)!.focus();
+    });
 
-    // A drag across the page. `touch-action: pan-y` leaves the vertical to the browser, so a
-    // finger scrolling the site past the phone still scrolls it and arrives here as a cancel.
+    // A drag across the page, the way `HeroPager` swipes — and, like it, the ends wrap rather
+    // than stop dead. `touch-action: pan-y` leaves the vertical to the browser, so a finger
+    // scrolling the site past the phone still scrolls it and arrives here as a cancel.
     panel.addEventListener('pointerdown', (e) => {
-      if (anim) return;
+      if (anim || half === 'anchor') return;
       touched();
       drag = { id: e.pointerId, x: e.clientX, y: e.clientY, on: false };
       e.preventDefault();
@@ -754,95 +813,54 @@ const DATA = rows.map((r) => ({
       if (!drag.on) {
         if (Math.abs(dx) < 8 || Math.abs(dx) <= Math.abs(dy)) return;
         drag.on = true;
+        used();
       }
       touched();
       const width = panel.getBoundingClientRect().width || 300;
-      const toward = dx < 0 ? 1 : -1;
-      const next = PAGES[indexOf(page) + toward];
-      if (!next) { peek = null; p = 0; pull = clamp(dx * 0.18, -22, 22); return; }
-      pull = 0;
-      dir = toward;
-      peek = next;
+      dir = dx < 0 ? 1 : -1;
+      peek = PAGES[(indexOf(page) + dir + PAGES.length) % PAGES.length];
       p = clamp(Math.abs(dx) / (width * 0.62), 0, 1);
     });
     const dropped = (commit: boolean) => {
       if (!drag) return;
       const moved = drag.on;
       drag = null;
-      pull = 0;
       if (!moved || !peek) { peek = null; p = 0; return; }
       // Past a third of the way it lands on the next page; short of that it falls back.
       const land = commit && p > 0.34;
-      if (land) {
-        if (selected !== 'anchor') cameFrom = selected;
-        selected = peek;
-        if (peek === 'anchor') origin.anchor = performance.now();
-        sync();
-      }
+      if (land) { selected = peek; sync(); }
       anim = { from: p, to: land ? 1 : 0, at: performance.now(), ms: TURN * (land ? 1 - p : p) + 90 };
     };
     panel.addEventListener('pointerup', () => dropped(true));
     panel.addEventListener('pointercancel', () => dropped(false));
 
-    // MARK: The evening's controls
-
-    /** Skip the wait: land `LEAD` short of the next change, so the switch itself is on screen. */
-    const marks = (c: Clock) => {
-      if (c === 'anchor') return ENDS;
-      const out = new Set<number>([CYCLE]);
-      for (const d of data) {
-        if (d.blocked) continue;
-        const close = d.close! * 60;
-        for (const sec of [d.open! * 60, close, d.spends ? close - WARN : -1]) {
-          if (sec < 0) continue;
-          const t = (sec - EVENING) / SPEED;
-          if (t > 0 && t < CYCLE) out.add(t);
-        }
-      }
-      return [...out].sort((a, b) => a - b);
-    };
-    ffBtn.addEventListener('click', () => {
-      touched();
-      const c = clockOf(selected);
-      letClockGo(c);
-      scrub.classList.remove('dragging');
-      const t = clock(performance.now(), c);
-      const lead = c === 'today' ? LEAD : 0.55;
-      const bounds = marks(c);
-      const next = bounds.find((b) => b - lead > t + 0.05) ?? bounds[0] + cycleOf(c);
-      putClock(c, next - lead);
-    });
-
-    modeBtn.addEventListener('click', () => {
-      touched();
-      goTo(selected === 'anchor' ? cameFrom : 'anchor');
-    });
+    // MARK: The evening's thread
 
     const scrubAt = (clientX: number, c: Clock) => {
       const box = scrub.getBoundingClientRect();
       return clamp((clientX - box.left) / Math.max(1, box.width), 0, 1) * cycleOf(c);
     };
     scrub.addEventListener('pointerdown', (e) => {
-      touched();
-      const c = clockOf(selected);
+      used();
+      const c = clockNow();
       held[c] = scrubAt(e.clientX, c);
       scrub.classList.add('dragging');
       scrub.setPointerCapture(e.pointerId);
     });
     scrub.addEventListener('pointermove', (e) => {
       if (!scrub.hasPointerCapture(e.pointerId)) return;
-      const c = clockOf(selected);
+      const c = clockNow();
       held[c] = scrubAt(e.clientX, c);
       touched();
     });
     const letGo = () => {
       scrub.classList.remove('dragging');
-      letClockGo(clockOf(selected));
+      letClockGo(clockNow());
     };
     scrub.addEventListener('pointerup', letGo);
     scrub.addEventListener('pointercancel', letGo);
     scrub.addEventListener('keydown', (e) => {
-      const c = clockOf(selected);
+      const c = clockNow();
       const step = e.shiftKey ? cycleOf(c) / 12 : 1;
       const at = clock(performance.now(), c);
       let to: number | null = null;
@@ -852,18 +870,16 @@ const DATA = rows.map((r) => ({
       else if (e.key === 'End') to = cycleOf(c) - 0.01;
       if (to === null) return;
       e.preventDefault();
-      touched();
+      used();
       letClockGo(c);
       putClock(c, to);
     });
 
-    // A pointer moving over it, or a keyboard visibly on it, counts as watching — so a page is
-    // never pulled out from under someone using it, and a cursor merely parked on a button is
-    // not mistaken for one.
+    // A pointer moving over it counts as watching, so a page is never pulled out from under
+    // someone using it; a cursor merely parked on a control is not mistaken for one.
     stack.addEventListener('pointermove', touched);
 
     sync();
-    setMarks('today');
 
     // Safari hands out no animation frames for the length of a scroll, which left the countdown
     // frozen until the page came to rest. A timer and the scroll itself keep the clock moving
