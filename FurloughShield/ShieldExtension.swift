@@ -58,7 +58,9 @@ final class ShieldExtension: ShieldConfigurationDataSource {
         let amber = UIColor(red: 0xF5 / 255, green: 0x9E / 255, blue: 0x4A / 255, alpha: 1)
         let cream = UIColor(red: 0xF5 / 255, green: 0xEF / 255, blue: 0xE6 / 255, alpha: 1)
         let muted = UIColor(red: 0xB8 / 255, green: 0xAF / 255, blue: 0xA3 / 255, alpha: 1)
-        let ground = UIColor(red: 0x0F / 255, green: 0x0D / 255, blue: 0x0B / 255, alpha: 1)
+        // What 14% white used to composite to over the material below. Opaque on purpose: see
+        // `primaryButtonBackgroundColor`.
+        let pill = UIColor(red: 0x3F / 255, green: 0x3F / 255, blue: 0x3F / 255, alpha: 1)
         var glass: HourglassState?
         if let target, let status {
             glass = HourglassState.of(target, status: status, runtime: state.runtime, now: now)
@@ -69,17 +71,21 @@ final class ShieldExtension: ShieldConfigurationDataSource {
             glass = .anchored
         }
         return ShieldConfiguration(
-            // App's own ground over the most opaque dark material, so the shield reads as
-            // Furlough, not a smear of what it covers.
+            // Blur only, no tint. iOS masks the blur to the screen's corner radius but fills
+            // `backgroundColor` to the square window bounds, so a ground tint left the App
+            // Switcher card a black square around a rounded panel (seen 2026-09-14). The tint
+            // was near-invisible anyway — ground at 92% over this material lands on #0E0E0B.
             backgroundBlurStyle: .systemChromeMaterialDark,
-            backgroundColor: ground.withAlphaComponent(0.92),
+            backgroundColor: .clear,
             icon: icon(for: glass, fallbackTint: amber),
             title: ShieldConfiguration.Label(text: text.title, color: cream),
             subtitle: ShieldConfiguration.Label(text: text.subtitle, color: muted),
-            // Card fill from the app, not a shouting cream pill — Close is the only action, no
-            // need to fight for the eye.
+            // A quiet fill, not a shouting cream pill — Close is the only action, no need to
+            // fight for the eye. Opaque: iOS ignored `UIColor.white.withAlphaComponent(0.14)`
+            // and drew the default system blue instead (seen 2026-09-14), while honouring every
+            // opaque colour in this same configuration.
             primaryButtonLabel: ShieldConfiguration.Label(text: "Close", color: cream),
-            primaryButtonBackgroundColor: UIColor.white.withAlphaComponent(0.14),
+            primaryButtonBackgroundColor: pill,
             secondaryButtonLabel: nil
         )
     }
