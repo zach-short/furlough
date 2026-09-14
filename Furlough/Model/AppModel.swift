@@ -213,6 +213,126 @@ final class AppModel {
         showsUsageStep = false
     }
 
+    // MARK: What a usage card's press writes
+
+    /// What one usage card's Apply did — the rules row, the anchor's doors, or both. The page
+    /// keeps it on the card as `UsageCardState.Applied`.
+    struct UsageApply: Equatable {
+        var targetID: UUID?
+        var heldKinds: [TargetKind] = []
+        /// True only when the press created the rules row itself — see `undoFreshTarget`.
+        var fresh = false
+        var message = ""
+        /// The rule loosened a row that already had one, so it waits out the delay.
+        var waiting = false
+    }
+
+    /// Why a press could not be written, in a sentence the card can show.
+    struct UsageRefusal: Error {
+        var reason: String
+    }
+
+    /// Writes one usage card's answer on `kind`. No query or await anywhere in here — every
+    /// line is a synchronous write + enforce — which is what makes an instant Apply honest
+    /// rather than optimistic. Shared by the page (`UsageView.write`) and the background
+    /// finisher below, so a press lands the same way wherever it is finished.
+    func applyUsage(
+        rule: Rule,
+        to kind: TargetKind,
+        named name: String,
+        writesRule: Bool,
+        holds: Bool
+    ) -> Result<UsageApply, UsageRefusal> {
+        var done = UsageApply()
+        if writesRule {
+            var fresh = false
+            // target(kind:) rather than matching `kind` alone: this app may already be the linked
+            // half of a row (YouTube beside youtube.com), and adding it again would split that pair.
+            if state.config.target(kind: kind) == nil {
+                var picked = pickerSelection
+                switch kind {
+                case .application(let token): picked.applicationTokens.insert(token)
+                case .webDomain(let token): picked.webDomainTokens.insert(token)
+                // Screen Time counts neither a whole category nor a hand-typed site.
+                case .category, .host: break
+                }
+                _ = applyPicker(picked)
+                reload()
+                fresh = true
+            }
+            guard let target = state.config.targets.first(where: { $0.kind == kind }) else {
+                return .failure(UsageRefusal(reason: "Could not add \(name)."))
+            }
+            let outcome = apply(rule: rule, nickname: target.nickname, for: target.id, andTo: [])
+            done.targetID = target.id
+            done.fresh = fresh
+            done.waiting = outcome.scheduled > 0
+            done.message = outcome.message
+        }
+        if holds {
+            // Holds every door of a linked row (app + site) together, so one pick closes both.
+            let doors = state.config.target(kind: kind)?.kinds ?? [kind]
+            guard hold(doors) else {
+                return .failure(UsageRefusal(reason: "The Anchor cannot take anything in while it is down."))
+            }
+            done.heldKinds = doors
+            let held = "On the Anchor's list: out of reach the moment you drop it."
+            done.message = done.message.isEmpty ? held : "\(done.message)\n\n\(held)"
+        }
+        return .success(done)
+    }
+
+    /// A press the usage step closed on before Screen Time had named its app: finished here,
+    /// off the page, so leaving cannot lose it. `name` is for the alert if it never lands.
+    struct UsageOwed {
+        var key: String
+        var name: String
+        var rule: Rule
+        var writesRule: Bool
+        var holds: Bool
+    }
+
+    /// How many times the background finisher asks Screen Time, a second apart — the page's
+    /// own `nameApps` count, since it is the same question asked from a different place.
+    private static let usageFinishAttempts = 3
+
+    /// Finishes presses the step closed on. Asks for their tokens the way the page did — a few
+    /// tries, a second apart, an empty answer meaning a failed query — writes each one it can,
+    /// and puts the ones it couldn't in `lastError`, since the page that would have said so is
+    /// gone. Nothing is written for a press Screen Time never answers.
+    func finishUsageInBackground(_ owed: [UsageOwed]) {
+        guard #available(iOS 26.4, *), !owed.isEmpty else { return }
+        SharedStore.log("usage: \(owed.count) press(es) still owed when the step closed; finishing in the background")
+        Task {
+            var found: [String: TargetKind] = [:]
+            for attempt in 1...Self.usageFinishAttempts {
+                found = (try? await UsageReader.kinds(forKeys: owed.map(\.key), within: UsageReader.patience)) ?? [:]
+                if !found.isEmpty || attempt == Self.usageFinishAttempts { break }
+                try? await Task.sleep(for: .seconds(1))
+            }
+            var missed: [String] = []
+            for one in owed {
+                guard let kind = found[one.key] else {
+                    missed.append(one.name)
+                    continue
+                }
+                switch applyUsage(rule: one.rule, to: kind, named: one.name, writesRule: one.writesRule, holds: one.holds) {
+                case .success:
+                    SharedStore.log("usage: finished \(one.name) in the background")
+                case .failure(let refusal):
+                    missed.append(one.name)
+                    SharedStore.log("usage: could not finish \(one.name) in the background: \(refusal.reason)")
+                }
+            }
+            guard !missed.isEmpty else { return }
+            SharedStore.log("usage: \(missed.count) press(es) left to finish in the background never landed")
+            let list = missed.formatted(.list(type: .and))
+            lastError = missed.count == 1
+                ? "Furlough could not finish \(list). Screen Time never handed the app over, so nothing was written for it. You can try again from Settings › Where the time goes."
+                : "Furlough could not finish \(list). Screen Time never handed those apps over, so nothing was written for them. You can try again from Settings › Where the time goes."
+        }
+    }
+
     // MARK: Lifecycle
 
     func activate() {

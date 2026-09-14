@@ -74,6 +74,19 @@ enum UsageCardState: Equatable {
     }
 }
 
+extension UsageCardState.Applied {
+    /// What the model wrote (`AppModel.applyUsage`), as the card keeps it.
+    init(_ written: AppModel.UsageApply) {
+        self.init(
+            targetID: written.targetID,
+            heldKinds: written.heldKinds,
+            fresh: written.fresh,
+            message: written.message,
+            waiting: written.waiting
+        )
+    }
+}
+
 /// Mirrors `UsageReportCard` in the report extension, used where iOS can't read Screen Time
 /// numbers directly — keep the two in sync.
 struct UsageSuggestionCard: View {
@@ -470,6 +483,22 @@ struct UsageFinishButton: View {
         // Not `.disabled` while working: that dims the glass, and a dimmed "Accessing the
         // mainframe…" reads as stuck rather than busy. `UsageView.finish` ignores a second press.
         .animation(.easeInOut(duration: 0.2), value: finishing)
+    }
+}
+
+/// Under the working Done button once Screen Time has kept it waiting a couple of seconds:
+/// the two ways out. Cancel is a real cancel — every press still owed is dropped and its card
+/// goes back on offer, nothing written (Zach, 2026-09-14: a cancel that still goes through is
+/// worse than none). Finishing in the background leaves now and lets the model land the rest.
+struct UsageFinishEscape: View {
+    let cancel: () -> Void
+    let background: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            GhostButton(title: "Cancel", color: Ember.muted, action: cancel)
+            GhostButton(title: "Finish in the background", color: Ember.amber, action: background)
+        }
     }
 }
 
