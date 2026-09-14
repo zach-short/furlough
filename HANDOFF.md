@@ -660,8 +660,11 @@ The plan for this stretch. Tick each phase off here as it lands.
    hourglass hero (built 2026-09-07, the widget timeline's three-minute entries included), and
    the whole Anchor flow (pair a tag, anchor, a wrong tag refused, weigh anchor, and whether
    the tag identifier is stable across two scans). On the Mac: the shield panel, the browser
-   redirect and its one-time Automation prompt, budget counting, the login item, and the
-   desktop widget placed on the desktop.
+   redirect and its one-time Automation prompt, budget counting, the login item, the
+   desktop widget placed on the desktop, and — added 2026-09-13 with step 43 — **the web filter
+   surviving a reinstall**: install a build, replace it with another (`furlough mac` twice), and
+   the activity log should carry `web filter: this copy of Furlough is not the one that installed
+   the filter…` followed by `web filter on`, with no visit to Settings > Web.
    Sent to Zach on 2026-09-08 as two checklists; the rest of his report is outstanding.
    **The Mac in `/Applications` is now a Debug build of `2851824`**, replaced 2026-09-08 with
    his go-ahead: SIGTERM to the running copy (not an Apple Event, so the "Quit refused while
@@ -2901,6 +2904,129 @@ The plan for this stretch. Tick each phase off here as it lands.
     exposes that moment as `Enforcer.onDayRollover(SharedState)`, and `MacModel.start()` wires it
     straight to `PendingNotifications.sync`. No new state, no change to `Record` or to the plan
     itself — the Mac now gets the same guaranteed pre-fire correction the phone already had.
+
+43. **An update stops costing the web filter, and the Mac gets a release pipeline.** Zach,
+    2026-09-13, after asking whether it was time to get the Mac ready for submission: fix the
+    reinstall first, then start on distribution. Both landed the same day. Nothing here has been
+    run on a Mac other than this one, and the second half cannot be run at all until a
+    certificate exists — see "What is not verified" at the end.
+
+    **(a) The filter survives being replaced.** Step 35's last paragraph recorded the defect and
+    named it exactly: replacing `/Applications/Furlough.app` leaves `systemextensionsctl` still
+    listing the extension as activated and enabled, while a properties request from the new
+    bundle comes back empty, "and the app cannot tell that from a filter nobody ever installed".
+    So it reported **Not installed** on a screen nobody had open and filtered nothing until
+    somebody pressed Install. For one Mac that is a quirk to work around; for a release with any
+    update mechanism it is a filter that quietly switches off on every update, for people who
+    will not notice.
+
+    Two things were wrong, and they compound. The first is that the app had nothing to compare:
+    `start()` asked whether the installed extension's *version* differed from the bundled one,
+    and `CURRENT_PROJECT_VERSION` is `1` in `project.yml` for every Mac build ever made, so that
+    check compared `1` with `1` and answered "same" on a Mac whose extension had just been
+    replaced out from under it. The second is that the repairable states were not repaired: the
+    launch path handled `notInstalled` and a newer version, and left `.failed` — which is where
+    a properties query that goes *unanswered* lands, the signature of a replaced bundle — to sit
+    there until a person acted.
+
+    - `Shared/Core/FilterRepair.swift`, pure and tested (`Tests/Core/FilterRepairTests.swift`,
+      13 tests): `Presence` is what macOS says flattened to the facts a decision turns on,
+      `decide` says whether this launch asks macOS again and `Reason` says why, in the sentence
+      that goes in the activity log.
+    - `WebFilter` now writes down **which build's extension macOS accepted**:
+      `bundledIdentity` is the extension's `CFBundleVersion` plus the first six bytes of its
+      code directory hash, read with `SecCodeCopySigningInformation`, and it is stored in the
+      App Group beside `furlough.mac.filter.wanted` as `…filter.installed`. The hash is the
+      point — it moves with every build whether or not anybody remembers to bump a number, which
+      the version demonstrably does not. A launch that finds a different identity in its own
+      bundle knows it was replaced rather than never installed.
+    - `…filter.attempted` holds the identity a launch last asked for, so a stuck or refused
+      activation is retried **once per build** rather than on every launch. It is written before
+      the request, not after, because the launches this has to survive are the ones that do not
+      come back.
+    - What it will not do is argue. A filter switched off in System Settings is left off, and so
+      is one somebody was asked about and declined — `FilterRepair.Presence` keeps `refused`
+      (macOS said no on its own, usually a leftover configuration) apart from `declined` (a
+      person said no), which the app already knew the difference between:
+      `Status.filterDenied(_, prompted:)` and the 1.5-second timing behind it.
+    - `furlough mac` now stamps `CURRENT_PROJECT_VERSION` with a UTC timestamp, the way
+      `archive.sh` does for the phone. macOS compares an extension's `CFBundleVersion` when it is
+      asked to replace one, so this is not bookkeeping: it is the other half of the same bug.
+      Verified on a Release build — app and extension both came out `202609140307`.
+    - Settings > Web > Copy diagnostics gained three lines: this build's extension, the one this
+      app installed, and the one a launch last asked for. "Installed" disagreeing with "in this
+      build" is the signature of a filter left behind by an earlier copy, and it is what the
+      status alone could never show.
+
+    **Measured, 2026-09-13**, with the same `SecCodeCopySigningInformation` call in a standalone
+    `swiftc` harness over the real bundles on this Mac:
+
+    ```
+    1+7b74e1dfafcb            /Applications/Furlough.app … .systemextension   (the running one)
+    1+7b74e1dfafcb            build/DerivedDataMac/…/Release/…                (the build it came from)
+    202609140307+759c0f607c92 build/DerivedDataMacRelease/…/Release/…         (a build cut today)
+    ```
+
+    Both properties the repair needs, in three lines: the identity is **stable for the same
+    code**, so reinstalling the same build asks macOS for nothing, and **different for a
+    different build**, so an update is seen. And the left-hand side is the dead comparison the
+    old code was making — `1` against `1`, across a fortnight of work.
+
+    **(b) The Mac's road, and the script that walks it.** There is no Mac App Store submission
+    and there will not be one — `FurloughMac` is unsandboxed, drives browsers through Apple
+    Events, terminates processes, installs a `LaunchAgent` and carries a system extension, and
+    the Mac App Store requires the sandbox without exception (DEPLOYMENT.md section 3, settled
+    before any of this was built). The equivalent is Developer ID plus notarization, from a page
+    on furloughapp.com.
+
+    `scripts/archive-mac.sh` (`furlough mac-release`, and `furlough mac-check` for the preflight
+    alone) is HANDOFF 26's recipe as a command. It builds Release with a stamped build number,
+    runs the phone archive's promise checks against the Mac binary — the control string first,
+    then no `resetEverything`/`clearEverything`/`TestingTools`, each probe reading a variable
+    rather than a pipe for the SIGPIPE reason `archive.sh` documents — then signs **by hand,
+    inside out** (extension, widget, app), because Xcode 26's Direct Distribution cannot sign an
+    app embedding a system extension (DTS r.108838909, fixed in the Xcode 27 beta). Then
+    notarize, staple, DMG with an /Applications symlink, sign and notarize that too, staple it,
+    and print what Gatekeeper makes of both.
+
+    Three of its checks are the ones worth keeping:
+    - **The entitlement is read back off the signature**, not off the file handed to codesign. A
+      Developer ID system-extension filter needs `content-filter-provider-systemextension` (DTS,
+      forums 737894) and an entitlement the profile does not grant is dropped *silently* at
+      signing — the filter then refuses to load on a stranger's Mac with nothing in the app to
+      say why. New entitlements files carry it: `FurloughMac-DeveloperID.entitlements` and
+      `FurloughMacFilter-DeveloperID.entitlements`, with every value literal and
+      `application-identifier` and `team-identifier` written out, because codesign expands no
+      build settings and adds nothing from a profile the way a build does.
+    - **`get-task-allow` is refused.** It is what makes a development signature a development
+      one, and notarization rejects it.
+    - **A split binary is refused.** `Furlough.debug.dylib` means the probes above are reading a
+      60 KB stub, and a system extension must be one Mach-O anyway.
+
+    **What this Mac is still missing, which is what `furlough mac-check` prints:** a **Developer
+    ID Application certificate** (Xcode > Settings > Accounts > Manage Certificates; Account
+    Holder only, so nobody else can make it), and **two Developer ID profiles** — one for
+    `com.zachshort.furlough.mac` with Network Extension *and* iCloud, one for
+    `com.zachshort.furlough.mac.filter` with Network Extension — saved as
+    `~/.furlough/signing/FurloughMac.provisionprofile` and `…/FurloughMacFilter.provisionprofile`
+    (outside the repo, like the App Store Connect key; `FURLOUGH_SIGNING` moves them). The
+    preflight decodes each profile rather than trusting its name: a development profile saved
+    under the release name, or one made before the capability was added to the App ID, are the
+    two ways this goes wrong quietly. The notary key is the TestFlight one and is already here.
+
+    **What is not verified.** 729 tests in 103 suites pass, and the iOS and Mac builds are
+    warning-free. The repair has not been watched happening on a Mac: doing that means
+    installing a build, replacing it, and reading the activity log for `web filter: this copy of
+    Furlough is not the one that installed the filter…` followed by `web filter on` — it is on
+    the Mac checklist in step 3 and it is worth doing before any of this reaches somebody else.
+    `archive-mac.sh` has been run only as `--check`, which is as far as it goes without a
+    certificate; everything after the preflight is written and unexecuted.
+
+    **Still owed before strangers have it**, none of it started: the download card on the site
+    still says "Furlough for Mac is open source. Build it from GitHub.", there is no update
+    mechanism (Foqos uses Sparkle over a notarized DMG on GitHub), and nothing on the site
+    explains what macOS will ask for — the extension approval, the filter permission, Automation
+    per browser — before somebody downloads it.
 
 ## Style rules
 

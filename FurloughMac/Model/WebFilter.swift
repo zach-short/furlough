@@ -233,6 +233,13 @@ final class WebFilter {
         lines.append("app: \(Bundle.main.bundleURL.path)")
         lines.append("in /Applications: \(Self.isInApplications)")
         lines.append("extension bundled with this build: \(Self.bundledVersion ?? "none found")")
+        // The three lines that say whether this app is the one that installed what macOS is
+        // running. An install replaces the bundle without touching anything macOS lists, so
+        // "installed" disagreeing with "in this build" is the signature of a filter left behind
+        // by an earlier copy — the thing the status alone could never show.
+        lines.append("this build's extension: \(Self.bundledIdentity ?? "could not be read")")
+        lines.append("extension this app installed: \(installedIdentity ?? "none recorded")")
+        lines.append("last asked for by a launch: \(attemptedIdentity ?? "none")")
         lines.append("extension id: \(FilterXPC.extensionID)")
 
         lines.append("")
@@ -321,7 +328,30 @@ final class WebFilter {
     /// Called with the host and the bundle identifier of the app whose connection was dropped.
     var onBlocked: ((String, String) -> Void)?
 
+    /// The extension macOS last told us it had accepted, as `bundledIdentity` writes it.
+    ///
+    /// This is what makes a replaced app tell itself apart from a fresh one. It sits beside
+    /// `wanted` in the App Group rather than in the state `SharedStore.reset` clears, for the
+    /// same reason `wanted` does: it describes macOS's Mac, not Furlough's setup, and Testing >
+    /// Reset everything leaves the extension where it is.
+    private var installedIdentity: String? {
+        get { SharedStore.defaults.string(forKey: Self.installedKey) }
+        set { SharedStore.defaults.set(newValue, forKey: Self.installedKey) }
+    }
+    /// The identity a launch last asked macOS for without being told it worked. One request per
+    /// build, so a Mac that will not take this copy is not asked again every time it starts.
+    private var attemptedIdentity: String? {
+        get { SharedStore.defaults.string(forKey: Self.attemptedKey) }
+        set { SharedStore.defaults.set(newValue, forKey: Self.attemptedKey) }
+    }
+    /// Set by `refresh()` when the extension service does not answer at all, which is a
+    /// different thing from a refusal and takes a different repair. `Status.failed` carries
+    /// both, because they read the same to everyone but this.
+    private var queryWentUnanswered = false
+
     private static let wantedKey = "furlough.mac.filter.wanted"
+    private static let installedKey = "furlough.mac.filter.installed"
+    private static let attemptedKey = "furlough.mac.filter.attempted"
     private let link = FilterLink()
     private var lastPushed: FilterRules?
     private var pushing = false
@@ -331,17 +361,72 @@ final class WebFilter {
     /// anywhere else, and says so only in an error code.
     static var isInApplications: Bool { Bundle.main.bundleURL.path.hasPrefix("/Applications/") }
 
+    /// Where the extension sits inside this app, which is the only copy this app can install.
+    private static var extensionURL: URL {
+        Bundle.main.bundleURL.appending(path: "Contents/Library/SystemExtensions/\(FilterXPC.extensionID).systemextension")
+    }
+
     /// The version of the extension this build carries, to tell an older installed copy from it.
     private static var bundledVersion: String? {
-        let url = Bundle.main.bundleURL.appending(path: "Contents/Library/SystemExtensions/\(FilterXPC.extensionID).systemextension")
-        return Bundle(url: url)?.infoDictionary?["CFBundleVersion"] as? String
+        Bundle(url: extensionURL)?.infoDictionary?["CFBundleVersion"] as? String
+    }
+
+    /// This build's extension, exactly: its version and the first bytes of its code directory
+    /// hash — the same hash macOS identifies a binary by.
+    ///
+    /// The version alone cannot do this job. `CURRENT_PROJECT_VERSION` sat at `1` for every Mac
+    /// build ever made, so "is the installed copy older than mine?" compared `1` with `1` and
+    /// answered no, on a Mac whose extension had just been replaced out from under it. The hash
+    /// moves with every build whether or not anybody remembers to bump a number, which is the
+    /// property this needs; the version is kept in front of it because it is what a person
+    /// reading the log or the diagnostics can recognise.
+    private static var bundledIdentity: String? {
+        let url = extensionURL
+        guard let bundle = Bundle(url: url) else { return nil }
+        let version = bundle.infoDictionary?["CFBundleVersion"] as? String ?? "?"
+        guard let stamp = codeHash(of: url) else { return nil }
+        return "\(version)+\(stamp)"
+    }
+
+    /// The start of a bundle's code directory hash, or nil when it has no readable signature.
+    ///
+    /// Nil rather than a guess on purpose: `FilterRepair` skips the replacement rules when the
+    /// identity cannot be read, so an unreadable signature costs the repair rather than causing
+    /// a reinstall on every launch.
+    private static func codeHash(of url: URL) -> String? {
+        var staticCode: SecStaticCode?
+        guard SecStaticCodeCreateWithPath(url as CFURL, [], &staticCode) == errSecSuccess,
+              let code = staticCode else { return nil }
+        var information: CFDictionary?
+        guard SecCodeCopySigningInformation(code, SecCSFlags(), &information) == errSecSuccess,
+              let dictionary = information as? [String: Any],
+              let hash = dictionary[kSecCodeInfoUnique as String] as? Data,
+              !hash.isEmpty else { return nil }
+        return hash.prefix(6).map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// What macOS says right now, as the facts `FilterRepair` turns on. `Status` is the copy and
+    /// the walkthrough; this is the half of it a decision can be made from.
+    private var presence: FilterRepair.Presence {
+        switch status {
+        case .notInApplications: .elsewhere
+        case .notInstalled: .notInstalled
+        case .installing: .installing
+        case .awaitingApproval: .awaitingApproval
+        case .disabledInSettings: .disabledInSettings
+        case .on: .running
+        case .filterOff: .notFiltering
+        case .filterDenied(_, let prompted): prompted ? .declined : .refused
+        case .failed: queryWentUnanswered ? .unanswered : .refused
+        }
     }
 
     // MARK: Lifecycle
 
-    /// Called once at launch. Finds out where the filter stands, and if it was asked for and this
-    /// build carries a newer extension, activates that one; a copy switched off in System
-    /// Settings is only reported, never re-asked for on every launch.
+    /// Called once at launch. Finds out where the filter stands and puts it back when it can:
+    /// `FilterRepair` decides, and the one case it exists for is an app that has just been
+    /// replaced (HANDOFF 35). A copy switched off in System Settings, or one somebody declined,
+    /// is only reported, never re-asked for.
     func start() {
         link.onBlocked = { [weak self] host, app in self?.onBlocked?(host, app) }
         Task {
@@ -350,25 +435,18 @@ final class WebFilter {
             // was no way to tell a macOS that answered "nothing is wrong" from a macOS that
             // never answered. These say which.
             SharedStore.log("web filter: asking macOS for its state")
-            let installed = await refresh()
+            await refresh()
             SharedStore.log("web filter: macOS says \(status.label)")
-            guard isWanted else { return }
             switch status {
-            case .notInstalled:
-                SharedStore.log("web filter: asked for but not installed; installing again")
-                await activate()
-            case .on, .filterOff:
-                if let bundled = Self.bundledVersion, installed != bundled {
-                    SharedStore.log("web filter: replacing version \(installed ?? "?") with \(bundled)")
-                    await activate()
-                }
-            case .disabledInSettings:
+            case .disabledInSettings where isWanted:
                 SharedStore.log("web filter is switched off in System Settings > General > Login Items & Extensions; sites are enforced by the tab reader alone")
-            case .awaitingApproval:
+            case .awaitingApproval where isWanted:
                 SharedStore.log("web filter: still waiting for approval in System Settings")
-            case .notInApplications, .installing, .failed, .filterDenied:
+            default:
                 break
             }
+            await repair()
+            guard isWanted else { return }
             // Asked for and not running is the case worth a record. The filter's state lives
             // outside the app, so by the time anyone looks at a launch that went wrong the
             // evidence is in macOS rather than here — unless it was written down at the time.
@@ -376,6 +454,36 @@ final class WebFilter {
                 await logDiagnostics(because: "the filter is asked for and is not running")
             }
         }
+    }
+
+    /// Puts the filter back when this launch can, and says why in the log.
+    ///
+    /// The case worth naming, because it is the one that went wrong silently: replacing
+    /// `/Applications/Furlough.app` — every Mac install, and every update — leaves macOS holding
+    /// the extension the old bundle staged. `systemextensionsctl` still lists it; a properties
+    /// request from the new bundle comes back empty or never answers; and until this, Furlough
+    /// read that as *Not installed*, said so on a screen nobody had opened, and filtered nothing
+    /// until somebody pressed Install. Now the app knows which build's extension macOS took, so a
+    /// launch that finds a different one in its own bundle asks for this one instead.
+    ///
+    /// What it will not do is argue: a filter switched off in System Settings, and one somebody
+    /// was asked about and declined, are both left exactly as they are.
+    private func repair() async {
+        let bundled = Self.bundledIdentity
+        let action = FilterRepair.decide(
+            wanted: isWanted,
+            presence: presence,
+            bundled: bundled,
+            activated: installedIdentity,
+            attempted: attemptedIdentity
+        )
+        guard case .activate(let reason) = action else { return }
+        SharedStore.log("web filter: \(reason.sentence)")
+        // Written down before the request rather than after it, because the launches this has to
+        // survive are the ones that do not come back: a request that hangs, or an app quit while
+        // macOS is still thinking, must not buy another attempt on every launch after it.
+        attemptedIdentity = bundled
+        await activate()
     }
 
     /// Reads the extension's state and the filter configuration's, and returns the version of
@@ -386,7 +494,9 @@ final class WebFilter {
             status = .notInApplications
             return nil
         }
+        queryWentUnanswered = false
         guard let found = await ExtensionRequest.properties() else {
+            queryWentUnanswered = true
             // Not a refusal, and worth saying so: the service that answers this is stuck, which
             // is a state a Mac can be left in by replacing the app while it holds a reference to
             // the extension. Pressing Install submits a fresh activation request, which often
@@ -438,6 +548,9 @@ final class WebFilter {
             switch outcome {
             case .completed:
                 SharedStore.log("web filter extension is active")
+                // What macOS has now, so the next launch can tell this build's extension from
+                // the one a future install replaces it with.
+                installedIdentity = Self.bundledIdentity
                 await enableFilter()
             case .afterReboot:
                 status = .failed("Restart the Mac to finish installing the web filter.")
@@ -496,6 +609,8 @@ final class WebFilter {
     /// tab reader keeps enforcing either way.
     func remove() {
         isWanted = false
+        installedIdentity = nil
+        attemptedIdentity = nil
         link.disconnect()
         lastPushed = nil
         Task {

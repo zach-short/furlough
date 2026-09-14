@@ -57,6 +57,8 @@ run_logged() {
 COMMANDS=(
   "phone:build Debug and run it on the connected iPhone"
   "mac:build the Mac app and put it in /Applications"
+  "mac-release:sign and notarize the Mac app as a DMG other people can install"
+  "mac-check:what this Mac still needs before it can cut a Mac release"
   "test:run the rules-engine tests here, no phone needed"
   "version:the marketing version, and bumping it by the rules"
   "gen:regenerate Furlough.xcodeproj from project.yml"
@@ -81,7 +83,7 @@ menu() {
   for entry in "${COMMANDS[@]}"; do
     name="${entry%%:*}"
     desc="${entry#*:}"
-    printf '  %s%-10s%s %s%s%s\n' "$B" "$name" "$O" "$D" "$desc" "$O"
+    printf '  %s%-12s%s %s%s%s\n' "$B" "$name" "$O" "$D" "$desc" "$O"
   done
   printf '\n  %sTab completes these. Anything after the name is passed straight through,%s\n' "$D" "$O"
   printf '  %sso `furlough beta --tools` and `furlough status 20` do what you expect.%s\n' "$D" "$O"
@@ -159,11 +161,18 @@ cmd_phone() {
 # Release, and into /Applications, because that is the only place the login item can point at
 # and the only place macOS will load the web filter from. Same reason the README says so.
 cmd_mac() {
-  say "Building the Mac app"
+  # A build number that rises on every Mac build, the way archive.sh stamps one for the phone.
+  # It is not bookkeeping: macOS compares an extension's CFBundleVersion when it is asked to
+  # replace one, and CURRENT_PROJECT_VERSION sits at 1 in project.yml, so every install before
+  # this one looked to macOS like the version it already had staged. Half of why a reinstall used
+  # to cost the web filter; the other half is FilterRepair, which notices and puts it back.
+  local stamp="${BUILD:-$(date -u +%Y%m%d%H%M)}"
+  say "Building the Mac app (build $stamp)"
   xcodebuild -project Furlough.xcodeproj -scheme FurloughMac -configuration Release \
     -destination 'platform=macOS,arch=arm64' \
     -allowProvisioningUpdates -allowProvisioningDeviceRegistration \
-    -derivedDataPath build/DerivedDataMac "$@" build
+    -derivedDataPath build/DerivedDataMac \
+    CURRENT_PROJECT_VERSION="$stamp" "$@" build
   say "Installing to /Applications"
   rm -rf /Applications/Furlough.app
   ditto build/DerivedDataMac/Build/Products/Release/Furlough.app /Applications/Furlough.app
@@ -217,6 +226,8 @@ cmd_complete() {
 case "${1:-help}" in
   phone)     shift; cmd_phone "$@" ;;
   mac)       shift; cmd_mac "$@" ;;
+  mac-release) shift; run_logged scripts/archive-mac.sh "$@" ;;
+  mac-check) shift; scripts/archive-mac.sh --check ;;
   test)      shift; xcodebuild test -project Furlough.xcodeproj -scheme FurloughCoreTests \
                       -destination 'platform=macOS,arch=arm64' "$@" ;;
   version)   shift; scripts/version.sh "$@" ;;

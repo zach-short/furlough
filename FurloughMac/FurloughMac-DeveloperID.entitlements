@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  What the Mac app is signed with for a Developer ID release: the file scripts/archive-mac.sh
+  hands to codesign, rather than one XcodeGen writes into the project.
+
+  It is not FurloughMac.entitlements with a line changed, because a hand signature is not an
+  Xcode one. Two differences, both of them traps:
+
+  1. The network extension value. Development and the App Store take the plain
+     `content-filter-provider`; a Developer ID build whose filter is a *system extension* takes
+     `content-filter-provider-systemextension`, and macOS refuses to load the filter without it
+     (DTS, developer forums 737894). Nothing on screen says which one a build carries — Settings
+     > Web > Copy diagnostics prints it, which is the reason it prints it.
+
+  2. Every value is literal, and the two Xcode adds by itself are written out. codesign does not
+     expand `$(TeamIdentifierPrefix)`, and it does not add `com.apple.application-identifier` or
+     `com.apple.developer.team-identifier` from a profile the way a build does — so a file that
+     left them out would sign an app with no App Group container and no iCloud, which fails at
+     runtime rather than at signing. `com.apple.security.get-task-allow` is deliberately absent:
+     a notarized build carrying it is rejected, and it is what makes the development signature a
+     development one.
+
+  Keep this in step with FurloughMac.entitlements. Nothing generates one from the other.
+-->
+<plist version="1.0">
+<dict>
+	<key>com.apple.application-identifier</key>
+	<string>X9V4L6HR2R.com.zachshort.furlough.mac</string>
+	<key>com.apple.developer.team-identifier</key>
+	<string>X9V4L6HR2R</string>
+	<key>com.apple.developer.ubiquity-kvstore-identifier</key>
+	<string>X9V4L6HR2R.com.zachshort.furlough</string>
+	<key>com.apple.developer.networking.networkextension</key>
+	<array>
+		<string>content-filter-provider-systemextension</string>
+	</array>
+	<key>com.apple.developer.system-extension.install</key>
+	<true/>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>X9V4L6HR2R.com.zachshort.furlough</string>
+	</array>
+	<key>com.apple.security.automation.apple-events</key>
+	<true/>
+</dict>
+</plist>

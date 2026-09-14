@@ -117,6 +117,8 @@ open /Applications/Furlough.app
 
 Or open the project in Xcode, pick the `FurloughMac` scheme and My Mac, and press Run. The app has to live in `/Applications` for the login item to point at it, and macOS will only load the web filter from there.
 
+`scripts/furlough mac` runs those three lines and stamps a rising build number over `CURRENT_PROJECT_VERSION`, which matters to the web filter rather than to bookkeeping — see [Releasing the Mac app](#releasing-the-mac-app).
+
 ## Requirements
 
 - A paid Apple Developer account (Family Controls is not available to Personal Teams). The Mac app on its own can be built without one — see [Building the Mac app without a developer account](#building-the-mac-app-without-a-developer-account).
@@ -288,6 +290,27 @@ Worth knowing before reading the numbers:
 - The monitor extension can fire a few minutes late, and threshold callbacks occasionally fire twice. Every callback is idempotent, so this is harmless.
 - Anchoring **Everything except** a list shields every app and website iOS lets a shield cover, through `.all(except:)` on the app and website category shields, plus the web content filter for every browser. iOS keeps some of its own apps outside every shield, so those stay reachable however the anchor is set; the site's Anchor help page records which, as they are confirmed on a phone. Websites off the list are blocked by the content filter as well as the shield, so a browser other than Safari shows iOS's own "Website Not Allowed" page, and an app on the list that loads web content inside itself may be blocked from doing so. A category cannot be excepted from a shield over everything, so the allowlist holds apps and sites only; picking a category in the picker puts its apps on the list one by one.
 - Distributing outside Xcode (TestFlight, App Store) needs the Family Controls distribution entitlement, requested per bundle ID, which can take weeks. `~/Projects/archive/furlough/testflight-deployment/DEPLOYMENT.md` has the request, and everything else the App Store wants.
+
+## Releasing the Mac app
+
+The Mac app is not an App Store app and cannot become one: it is unsandboxed, drives browsers through Apple Events, terminates other processes, installs a launchd agent and carries a system extension, and the Mac App Store requires the sandbox without exception. Its road is a **Developer ID signature plus notarization**, in a disk image served from a site you own. Nothing in App Store Connect is involved.
+
+```bash
+scripts/furlough mac-check      # what this Mac still needs, and where to get it
+scripts/furlough mac-release    # build, sign, notarize, staple, and make the DMG
+```
+
+`scripts/archive-mac.sh` is the whole recipe, and its header is the long version. What it does that `xcodebuild -exportArchive` cannot: sign **by hand, inside out** — the web filter, then the widget, then the app — because Xcode 26's Direct Distribution cannot sign an app that embeds a system extension. Before any of that it runs the same promise checks the phone's archive does, against the Mac binary: the control string first, then no testing-only code, then no split debug binary. Afterwards it reads the entitlements back **off the signature**, because an entitlement a profile does not grant is dropped silently at signing, and the one that matters here — `content-filter-provider-systemextension`, which a Developer ID system extension needs and a development build must not have — would otherwise leave a filter that refuses to load on somebody else's Mac with nothing in the app to say why.
+
+Three things have to exist on the Mac doing the release, and two of them only the Account Holder can make:
+
+1. A **Developer ID Application** certificate: Xcode > Settings > Accounts > your Apple ID > Manage Certificates > + > Developer ID Application.
+2. Two **Developer ID provisioning profiles** from developer.apple.com > Profiles > + > Developer ID: one for `com.zachshort.furlough.mac` with the Network Extension capability and iCloud, one for `com.zachshort.furlough.mac.filter` with Network Extension. Save them as `~/.furlough/signing/FurloughMac.provisionprofile` and `~/.furlough/signing/FurloughMacFilter.provisionprofile` (`FURLOUGH_SIGNING` moves that directory).
+3. The App Store Connect key notarization authenticates with — the same one TestFlight uses, at `~/.appstoreconnect/private_keys/`.
+
+`mac-check` decodes each profile rather than trusting its file name, and prints exactly which of the three is missing.
+
+**Every Mac build stamps a build number**, and it is not bookkeeping: macOS compares a system extension's `CFBundleVersion` when it is asked to replace one, and `CURRENT_PROJECT_VERSION` is `1` in `project.yml`. `scripts/furlough mac` and `mac-release` both stamp a UTC timestamp over it. Beside that, the app now records which build's extension macOS accepted, so replacing `/Applications/Furlough.app` — which is what every install and every update is — is recognised as a replacement rather than read as "no filter was ever installed", and the next launch puts it back by itself. A filter switched off in System Settings, or one you were asked about and declined, is left exactly as it is.
 
 ## Building the Mac app without a developer account
 

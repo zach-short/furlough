@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The web filter's entitlements for a Developer ID release. The notes on the app's copy beside
+  this one apply here too: the system-extension form of the network extension value, every
+  value literal, the pair Xcode would otherwise add from the profile written out, and no
+  get-task-allow.
+
+  The sandbox stays on — every network extension is sandboxed — and the App Group is here only
+  to prefix the Mach service name the app connects to (FilterXPC.serviceName).
+-->
+<plist version="1.0">
+<dict>
+	<key>com.apple.application-identifier</key>
+	<string>X9V4L6HR2R.com.zachshort.furlough.mac.filter</string>
+	<key>com.apple.developer.team-identifier</key>
+	<string>X9V4L6HR2R</string>
+	<key>com.apple.developer.networking.networkextension</key>
+	<array>
+		<string>content-filter-provider-systemextension</string>
+	</array>
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>X9V4L6HR2R.com.zachshort.furlough</string>
+	</array>
+</dict>
+</plist>
