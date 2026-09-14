@@ -337,6 +337,19 @@ enum Policy {
     }
 
     #if os(iOS)
+    /// Furlough's own token, if Screen Time has ever named it for `TokenCache` (data access,
+    /// iOS 26.4+; see `UsageReader`). However Furlough's token ends up in a shield — picked
+    /// directly, swept in by a category, or held by the anchor — blocking it would take away the
+    /// one app that could undo the block, so `decide` scrubs it back out below, whenever it's
+    /// resolvable.
+    private static var ownToken: ApplicationToken? {
+        guard let encoded = SharedStore.tokenCache()?.entries[Furlough.bundleID],
+              let kind = try? JSONDecoder().decode(TargetKind.self, from: encoded),
+              case .application(let token) = kind
+        else { return nil }
+        return token
+    }
+
     static func decide(config: Config, runtime: RuntimeState, now: Date, calendar: Calendar = .current) -> Decision {
         var decision = Decision()
         for target in config.targets {
@@ -396,6 +409,12 @@ enum Policy {
                 decision.allowedWeb = web.subtracting(decision.shieldedWeb)
                 decision.allowedHosts = hosts.subtracting(decision.filteredHosts)
             }
+        }
+        // Last word, after every rule and the anchor have had theirs: Furlough never shields
+        // itself, by whatever route it got into the set.
+        if let token = ownToken {
+            decision.shieldedApps.remove(token)
+            decision.allowedApps.insert(token)
         }
         return decision
     }

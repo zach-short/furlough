@@ -1085,6 +1085,17 @@ final class AppModel {
         return selection
     }
 
+    /// Furlough's own token, when Screen Time has already named it in `TokenCache` (data access,
+    /// iOS 26.4+). `Policy.decide` refuses to shield this token regardless, but keeping it out of
+    /// the anchor's list too means the screen never shows Furlough as something it's holding.
+    private var ownApplicationToken: ApplicationToken? {
+        guard let encoded = UsageReader.cachedKinds()?[Furlough.bundleID],
+              let kind = try? JSONDecoder().decode(TargetKind.self, from: encoded),
+              case .application(let token) = kind
+        else { return nil }
+        return token
+    }
+
     /// Replaces the anchor's list: what it holds, or under the everything-except scope what it
     /// lets through. Refused while anchored, so nothing loosens under a lock.
     func setAnchorSelection(_ selection: FamilyActivitySelection) {
@@ -1093,6 +1104,12 @@ final class AppModel {
         var kinds: [TargetKind] = []
         kinds += selection.applicationTokens.map(TargetKind.application)
         kinds += selection.webDomainTokens.map(TargetKind.webDomain)
+        // Furlough itself can never become the anchor — anchoring it would take away the one
+        // app that could unanchor it. Best-effort: only catches it where the token is already
+        // identified (see `ownApplicationToken`); `Policy.decide` is the real backstop.
+        if let own = ownApplicationToken {
+            kinds.removeAll { $0 == .application(own) }
+        }
         // .all(except:) only excepts app/site tokens, never categories — a category token here
         // would sit unread, so it's dropped for the everything-except scope.
         if !current.config.anchor.anchorsEverything {
