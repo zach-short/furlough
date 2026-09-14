@@ -93,28 +93,34 @@ description's own opening takes the position instead. That is a legitimate choic
 
 ## Description
 
-**3983 chars of 4000.** Plain text, no HTML, which is what Apple accepts.
+**3964 chars of 4000.** Plain text, no HTML, which is what Apple accepts.
+
+**Both blocks in this file were over Apple's limit on 2026-09-13** — the description at 4052 and
+the notes at 4411 — because the iCloud wording was added to each without taking anything out.
+Neither would have been accepted. Recount with `wc -m` after every edit; the counts here are the
+only warning you get, since `store-submit.sh` checks the notes but nothing checks the description
+until the API refuses it.
 
 The first three rendered lines are the whole first paragraph, and it now names **both** halves —
 the timed rules and the Anchor — because a reader who stops after three lines used to leave
 believing Furlough was a Screen Time app with a bonus. Nothing above them is spent on setup.
 
 ```
-Furlough is an app blocker with no unblock button, and two ways to use it. Rules give an app the hours it is allowed and a daily budget, and only ever loosen after a delay you set in advance. The Anchor locks a list, or the whole phone, in one tap, and lifts only when you hold the phone to an NFC tag you paired. Use either on its own.
+Furlough is an app blocker with no unblock button, and two ways to use it. Rules give an app the hours it is allowed and a daily budget, and loosen only after a delay you set in advance. The Anchor locks a list, or the whole phone, in one tap, and lifts only when you hold the phone to an NFC tag you paired. Use either on its own.
 
 THE ANCHOR
 
-One tap and everything on the list is gone. No timer to wait out, no code to type, no delay to serve: the only thing that releases it is a physical NFC tag held to the phone. You supply the tag — any NTAG sticker works, as does the one that came with another blocking product. Up to three pair at once, so a key can live wherever you do.
+One tap and everything on the list is gone. No timer to wait out, no code to type: the only thing that releases it is a physical NFC tag held to the phone. You supply the tag, and any NTAG sticker works. Up to three pair at once, so a key can live wherever you do.
 
-Switch its scope and the list turns inside out: every app and website on the phone is shielded and the list becomes what stays open, starting from the apps you tiered Essential. It can drop on a schedule you set — ten at night on school nights, lifted by the tag in the morning — and it carries to Furlough for Mac, which drops one of its own that only your phone's tag will lift. While it is on, neither the list nor the tags can be edited, so no key can be cut from under the lock.
+Switch its scope and the list turns inside out: every app and website is shielded and the list becomes what stays open. It can drop on a schedule — ten at night on school nights, lifted by the tag in the morning — and it carries to Furlough for Mac, which only your phone's tag will lift. While it is on, neither the list nor the tags can be edited, so no key can be cut from under the lock.
 
 RULES
 
-Pick the apps and websites that eat your time, from Apple's own picker. Give each one a daily budget in minutes and, if you want, the hours it is allowed: eight to ten on school nights, later on weekends, different every day if you like. Outside its hours, or once the budget is spent, iOS shields it until it is due to open again.
+Pick the apps and websites that eat your time, from Apple's own picker. Give each a daily budget in minutes and, if you want, the hours it is allowed: eight to ten on school nights, later on weekends, different every day if you like. Outside its hours, or once the budget is spent, iOS shields it until it is due to open again.
 
 THE DELAY
 
-A shorter window, a smaller budget, a day taken off: those apply the moment you save. A longer window, a bigger budget, removing an app: those wait out a delay you chose beforehand, 24 hours by default. While it waits, a list shows the rule you have now against the one queued to replace it, and you can cancel it right up until it lands.
+A shorter window, a smaller budget, a day taken off: those apply the moment you save. A longer window, a bigger budget, removing an app: those wait out a delay you chose beforehand, 24 hours by default. While it waits, a list shows the rule you have now against the one queued to replace it, cancellable until it lands.
 
 Each app gets a tier that scales its delay: Essential a quarter of the base, Useful the base, Idle twice, Hazard four times. Moving one toward Essential shortens its future delays, which is itself a loosening, so that waits too.
 
@@ -122,32 +128,41 @@ Blocking something you need is warned about by name before you save: a messaging
 
 THE SHIELD
 
-The block screen says which app is closed and when it opens next. That is the whole conversation: no snooze, no code, no one more minute. While anything is shielded, iOS refuses app deletion, so an app cannot be deleted to escape its own rule.
+The block screen says which app is closed and when it opens next. That is the whole conversation: no snooze, no code, no one more minute. While anything is shielded, iOS refuses app deletion, so an app cannot be deleted to escape its rule.
 
 WEBSITES
 
-A site picked from Apple's picker behaves like an app: hours, a daily budget, Furlough's own shield. A site typed in by name goes to the system's web filter instead: hours but no budget, and iOS's block page rather than Furlough's.
+A site picked from Apple's picker behaves like an app: hours, a daily budget, Furlough's own shield. A site typed in by name goes to the system's web filter instead: hours but no budget, and iOS's block page, not Furlough's.
 
 THE WAY OUT
 
-There is one, it is Apple's, and it always works: Settings, Screen Time, Apps with Screen Time Access, Furlough, off. It lifts every shield at once. Furlough cannot prevent it and documents it in the app on purpose. Everything else assumes you'd rather not.
+There is one, it is Apple's, and it always works: Settings, Screen Time, Apps with Screen Time Access, Furlough, off. It lifts every shield at once. Furlough cannot prevent it and documents it on purpose. Everything else assumes you'd rather not.
 
 ALSO IN THE APP
 
-A home screen widget and a Live Activity counting down the open window. Notifications at every edge: a window opening, five minutes before it closes, a budget about to run out. A week of hours drawn on a grid, and one app's rule copied onto any number of others. Setting the clock forward does not buy time.
+A home screen widget that enlarges for StandBy, a Control Center button and a Focus that drop the Anchor, and a Live Activity counting down the open window. Notifications at every edge: a window opening, five minutes before it closes, a budget about to run out, and a weekly digest. A record of streaks and hours shielded. A week of hours drawn on a grid, one app's rule copied onto any number of others, and a clock you cannot set forward to buy time.
 
 PRIVACY
 
-No account, no server, no analytics, no third-party code. Apple's Screen Time API is built so Furlough is never told which apps you picked. Rules stay on the iPhone that made them; what leaves it, once you link your devices, goes to your own iCloud alone — the Anchor's state, so Furlough on your Mac locks with it, and the names of what you add if you let it.
+No account, no server, no analytics, no third-party code. Apple's Screen Time API is built so Furlough is never told which apps you picked. Rules stay on the iPhone that made them; what leaves it, once you link your devices, goes to your own iCloud alone — the Anchor's state, so your Mac locks with it, and the names of what you add if you let it.
 
 REQUIREMENTS
 
-iPhone, iOS 26 or later. Screen Time access, which iOS grants only to an adult Apple Account. Furlough asks for individual authorization: the person setting the rules and the person kept to them are the same. It is not a parental control app.
+iPhone, iOS 26 or later. Screen Time access, which iOS grants only to an adult Apple Account. Furlough asks for individual authorization: the person setting the rules and the person kept to them are the same. Not a parental control app.
 ```
 
 **What it deliberately does not say**, so nobody re-adds it later:
 
-- No sync, no account, no cloud. The PRIVACY paragraph says rules stay on one iPhone.
+- **No account and no server — but the PRIVACY paragraph no longer says nothing leaves the
+  phone.** It cannot: since `ubiquity-kvstore-identifier` was added, linking devices writes the
+  Anchor's state and the names of what you add to the person's own iCloud. The paragraph names
+  exactly that and stops. The old wording, "rules stay on the iPhone that made them and are not
+  synced anywhere", shipped to App Store Connect and was false against the build behind it.
+- **No usage dashboard, and no feature that is only on the board.** Everything in ALSO IN THE APP
+  was checked against the code on 2026-09-13: the Control Center button is `DropAnchorControl`,
+  the Focus filter is `AnchorFocusFilter`, the record is `Record.swift`, the digest is in
+  `PendingNotifications`. StandBy is the existing widget enlarging, not a widget of its own —
+  there is no StandBy widget family — so the line says "enlarges for StandBy" and not more.
 - **No usage dashboard.** In-app reading of your own Screen Time history needs Apple's App &
   Website Usage data access, which customers get on EU devices only. Everywhere else the report
   extension shows one card at a time. A description promising a usage screen would be false for
@@ -405,29 +420,52 @@ fact that Family Controls does not run in the Simulator, and the report extensio
 2.3.1 requires every feature to be described here with specificity, and an empty usage screen a
 reviewer did not expect is the kind of thing that comes back as "the app did not work".
 
+**Rewritten 2026-09-13, after the 2.1 rejection.** Version 1.0 came back asking for a demo video
+of the phone and the tag interacting, filmed together on real hardware. The old NFC section was
+headed "NFC IS OPTIONAL AND CANNOT BE TESTED WITHOUT HARDWARE", which reads as a reason not to
+test it and is most likely what invited the letter. The video now sits second, under its own
+heading, before anything a reviewer has to do — and the section says in plain words that the tag
+is a commodity sticker, that nothing ships or is sold with the app, and that it is not paired to
+any particular product, because "designated hardware" is the framing the rejection came in.
+
+**The URL is a placeholder.** The block below holds
+`[PASTE THE VIDEO URL HERE BEFORE SUBMITTING]`. `store-submit.sh` reads the notes straight out of
+this file and will push that text to Apple as written, so replace it before running the script —
+and grep for it if you are in any doubt.
+
 ```
 WHAT FURLOUGH IS
 
-A self-restriction tool: one person sets rules for the apps on their own iPhone. It is not a parental control app and does not use parent or guardian authorization. Furlough requests individual Screen Time authorization, AuthorizationCenter.requestAuthorization(for: .individual), so the person choosing what to block and the person being blocked are the same adult.
+A self-restriction tool: one person sets rules for the apps on their own iPhone. It is not a parental control app. Furlough requests individual Screen Time authorization, AuthorizationCenter.requestAuthorization(for: .individual), so the person choosing what to block and the person being blocked are the same adult.
+
+DEMO VIDEO OF THE NFC TAG
+
+[PASTE THE VIDEO URL HERE BEFORE SUBMITTING]
+
+One take on a physical iPhone, the tag and the screen in the same frame: pairing a tag, dropping the Anchor, a blocked app showing the shield, and the tag lifting it.
+
+The tag is an ordinary NTAG sticker out of a pack of ten. No hardware ships or is sold with this app, and it is not paired to any particular product. Furlough reads a tag's hardware identifier, in the foreground, on the person's own action, and never writes to a tag or reads one in the background.
 
 BEFORE YOU START
 
 Screen Time authorization must be granted by an ADULT Apple Account. A child account or a Managed Apple ID will be refused by the system, not by us.
 
-Family Controls does not function in the Simulator. Furlough cannot shield anything there and cannot be evaluated past onboarding. Please review on a physical iPhone running iOS 26 or later.
+Family Controls does not function in the Simulator: Furlough cannot shield anything there. Please review on a physical iPhone running iOS 26 or later.
 
 HOW TO SEE IT WORKING
 
-1. Launch. On the onboarding screen tap "Allow Screen Time access" and accept the system prompt. A "Where your time went" step follows it; tap "Skip for now" at the bottom to reach the home screen.
+1. Launch, tap "Allow Screen Time access" and accept the system prompt. A "Where your time went" step follows; tap "Skip for now" to reach the home screen.
 2. Tap + on the home screen, choose "Application", and pick any installed app.
 3. Give it a window that has already passed today, or set the daily budget to its lowest value.
 4. Save. Leave Furlough and open the app you picked. It is now behind Furlough's block screen.
 
+That is the timed half. For the Anchor: pair a tag on the Anchor screen, choose apps, tap Anchor. The video above shows it end to end.
+
 THERE IS INTENTIONALLY NO UNBLOCK BUTTON
 
-That is the product. Anything that grants more time waits out a delay the person chose in advance, and is visible and cancellable in the app while it waits. Tightening a rule applies immediately.
+That is the product. Anything that grants more time waits out a delay the person chose in advance, visible and cancellable while it waits. Tightening a rule applies immediately.
 
-The way out is the system's own, is documented inside the app during onboarding and again in Settings, and always works:
+The way out is the system's own, is documented in the app, and always works:
 
 Settings > Screen Time > Apps with Screen Time Access > Furlough > off.
 
@@ -435,27 +473,19 @@ Turning it off lifts every shield immediately. The person is never trapped.
 
 APP DELETION IS DENIED WHILE SOMETHING IS SHIELDED
 
-Furlough sets application.denyAppRemoval while any shield is active, so the app cannot be uninstalled as a way around rules the person set for themselves. The Screen Time switch above releases it along with the shields.
+Furlough sets application.denyAppRemoval while any shield is active, so the app cannot be uninstalled to get around rules the person set for themselves. The Screen Time switch above releases it.
 
 THE USAGE STEP AND THE REPORT EXTENSION
 
-The "Where your time went" step reviews the last fortnight of Screen Time history and suggests a rule per app. Where Apple grants the App & Website Usage data access, the app reads the history itself. Everywhere else, only the DeviceActivityReport extension ever sees a number, so the cards are remote views shown one at a time, and "Apply" hands off to the picker, because nothing can come back out of that sandbox.
-
-On a review device outside the EU the second path is expected, and on a device with little Screen Time history the step may have nothing to show. Both are correct, not a failure. The step is skippable and nothing else depends on it.
-
-Requesting that capability also makes the Screen Time authorization prompt all-or-nothing. That wording is iOS's, not ours.
-
-NFC IS OPTIONAL AND CANNOT BE TESTED WITHOUT HARDWARE
-
-The Anchor blocks a chosen set of apps instantly and is released only by scanning an NFC tag the person paired beforehand. The person supplies the tag; any NTAG sticker works. Nothing else depends on it and it can be skipped. Furlough reads only a tag's hardware identifier, in the foreground, on the person's own action. It never writes to a tag and never reads one in the background.
+The "Where your time went" step reviews the last fortnight of Screen Time history and suggests a rule per app. With App & Website Usage data access the app reads that history itself; everywhere else only the DeviceActivityReport extension sees a number, so the cards are remote views shown one at a time and "Apply" hands off to the picker. Outside the EU that second path is expected, and with little history the step may show nothing. Both are correct, and it is skippable. That capability also makes the authorization prompt all-or-nothing — iOS's wording, not ours.
 
 WEBSITES
 
-A website chosen from Apple's picker is shielded like an app. A website typed in by hostname is handled by the system's own web content filter, which shows iOS's own "Website Not Allowed" page rather than Furlough's shield. Both are intended.
+A website chosen from Apple's picker is shielded like an app. One typed in by hostname goes to the system's web content filter, which shows iOS's "Website Not Allowed" page instead of Furlough's shield. Both are intended.
 
 NO ACCOUNT, NO NETWORK, NO DATA COLLECTION
 
-Furlough has no server, no accounts, no analytics and no third-party SDKs. Rules and the opaque activity tokens never leave the device. What is written off the device goes to the user's own iCloud key-value store, and only once they have linked their devices from Settings > Devices: the Anchor's state (down or not, since when, until when), so Furlough on the user's Mac can lock and unlock with the iPhone; one entry per linked device with the name the user gave it; and, at the user's option, the names of the apps and sites they add, so their other devices can block the same things. Furlough has no server that could read any of it. The privacy answer is Data Not Collected, since private iCloud storage under the user's own account is not collected by us. There are no demo credentials because there is nothing to sign in to.
+Furlough has no server, no accounts, no analytics and no third-party SDKs. Rules and the opaque activity tokens never leave the device. What does leave it goes to the user's own iCloud key-value store, and only after they link their devices in Settings > Devices: the Anchor's state, so a linked Mac locks with it; one entry per device under the name the user gave it; and, at their option, the names of the apps and sites they add. Nothing we run could read any of it, so the privacy answer is Data Not Collected. There are no demo credentials: nothing to sign in to.
 ```
 
 **Sign-in required: No.** There is no account, so leave the demo account fields empty.
@@ -472,8 +502,9 @@ message often lands there.
 ### What Apple enforces here, confirmed against the API 2026-09-08
 
 - **Review Notes cannot exceed 4000 characters.** The draft above was 4290 and was rejected with
-  `ENTITY_ERROR.ATTRIBUTE.INVALID.TOO_LONG`. It is now **3866**, which is what the block above
-  holds, after a second trim on 2026-09-09 for headroom. That day the web form refused a paste
+  `ENTITY_ERROR.ATTRIBUTE.INVALID.TOO_LONG`. It is now **3937**, which is what the block above
+  holds, after the 2026-09-13 rewrite that added the demo video and trimmed 474 characters to pay
+  for it. That day the web form refused a paste
   at 4290: it was the old draft, pasted from a stale copy rather than from this file. Copy the
   block from here (`build/review-notes.txt` is written from it, and `pbcopy < build/review-notes.txt`
   puts it on the clipboard exactly), and clear the field before pasting.
@@ -484,7 +515,7 @@ message often lands there.
   `+44 844 209 0611`.
 
 **Where this gets written, and by what.** App `6810006594`, version `1.0`
-(`b60441f6-a8f1-4619-8e04-5584a68d46db`, PREPARE_FOR_SUBMISSION), review-details record
+(`b60441f6-a8f1-4619-8e04-5584a68d46db`, **REJECTED** since 2026-09-10), review-details record
 `dd22a325-f43a-4695-b50b-e0ffda9710ce`. The API key `L6A2R4SBXQ` on this machine can write it, so
 none of this has to be retyped into the web form.
 
