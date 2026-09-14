@@ -1,11 +1,10 @@
 import Foundation
 import Testing
 
-/// iOS takes 20 monitored activities: the daily budget tracker plus 19 window spans. The
-/// editor has to know before Save, because registration only finds out afterwards.
+/// iOS caps activities at 20 (budget tracker + 19 spans); must check before Save since
+/// registration only fails silently.
 @Suite("Activity limit")
 struct ActivityLimitTests {
-    /// `count` windows an hour apart, all valid and all distinct.
     func windows(_ count: Int, days: Weekdays = .all) -> [TimeWindow] {
         (0..<count).map { window($0 * 60, $0 * 60 + 30, days) }
     }
@@ -35,14 +34,14 @@ struct ActivityLimitTests {
         #expect(ActivityLimit.spans(in: makeState([a, b])).count == 3)
     }
 
-    /// A rule that never allows anything registers no window: it is enforced by its zero budget.
+    // Enforced by its zero budget, not the window.
     @Test("a rule that never allows anything costs nothing")
     func neverAllowed() {
         let blocked = makeTarget("A", rule: Rule(windows: windows(5), dailyBudgetMinutes: 0))
         #expect(ActivityLimit.spans(in: makeState([blocked])).isEmpty)
     }
 
-    /// `Monitoring.register` registers queued rules too, so they have to be counted.
+    // `Monitoring.register` registers queued rules too.
     @Test("a queued rule's spans count as well")
     func pendingCounts() {
         let a = makeTarget("A", rule: rule(2))
@@ -61,14 +60,12 @@ struct ActivityLimitTests {
 
     // MARK: Projecting a save
 
-    /// The edit that would otherwise slip through: a loosening queues *beside* the old rule, so
-    /// for the length of the delay both sets of windows are registered.
+    // A loosening queues beside the old rule, so both sets of windows are registered during the delay.
     @Test("a loosening needs the old rule's spans and the new one's at once")
     func looseningCountsBoth() {
         let old = Rule(windows: windows(3), dailyBudgetMinutes: 30)
         let target = makeTarget("A", rule: old)
         let state = makeState([target])
-        // Later hours and a bigger budget: a loosening, so it queues rather than replacing.
         let looser = Rule(windows: windows(3).map { window($0.startMinute + 500, $0.endMinute + 500) }, dailyBudgetMinutes: 60)
         #expect(Policy.classify(newRule: looser, against: target) == .loosening)
 
@@ -86,7 +83,6 @@ struct ActivityLimitTests {
         #expect(ActivityLimit.spans(in: projected).count == 2)
     }
 
-    /// Saving replaces whatever was already queued for that target rather than stacking on it.
     @Test("a queued rule is replaced, not added to")
     func replacesExistingPending() {
         let target = makeTarget("A", rule: rule(2))
@@ -96,7 +92,7 @@ struct ActivityLimitTests {
 
         let looser = Rule(windows: windows(3), dailyBudgetMinutes: 60)
         let projected = ActivityLimit.projecting(looser, appliedTo: [target.id], in: state)
-        // The stale queued rule is gone: the two saved spans plus the three queued ones.
+        // The old 2 spans are a subset of the new 3.
         #expect(ActivityLimit.spans(in: projected).count == 3)
         #expect(projected.pending.count == 1)
     }
@@ -125,16 +121,13 @@ struct ActivityLimitTests {
         #expect(over?.contains("iOS allows 19") == true)
     }
 
-    /// A first rule is always a tightening against "unrestricted", so it replaces nothing and
-    /// only its own spans count.
+    // A first rule is always a tightening against "unrestricted", so nothing is replaced.
     @Test("a first rule fits on its own spans alone")
     func firstRule() {
         let target = makeTarget("A", rule: nil)
         #expect(ActivityLimit.reason(applying: rule(19), to: [target.id], in: makeState([target])) == nil)
     }
 
-    /// Apply-to-others saves the same rule to several targets at once, and the spans are shared,
-    /// so it costs no more than saving to one.
     @Test("applying the same rule to many targets costs one set of spans")
     func applyToOthers() {
         let a = makeTarget("A", rule: nil)
@@ -144,14 +137,12 @@ struct ActivityLimitTests {
         #expect(ActivityLimit.reason(applying: rule(19), to: [a.id, b.id, c.id], in: state) == nil)
     }
 
-    /// But applying to targets that already have different windows can overflow, because each
-    /// one's existing rule is loosened away rather than replaced.
+    // Overflows because each target's existing rule is loosened away, not replaced.
     @Test("applying over other targets' loosened rules can overflow")
     func applyOverExisting() {
         let a = makeTarget("A", rule: Rule(windows: windows(10), dailyBudgetMinutes: 30))
         let b = makeTarget("B", rule: Rule(windows: windows(10).map { window($0.startMinute + 5, $0.endMinute + 5) }, dailyBudgetMinutes: 30))
         let state = makeState([a, b])
-        // A rule that is a loosening for both, so both old sets stay queued alongside it.
         let looser = Rule(windows: [window(1300, 1400)], dailyBudgetMinutes: 240)
         let reason = ActivityLimit.reason(applying: looser, to: [a.id, b.id], in: state)
         #expect(reason != nil)
@@ -164,7 +155,7 @@ struct ActivityLimitTests {
 
     // MARK: A whole import against the ceiling
 
-    /// A plan the Mac's matcher works out, so these read like the review does.
+    // Mirrors what the Mac's own matcher produces, so these tests read like the real review.
     func plan(_ targets: [ExportedTarget], _ state: SharedState) -> ImportPlan {
         let file = ConfigExport(
             platform: .mac,
@@ -185,9 +176,8 @@ struct ActivityLimitTests {
         ExportedTarget(kind: .website, identifier: host, name: nil, nickname: nil, utility: nil, rule: rule)
     }
 
-    /// The count has to run on the plan, not at registration: `applyImport` saves first and
-    /// `enforce` swallows what `Monitoring.register` throws, so an oversized import lands whole
-    /// and leaves the rules in force with nothing watching them.
+    // Must check on the plan: `enforce` swallows what `Monitoring.register` throws, so an
+    // oversized import would otherwise land whole with nothing watching it.
     @Test("an import that would not register is refused while it is still a proposal")
     func importOverTheCeiling() {
         let target = makeTarget("A", rule: nil)
@@ -204,14 +194,12 @@ struct ActivityLimitTests {
         #expect(ActivityLimit.reason(applying: plan([site("a.com", rule(19))], state), in: state) == nil)
     }
 
-    /// The queued half presses against the ceiling from the moment Apply is pressed, a day
-    /// before any of it is in force: `Monitoring.register` registers pending rules too, so the
-    /// old rule and the loosening that replaces it need their spans at the same time.
+    // `Monitoring.register` registers pending rules too, so the queued half counts against the
+    // ceiling immediately, not only once it lands.
     @Test("the queued half of an import counts before it lands")
     func importQueuedCounts() {
         let target = makeTarget("A", rule: Rule(windows: windows(10), dailyBudgetMinutes: 30))
         let state = makeState([target])
-        // A loosening: it queues, and the rule it replaces stays in force beside it.
         let looser = Rule(
             windows: windows(10).map { window($0.startMinute + 5, $0.endMinute + 5) },
             dailyBudgetMinutes: 240

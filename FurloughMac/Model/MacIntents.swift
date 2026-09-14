@@ -1,12 +1,8 @@
 import AppIntents
 import Foundation
 
-/// Puts Furlough's window on screen.
-///
-/// Worth an action of its own here in a way it would not be on the phone. The Mac app has no
-/// Dock icon once it is onboarded, and its menu bar item is not guaranteed to be visible —
-/// on a full menu bar macOS places the overflow under the notch, where the item exists and
-/// cannot be seen. This is the way in that does not depend on either.
+/// Needed because the onboarded Mac app has no Dock icon, and a full menu bar can hide its
+/// menu bar item under the notch overflow.
 struct ShowFurloughIntent: AppIntent {
     static let title: LocalizedStringResource = "Show Furlough"
     static let description = IntentDescription(
@@ -22,10 +18,7 @@ struct ShowFurloughIntent: AppIntent {
     }
 }
 
-/// What Spotlight puts under Furlough's name on the Mac.
-///
-/// Two, not the phone's three: there is no Anchor here. It needs a tag to lift and a Mac has
-/// no NFC reader, so anchoring on this machine would be a lock with no key — see `MacHero`.
+/// No Anchor shortcut here: anchoring needs an NFC tag to lift, and Macs have no NFC reader.
 struct FurloughMacShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(

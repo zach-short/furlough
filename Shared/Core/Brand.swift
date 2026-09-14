@@ -1,33 +1,20 @@
 import Foundation
 
-/// What an app is known by before Screen Time says: the name its bundle identifier stands for,
-/// and the colour its icon is mostly made of.
-///
-/// With data access Screen Time hands the usage page minutes and a bundle identifier and nothing
-/// else — no name, and no token to draw Apple's icon with. The token comes from a second query
-/// that takes seconds when it answers and sometimes never does, and a page that waited on it sat
-/// under an hourglass for minutes at a time. Nothing about Instagram needs asking: the tables
-/// already know the identifier, and know it offline. So a card is drawn from here first — the
-/// name from `Companions` and `AppUtility`, and a letter on the brand's colour where the icon will
-/// go — and Apple's own name and artwork take over the moment the token lands.
-///
-/// A colour and a letter rather than the icon itself: the artwork is the app's trademark, and the
-/// one place Furlough may draw it from is `Label(token)`. The colour is only ever an interim, so
-/// it is close rather than exact, and an app the table does not know simply has none.
+/// Placeholder identity for a usage card before Screen Time resolves the real icon token — a
+/// second query that can take seconds or never answer, so the card draws a name and a
+/// letter-on-color tile from these offline tables first, and Apple's own artwork takes over
+/// once the token lands. Never the icon itself: `Label(token)` is the only place allowed to
+/// draw that trademark.
 enum Brand {
-    /// What the tables call the thing behind a usage key — a bundle identifier, or "web:" and a
-    /// domain. `Companions` first, because its names are the ones written to be shown; then
-    /// `AppUtility`, which knows many more apps than are also websites. A domain is its own name.
-    /// Nil when neither table knows, which is the honest answer: a guess would put the wrong name
-    /// on a card and on the rule it writes. The same order `AppModel.nameFromTables` asks in.
+    /// `Companions` first (names written to be shown), then `AppUtility`. Nil when neither
+    /// knows, rather than guess wrong — same order `AppModel.nameFromTables` asks in.
     static func name(forKey key: String) -> String? {
         if let domain = UsageAnalysis.domain(inKey: key) { return domain }
         if let pair = Companions.pair(forBundleID: key, name: "") { return pair.title }
         return AppUtility.name(forBundleID: key)
     }
 
-    /// The colour the thing behind `key` is known by, as RGB, or nil when the table has none. A
-    /// web key answers through `Companions`, so youtube.com is YouTube's red.
+    /// A web key answers through `Companions`, so youtube.com is YouTube's red.
     static func color(forKey key: String) -> UInt32? {
         if let domain = UsageAnalysis.domain(inKey: key) {
             guard let pair = Companions.pair(forHost: domain) else { return nil }
@@ -36,16 +23,13 @@ enum Brand {
         return colors[Companions.normalize(bundleID: key)]
     }
 
-    /// The letter a tile carries in place of the icon: the first character of the name,
-    /// uppercased. Nil for a name that is nothing but space.
     static func monogram(_ name: String) -> String? {
         guard let first = name.trimmingCharacters(in: .whitespacesAndNewlines).first else { return nil }
         return String(first).uppercased()
     }
 
-    /// True when a colour is light enough to want dark lettering: Snapchat's yellow and Hulu's
-    /// green, not Instagram's magenta or WhatsApp's. Relative luminance in sRGB, split at a half,
-    /// which is where those four fall on the sides their own icons put them.
+    /// Relative luminance in sRGB, split at 0.5 (e.g. Snapchat yellow is light, Instagram
+    /// magenta isn't).
     static func isLight(_ rgb: UInt32) -> Bool {
         func linear(_ channel: UInt32) -> Double {
             let value = Double(channel & 0xFF) / 255
@@ -55,13 +39,10 @@ enum Brand {
         return luminance > 0.5
     }
 
-    /// The dark a near-black icon is lifted to. Black on Furlough's ground is a hole, and it is
-    /// also what dark lettering on a light tile is drawn in, so the two agree.
+    /// A near-black icon is lifted to this instead of true black, which reads as a hole on
+    /// Furlough's ground; also used for dark lettering on light tiles.
     static let ink: UInt32 = 0x2A2724
 
-    /// RGB by lowercased bundle identifier: the colour each icon is mostly made of, near enough
-    /// to be placed at a glance. Icons that are black or nearly so — X, Threads, ChatGPT, Uber —
-    /// are `ink` instead. Identifiers are spelled the way `Companions` spells them.
     static let colors: [String: UInt32] = [
         // Video
         "com.google.ios.youtube": 0xFF0000,

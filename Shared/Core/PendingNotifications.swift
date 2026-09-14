@@ -6,42 +6,28 @@ struct PlannedNotification: Equatable, Identifiable, Sendable {
     var id: String
     var title: String
     var body: String
-    /// On the device's clock. The system fires these, and the system only knows its own time,
-    /// so a Furlough time has to be moved onto it first — see `Clock.Reading.device`.
+    /// On the device's clock — Furlough times must be moved onto it first; see `Clock.Reading.device`.
     var fireAt: Date
 }
 
-/// The notifications that go with a queued loosening: one an hour before it lands, while there
-/// is still time to cancel it, and one when it lands.
-///
-/// This is the half of the feature worth being careful about, so it is pure: `plan` says what
-/// should be outstanding for a given state, and `sync` makes the system agree with it. Nothing
-/// here enforces anything — a notification that fires late or not at all cannot lift a shield —
-/// but it is the only warning before something loosens, which is exactly when Zach would want
-/// the chance to change his mind.
+/// The notifications for a queued loosening: one an hour before it lands (time to cancel), one
+/// when it lands. Pure: `plan` computes what should be outstanding, `sync` applies it.
 enum PendingNotifications {
-    /// Every identifier scheduled ahead of time starts with this, so `sync` can tell Furlough's
-    /// own scheduled notifications from the ones other code posts on the spot.
+    /// Prefix on every scheduled identifier, so `sync` can tell these apart from ad hoc notifications.
     static let prefix = "furlough.pending."
     /// How long before a change lands the warning arrives.
     static let lead: TimeInterval = 3600
     /// The weekly digest's own prefix, under the one above so `sync` still owns it.
     static let digestPrefix = prefix + "digest."
-    /// Where each app keeps its answer to "do you want the weekly record on a Monday".
-    ///
-    /// In the **App Group** and not in `Config`: the record it reports is this device's own, so
-    /// the preference about it is too — it must not travel in an exported setup and must not
-    /// wait out a loosening delay — and the phone's monitor extension, which is what re-plans
-    /// the digest during a week the app is never opened, does not share the app's own
-    /// `UserDefaults.standard`. The two platforms keep separate answers about separate records.
+    /// Stored in the App Group, not `Config`: this is device-local (must not travel in an export
+    /// or wait out a loosening delay), and the monitor extension needs it outside `UserDefaults.standard`.
     #if os(iOS)
     static let digestPreferenceKey = "furlough.weeklyDigest"
     #else
     static let digestPreferenceKey = "furlough.mac.weeklyDigest"
     #endif
 
-    /// Absent means never answered, and the answer to never answered is yes: a record nobody is
-    /// ever told about is the thing the digest exists to fix.
+    /// Defaults to true when unanswered, since an unread record is what the digest exists to fix.
     static var wantsWeeklyDigest: Bool {
         SharedStore.defaults.object(forKey: digestPreferenceKey) as? Bool ?? true
     }
@@ -55,14 +41,9 @@ enum PendingNotifications {
         SharedStore.defaults.removeObject(forKey: digestPreferenceKey)
     }
 
-    /// Everything that should be outstanding for `state` at `now`. `drift` is the device clock's
-    /// distance from Furlough's own time, from `Clock.Reading.drift`: the fire dates are moved
-    /// onto the device's clock, because that is the clock the system will fire them against.
-    ///
-    /// `digest` is whether this device wants the weekly record notification. Off by default
-    /// here and asked for by each model, because it is the one planned notification that is a
-    /// preference rather than a consequence — and because it is device-local: the record it
-    /// reads is this device's own.
+    /// Everything that should be outstanding for `state` at `now`. `drift` (from
+    /// `Clock.Reading.drift`) moves fire dates onto the device's own clock, since that's what
+    /// the system schedules against. `digest` defaults off since it's a device-local preference.
     static func plan(
         state: SharedState,
         now: Date,
@@ -78,8 +59,7 @@ enum PendingNotifications {
                 let what = describe(change, in: state.config, calendar: calendar)
                 var planned: [PlannedNotification] = []
                 let warnAt = change.effectiveAt.addingTimeInterval(-lead)
-                // A change queued with less than an hour to run gets no warning: it would fire
-                // at the same moment as the change landing, and say the opposite thing.
+                // Skip the warning if under an hour remains — it would fire at the same moment as landing.
                 if warnAt > now {
                     planned.append(PlannedNotification(
                         id: id(change, .warning),
@@ -98,25 +78,15 @@ enum PendingNotifications {
             }
     }
 
-    /// The digest for the coming Monday, when this device wants one and the week it would
-    /// report has something in it. One notification, not a repeating trigger: the numbers are
-    /// fixed when a notification is scheduled, and a repeating one would say the same week
-    /// forever. It is re-planned on every enforce and every reconcile, so the copy is at worst
-    /// as old as the last time Furlough was awake — which on the phone is the monitor's
-    /// midnight callback, and on the Mac is the enforcer's tick.
-    ///
-    /// A digest that has already fired is not caught up and not re-sent: whatever Monday it
-    /// was, the next one is the next Monday, the same way a missed midnight callback is simply
-    /// the next one's problem.
+    /// The digest for the coming Monday, if wanted and the week has something to report. A
+    /// one-shot notification, not repeating (its numbers would go stale); re-planned on every
+    /// enforce/reconcile. A missed digest is never caught up — the next one is just next Monday.
     private static func weeklyDigests(
         state: SharedState, now: Date, drift: TimeInterval, wanted: Bool, calendar: Calendar
     ) -> [PlannedNotification] {
         guard wanted, let next = nextDigestDate(after: now, calendar: calendar) else { return [] }
-        // The numbers the week will have come Monday morning are the numbers it has now for
-        // every whole day before today — so a digest planned on Sunday night is exact, and one
-        // planned on Wednesday is a week ending on Tuesday. Re-planning is what closes that
-        // gap; the identifier carries the copy's fingerprint so a re-plan with different words
-        // replaces the request instead of being taken for the one already scheduled.
+        // Re-planning closes the gap between whole days counted now and Monday morning; the id
+        // carries a fingerprint of the copy so a changed re-plan replaces rather than duplicates.
         guard let digest = Record.weeklyDigest(state.runtime.days, upTo: next, calendar: calendar) else { return [] }
         return [PlannedNotification(
             id: digestPrefix + fingerprint(digest.title + digest.body),
@@ -126,9 +96,8 @@ enum PendingNotifications {
         )]
     }
 
-    /// The next Monday morning strictly after `now`, on Furlough's own clock. `nextDate` is
-    /// what handles the clocks going forward: it matches nine o'clock local time, not a fixed
-    /// number of seconds from the last one.
+    /// The next Monday morning strictly after `now`, on Furlough's own clock (matches local
+    /// time, not a fixed offset).
     static func nextDigestDate(after now: Date, calendar: Calendar = .current) -> Date? {
         var parts = DateComponents()
         parts.weekday = Furlough.digestWeekday
@@ -138,9 +107,8 @@ enum PendingNotifications {
         return calendar.nextDate(after: now, matching: parts, matchingPolicy: .nextTime)
     }
 
-    /// A fingerprint of the copy, stable across launches. Swift's own `hashValue` is seeded per
-    /// process, so an identifier built from it would differ on every run and reschedule the
-    /// same digest forever. FNV-1a, 64-bit, in base 36.
+    /// A fingerprint stable across launches (Swift's `hashValue` is seeded per process and
+    /// would reschedule the same digest forever). FNV-1a, 64-bit, base 36.
     static func fingerprint(_ text: String) -> String {
         var hash: UInt64 = 0xcbf2_9ce4_8422_2325
         for byte in text.utf8 {
@@ -183,10 +151,8 @@ enum PendingNotifications {
         }
     }
 
-    /// Makes the system's scheduled notifications match `plan`: anything of Furlough's that is
-    /// no longer planned is withdrawn (a cancelled change must not still announce itself), and
-    /// anything planned that is not already scheduled is added. Already-correct requests are
-    /// left alone, so this can run on every enforce without re-scheduling the world.
+    /// Makes the system's scheduled notifications match `plan`, diffing against what's already
+    /// scheduled so this can run on every enforce without re-scheduling everything.
     static func sync(
         state: SharedState,
         now: Date,
@@ -195,8 +161,7 @@ enum PendingNotifications {
         calendar: Calendar = .current
     ) {
         let planned = plan(state: state, now: now, drift: drift, digest: digest, calendar: calendar)
-        // Only the identifiers are carried into the callback. `UNUserNotificationCenter` and
-        // `UNNotificationRequest` are not Sendable, so neither may be captured by it.
+        // Only identifiers cross into the callback — UNUserNotificationCenter/UNNotificationRequest aren't Sendable.
         UNUserNotificationCenter.current().getPendingNotificationRequests { existing in
             let scheduled = Set(existing.map(\.identifier).filter { $0.hasPrefix(prefix) })
             apply(planned, alreadyScheduled: scheduled, calendar: calendar)
@@ -213,10 +178,8 @@ enum PendingNotifications {
             content.title = note.title
             content.body = note.body
             content.sound = .default
-            // A calendar trigger rather than a time interval, so it survives the app being
-            // closed and fires at the moment the change actually lands.
-            // Seconds included: without them the trigger fires at the top of the minute, which
-            // would announce a change as landed up to a minute before it lands.
+            // A calendar trigger (not a time interval) survives the app being closed. Seconds
+            // are included so it doesn't fire early, at the top of the minute.
             let parts = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: note.fireAt)
             let request = UNNotificationRequest(
                 identifier: note.id,
@@ -230,8 +193,8 @@ enum PendingNotifications {
     }
 }
 
-/// Posts a local notification now. One copy, shared by the phone's monitor extension and the
-/// Mac's enforcer, which each had their own before.
+/// Posts a local notification now; shared by the monitor extension and the Mac enforcer, which
+/// each used to have their own copy.
 enum Notifier {
     static func post(id: String, title: String, body: String) {
         let content = UNMutableNotificationContent()

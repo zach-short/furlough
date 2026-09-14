@@ -1,28 +1,11 @@
 import SwiftUI
 
-/// The Anchor half, in the detail pane: one action and two rows.
-///
-/// It was a sheet behind a padlock in the toolbar — a lock icon, unlabelled, over a stack of
-/// eleven blocks that put Scope, two add fields and a four-line footnote in front of the one
-/// fact a new reader needed, which is that nothing here works until a phone has dropped an
-/// anchor once. It is one of the window's two halves now, reached by the segment in the sidebar,
-/// and it opens on a three-step checklist until it is set up.
-///
-/// The Mac has no tag reader and no scheduled drops, so where the phone's page carries four rows
-/// this one carries two: Scope, and Your iPhone, which is the whole of what a key means here.
 struct MacAnchorPane: View {
     @Environment(MacModel.self) private var model
-    /// Hands an Application-or-Website answer to the window's one add flow, bound for this
-    /// half's list. The same pipeline the + button uses, so the guide's step and the button
-    /// cannot drift apart — the question is asked here only because a popover pops from the
-    /// control that was clicked, and this one is a card in the middle of the pane.
     let onChooseApps: (AddChoice) -> Void
-    /// Asks the window to explain the link to the phone, in Help's own window beside this one.
     let onExplainDevices: () -> Void
 
-    /// The screen a row opened, shown in place with a Back link rather than pushed: the detail
-    /// pane is not in a navigation stack, and `WeekSheet` and `LogView` swap in place for the
-    /// same reason.
+    // Not a NavigationStack; sub-screens swap in place here, as WeekSheet and LogView also do.
     @State private var screen: Screen?
     @State private var message: String?
     @State private var asking = false
@@ -32,7 +15,6 @@ struct MacAnchorPane: View {
     private var anchor: AnchorProfile { model.state.config.anchor }
     private var isHolding: Bool { anchor.isHolding(at: model.now) }
 
-    /// The three steps this half is set up in. See `HalfGuide.macAnchor`.
     private var guide: HalfGuide {
         HalfGuide.macAnchor(
             config: model.state.config,
@@ -43,9 +25,6 @@ struct MacAnchorPane: View {
 
     var body: some View {
         Group {
-            // Before it is set up this pane is the checklist and nothing else, centred in the
-            // pane the way the other half's guide is. Everything else scrolls: a sub-screen can
-            // be taller than a small window.
             if screen == nil, guide.isRunning {
                 guidePane
                     .frame(maxWidth: 620, alignment: .leading)
@@ -60,8 +39,6 @@ struct MacAnchorPane: View {
                         case nil: setUpPane
                         }
                     }
-                    // Centred, and the column the width the rule editor uses, so the two halves
-                    // put their content in the same place.
                     .frame(maxWidth: 620, alignment: .leading)
                     .padding(.horizontal, 28)
                     .padding(.top, 20)
@@ -70,8 +47,6 @@ struct MacAnchorPane: View {
                 }
             }
         }
-        // Asked when the pane arrives, so the link row is about now rather than about whenever
-        // the app last happened to hear something.
         .task { model.checkLink() }
         .alert("Anchor", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
             Button("OK") { message = nil }
@@ -82,8 +57,6 @@ struct MacAnchorPane: View {
 
     // MARK: The guide
 
-    /// Hear from the phone, choose what it holds, drop it. The severe banner outranks even this:
-    /// a Mac that cannot reach iCloud can never be released, and it bears on the third step.
     private var guidePane: some View {
         VStack(alignment: .leading, spacing: 0) {
             if !model.cloudAvailable {
@@ -98,9 +71,6 @@ struct MacAnchorPane: View {
     private func guideButton(at live: Int?) -> some View {
         switch live {
         case 0:
-            // Nothing on this Mac can do the step; what it can do is look again. The link's own
-            // words go under the button, because "not yet" and "iCloud is off" are two different
-            // reasons to still be on this step.
             VStack(alignment: .leading, spacing: 8) {
                 GuideButton(title: "Check again", systemImage: "arrow.clockwise") { model.checkLink() }
                 Text(model.link.detail(now: model.now))
@@ -120,7 +90,6 @@ struct MacAnchorPane: View {
                     }
                 }
         case 2:
-            // The real one, so the first drop goes through exactly what every later drop does.
             dropButton
         default:
             EmptyView()
@@ -129,12 +98,8 @@ struct MacAnchorPane: View {
 
     // MARK: Set up
 
-    /// One action and two rows. What it holds is the sidebar's, the way the rules list is: this
-    /// is the window's left-hand column and the half's list belongs in it, which is also what
-    /// keeps this pane down to the drop and the two things that are settings rather than acts.
     private var setUpPane: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // What the link is asking about on this half, when it is asking anything.
             MacLinkTraffic(half: .anchor)
                 .padding(.bottom, 8)
             stateCard
@@ -145,9 +110,6 @@ struct MacAnchorPane: View {
         }
     }
 
-    /// Where the anchor stands and the button that changes it. The mark is here rather than in a
-    /// header: the segment in the sidebar already names this half, and what a glyph is good for
-    /// is saying at a glance whether the anchor is down.
     private var stateCard: some View {
         HStack(spacing: 12) {
             AnchorGlyph(isAnchored: isHolding, size: 44)
@@ -187,23 +149,16 @@ struct MacAnchorPane: View {
             return "\(held) since \(since.formatted(date: .omitted, time: .shortened))\(lift)"
         }
         if anchor.scope == .chosen, anchor.kinds.isEmpty { return "Nothing chosen yet" }
-        // Ahead of `phoneSeen`, and for the same reason `macDrop` checks it first: a latch set
-        // by some earlier account says nothing about whether a phone can be heard from now.
+        // Checked before hasKey, like macDrop: an old latch doesn't mean a phone is reachable now.
         if !model.cloudAvailable { return "\(held) · iCloud unreachable" }
         if !model.hasKey { return "\(held) · no iPhone on the link" }
         return "\(held) · ready"
     }
 
-    /// Scope and Your iPhone: the two things about the anchor on a Mac that are settings rather
-    /// than acts. Each was a card and a footnote on the sheet; each is a row and a screen now,
-    /// and the footnote is the first sentence you read when the screen opens.
     private var settingsCard: some View {
         VStack(spacing: 0) {
             settingsRow(title: "Scope", detail: scopeSummary) { screen = .scope }
             CardDivider()
-            // The dot, and the iCloud warning folded into the words beside it. It used to be a
-            // severe banner at the top of the sheet; it belongs on the one row it is about,
-            // which is also the only row that can be wrong without anybody having done anything.
             settingsRow(title: "Devices", detail: phoneSummary, dot: phoneDot) { screen = .phone }
         }
         .emberCard()
@@ -271,8 +226,6 @@ struct MacAnchorPane: View {
 
 // MARK: - The two screens behind the rows
 
-/// The chrome the two share: a Back link, the title, the lead under it, the cards below. No
-/// heading of its own above the lead — the title line already names the screen.
 private struct MacAnchorScreen<Content: View>: View {
     let title: String
     let lead: String
@@ -304,8 +257,6 @@ private struct MacAnchorScreen<Content: View>: View {
     }
 }
 
-/// How far the anchor reaches: the list, or every app on this Mac but the list. Locked while
-/// anchored. The list does not survive a switch, so a list that holds anything asks first.
 private struct MacAnchorScopeScreen: View {
     @Environment(MacModel.self) private var model
     let onBack: () -> Void
@@ -384,16 +335,6 @@ private struct MacAnchorScopeScreen: View {
     }
 }
 
-/// Whether the two devices are actually talking, and a button that asks.
-///
-/// Nothing else on this Mac says the Anchor reaches the phone at all, and there is no screen
-/// where the link could be set up, because there is nothing to set up. So the Anchor — the one
-/// half it is about — carries the way in.
-///
-/// The severe warning is the lead here rather than a banner on the pane in front. A Mac that
-/// cannot reach iCloud cannot be released by the one thing that could release it, which is the
-/// failure Furlough has no other way out of; the row that opens this screen wears an ember dot
-/// and says so in its own words, and this is where the whole of it is said.
 private struct MacAnchorPhoneScreen: View {
     @Environment(MacModel.self) private var model
     let onBack: () -> Void
@@ -416,8 +357,6 @@ private struct MacAnchorPhoneScreen: View {
             : "An iPhone's tag is the only thing that lifts an anchor, here or there. Link this Mac to your iPhone and a drop on either locks both; nothing crosses until you do."
     }
 
-    /// The same row Help's own hub draws, so it is plainly a link into Help rather than a
-    /// setting of its own.
     private var helpCard: some View {
         Button(action: onExplainDevices) {
             HelpRow(topic: .devices)
@@ -429,8 +368,6 @@ private struct MacAnchorPhoneScreen: View {
 
 // MARK: - Marks
 
-/// The anchor in a tile, ember while anchored. The phone's `AnchorGlyph`, which is what the
-/// toolbar's SF padlock used to stand in for.
 struct AnchorGlyph: View {
     let isAnchored: Bool
     var size: CGFloat = 34
@@ -450,8 +387,6 @@ struct AnchorGlyph: View {
     }
 }
 
-/// The anchor, small enough to sit inside a line of a sidebar row: this one is on the anchor's
-/// list too. A mark rather than a second list, as on the phone.
 struct HeldMark: View {
     var size: CGFloat = 9
 
@@ -463,8 +398,6 @@ struct HeldMark: View {
     }
 }
 
-/// The mirror of `HeldMark`, in the corner of a tile in the anchor's grid: this app has hours in
-/// the other half.
 struct RuledBadge: View {
     var size: CGFloat = 15
 

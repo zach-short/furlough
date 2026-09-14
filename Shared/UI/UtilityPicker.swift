@@ -1,8 +1,8 @@
 import SwiftUI
 
 extension Utility {
-    /// Green through amber to ember as the tier falls: the colour says how much protecting the
-    /// app itself deserves, which is the opposite of how much protecting *from* it does.
+    /// Colour tracks how much protecting the app deserves — the opposite of how much
+    /// protection it needs *from*.
     var tint: Color {
         switch self {
         case .essential: Ember.moss
@@ -13,11 +13,8 @@ extension Utility {
     }
 }
 
-/// The four tiers as a row of chips, with the delay each one buys spelled out underneath.
-///
-/// One control for both halves of the feature: it sets how long this target's loosenings wait,
-/// and it is what decides whether blocking it is questioned first. Shared by the phone and the
-/// Mac, so the wording cannot drift between them.
+/// Sets both the loosening delay and whether blocking this target gets questioned first.
+/// Shared by phone and Mac so wording can't drift.
 struct UtilityPicker: View {
     @Binding var selection: Utility
     /// The base delay, so each chip can say what it would actually cost.
@@ -90,8 +87,8 @@ struct UtilityPicker: View {
     }
 }
 
-/// The warning shown before a target worth keeping is blocked or anchored. Loud on purpose:
-/// Furlough has no emergency unblock, so this is the last point at which the decision is cheap.
+/// Loud on purpose — Furlough has no emergency unblock, so this is the last cheap point to
+/// reconsider.
 struct CautionBanner: View {
     let text: String
     var isSevere: Bool

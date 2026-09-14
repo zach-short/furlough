@@ -1,19 +1,8 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Settings, as a menu.
-///
-/// It used to be every setting at once, seven cards down one scroll: the delay and which half
-/// the app opens on — the two things a person comes here to change — read as two blocks among
-/// the record, the export, the diagnostics line and About, and each new setting made the scroll
-/// longer for everybody who was not looking for it.
-///
-/// So each card is a row now, and the footnote that used to sit under it is the first sentence
-/// of the screen the row opens. That is the move the Anchor page already made for its own four
-/// settings, down to the row and the chrome it opens into (`AnchorSettingScreen`), so the two
-/// screens are read the same way. Each row carries the one fact you would have scrolled to
-/// read — what the app opens on, how long a loosening waits, whether the devices are linked,
-/// whether anything is wrong — and growing now costs a row rather than a screenful.
+/// Settings, as a menu: each row opens a screen and shows the one fact worth knowing without
+/// opening it. Shares its chrome (`AnchorSettingScreen`) with the Anchor page's own settings.
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -22,8 +11,7 @@ struct SettingsView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    // What Furlough does: the two halves' own settings, and the devices they
-                    // cross to.
+                    // The two halves' own settings, and the devices they cross to.
                     VStack(spacing: 0) {
                         sectionRow("Start", detail: startSummary) { StartSettingsScreen() }
                         CardDivider()
@@ -34,11 +22,9 @@ struct SettingsView: View {
                         }
                     }
                     .emberCard()
-                    // Asked when the menu opens, so the Devices row is about now rather than
-                    // about whenever the app last happened to hear something.
+                    // Refresh on open so the Devices row reflects now, not the last heartbeat.
                     .task { model.refreshLink() }
 
-                    // What has happened: the record of the contract, and the fortnight behind it.
                     VStack(spacing: 0) {
                         if let record = recordSummary {
                             sectionRow("The record", detail: record) { RecordScreen() }
@@ -51,7 +37,6 @@ struct SettingsView: View {
                     .emberCard()
                     .padding(.top, 12)
 
-                    // The app itself.
                     VStack(spacing: 0) {
                         sectionRow("Your setup", detail: "Download it, or restore from a file") {
                             SetupScreen()
@@ -61,13 +46,8 @@ struct SettingsView: View {
                             DiagnosticsView()
                         }
                         CardDivider()
-                        // The version on the row, because it is the one thing about About that
-                        // gets asked for by somebody reading a bug report back to you.
-                        //
-                        // The reset behind it is testing-only: only the Testing section calls
-                        // it, and only the builds carrying that section have the method. It is
-                        // compiled out of the call here too, so the name stays out of a Release
-                        // binary — which is a thing scripts/archive.sh refuses to ship.
+                        // resetEverything() is compiled out here too, so the symbol stays out of
+                        // a Release binary — scripts/archive.sh refuses to ship one that has it.
                         sectionRow("About", detail: appVersion) {
                             AboutScreen(onReset: {
                                 #if DEBUG || TESTING_TOOLS
@@ -103,16 +83,12 @@ struct SettingsView: View {
 
     // MARK: What each row says without being opened
 
-    /// The half, and nothing about the +. Two facts wrapped the row onto a second line, and the
-    /// short true version of the second one — "+ adds to the anchor" — is only true over the
-    /// Anchor page, which is the misreading the setting exists to undo. So it is said in full on
-    /// the screen or not at all.
     private var startSummary: String {
         "Opens on \(model.startHalf.title)"
     }
 
-    /// The delay, in the words the rest of the app uses for it — and while the first week runs,
-    /// the capped number instead, because that is the one a loosening would actually wait.
+    /// During the first-week trial, shows the capped delay rather than the configured one,
+    /// since that's the one a loosening would actually wait.
     private var rulesSummary: String {
         if Forgiveness.trialDaysLeft(model.state.config, at: model.clock.now) != nil {
             return "First week: a loosening waits \(TimeFormat.delay(hours: Furlough.trialDelayHours))"
@@ -139,8 +115,7 @@ struct SettingsView: View {
             : "Furlough on your other devices can share the Anchor with this iPhone, and be told what you add here. Nothing crosses until you link it."
     }
 
-    /// Nil until there is a record, so a fresh install is not offered a row into an empty screen
-    /// — the card it replaced drew nothing for the same reason.
+    /// Nil until there is a record, so a fresh install isn't offered a row into an empty screen.
     private var recordSummary: String? {
         let card = Record.card(model.state, now: model.state.now)
         guard !card.isEmpty else { return nil }
@@ -160,12 +135,6 @@ struct SettingsView: View {
 
 // MARK: - Start
 
-/// The three things about how Furlough opens: which half it opens on, what the + means over the
-/// Anchor page, and the checklists again.
-///
-/// First in the menu because these are the settings a person came here to change. The intro asks
-/// the first one once, in the pane that says the app is two halves; this is the only other place
-/// it can be answered, and the pane is not coming back.
 private struct StartSettingsScreen: View {
     @Environment(AppModel.self) private var model
 
@@ -188,15 +157,7 @@ private struct StartSettingsScreen: View {
         }
     }
 
-    /// What + does over the Anchor page.
-    ///
-    /// The + acts on the page it is over, which over the Anchor page means its list — and the
-    /// one person that reading fails is the one who set the anchor up months ago and has read +
-    /// as "give an app hours" ever since. So it is a preference rather than a rule, and only
-    /// about the Anchor page: over Rules the button has no second reading to choose between.
-    ///
-    /// Stacked rather than beside its title, because "To the anchor" and "A new rule" have to say
-    /// what they do, and two chips that wide leave a row with nowhere to put the words.
+    /// Only meaningful over the Anchor page — over Rules, + has no second reading to choose.
     private var addRow: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("On the Anchor page, + adds")
@@ -216,8 +177,6 @@ private struct StartSettingsScreen: View {
         .padding(.vertical, 12)
     }
 
-    /// Says what pressing it would do, and then what it did — both derived from the same set, so
-    /// the row answers for itself rather than raising an alert to say something happened.
     private var guideDetail: String {
         let finished = model.finishedGuides
         guard !finished.isEmpty else { return "Both checklists are showing on Home." }
@@ -246,7 +205,6 @@ private struct StartSettingsScreen: View {
 
 // MARK: - Rules
 
-/// The loosening delay, and the first week counting itself down under it.
 private struct RulesSettingsScreen: View {
     @Environment(AppModel.self) private var model
     @State private var delayHours = Furlough.defaultLoosenDelayHours
@@ -280,8 +238,7 @@ private struct RulesSettingsScreen: View {
             .emberCard()
             if let left = Forgiveness.trialDaysLeft(model.state.config, at: model.clock.now),
                let ends = model.state.config.trialEndsAt {
-                // While the week runs, every countdown in the app is already saying the capped
-                // number. Without this line that reads like the delay above is not being applied.
+                // Without this, the capped trial delay above reads as if it's being ignored.
                 CautionBanner(
                     text: "First week: \(left == 1 ? "1 day" : "\(left) days") left. Until \(TimeFormat.day(ends)) a loosening waits \(TimeFormat.delay(hours: Furlough.trialDelayHours)), whatever this says. After that the full delay applies and cannot be put off.",
                     isSevere: false
@@ -300,13 +257,6 @@ private struct RulesSettingsScreen: View {
 
 // MARK: - Your setup
 
-/// The export and the import, which are the same screen: one writes the file and the other reads
-/// it back.
-///
-/// One lead where there were two paragraphs. Both dropped facts — that restoring has to ask which
-/// app each rule was, and that every restored rule goes through the delay — are said on the
-/// import screen itself, next to the pickers doing the asking, which is where somebody deciding
-/// whether to trust a file is actually standing.
 private struct SetupScreen: View {
     @Environment(AppModel.self) private var model
     @State private var setupFile: SetupDocument?
@@ -316,8 +266,7 @@ private struct SetupScreen: View {
     @State private var chosenSetup: ChosenSetup?
     @State private var importError: String?
 
-    /// A file that has been read and not yet acted on. `ConfigExport` is a value, not an
-    /// identity, so the sheet needs one of its own to be presented by.
+    /// `ConfigExport` is a value type with no identity, so wrap it for `sheet(item:)`.
     private struct ChosenSetup: Identifiable {
         let id = UUID()
         let export: ConfigExport
@@ -375,9 +324,7 @@ private struct SetupScreen: View {
         }
     }
 
-    /// Builds the file and opens the save panel. Reading the store is the whole of it: an
-    /// export changes nothing, so alone among the buttons on this screen it needs no delay,
-    /// no confirmation and no enforcement pass afterwards.
+    /// Read-only, so unlike the other buttons here it needs no delay or confirmation.
     private func exportSetup() {
         do {
             let export = ConfigExport.current()
@@ -392,18 +339,8 @@ private struct SetupScreen: View {
 
 // MARK: - About
 
-/// The version, the About page, and the way out when a shield sticks.
-///
-/// The stuck paragraph used to be printed in Settings in full, and it is Help's own page of the
-/// same name with the same words. One copy, and it is the one with the ordered steps — so this
-/// is a link.
-///
-/// The testing section is here rather than in the menu because the gesture that asks for it is
-/// five taps on the Version row above: the thing asked for should appear where it was asked for.
 private struct AboutScreen: View {
-    /// What follows a testing reset, once the model has forgotten everything: close Settings, so
-    /// the app is looking at onboarding rather than at a screen about a phone with nothing on it.
-    /// Unused outside the builds that carry the section.
+    /// Closes Settings after a testing reset so the app lands on onboarding, not an empty screen.
     let onReset: () -> Void
     #if DEBUG || TESTING_TOOLS
     @State private var showTesting = TestingTools.isShown
@@ -440,9 +377,6 @@ private struct AboutScreen: View {
                 Footnote(text: "Not in the App Store build. Reset everything forgets every app, rule, pending change and the Anchor, lifts all shields, hands Screen Time access back and returns to onboarding — a fresh install, apart from the notification permission, which iOS only asks about once.\n\nHide these buttons puts this section away. Show testing buttons, or five taps on Version above, brings it back.")
                     .padding(.top, 8)
             } else {
-                // A way back that does not have to be known about. The five taps still work and
-                // are the quieter route, but a hidden gesture is a poor only route to the button
-                // that resets the phone during a test pass.
                 GhostButton(title: "Show testing buttons", color: Ember.muted) {
                     TestingTools.isShown = true
                     showTesting = true
@@ -460,9 +394,7 @@ private struct AboutScreen: View {
         #endif
     }
 
-    /// Five taps on the Version row ask for the Testing section back. Nothing at all in a build
-    /// that does not carry it — see `TestingTools` for why the section hides itself even when it
-    /// is there.
+    /// Five taps on Version brings the Testing section back; see `TestingTools`.
     private func noteVersionTap() {
         #if DEBUG || TESTING_TOOLS
         if TestingTools.noteVersionClick() { showTesting = true }
@@ -470,7 +402,6 @@ private struct AboutScreen: View {
     }
 }
 
-/// What the About row reads, and the Version row behind it.
 private var appVersion: String {
     let info = Bundle.main.infoDictionary
     let short = info?["CFBundleShortVersionString"] as? String ?? "—"
@@ -480,9 +411,7 @@ private var appVersion: String {
 
 // MARK: - The rows these screens are built from
 
-/// A row in the menu: the section's name, the one fact about it worth having without opening it,
-/// and — where the state can go wrong with nobody having touched anything — a dot. The Anchor
-/// page's settings card is built from the same row, and is read the same way.
+/// Shared with the Anchor page's own settings card.
 @MainActor
 private func sectionRow<Screen: View>(
     _ title: String,
@@ -519,8 +448,7 @@ private func sectionRow<Screen: View>(
     .buttonStyle(.plain)
 }
 
-/// A fact and its value. Read-only: everything that can be acted on is an `actionRow` or a
-/// `navRow`, so a row that just says a thing looks like one.
+/// Read-only, unlike `actionRow`/`navRow`.
 @MainActor
 private func statusRow(_ title: String, _ value: String) -> some View {
     HStack {
@@ -537,8 +465,7 @@ private func statusRow(_ title: String, _ value: String) -> some View {
     .padding(.vertical, 11)
 }
 
-/// A row that does something here rather than opening a screen: ember, and with a line under it
-/// when what it would do is worth saying before it is pressed.
+/// Acts in place rather than opening a screen.
 @MainActor
 private func actionRow(
     _ title: String,
@@ -568,8 +495,7 @@ private func actionRow(
     .disabled(!isEnabled)
 }
 
-/// A row inside one of the screens that opens a further one — Help's pages, the log. The menu's
-/// own rows are `sectionRow`s.
+/// For screens nested inside a section (Help pages, the log); the menu's own rows are `sectionRow`.
 @MainActor
 private func navRow<Screen: View>(
     _ title: String,
@@ -592,9 +518,7 @@ private func navRow<Screen: View>(
     .buttonStyle(.plain)
 }
 
-/// One of a pair: the chosen one is filled, the other is an outline. Not a `Picker`, because both
-/// choices have to be readable at once — the question is which of two things this means, and a
-/// wheel that shows one answer at a time is a poor way to ask it.
+/// Not a `Picker`: both choices need to stay readable at once, unlike a wheel showing one at a time.
 @MainActor
 private func chip(
     _ title: String,
@@ -628,13 +552,8 @@ private func stamp(_ date: Date?) -> String {
 
 // MARK: - Diagnostics
 
-/// Everything the Settings screen used to say under Enforcement, one push behind the row that
-/// says whether any of it is wrong.
-///
-/// Nothing here is a setting. It is what Furlough can see about itself — the two permissions, the
-/// App Group the extensions read through, when the shields and schedules were last written — and
-/// the two things a person can do about it: run the whole pass again, and read what the monitor
-/// has been doing. Help's *If something gets stuck* sends people here by name.
+/// Nothing here is a setting; it's what Furlough can see about itself. Linked from Help's
+/// *If something gets stuck* by name.
 struct DiagnosticsView: View {
     @Environment(AppModel.self) private var model
 

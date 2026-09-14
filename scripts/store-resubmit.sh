@@ -5,21 +5,17 @@
 #   BUILD=202609090936 scripts/store-resubmit.sh
 #   VERSION=1.1 BUILD=202609111514 scripts/store-resubmit.sh   …renaming the record first
 #
-# The two clicks in the web form after a rejection — swap the build under Version > Build,
-# then "Resubmit to App Review" — through the API instead. It finds the iOS version whose
-# state is REJECTED (or, failing that, the newest one that can still take a build), attaches
-# the build, and marks the open submission submitted again. Reads before every write and says
-# what it found; a build that is already attached is left alone.
+# The two clicks in the web form after a rejection — swap the build under Version > Build, then
+# "Resubmit to App Review" — through the API instead: finds the REJECTED iOS version (or the
+# newest one that can still take a build), attaches the build, marks the open submission
+# submitted again. Reads before every write; an already-attached build is left alone.
 #
-# Two things make the resubmit answer 409 "not ready to be submitted yet": a rejected item
-# is never resubmitted as it stands, so the version goes back in as a fresh item (which is
-# what the web form does underneath), and a just-changed version can take a moment to settle,
-# which the script waits out half a minute at a time rather than failing on the first.
+# A rejected item can't be resubmitted as-is, so the version goes back in as a fresh item (what
+# the web form does underneath) and a just-changed version can take a moment to settle — both
+# surface as 409 "not ready to be submitted yet", which this waits out 30s at a time.
 #
-# Written 2026-09-09, when 1.0 (202609090423) was rejected under 2.5.1 and the fix went up as
-# 202609090936 while nobody was at the Mac. Same credentials as the other store scripts:
-# ASC_KEY_ID and ASC_ISSUER_ID, with the .p8 at ~/.appstoreconnect/private_keys/. No fastlane:
-# the token is minted here with OpenSSL.
+# Same credentials as the other store scripts: ASC_KEY_ID and ASC_ISSUER_ID, with the .p8 at
+# ~/.appstoreconnect/private_keys/. No fastlane: the token is minted here with OpenSSL.
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -44,7 +40,7 @@ der = pk.sign(OpenSSL::Digest::SHA256.new, input)
 r, s = OpenSSL::ASN1.decode(der).value.map { |v| v.value.to_s(2).rjust(32, "\0") }
 token = input + '.' + b64.(r + s)
 
-# One call, answered as [status, parsed body]. Nothing here exits; `request` below does.
+# Nothing here exits; `request` below does.
 def attempt(token, method, path, body = nil)
   uri = URI('https://api.appstoreconnect.apple.com' + path)
   klass = { 'GET' => Net::HTTP::Get, 'PATCH' => Net::HTTP::Patch, 'POST' => Net::HTTP::Post, 'DELETE' => Net::HTTP::Delete }[method]
@@ -78,9 +74,9 @@ build = builds.first
 abort "build #{build_number} is #{build['attributes']['processingState']}, not VALID yet; wait for processing" unless build['attributes']['processingState'] == 'VALID'
 puts "build #{build_number}: #{build['id']} (VALID)"
 
-# `build` must be named in the sparse fieldset or the relationship is left out of the answer,
-# and the script would re-attach the same build every run — which restarts Apple's checks and
-# makes the resubmit below fail as "not ready yet" indefinitely. Found out the hard way.
+# `build` must be named in the sparse fieldset, or the relationship is left out of the answer
+# and this re-attaches the same build every run, restarting Apple's checks and making the
+# resubmit below fail as "not ready yet" indefinitely. Found out the hard way.
 versions = request(token, 'GET', "/v1/apps/#{app_id}/appStoreVersions?filter[platform]=IOS&fields[appStoreVersions]=versionString,appVersionState,build&include=build&fields[builds]=version")
 version = versions['data'].find { |v| v['attributes']['appVersionState'] == 'REJECTED' } ||
           versions['data'].find { |v| %w[PREPARE_FOR_SUBMISSION DEVELOPER_REJECTED METADATA_REJECTED INVALID_BINARY].include?(v['attributes']['appVersionState']) }
@@ -89,10 +85,9 @@ attached_id = version.dig('relationships', 'build', 'data', 'id')
 attached = (versions['included'] || []).find { |b| b['id'] == attached_id }
 puts "version #{version['attributes']['versionString']}: #{version['attributes']['appVersionState']}, build #{attached ? attached['attributes']['version'] : 'none'}"
 
-# A build carries its own marketing version, and App Store Connect refuses one whose
-# CFBundleShortVersionString differs from the version record's. Renaming the record is how a
-# rejected first release takes a build cut under a later number: it has never shipped, so the
-# number is still free. Set VERSION to rename; left unset, the record keeps the name it has.
+# App Store Connect refuses a build whose CFBundleShortVersionString differs from the version
+# record's, so renaming the record is how a rejected, never-shipped release takes a build cut
+# under a later number. Set VERSION to rename; left unset, the record keeps its name.
 target_version = ENV['VERSION'].to_s
 unless target_version.empty? || target_version == version['attributes']['versionString']
   request(token, 'PATCH', "/v1/appStoreVersions/#{version['id']}",
@@ -118,12 +113,10 @@ open = subs.find { |s| %w[UNRESOLVED_ISSUES READY_FOR_REVIEW].include?(s['attrib
 abort "no submission to resubmit (states: #{subs.map { |s| s['attributes']['state'] }.join(', ')}). Use scripts/store-submit.sh --submit to make one." unless open
 puts "submission #{open['id']}: #{open['attributes']['state']}"
 
-# A rejected item is not resubmitted as it stands. The web form's Edit > Add for Review marks
-# the item resolved, which moves it and the version to READY_FOR_REVIEW; until then the
-# resubmit below answers "not ready to be submitted yet" for ever (ten minutes of it, measured
-# 2026-09-09), and a submission with unresolved issues refuses new items, so re-adding the
-# version is not a way round it either. The API form of that edit is `resolved: true` on the
-# item. The item's version relationship is only in the answer when it is asked for by name.
+# The web form's Edit > Add for Review marks the rejected item resolved (API: `resolved: true`),
+# moving it and the version to READY_FOR_REVIEW; without this the resubmit below answers "not
+# ready to be submitted yet" indefinitely, and a submission with unresolved issues refuses new
+# items too. The item's version relationship only appears in the response when asked for by name.
 items = request(token, 'GET', "/v1/reviewSubmissions/#{open['id']}/items?fields[reviewSubmissionItems]=state,appStoreVersion&include=appStoreVersion&fields[appStoreVersions]=versionString")['data']
 mine = items.select do |i|
   linked = i.dig('relationships', 'appStoreVersion', 'data', 'id')
@@ -138,7 +131,7 @@ end
 state = request(token, 'GET', "/v1/appStoreVersions/#{version['id']}?fields[appStoreVersions]=appVersionState")['data']['attributes']['appVersionState']
 puts "version is #{state}"
 
-# Up to five minutes of "not ready yet", then give up with Apple's own words.
+# Up to five minutes of "not ready yet" before giving up.
 10.times do |i|
   code, json = attempt(token, 'PATCH', "/v1/reviewSubmissions/#{open['id']}",
                        { data: { type: 'reviewSubmissions', id: open['id'], attributes: { submitted: true } } })

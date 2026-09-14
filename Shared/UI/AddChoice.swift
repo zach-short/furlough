@@ -1,27 +1,16 @@
 import SwiftUI
 
-/// What the + button asks before anything is picked: an app or a website.
 enum AddChoice: Hashable, CaseIterable {
     case application
     case website
 }
 
-/// A trip to Apple's picker, and what to do with what it comes back with.
-///
-/// The two callers want opposite things from the same picker. The + button shows the whole
-/// selection and reads the answer as the whole truth, so anything unpicked is a removal. The
-/// companion nudge shows an empty one and asks a single question — "which app is this?" — so
-/// nothing may be removed on the strength of it, and what comes back is added beside the
-/// target that asked, wearing that target's rule.
+/// The + button reads the full picker result as the whole truth (unpicked = removed); the
+/// companion nudge only adds, never removes.
 struct AddRequest: Hashable {
     var choice: AddChoice
-    /// Which half the answer lands in: a target with hours, or the anchor's list.
-    ///
-    /// The + button is over two pages now, and it adds to the page it is over. One pipeline
-    /// rather than two, because the trip is the same trip — a sheet, then Apple's picker — and
-    /// only the landing differs. Under `.anchor` the choice above is not asked: an app and a
-    /// site with a token are both picked in the one picker, and a site typed by name is a
-    /// target, so it reaches the anchor by being taken in rather than by being added here.
+    /// Which half the answer lands in: a target's hours, or the anchor's list. Under `.anchor`
+    /// the choice above is skipped — app and site share the one picker there.
     var destination: Half = .rules
     /// Set when the nudge on a target asked, rather than the + button.
     var companion: Companion?
@@ -29,15 +18,13 @@ struct AddRequest: Hashable {
     struct Companion: Hashable {
         /// The target whose other half this is: the one whose rule the new one inherits.
         var targetID: UUID
-        /// What the companions table calls the app, so it can be named before iOS ever names
-        /// it. Empty when several were picked and no single name fits.
+        /// Name to show before iOS names it; empty when several were picked with no single fit.
         var title: String
     }
 
     static func plain(_ choice: AddChoice) -> AddRequest { AddRequest(choice: choice) }
 
-    /// Add to the anchor's list: the already-blocked sheet where there is anything to offer,
-    /// Apple's picker where there is not.
+    /// Opens the already-blocked sheet if there's anything to offer, else Apple's picker.
     static let anchor = AddRequest(choice: .application, destination: .anchor)
 
     static func companion(_ choice: AddChoice, of targetID: UUID, titled title: String) -> AddRequest {
@@ -45,9 +32,8 @@ struct AddRequest: Hashable {
     }
 }
 
-/// The little popover under the + button: Application or Website, each with one line saying
-/// what it means on this platform. Whoever shows it decides what happens next: on the phone
-/// both open Apple's picker, on the Mac they open different sheets.
+/// Caller decides what happens next: both open Apple's picker on the phone, different sheets
+/// on the Mac.
 struct AddChoicePopover: View {
     let applicationCaption: String
     let websiteCaption: String
@@ -103,7 +89,6 @@ struct AddChoicePopover: View {
     }
 }
 
-/// A row that lights up faintly while pressed, and under the pointer on the Mac.
 private struct AddChoiceRowStyle: ButtonStyle {
     @State private var hovering = false
 

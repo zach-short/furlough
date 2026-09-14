@@ -1,14 +1,9 @@
 import Foundation
 
-/// What Furlough guesses a target is worth, and what it costs to block.
-///
-/// A table rather than a model on purpose. On the Mac a target already *is* a bundle
-/// identifier or a host, so a lookup is exact, offline and testable; asking a model would only
-/// add latency and a way to be wrong. On the phone a Screen Time token is opaque, so this can
-/// only answer once the shield has taught us a name (`Target.systemName`) — which is why the
-/// guess is a suggestion the rule editor offers, never something applied behind anyone's back.
-///
-/// Everything here is a default. `Target.utility` is what actually decides, and Zach sets it.
+/// What Furlough guesses a target is worth. A static table rather than a model: exact,
+/// offline, testable — and on the phone a Screen Time token is opaque anyway, so this can only
+/// answer once the shield has learned a name (`Target.systemName`). Only a default; the rule
+/// editor offers it as a suggestion, `Target.utility` is what actually decides.
 enum AppUtility {
     /// A tier, plus the specific consequence of blocking this one where saying it plainly beats
     /// the generic line. Only essentials carry a detail: for the rest the tier says enough.
@@ -28,17 +23,12 @@ enum AppUtility {
         switch target.kind {
         #if os(iOS)
         case .application:
-            // A token says nothing. The name the shield learned is all there is to go on, and
-            // failing that, whatever Zach called it himself.
             return byName(target.systemName) ?? byName(target.nickname)
         case .webDomain:
-            // `WebDomain.domain` arrives through the same channel as an app's name.
             return byHost(target.systemName) ?? byHost(target.nickname) ?? byName(target.systemName)
         case .category:
-            // Categories are always blocked, so there is no loosening to delay and nothing to warn about.
-            return nil
+            return nil // always blocked, so nothing to warn about
         case .host(let host):
-            // Typed, so the host is known from the start: the same answer the Mac gives.
             return byHost(host)
         #else
         case .macApp(let bundleID):
@@ -51,12 +41,9 @@ enum AppUtility {
 
     // MARK: Matching
 
-    /// The three ways a table here is keyed, written once and generic over what the table
-    /// answers. `RuleSuggestion` keys its own table of exceptions exactly the same way — a tier
-    /// and a starting rule are two answers to the one question, "which entry is this?" — so only
-    /// the answer differs, and neither file has its own idea of what counts as a match.
+    /// `RuleSuggestion` keys its exceptions table the same way, so neither file has its own
+    /// idea of what counts as a match.
 
-    /// A name as a table key: trimmed and lowercased, nil when nothing is left of it.
     static func key(forName name: String?) -> String? {
         guard let key = name?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
               !key.isEmpty
@@ -96,31 +83,14 @@ enum AppUtility {
 
     static func byName(_ name: String?) -> Advice? { match(name: name, in: names) }
 
-    /// Bundle identifiers match exactly, then by prefix, so "com.apple.mobilesafari" and a
-    /// vendor's whole suite land together without listing each one.
     static func byBundleID(_ raw: String) -> Advice? {
         match(bundleID: raw, in: bundleIDs, prefixes: bundleIDPrefixes)
     }
 
-    /// What to *call* the app with this bundle identifier, or nil when the table cannot tell.
-    ///
-    /// A Screen Time token says nothing on its own, so without data access a target has no name
-    /// until the shield covers it once. `AppModel.nameUnnamedTargets` exists to skip that wait: on
-    /// a device with data access it resolves a fresh target's token to a bundle identifier through
-    /// `UsageReader.identities()` right after it is added, and asks here (after `Companions`, which
-    /// knows the rest by name outright) whether the identifier is already known. Answering exactly
-    /// is what lets that shortcut work for anything in the table, not only Companions' own 33 pairs
-    /// — so this checks `properNameByBundleID` first, a name confirmed against the App Store the
-    /// same session the identifier was added (see `design/companions-sources.md` for the ones that
-    /// are also companions, and this file's own history otherwise).
-    ///
-    /// Failing that, the older and lossier route: take the advice the identifier maps to in
-    /// `bundleIDs`, and answer the one name in `names` that maps to the very same advice — but only
-    /// when exactly one does. Every essential carries its own detail sentence, so those are unique
-    /// and answer here without needing an entry in `properNameByBundleID` at all; the quieter tiers
-    /// mostly share a bare `.init(.useful)` between many apps, and for anything not also listed in
-    /// `properNameByBundleID` the table genuinely does not know which one this is. Guessing between
-    /// them would put the wrong name on a target and on the shield, which is worse than "This app".
+    /// Checks `properNameByBundleID` (names confirmed against the App Store) first. Failing
+    /// that, falls back to reverse-matching `bundleIDs` -> `names` via shared `Advice` — but
+    /// only when exactly one name maps to that advice, since many apps share a bare
+    /// `.init(.useful)` and guessing among them would put the wrong name on a target.
     static func name(forBundleID raw: String) -> String? {
         let key = raw.lowercased()
         if let exact = properNameByBundleID[key] { return exact }
@@ -130,34 +100,19 @@ enum AppUtility {
         return properName(matchKey)
     }
 
-    /// The name to offer as a nickname for `target`, or nil when there is nothing better to call
-    /// it than what it is already called.
-    ///
-    /// The cold-start gap in naming. A typed site is its own address, so it reads
-    /// "m.youtube.com" on the shield, in the widget and in every notification until someone
-    /// types something better; a Mac app Furlough learned no name for reads as its bundle
-    /// identifier. Both are things these tables know the proper name of already.
-    ///
-    /// Offered, never applied, and offered as a *nickname* rather than written into
-    /// `systemName`: a nickname is config a person owns and an export carries, so filling it in
-    /// behind their back would put a name they never chose into their setup. `Companions` is
-    /// asked first because its names are the ones written to be shown — the same order
-    /// `AppModel.nameFromTables` asks in. Nil once a nickname exists, so it can never talk over
-    /// a name someone chose, and nil when the answer is what the target already shows.
+    /// Offered as a *nickname*, never written into `systemName` directly — filling that in
+    /// behind someone's back would put a name they never chose into their own config. Nil once
+    /// a nickname exists, so it never talks over a name someone already picked.
     static func offeredNickname(for target: Target) -> String? {
         guard target.nickname.isEmpty, let known = knownName(of: target) else { return nil }
         return known == target.defaultName ? nil : known
     }
 
-    /// What the tables call the thing behind a target, whatever identity it has.
     private static func knownName(of target: Target) -> String? {
         switch target.kind {
         #if os(iOS)
         case .application, .category:
-            // A token carries no identity to look up. Either the shield has taught this one its
-            // real name already, in which case there is nothing here to add, or nothing has, in
-            // which case there is nothing here to ask with.
-            return nil
+            return nil // a token carries no identity to look up
         case .webDomain:
             return Companions.pair(forHost: target.systemName ?? "")?.title
         case .host(let host):
@@ -172,10 +127,7 @@ enum AppUtility {
         }
     }
 
-    /// Bundle identifiers this table knows the exact name of, confirmed against the App Store
-    /// rather than reconstructed from a shared tier. Only entries `Companions` does not already
-    /// carry: anything with a website goes through it first, in the caller
-    /// (`AppModel.nameFromTables`), and its names are the ones written to be shown.
+    /// Only entries `Companions` doesn't already carry (checked first by the caller).
     static let properNameByBundleID: [String: String] = [
         "net.kortina.labs.venmo": "Venmo",
         "com.squareup.cash": "Cash App",
@@ -266,11 +218,9 @@ enum AppUtility {
         "com.robinhood.release.robinhood": "Robinhood",
     ]
 
-    /// A key from `names` as a person writes it. The keys are lowercased because that is how the
-    /// shield reports a name and so how the lookup has to match, which loses the casing — and
-    /// capitalising each word recovers most of it but not all: "facetime" is not "Facetime".
-    /// Only the ones it gets wrong are listed; `Companions` already carries proper names for the
-    /// things that are also websites, and it is asked first.
+    /// Keys are lowercased (to match the shield's reporting), so capitalizing each word
+    /// recovers most casing but not all ("facetime" -> "Facetime" is wrong); only the
+    /// exceptions are listed here.
     static func properName(_ key: String) -> String {
         if let exact = properNames[key] { return exact }
         return key.split(separator: " ").map(\.capitalized).joined(separator: " ")
@@ -313,12 +263,10 @@ enum AppUtility {
         "among us!": "Among Us!",
     ]
 
-    /// Subdomains count: "m.youtube.com" is YouTube.
     static func byHost(_ raw: String?) -> Advice? { match(host: raw, in: hosts) }
 
     // MARK: The table
 
-    /// Names as the shield reports them on iOS, lowercased.
     static let names: [String: Advice] = [
         "messages": .init(.essential, "Messages is how people reach you, and how codes texted to you arrive."),
         "phone": .init(.essential, "Phone is how you call anyone, and how anyone calls you."),
@@ -477,7 +425,6 @@ enum AppUtility {
         "bluesky": .init(.hazard),
     ]
 
-    /// Mac and iOS bundle identifiers. Messages, FaceTime and Maps share ids across platforms.
     static let bundleIDs: [String: Advice] = [
         "com.apple.mobilesms": .init(.essential, "Messages is how people reach you, and how codes texted to you arrive."),
         "com.apple.mobilephone": .init(.essential, "Phone is how you call anyone, and how anyone calls you."),
@@ -617,7 +564,6 @@ enum AppUtility {
         "xyz.blueskyweb.app": .init(.hazard),
     ]
 
-    /// Whole vendor suites, matched on the longest prefix that fits.
     static let bundleIDPrefixes: [(prefix: String, value: Advice)] = [
         ("com.agilebits", .init(.essential, "1Password holds the passwords you need to sign in anywhere.")),
         ("com.1password", .init(.essential, "1Password holds the passwords you need to sign in anywhere.")),
@@ -634,7 +580,6 @@ enum AppUtility {
         ("net.whatsapp", .init(.useful)),
     ]
 
-    /// Websites, matched on the longest host that fits so "shorts.youtube.com" beats "youtube.com".
     static let hosts: [(host: String, value: Advice)] = [
         ("web.whatsapp.com", .init(.essential, "WhatsApp Web is how some people reach you.")),
         ("messages.google.com", .init(.essential, "Messages is how people reach you, and how codes texted to you arrive.")),

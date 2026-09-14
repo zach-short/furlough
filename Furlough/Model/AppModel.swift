@@ -25,117 +25,76 @@ enum ProposalResult: Equatable {
 @MainActor
 @Observable
 final class AppModel {
-    /// One model for the app and for the App Intents behind it: an intent can run with no
-    /// window on screen, and it has to change the same state the views are watching rather
-    /// than a second copy of it. The Mac has done this since it had a menu bar to run from.
+    /// Shared so App Intents (which can run with no window) mutate the same state the views watch.
     static let shared = AppModel()
 
     var authorization = AuthorizationCenter.shared.authorizationStatus
     var state = SharedStore.load()
     var lastError: String?
-    /// Something to say after an action that had no screen of its own to say it in — an
-    /// intent run from Spotlight. The root shows it once and clears it.
+    /// Message for an action with no screen of its own (e.g. an intent run from Spotlight);
+    /// shown once by the root, then cleared.
     var notice: String?
     var notificationsGranted: Bool?
     let isAppGroupAvailable = SharedStore.isAppGroupAvailable
     private let scanner = TagScanner()
     /// A Weigh Anchor intent waiting for Furlough to reach the foreground; see below.
     @ObservationIgnored private var wantsWeighAnchor = false
-    /// Screen Time access stood at the end of an earlier run. FamilyControls reports "not
-    /// determined" for a moment after a cold start, so the root trusts this to hold the launch
-    /// screen instead of flashing onboarding. Kept in the app's own defaults rather than the
-    /// App Group: it records what iOS last said, not what is blocked. A testing reset hands
-    /// access back, so it puts this back too, or the next launch would hold a launch screen
-    /// for a phone that is about to be asked to grant access again.
+    /// FamilyControls briefly reports "not determined" right after a cold start; this remembers
+    /// the last real answer so the launch screen doesn't flash onboarding. In app defaults, not
+    /// the App Group, since it tracks what iOS said, not what's blocked.
     let wasAuthorized = UserDefaults.standard.bool(forKey: AppModel.wasAuthorizedKey)
     private static let wasAuthorizedKey = "furlough.wasAuthorized"
-    /// Targets whose "the other half is missing" nudge has been waved away. Beside
-    /// `wasAuthorized` in the app's own defaults rather than in `Config`: it records what has
-    /// been said, not what is blocked, so it must not be exported with a setup and must not
-    /// go through the loosening delay.
+    /// Targets whose companion nudge was dismissed. In app defaults, not Config: must not
+    /// export with a setup or wait out the loosening delay.
     private var companionDismissed = Set(UserDefaults.standard.stringArray(forKey: AppModel.companionDismissedKey) ?? [])
     private static let companionDismissedKey = "furlough.companionDismissed"
-    /// The usage step has had its turn. Beside the two above for the same reason: it records
-    /// what has been shown, not what is blocked, so it must not travel in an exported setup and
-    /// must not wait out a loosening delay.
+    /// Whether the usage step has been shown. Same reasoning as `wasAuthorized`.
     private(set) var hasSeenUsageStep = UserDefaults.standard.bool(forKey: AppModel.usageStepKey)
     private static let usageStepKey = "furlough.sawUsageStep"
-    /// Whether Monday morning brings the record as a notification. On unless it has been turned
-    /// off — absent means never asked, and the answer to never asked is yes here, because a
-    /// record nobody is told about is the state this replaces.
-    ///
-    /// Whether Monday morning brings the record as a notification. Kept in the App Group rather
-    /// than beside the flags above, because the monitor extension re-plans the digest while the
-    /// app is closed and does not share the app's own defaults — see
-    /// `PendingNotifications.digestPreferenceKey`, which is where it lives and why.
+    /// Weekly digest toggle; defaults to on. Lives in the App Group (not app defaults) because
+    /// the monitor extension re-plans it while the app is closed — see
+    /// `PendingNotifications.digestPreferenceKey`.
     private(set) var weeklyDigest = PendingNotifications.wantsWeeklyDigest
-    /// The where-to-leave-it screen has been shown. Beside the ones above for the same reason,
-    /// and the reason it is a flag at all rather than "the anchor has exactly one tag": forget
-    /// the tag and pair another and the count is one again, but the advice has already been
-    /// read. It is what makes this a first pairing rather than any pairing.
+    /// Whether the where-to-leave-it screen has been shown. A flag rather than "anchor has one
+    /// tag": forgetting and re-pairing a tag would otherwise look like a first pairing again.
     private(set) var hasSeenTagPlacement = UserDefaults.standard.bool(forKey: AppModel.tagPlacementKey)
     private static let tagPlacementKey = "furlough.sawTagPlacement"
-    /// The tag just paired, while its where-to-leave-it screen is up. Set only on a first
-    /// pairing; cleared when the screen goes. The identifier rather than the tag, so the screen
-    /// reads whatever the tag ended up being called — both pairing paths name it after the
-    /// pairing itself, one of them from the alert the person just typed into.
+    /// The tag just paired, while its placement screen is up; cleared when the screen dismisses.
     var placingTagID: Data?
     /// What that tag is called now, for the screen's first line.
     var placingTagName: String? {
         placingTagID.flatMap { state.config.anchor.tag(matching: $0)?.name }
     }
-    /// The half the intro was told to start on: the page Home opens on, and the guide that runs
-    /// first. Beside the three above in the app's own defaults, for the same reason — it records
-    /// what was asked for, not what is blocked, so it must not travel in an exported setup and
-    /// must not wait out a loosening delay.
-    ///
-    /// Rules when nothing has been asked: a phone upgrading from a build that never had the
-    /// question comes up on the screen it has always come up on. A fresh install answers the
-    /// pane before it ever reaches Home.
+    /// Which half Home opens on and which guide runs first. In app defaults, not exported.
+    /// Defaults to Rules for upgrades that predate this setting.
     private(set) var startHalf = AppModel.storedStartHalf
     private static let startHalfKey = "furlough.startHalf"
     private static var storedStartHalf: Half {
         UserDefaults.standard.string(forKey: startHalfKey).flatMap(Half.init(rawValue:)) ?? .rules
     }
-    /// The start pane's third line, which is not a third page: "Both" opens on `startHalf` and
-    /// leaves the other half's guide running too. Stored beside it and for the same reason.
+    /// "Both": opens on `startHalf` but leaves the other half's guide running too.
     private(set) var wantsBothHalves = UserDefaults.standard.bool(forKey: AppModel.bothHalvesKey)
     private static let bothHalvesKey = "furlough.bothHalves"
-    /// What the + button adds while the Anchor page is the one in front.
-    ///
-    /// The anchor, because the + acts on the page it is over and that is the page's own list —
-    /// Zach's call on 2026-09-10, with a way to change it, because somebody who set the anchor
-    /// up once and lives in the rules half reads + as "give an app hours" wherever it is. The
-    /// + over the Rules page is not asked: that page has no second reading. Stored beside the
-    /// rest in the app's own defaults, for the same reason — a preference about a button is
-    /// not a rule, so it must not travel in an exported setup or wait out a delay.
+    /// What the + button adds while on the Anchor page (defaults to anchor; configurable).
     private(set) var anchorPageAdds = AppModel.storedAnchorPageAdds
     private static let anchorPageAddsKey = "furlough.anchorPageAdds"
     private static var storedAnchorPageAdds: Half {
         UserDefaults.standard.string(forKey: anchorPageAddsKey).flatMap(Half.init(rawValue:)) ?? .anchor
     }
-    /// Whether arriving on the Anchor page arms the reader on its own. Off by default: Apple's
-    /// scan sheet showing up unasked the first time someone swipes to this half is the surprise
-    /// this setting exists to prevent — the reader row and the guide's first step still arm it by
-    /// hand either way. Stored beside the rest in the app's own defaults, for the same reason.
+    /// Whether arriving on the Anchor page arms the NFC reader automatically. Off by default to
+    /// avoid surprising Apple's scan sheet.
     private(set) var autoArmsReader = UserDefaults.standard.bool(forKey: AppModel.autoArmsReaderKey)
     private static let autoArmsReaderKey = "furlough.autoArmsReader"
-    /// The halves whose three-step guide has been walked to the end. Beside the rest in the
-    /// app's own defaults, for the same reason.
-    ///
-    /// A flag rather than a derived fact because the last step of each guide is not something
-    /// the config can answer: reading your own list is done when you say it is, and an anchor
-    /// that has been dropped once lifts again later without the guide being owed a second
-    /// showing. The first two steps of each are derived — see `HalfGuide`.
+    /// Halves whose guide has been completed. A stored flag, not derived — completion (e.g.
+    /// "read your list") can't be inferred from config state. First two steps of each guide are
+    /// derived; see `HalfGuide`.
     private(set) var finishedGuides = AppModel.storedFinishedGuides
     private static let finishedGuidesKey = "furlough.finishedGuides"
     private static var storedFinishedGuides: Set<Half> {
         Set((UserDefaults.standard.stringArray(forKey: finishedGuidesKey) ?? []).compactMap(Half.init(rawValue:)))
     }
     #if DEBUG || TESTING_TOOLS
-    /// A testing reset has asked for the first run back — see `resetEverything`. Beside the
-    /// three above for the same reason, and read at launch like them, so a phone relaunched
-    /// part-way through a pass still starts where the reset left it.
+    /// A testing reset asked for onboarding again — see `resetEverything`.
     private(set) var restartsOnboarding = UserDefaults.standard.bool(forKey: AppModel.restartsOnboardingKey)
     private static let restartsOnboardingKey = "furlough.testing.restartOnboarding"
     #endif
@@ -148,8 +107,7 @@ final class AppModel {
         }
     }
 
-    /// The four questions the old Enforcement section asked, answered as one sentence. The rows
-    /// themselves are a screen in now — see `Diagnostics`.
+    /// Summarizes access, App Group, notification and registration status; see `Diagnostics`.
     var diagnostics: Diagnostics {
         Diagnostics.summary(
             Diagnostics.Reading(
@@ -161,10 +119,8 @@ final class AppModel {
         )
     }
 
-    /// Whether the first-run screen is what belongs on screen. Access decides it: a phone that
-    /// has not granted it has nothing Furlough could enforce, and a phone that has is past this
-    /// screen for good — except after a testing reset, which asks for the first run back and is
-    /// answered here rather than by pretending access is gone. See `resetEverything`.
+    /// Onboarding shows until Screen Time access is granted, except a testing reset can force
+    /// it again — see `resetEverything`.
     var showsOnboarding: Bool {
         #if DEBUG || TESTING_TOOLS
         if restartsOnboarding { return true }
@@ -172,34 +128,21 @@ final class AppModel {
         return !isAuthorized
     }
 
-    /// Whether the usage step is on screen. It sits between Screen Time access and the first
-    /// rule, because seeing where a fortnight went is the shortest way from an empty Furlough
-    /// to one that is set up — and once there are rules, it has nothing left to say that
-    /// Settings cannot say later.
-    ///
-    /// Stored rather than derived, and only ever turned on by `considerUsageStep`: applying a
-    /// suggestion inside the step gives Furlough its first rule, and a condition that read the
-    /// targets live would pull the screen out from under the person mid-flow. `finishUsageStep`
-    /// is the one way out.
+    /// Shown between Screen Time access and the first rule. Stored, not derived from targets:
+    /// applying a suggestion inside this step creates the first rule, and a live condition would
+    /// pull the screen out from under the user mid-flow. Cleared only by `finishUsageStep`.
     private(set) var showsUsageStep = false
 
-    /// Turns the step on the first time Furlough has access and nothing to enforce yet — and
-    /// only where the app can read the numbers itself.
-    ///
-    /// Without data access the step still has something to show: the report extension draws
-    /// real cards inside its own sandbox. What it cannot do is hand a rule back, so every card
-    /// ends in a manual trip to the picker and the editor. That is a decent thing to find in
-    /// Settings and a poor first screen, so on a phone without access the Rules guide's first
-    /// step opens the picker instead and "Where the time goes" keeps the tour.
+    /// Shown only when data access is available: without it every card would dead-end in a
+    /// manual picker trip, which is fine in Settings but a poor first screen.
     private func considerUsageStep() {
         guard !hasSeenUsageStep, isAuthorized, UsageReader.hasDataAccess(authorization) else { return }
         guard state.config.targets.isEmpty else { return }
         showsUsageStep = true
     }
 
-    /// The start pane, answered. Written when Continue is pressed rather than on each tap, so
-    /// backing out of the intro and coming at it again does not leave a half chosen by a finger
-    /// that was on its way somewhere else.
+    /// Written on Continue, not on each tap, so backing out of the intro doesn't leave a stray
+    /// choice.
     func chooseStart(half: Half, both: Bool) {
         UserDefaults.standard.set(half.rawValue, forKey: Self.startHalfKey)
         UserDefaults.standard.set(both, forKey: Self.bothHalvesKey)
@@ -207,9 +150,7 @@ final class AppModel {
         wantsBothHalves = both
     }
 
-    /// The same answer, changed later from Settings. The intro asks it once and this is the only
-    /// other place it is asked, so `wantsBothHalves` rides along unchanged: someone moving the
-    /// page Furlough opens on has said nothing about whether the other half's guide still runs.
+    /// Changing just the start half leaves `wantsBothHalves` untouched.
     func setStartHalf(_ half: Half) {
         guard half != startHalf else { return }
         chooseStart(half: half, both: wantsBothHalves)
@@ -242,21 +183,15 @@ final class AppModel {
         write(finishedGuides: finishedGuides.union([half]))
     }
 
-    /// Both checklists, asked for again from Settings.
-    ///
-    /// Only the last step of each is a flag, so this is the whole of what can be undone: a half
-    /// that is set up comes back showing its third step live — read your list, drop it — rather
-    /// than pretending the apps were never picked. That is the honest version of "again", and it
-    /// is the step worth seeing twice anyway.
+    /// Resets guide completion; the derived first two steps still reflect actual state, so this
+    /// only replays the last step.
     func restartGuides() {
         guard !finishedGuides.isEmpty else { return }
         write(finishedGuides: [])
     }
 
-    /// A phone that arrives already set up has no guide owed to it. Run once, on the first
-    /// launch of a build that has guides at all: without it an update would put a checklist in
-    /// front of someone who has been using Furlough for months. The key being absent is what
-    /// "never asked" means, so writing an empty set is what closes the question.
+    /// Marks guides as already finished for a phone that's already set up, so an update doesn't
+    /// show a checklist to an existing user. Runs once — absence of the key means "never seeded".
     private func seedFinishedGuides() {
         guard UserDefaults.standard.object(forKey: Self.finishedGuidesKey) == nil else { return }
         var seeded: Set<Half> = []
@@ -284,43 +219,36 @@ final class AppModel {
         observeChanges()
         observeCloud()
         AnchorCloud.synchronize()
-        // Signing out of iCloud happens in Settings, outside this app, so every activation is
-        // the soonest a returning phone can find out that the anchor stopped crossing.
+        // iCloud sign-out happens outside the app; activation is the earliest point to notice
+        // the anchor stopped syncing.
         refreshCloudAvailability(reason: "activate")
-        // Core has no UIKit to ask, and an iPad has no tag reader: the record it signs must
-        // say so, or a Mac would take it for a phone that could release it.
+        // iPad has no tag reader; the signed record must say so or a Mac would treat it as able
+        // to release the anchor.
         AnchorSync.notePlatform(isPad: UIDevice.current.userInterfaceIdiom == .pad)
-        // Once, on the first launch of a build that has the roster: a phone that was already
-        // talking to its Mac stays on the link, and one that was not starts off it.
+        // Runs once per build upgrade to grandfather existing Mac links.
         DeviceLink.decideGrandfathering(now: state.now)
         note(AuthorizationCenter.shared.authorizationStatus)
         reload()
         applyRemoteAnchor(reason: "activate")
         settleLink(reason: "activate")
-        // After the reload, because what it seeds from is what is already set up.
         seedFinishedGuides()
         considerUsageStep()
         Task { await refreshNotificationStatus() }
-        // Names for anything the shield has not covered yet, where this phone can read them —
-        // among the rules, and on the anchor's list, which has its own names key. Off the
-        // critical path: both need a Screen Time query, and nothing waits on the answer.
+        // Off the critical path: both need a Screen Time query and nothing waits on it.
         Task {
             await nameUnnamedTargets()
             await nameAnchoredKinds()
             await anchorArrivalsFromTheTables()
         }
-        // Before the authorization guard: a tag scan is how the anchor is lifted, and it has
-        // to work even on a launch where FamilyControls has not answered yet.
+        // Must run before the authorization guard: lifting the anchor via tag scan must work
+        // even before FamilyControls has answered.
         weighAnchorIfInFront()
         guard isAuthorized else { return }
         enforce(reason: "app active")
     }
 
-    /// Listens for a write from another process — a Control Center drop, the monitor's
-    /// schedule firing or lifting — and catches up, so the screen does not say Free over a
-    /// phone that is anchored. A Darwin notification carries no payload and reaches every
-    /// process; the observer is registered once, and its callback can capture nothing, so it
-    /// goes through `shared`.
+    /// Darwin notifications carry no payload and the C callback can't capture context, so it
+    /// routes through `shared`.
     @ObservationIgnored private var observesChanges = false
 
     private func observeChanges() {
@@ -336,23 +264,19 @@ final class AppModel {
         )
     }
 
-    /// Another process wrote the store. Reload, and if that changed anything, enforce: a drop
-    /// from the widget has applied its shields already, but only the app registers
-    /// DeviceActivity, and the monitor's own writes are worth a fresh registration too. The
-    /// app's own writes come back through here as well and find nothing new.
+    /// Only the app registers DeviceActivity, so any external write (widget drop, monitor)
+    /// needs a fresh enforce even though shields may already be applied.
     func changedElsewhere() {
         let before = state
         reload()
         guard state != before, isAuthorized else { return }
         enforce(reason: "changed elsewhere")
-        // The shield's writes come through here too, and a name it has just learned may be
-        // the one thing an add was waiting on before it could block the site or cross.
+        // A name the shield just learned may be what an add was waiting on to link or cross.
         settleLink(reason: "changed elsewhere")
     }
 
-    /// Follows FamilyControls' own updates. After a cold start the first read says "not
-    /// determined" and the real answer arrives here a moment later; if the app went active in
-    /// between, this enforces now, as `activate()` could not.
+    /// FamilyControls reports "not determined" right after cold start; the real answer arrives
+    /// here shortly after — enforce then if `activate()` couldn't.
     func observeAuthorization() async {
         for await status in AuthorizationCenter.shared.$authorizationStatus.values {
             let hadAccess = isAuthorized
@@ -389,11 +313,8 @@ final class AppModel {
         }
     }
 
-    /// Begins the first week the first time Screen Time access is granted, and never again on
-    /// this install — `Forgiveness.startTrial` is what refuses the second time. This is the
-    /// only moment it can start: before access there is nothing to be forgiven for, and after
-    /// it every path back here goes through Settings, which is the way out of Furlough and
-    /// must not also be the way to a fresh week.
+    /// Starts the trial only on first grant of Screen Time access; `Forgiveness.startTrial`
+    /// refuses subsequent grants.
     private func startTrialIfNeeded() {
         var current = SharedStore.load()
         guard Forgiveness.startTrial(&current.config, now: current.now) else { return }
@@ -401,18 +322,15 @@ final class AppModel {
         SharedStore.log("first week started; loosenings wait \(Furlough.trialDelayHours) h until it ends")
     }
 
-    /// The edit on `id` that is still takeable back, or nil. Read on Furlough's own clock, so
-    /// a device clock moved back does not reopen a window that has closed.
+    /// Read on Furlough's own clock so a device clock rolled back can't reopen a closed undo
+    /// window.
     func undo(for id: UUID) -> RuleUndo? {
         guard let target = state.config.target(id: id) else { return nil }
         return Forgiveness.undo(for: target, at: clock.now)
     }
 
-    /// Puts `id` back to the rule it had before the last edit. True when it happened.
-    ///
-    /// Instant, and not an unblock: the rule it restores is the one that was in force a quarter
-    /// of an hour ago, so nothing comes open that was not open then. A target whose previous
-    /// rule was none goes back to unconfigured, which is where it stood before it was touched.
+    /// Reverts to the prior rule instantly (not a loosening, since it was already in force).
+    /// Returns true when applied.
     @discardableResult
     func undoRule(for id: UUID) -> Bool {
         var current = SharedStore.load()
@@ -424,9 +342,8 @@ final class AppModel {
         return true
     }
 
-    /// Turns the weekly digest on or off. Enforcing is what re-plans it, so turning it off
-    /// withdraws the one already scheduled in the same breath — `sync` takes away anything of
-    /// Furlough's that is no longer planned.
+    /// `enforce()` re-plans notifications, so turning the digest off also withdraws any already
+    /// scheduled.
     func setWeeklyDigest(_ on: Bool) {
         guard on != weeklyDigest else { return }
         PendingNotifications.setWantsWeeklyDigest(on)
@@ -453,9 +370,7 @@ final class AppModel {
         state = SharedStore.load()
     }
 
-    /// Furlough's own time and how far the device's clock is from it. Every view that shows a
-    /// countdown reads it through here, so a device clock moved forward changes nothing but the
-    /// banner on the Pending screen.
+    /// Furlough's own time and its drift from the device clock; countdowns read through here.
     var clock: Clock.Reading { state.clock() }
 
     /// Re-derives everything from persisted state: folds in due pending changes, re-registers
@@ -470,8 +385,7 @@ final class AppModel {
         if Policy.applyDuePending(&current, now: clock.now) {
             SharedStore.log("applied due pending changes (\(reason))")
         }
-        // Folded before registration, so a timed anchor whose time has passed does not get its
-        // wake registered again; `Policy` has read it as released since the moment it passed.
+        // Must run before registration or an expired timed anchor's wake gets re-registered.
         if Policy.liftExpiredAnchor(&current.config, now: clock.now) {
             SharedStore.log("a timed anchor's time had passed; lifted it (\(reason))")
         }
@@ -486,8 +400,8 @@ final class AppModel {
         }
         SharedStore.save(current)
         ShieldReconciler.reconcile(reason: reason)
-        // The warning before a loosening lands is the last chance to cancel it, so it is
-        // rescheduled from the saved state on every enforce rather than only when queued.
+        // Rescheduled on every enforce (not just when queued) so the pre-loosening warning
+        // stays accurate.
         PendingNotifications.sync(state: current, now: clock.now, drift: clock.drift, digest: weeklyDigest)
         WidgetCenter.shared.reloadAllTimelines()
         ControlCenter.shared.reloadControls(ofKind: Furlough.anchorControlKind)
@@ -556,13 +470,9 @@ final class AppModel {
         selected.formUnion(selection.webDomainTokens.map(TargetKind.webDomain))
         selected.formUnion(selection.categoryTokens.map(TargetKind.category))
 
-        // Each removal waits out its own target's tier, so unpicking Messages and TikTok
-        // together does not make Messages wait for TikTok.
-        //
-        // Which targets the picker may remove at all is `Policy.picker(removes:selected:)`, which
-        // is pure and tested: a typed host is in no selection, and a linked pair is not broken by
-        // unpicking one half of it. The editor's "Also blocks" card is the one place a half comes
-        // off, because that is a loosening and has to wait out the delay.
+        // Each removal waits out its own target's tier. Policy.picker(removes:selected:) decides
+        // eligibility — a linked pair isn't broken by unpicking one half (only the editor's
+        // "Also blocks" card does that, as a delayed loosening).
         for target in current.config.targets where Policy.picker(removes: target, selected: selected) {
             if target.rule == nil {
                 current.config.targets.removeAll { $0.id == target.id }
@@ -579,16 +489,11 @@ final class AppModel {
         SharedStore.save(current)
         SharedStore.log("picker: added \(outcome.added), removals scheduled \(outcome.removalsScheduled)")
         enforce(reason: "picker")
-        // What was just added is owed to the other devices, once it can be named. Written down
-        // now, settled when the name arrives — see `settleLink`.
+        // Owed to other devices once named — settled later via settleLink.
         let added = current.config.targets.filter { !existing.contains($0.kind) }.map(\.id)
         LinkFlow.noteAdded(added, half: .rules, config: current.config)
-        // A token straight out of the picker has no name, and half of what the editor can offer
-        // needs one: the companion nudge and the merge offer are both found through the name,
-        // so a freshly added app showed neither until something else named it. Until now that
-        // was the next activation or the first time the shield covered it, which is why the
-        // "add as a website" button appeared for some rows and not others (2026-09-09). Off the
-        // critical path, as at launch — nothing here waits on Screen Time's answer.
+        // A token from the picker has no name yet, and the companion nudge / merge offer both
+        // need one. Off the critical path — nothing waits on Screen Time's answer.
         if outcome.added > 0 { Task { await nameUnnamedTargets() } }
         return outcome
     }
@@ -597,12 +502,8 @@ final class AppModel {
     /// to work through a screenful of suggestions, far short of living under one.
     static let undoWindow: TimeInterval = 30 * 60
 
-    /// Takes back an app the usage flow has just added, and the rule it wrote on it. Not a
-    /// loosening waiting out the delay: the delay is there so a rule you have been living under
-    /// cannot be dropped on a whim, and this one was written and taken back inside one screen,
-    /// minutes old, before it ever shielded anything — the same judgement `applyPicker` makes
-    /// about a target that has no rule yet. Refuses anything older than `undoWindow`, which is
-    /// why the flow offers Undo only on what it added itself. False when nothing was undone.
+    /// Undoes a target added moments ago (within `undoWindow`), bypassing the loosening delay
+    /// since it never actually shielded anything. False when nothing was undone.
     func undoFreshTarget(_ id: UUID) -> Bool {
         var current = SharedStore.load()
         guard let target = current.config.targets.first(where: { $0.id == id }),
@@ -626,8 +527,7 @@ final class AppModel {
 
         var message: String? {
             guard case .added(let count, let inherited) = self else { return nil }
-            // One pick is the pair itself and shares the row. More than one means the rest are
-            // separate things that were picked at the same time, and they get rows of their own.
+            // A single pick joins the row; extra picks become their own rows on the same hours.
             let extras = count > 1 ? " The other \(count - 1) got \(count == 2 ? "a row" : "rows") of \(count == 2 ? "its" : "their") own, on the same hours." : ""
             return inherited
                 ? "One row now, on one schedule and one budget.\(extras)"
@@ -635,24 +535,10 @@ final class AppModel {
         }
     }
 
-    /// Puts the app half onto the website's own row, so the two are one thing.
-    ///
-    /// Not `applyPicker`: that one reads a selection as the whole truth and schedules a removal
-    /// for every target absent from it, which is right for the + button and catastrophic here,
-    /// where the picker was deliberately opened empty to ask one question. Nothing is removed.
-    ///
-    /// Linking rather than appending, since 2026-09-08: one habit is one row. The app becomes the
-    /// **face** of that row and the site moves in beside it, because the app is the half with
-    /// Apple's own artwork and name. The rule, the tier, the nickname and the removal delay were
-    /// already the row's and stay the row's, so nothing is copied and nothing can drift.
-    ///
-    /// A tightening, and instant: more is blocked than a moment ago. Taking a half back off is
-    /// the loosening, and `unlink` queues that behind the delay.
-    ///
-    /// One pick is the app the nudge named, so it is named from the companions table at once —
-    /// the widget, the notifications and the Live Activity can say "YouTube" rather than "This
-    /// app" before the shield has ever covered it. Several picks means the name fits none of
-    /// them, so the extras become rows of their own wearing the same rule, exactly as before.
+    /// Links the app onto the website's existing row rather than using `applyPicker` (which
+    /// would treat the empty selection as "remove everything absent"). The app becomes the
+    /// row's face; its rule, tier, nickname and delay are unchanged. A tightening, applied
+    /// instantly — `unlink` handles removing a half as a delayed loosening.
     @discardableResult
     func addCompanionApps(_ selection: FamilyActivitySelection, for request: AddRequest.Companion) -> CompanionAddOutcome {
         var current = SharedStore.load()
@@ -663,8 +549,7 @@ final class AppModel {
         else { return .none }
         let inherited = current.config.targets[index].rule
 
-        // The first pick joins the row and becomes its face; the site it was offered beside moves
-        // in beside it. `also` keeps the order it was built in, so the face comes off the front.
+        // The first pick becomes the row's face; the site moves in beside it via `also`.
         let site = current.config.targets[index].kinds
         let face = tokens.first!
         current.config.targets[index].kind = .application(face)
@@ -672,8 +557,8 @@ final class AppModel {
         if !request.title.isEmpty, tokens.count == 1 {
             current.config.targets[index].systemName = request.title
         }
-        // Anything else picked is not this thing, so it gets its own row rather than being folded
-        // into a pair it does not belong to. It still wears the rule, as it did before linking.
+        // Extra picks aren't part of this pair, so they get their own rows (keeping the
+        // inherited rule).
         for token in tokens.dropFirst() {
             current.config.targets.append(Target(kind: .application(token), rule: inherited))
         }
@@ -692,12 +577,9 @@ final class AppModel {
         case unreadable
     }
 
-    /// Adds a website by name, the way the Mac has always done it.
-    ///
-    /// No token and no picker: `WebContentSettings.blockedByFilter` takes a plain string, so
-    /// the host is the whole target. Nothing is enforced until it has a rule, as ever. A host
-    /// that is already managed — or a subdomain of one, which `Config.target(host:)` matches —
-    /// is not added twice; the sheet says which one it landed on.
+    /// Adds a website by name (no token/picker needed — `WebContentSettings.blockedByFilter`
+    /// takes a plain string). Deduplicates against existing hosts and subdomains via
+    /// `Config.target(host:)`.
     @discardableResult
     func addHost(_ raw: String) -> AddHostOutcome {
         guard let host = Hosts.normalize(raw) else { return .unreadable }
@@ -706,9 +588,7 @@ final class AppModel {
         return .added(host)
     }
 
-    /// Several at once, in one save and one enforcement pass: the companion nudge offers every
-    /// site an app is also at, and adding four of them should not be four rounds of the whole
-    /// reconcile. Mirrors `MacModel.addHosts`, which the Mac's companion sheet has always used.
+    /// Batches several hosts into one save/enforce pass. Mirrors `MacModel.addHosts`.
     @discardableResult
     func addHosts(_ raw: [String]) -> [Target] {
         var current = SharedStore.load()
@@ -731,12 +611,9 @@ final class AppModel {
 
     // MARK: Importing a setup
 
-    /// Opens a chosen file, or says why it will not be read. Writes nothing.
-    ///
-    /// The phone stops here rather than going straight to a plan: a Screen Time target is an
-    /// opaque token scoped to this device and this install, so the file cannot say which app
-    /// each of its rules belonged to and the person has to. `ImportSetupView` asks, and hands
-    /// the answers back to `plan`.
+    /// Opens a file without planning yet: a Screen Time token is opaque and device-scoped, so
+    /// the file can't say which app a rule belonged to — `ImportSetupView` asks the user, then
+    /// calls `plan`.
     func openSetup(fileAt url: URL) -> Result<ConfigExport, ConfigImport.Refusal> {
         do {
             return .success(try ConfigImport.read(contentsOf: url))
@@ -749,25 +626,15 @@ final class AppModel {
     func plan(_ export: ConfigExport, matches: [ImportMatch]) -> ImportPlan {
         let current = SharedStore.load()
         var plan = ConfigImport.plan(export, matches: matches, state: current, now: current.now)
-        // iOS's ceiling on monitored activities, asked before the button rather than after the
-        // save. `ConfigImport` cannot ask it: the limit is DeviceActivity's and the Mac has no
-        // such thing, so the platform that has the ceiling is the one that counts against it.
+        // DeviceActivity's activity-count ceiling is iOS-only, so it's checked here rather than
+        // in the platform-agnostic ConfigImport.
         plan.limitReason = ActivityLimit.reason(applying: plan, in: current)
         return plan
     }
 
-    /// Applies a whole plan in one save and one enforcement pass.
-    ///
-    /// `propose`, `setUtility` and the rest each save and then re-register every DeviceActivity
-    /// schedule, which is right for one edit typed by hand and wrong for twenty arriving
-    /// together. The targets a file adds are appended by the plan rather than through
-    /// `applyPicker`: that method reads a selection as the whole truth and schedules a removal
-    /// for everything absent from it, which is exactly wrong for a file that only ever adds.
-    ///
-    /// Returns what it did, in the past tense, for the caller to say. Every other mutation here
-    /// hands back a `ProposalResult` and every screen puts it in an alert; an import that
-    /// silently closed the sheet would be the one change in the app that says nothing, and it is
-    /// the largest one — see `ImportPlan.confirmation`.
+    /// Applies a whole import plan in one save/enforce pass rather than one per target, and
+    /// appends targets directly (not via `applyPicker`, which would schedule removal of
+    /// anything absent from a selection).
     func applyImport(_ plan: ImportPlan) -> String {
         SharedStore.mutate { state in
             let now = state.now
@@ -780,32 +647,19 @@ final class AppModel {
 
     // MARK: The other half
 
-    /// What to offer beside `target`, or nil when there is nothing to say.
-    ///
-    /// A picked target cannot be offered anything as it is added: a Screen Time token is
-    /// opaque. The shield learns the name the first time it covers something, and from that
-    /// name `Companions` still answers — so for those the offer arrives on the second look
-    /// rather than the first, which is the best the phone can do. Nil once the other half is
-    /// in, once the nudge has been waved away, and for anything the table does not know.
-    ///
-    /// A typed host is the exception, and the reason this reads the way it does. It was
-    /// written down rather than minted, so it carries its name from the moment it is added and
-    /// needs no learned one: its nudge fires on the first look, the way the Mac's sheet does.
-    ///
-    /// "Already in" can only be judged by the names Furlough knows, so a picked half that has
-    /// never been blocked is invisible here and can be offered once. Dismissing it settles
-    /// that for good, which is why the nudge is dismissible rather than merely closable.
+    /// What to offer beside `target` as its companion, or nil. A Screen Time token is opaque
+    /// until the shield first names it, so the nudge only appears from the second look on —
+    /// except a typed host, which carries its own name immediately. Nil once linked, dismissed,
+    /// or unknown to the Companions table.
     func companion(for target: Target) -> Companions.Half? {
         guard !companionDismissed.contains(target.id.uuidString) else { return nil }
-        // A target that already covers both halves has nothing left to be offered, and this is
-        // the cheapest way to know it: a linked row's site half may be a token whose domain
-        // Furlough was never told, so asking "does it cover a site?" beats asking "which site?"
+        // Checking "does it cover a site" is cheaper than "which site" — a linked site half may
+        // be a token whose domain was never learned.
         guard !(target.coversApp && target.coversSite) else { return nil }
         switch target.kind {
         case .application:
-            // Told Never, the site is not offered either: the setting is about the site, and
-            // a nudge is the Ask it was told not to make. Told Always, `settleLink` has linked
-            // it already wherever it could, and what is left here is what it could not.
+            // Under Never no nudge is offered; under Always settleLink has already linked
+            // what it could.
             guard state.config.link.companionSite != .never, let name = learnedName(of: target) else { return nil }
             let hosts = Companions.missingHosts(forAppNamed: name, knownHosts: learnedNames(ofHosts: true))
             return hosts.isEmpty ? nil : .sites(hosts)
@@ -842,11 +696,8 @@ final class AppModel {
         }
     }
 
-    /// Adds sites to a target as linked halves rather than as rows of their own.
-    ///
-    /// A tightening, and applied at once: more is blocked than a moment ago, and the pair being
-    /// shut together from the moment it is offered is the whole point. Removing a half is the
-    /// loosening, and that waits — see `unlink`.
+    /// Links sites onto a target as halves rather than rows. A tightening, applied instantly;
+    /// `unlink` handles the delayed loosening of removing a half.
     @discardableResult
     func linkHosts(_ raw: [String], to id: UUID) -> LinkOutcome {
         var current = SharedStore.load()
@@ -865,13 +716,9 @@ final class AppModel {
         return .linked(name: name, added: added)
     }
 
-    /// Folds `absorbed` into `keeping` as a linked half, and takes its row away.
-    ///
-    /// This is the retroactive case: YouTube and youtube.com were added separately, before there
-    /// was any such thing as linking. Merging is a **tightening** — two 45-minute budgets become
-    /// one 45 across both halves, and the tighter of the two schedules wins — so it lands now,
-    /// with no delay. The face is the app wherever one of the two is an app: it is the half with
-    /// Apple's own artwork and name.
+    /// Folds `absorbed` into `keeping`, retroactively linking two rows added separately. A
+    /// tightening (tighter schedule + shared budget wins), applied instantly. The app half
+    /// becomes the face when either side is an app.
     @discardableResult
     func merge(_ absorbed: UUID, into keeping: UUID) -> LinkOutcome {
         var current = SharedStore.load()
@@ -881,20 +728,17 @@ final class AppModel {
               let index = current.config.targets.firstIndex(where: { $0.id == keeping })
         else { return .none }
         let gone = b.displayName
-        // The app is the face. When the row being kept is the website and the one being absorbed
-        // is the app, the halves swap places so the row shows the app.
+        // The app half becomes the face even if it's the one being absorbed.
         let faceIsApp = a.coversApp || !b.coversApp
         current.config.targets[index].kind = faceIsApp ? a.kind : b.kind
         let face = current.config.targets[index].kind
-        // Order kept and duplicates dropped: the two rows should never have shared a door — the
-        // lookups refuse to add one twice — but a half listed twice would show twice and unlink
-        // half-way, and the guard costs one line.
+        // Dedup defensively — the two rows should never share a kind, but a duplicate would
+        // show twice and unlink incorrectly.
         var seen: Set<TargetKind> = [face]
         let others = (faceIsApp ? (a.also ?? []) + b.kinds : (b.also ?? []) + a.kinds)
             .filter { seen.insert($0).inserted }
         current.config.targets[index].also = others.isEmpty ? nil : others
-        // The tighter of the two rules, so a merge can only ever take away. A target with no rule
-        // enforces nothing, so the one that has a rule wins outright.
+        // Tighter rule wins; a target with no rule enforces nothing, so any real rule beats none.
         current.config.targets[index].rule = Self.budgeted(
             Self.tighter(a.rule, b.rule),
             counted: current.config.targets[index].isCounted
@@ -904,16 +748,10 @@ final class AppModel {
             current.config.targets[index].systemName = b.systemName
             if current.config.targets[index].nickname.isEmpty { current.config.targets[index].nickname = b.nickname }
         }
-        // The more cautious tier of the two: a longer wait is the safe direction, and a merge
-        // must not be a way to shorten one.
+        // The slower (more cautious) utility tier wins — a merge must not shorten a wait.
         current.config.targets[index].utilityLevel = Self.slower(a.utilityLevel, b.utilityLevel)
-        // Read while `index` still means something. Taking the absorbed row out first shifts
-        // every row after it down one, so this line used to read the wrong target — or, when
-        // the kept row was the last one, an index one past the end, which is a crash and not a
-        // wrong name. That only happened merging from the *second* of the two rows: the app was
-        // added before the site, so merging from the site's editor removed a row above the one
-        // being kept. Seen on the phone 2026-09-09 — the app died and the merge was never saved,
-        // while the same merge from the app's side worked.
+        // Must read `name` before removing the absorbed row — removal shifts indices below it,
+        // and reading after could hit a stale index or crash (real bug, 2026-09-09).
         let name = current.config.targets[index].displayName
         current.config.targets.removeAll { $0.id == absorbed }
         // Anything queued for the row that is going would land on a target that no longer exists.
@@ -932,17 +770,11 @@ final class AppModel {
         return a.isTighterOrEqual(to: b) ? a : b
     }
 
-    /// The surviving rule, with the no-limit budget replaced where a limit now means something.
-    ///
-    /// A whole day of budget is not a budget. It is the sentinel `RuleEditorView.savedBudget`
-    /// forces onto a target nothing counts, precisely because a limit there would be a number no
-    /// part of iOS would enforce. Merge a site like that into an app and the pair *is* counted, so
-    /// the sentinel stops being true — and left alone it would show as "1440 MIN" beside a slider
-    /// pinned at its maximum. The default takes its place, which is what any new rule gets, and it
-    /// is a tightening, so it lands with the rest of the merge.
+    /// Replaces the "no limit" sentinel (1440 min, from `RuleEditorView.savedBudget`, used for
+    /// uncounted targets) with the default budget when a merge makes the target counted —
+    /// otherwise it would show as a maxed-out slider.
     private static func budgeted(_ rule: Rule?, counted: Bool) -> Rule? {
-        // No real limit on any day of the week, however the week is written: seven days of the
-        // sentinel is the same sentinel, and the default replaces the lot of them.
+        // All seven days must carry the sentinel for this to apply.
         guard counted, var rule, (1...7).allSatisfy({ rule.limit(on: $0) == nil }), rule.isEverAllowed
         else { return rule }
         rule.dailyBudgetMinutes = Furlough.defaultBudgetMinutes
@@ -958,11 +790,8 @@ final class AppModel {
         return a.delayMultiplier >= b.delayMultiplier ? a : b
     }
 
-    /// The rows that are the other half of `target` and could be folded into it.
-    ///
-    /// Only ever the halves of one thing: an app row beside the site it is also at, or the other
-    /// way round. Judged by the same table and the same learned names the nudge uses, so a row
-    /// the shield has never covered is invisible here, exactly as it is there.
+    /// Rows that are the other half of `target` and could be merged in. Uses the same
+    /// Companions table and learned names as the nudge.
     func mergeable(with target: Target) -> [Target] {
         guard !(target.coversApp && target.coversSite) else { return [] }
         guard let pair = pairOf(target) else { return [] }
@@ -983,15 +812,13 @@ final class AppModel {
         return Companions.pair(forHost: name) ?? Companions.pair(forBundleID: "", name: name)
     }
 
-    /// Takes a half back off a target. A **loosening** — something blocked a moment ago stops
-    /// being — so it waits out the delay like every other loosening, and the pending list can
-    /// cancel it. Returns nil when there is nothing to take off.
+    /// Removes a half from a target. A loosening — waits out the delay and can be cancelled
+    /// from the pending list.
     func unlink(_ kind: TargetKind, from id: UUID) -> ProposalResult {
         var current = SharedStore.load()
         guard let target = current.config.target(id: id), target.covers(kind), target.kind != kind else { return .unchanged }
-        // Queued as a `PendingKind` like every other loosening, so it warns an hour ahead, reads
-        // as a delta on the pending card and cancels from the same list — rather than getting a
-        // mechanism of its own that all three would have to learn about.
+        // Queued as a PendingKind like other loosenings so it reuses warning/cancel/display
+        // machinery.
         let already = current.pending.contains { $0.kind == .unlink(targetID: id, kind: kind) }
         guard !already else { return .unchanged }
         let effectiveAt = current.now.addingTimeInterval(current.config.delay(for: target))
@@ -1010,23 +837,10 @@ final class AppModel {
 
     // MARK: Naming what the shield has not covered yet
 
-    /// Gives a name to every target that has none, from the tables rather than from the shield.
-    ///
-    /// A Screen Time token is opaque, so until the shield first covers something the only thing
-    /// Furlough can call it is "This app" — which is what put "This app and This app is worth
-    /// having around" on the Anchor screen. With data access the token can be matched against
-    /// what is installed, which yields a bundle identifier, and `Companions` and `AppUtility`
-    /// both key on those. So an app in either table gets its real name before it is ever blocked.
-    ///
-    /// Two limits, both deliberate and neither hidden. It needs `FamilyActivityData`, which Apple
-    /// gives a development build in any region and a customer only in the EU, so most installs
-    /// fall through to the shield exactly as before — Zach chose this route on 2026-09-08 knowing
-    /// that. And it can only name what the tables know: something in neither is still "This app"
-    /// until the shield says otherwise.
-    ///
-    /// Written to the learned-names key rather than into the config, so it travels the same road
-    /// the shield's own names travel: no rule changes, nothing queues, an export does not carry
-    /// it, and a name Screen Time teaches later still wins on the next load.
+    /// Names unnamed targets via Screen Time data access (bundle ID matched against
+    /// Companions/AppUtility) rather than waiting for the shield to learn them. Data access is
+    /// EU-only for customers, dev builds anywhere (`FamilyActivityData`). Written to the
+    /// learned-names key, not Config, so it doesn't export or queue.
     func nameUnnamedTargets() async {
         guard #available(iOS 26.4, *), UsageReader.hasDataAccess else { return }
         let unnamed = state.config.targets.filter { learnedName(of: $0) == nil }
@@ -1035,8 +849,8 @@ final class AppModel {
         do {
             identities = try await UsageReader.identities()
         } catch {
-            // Screen Time simply did not answer. Nothing is worse off than before, and the shield
-            // is still coming; there is nothing here worth telling anyone about.
+            // Screen Time didn't answer; nothing worse off, the shield will still name it
+            // eventually.
             return
         }
         var learned = 0
@@ -1051,16 +865,9 @@ final class AppModel {
         settleLink(reason: "named from the tables")
     }
 
-    /// The same, for what the anchor holds and no rule covers.
-    ///
-    /// Those have no target and so no `systemName` to fill in, and until one of them is named
-    /// this phone cannot tell the other devices what it is holding — a token means nothing off
-    /// the phone that minted it. The shield names them as it covers them, which may be days
-    /// after they went on the list; this names them from the tables the moment they do, where
-    /// Screen Time data access exists to ask.
-    ///
-    /// Written to the anchor's names key, beside the shield's, for the same reasons that one is
-    /// not the config: no rule changes, nothing queues, and an export does not carry it.
+    /// Same as `nameUnnamedTargets`, but for anchor-held kinds with no target/rule — a token
+    /// means nothing to other devices until named. Written to the anchor's names key, not
+    /// Config.
     func nameAnchoredKinds() async {
         guard #available(iOS 26.4, *), UsageReader.hasDataAccess else { return }
         let held = state.config.anchor.kinds
@@ -1072,7 +879,7 @@ final class AppModel {
         do {
             identities = try await UsageReader.identities()
         } catch {
-            // Screen Time did not answer. The shield is still coming, and nothing is worse off.
+            // Screen Time didn't answer; nothing worse off.
             return
         }
         var learned = 0
@@ -1085,34 +892,23 @@ final class AppModel {
         settleLink(reason: "anchor named from the tables")
     }
 
-    /// Puts an app another device anchored onto this phone's anchor list, where Screen Time's
-    /// tables can find it.
-    ///
-    /// The one thing the phone genuinely could not do with a name. Only Apple's picker mints an
-    /// application token, so an app the Mac anchors arrives here as a name and a bundle
-    /// identifier and nothing this phone can block — the site half lands and the app half is a
-    /// trip to the picker. With data access the tables match that bundle identifier to the
-    /// token for it, and the app goes on the list with no picker at all.
-    ///
-    /// Without data access `LinkFlow.anchorOwed` simply keeps its queue and the arrival's own
-    /// sentence stands: the app needs the picker. Nothing here fails; it only does not happen.
+    /// Resolves apps another device anchored (arriving as name + bundle ID, no token) into real
+    /// tokens via the data-access tables, avoiding a manual picker trip. Without data access,
+    /// `LinkFlow.anchorOwed` just stays queued.
     func anchorArrivalsFromTheTables() async {
         guard #available(iOS 26.4, *), UsageReader.hasDataAccess else { return }
         let owed = LinkFlow.anchorOwed
         guard !owed.isEmpty else { return }
-        // Nothing changes the list under a lock, and under everything-except the list is what
-        // stays open — adding to it there would let the app through rather than hold it. Kept
-        // in the queue either way: the anchor lifts, and the scope can be switched back.
+        // Refused while anchored or under everything-except scope (adding there would let it
+        // through, not hold it); stays queued for later.
         let anchor = state.config.anchor
         guard !anchor.isHolding(at: state.now), !anchor.anchorsEverything else { return }
-        // One question for the whole queue, and given up on: asking per bundle identifier was a
-        // walk of every app on the phone per bundle identifier, and an unlimited one — a queue
-        // of those is what the usage page then had to wait behind.
+        // One batched query for the whole queue — asking per bundle ID would re-walk every app
+        // on the phone each time.
         let found = (try? await UsageReader.kinds(forKeys: owed, within: UsageReader.patience)) ?? [:]
         guard !found.isEmpty else { return }
         var current = SharedStore.load()
-        // Asked again on the store this is about to write: the anchor may have dropped while
-        // the tables were being read, and a drop is exactly the moment the list must not move.
+        // Re-check after the await: the anchor may have dropped while the query was in flight.
         guard !current.config.anchor.isHolding(at: current.now), !current.config.anchor.anchorsEverything else { return }
         var added = 0
         for kind in found.values where !current.config.anchor.contains(kind) {
@@ -1126,9 +922,8 @@ final class AppModel {
         enforce(reason: "link arrival, anchor")
     }
 
-    /// What the tables call the thing behind a usage key: a bundle identifier, or "web:" and a
-    /// domain. `Companions` first, because its names are the ones written to be shown; then
-    /// `AppUtility`, which knows many more apps than are also websites. A domain is its own name.
+    /// Resolves a usage key (bundle ID, or "web:"+domain) to a display name: Companions first,
+    /// then AppUtility, else the domain itself.
     static func nameFromTables(_ key: String) -> String? {
         if key.hasPrefix("web:") { return String(key.dropFirst(4)) }
         if let pair = Companions.pair(forBundleID: key, name: "") { return pair.title }
@@ -1146,14 +941,11 @@ final class AppModel {
         state.config.targets.flatMap { target -> [String] in
             target.kinds.compactMap { kind in
                 switch kind {
-                // `systemName` belongs to the face, so it only names this door when this door
-                // *is* the face. A linked website token has no name of its own; `companion(for:)`
-                // does not need one, because a target covering both halves is asked nothing.
+                // systemName belongs to the face only; a linked half has no name of its own.
                 case .webDomain: ofHosts && kind == target.kind ? target.systemName : nil
                 case .application: !ofHosts && kind == target.kind ? target.systemName : nil
                 case .category: nil
-                // A typed host is its own name, learned or not, so it counts as a known site
-                // whether it is the face of its row or a half linked onto one.
+                // A typed host is its own name whether it's the face or a linked half.
                 case .host(let host): ofHosts ? host : nil
                 }
             }
@@ -1205,10 +997,8 @@ final class AppModel {
         }
     }
 
-    /// One rule for several targets in one save: the editor's draft for the app it was written
-    /// on (with its nickname) and for every app chosen in "Apply these windows to other apps".
-    /// Each target is judged on its own, so the rule lands now where it tightens and waits out
-    /// the delay where it loosens, the same as saving each one by hand.
+    /// Applies one rule to multiple targets in one save; each is judged individually
+    /// (tighten now / loosen delayed) as if saved by hand.
     func apply(rule: Rule, nickname: String, for id: UUID, andTo others: [UUID]) -> ApplyOutcome {
         var current = SharedStore.load()
         if let index = current.config.targets.firstIndex(where: { $0.id == id }) {
@@ -1247,9 +1037,8 @@ final class AppModel {
             return false
         }
         if Policy.classify(newRule: rule, against: target) == .tightening {
-            // What it replaced, so the next quarter of an hour can put it back. Only here,
-            // where a rule lands *now*: a loosening arriving after its delay needs no undo,
-            // because undoing a loosening is a tightening and those are instant anyway.
+            // Records the previous rule for undo — only needed here, since undoing a loosening
+            // is itself an instant tightening.
             Forgiveness.record(previous: target.rule, on: &state.config.targets[index], at: state.now)
             state.config.targets[index].rule = rule
             return .appliedNow
@@ -1304,38 +1093,27 @@ final class AppModel {
         var kinds: [TargetKind] = []
         kinds += selection.applicationTokens.map(TargetKind.application)
         kinds += selection.webDomainTokens.map(TargetKind.webDomain)
-        // A category can be held, but it cannot be let through: `.all(except:)` excepts app
-        // and site tokens and nothing else. The picker expands a picked category into its apps
-        // (`includeEntireCategory`), so those are on the allowlist as apps, and the category
-        // token itself would only sit in the list unread. Dropped here rather than ignored
-        // downstream, so the list a person sees is the list that is enforced.
+        // .all(except:) only excepts app/site tokens, never categories — a category token here
+        // would sit unread, so it's dropped for the everything-except scope.
         if !current.config.anchor.anchorsEverything {
             kinds += selection.categoryTokens.map(TargetKind.category)
         }
-        // The picker speaks only about tokens, so it may only replace tokens. Anything the
-        // anchor holds by name is kept: a selection that has never heard of a typed host is
-        // not evidence that the host should be let go, and `Policy.decide` shields `.host`
-        // kinds in the anchor exactly like the rest.
+        // The picker only knows tokens, so typed hosts (kept by name) are preserved regardless
+        // of selection.
         kinds += current.config.anchor.kinds.filter(\.isHost)
         guard kinds != current.config.anchor.kinds else { return }
         current.config.anchor.kinds = kinds
         SharedStore.save(current)
         SharedStore.log("anchor: now \(current.config.anchor.anchorsEverything ? "lets through" : "holds") \(kinds.count) item(s)")
         enforce(reason: "anchor edit")
-        // Held here is worth holding there. Apple's picker is the main way onto this list and
-        // it speaks only in tokens, so most of what it just added has no name yet and cannot
-        // cross today; the settle offers whatever can be named, and the ones that cannot are
-        // offered by the next settle after the shield or the tables name them.
+        // Newly added tokens usually have no name yet and can't cross today; later settles
+        // pick them up once named.
         settleLink(reason: "anchor edit")
         Task { await nameAnchoredKinds() }
     }
 
-    /// Takes what `targetIDs` cover into the anchor, on top of what it holds. This is the
-    /// Anchor screen's first offer — the targets Furlough already blocks, chosen from
-    /// `Config.anchorCandidates` — landing; Apple's picker is the other way in, through
-    /// `setAnchorSelection`. Refused while anchored, like every other change to the list, and
-    /// refused under the everything-except scope, where "what you already block" is already
-    /// held and taking it in would mean letting it through.
+    /// Adds existing rule targets to the anchor's list (the Anchor screen's suggested-candidates
+    /// flow). Refused while anchored or under everything-except scope.
     func addToAnchor(targetIDs: [UUID]) {
         var current = SharedStore.load()
         guard !current.config.anchor.isAnchored, !current.config.anchor.anchorsEverything else { return }
@@ -1344,19 +1122,12 @@ final class AppModel {
         SharedStore.save(current)
         SharedStore.log("anchor: took in \(chosen.count) of the rules; now holds \(current.config.anchor.count) item(s)")
         enforce(reason: "anchor edit")
-        // Held here is worth holding there. Nothing is written down as awaiting: the list these
-        // just went on is what `LinkFlow.anchorAdditions` walks.
+        // LinkFlow.anchorAdditions walks the list directly rather than a separate awaiting queue.
         settleLink(reason: "anchor edit")
     }
 
-    /// Takes what `targetIDs` cover back off the anchor's list. The other way round from
-    /// `addToAnchor`, and the same two refusals: nothing changes under a lock, and under the
-    /// everything-except scope the list is what stays open, where taking a row off would be
-    /// holding it rather than letting it go.
-    ///
-    /// No delay, because nothing about the anchor's list is delayed: it is not a rule, and the
-    /// tag is what makes it hard to undo. `setAnchorSelection` unpicks in the same breath and
-    /// waits for nothing either.
+    /// Removes targets from the anchor's list. No delay — the tag itself is what makes the
+    /// anchor hard to undo, not a waiting period.
     func removeFromAnchor(targetIDs: [UUID]) {
         var current = SharedStore.load()
         guard !current.config.anchor.isAnchored, !current.config.anchor.anchorsEverything else { return }
@@ -1367,16 +1138,9 @@ final class AppModel {
         enforce(reason: "anchor edit")
     }
 
-    /// Takes doors into the anchor by kind rather than by rules row — the usage flow's anchor
-    /// half, where the app being judged may have no row at all and does not need one. Somebody
-    /// who came for the Anchor alone should not collect a rules list on the way to a list of
-    /// things the tag holds, so nothing here makes a `Target`.
-    ///
-    /// The same two refusals as `addToAnchor`: nothing changes under a lock, and under the
-    /// everything-except scope the list is what stays open, where adding would be letting
-    /// through. Returns whether the anchor ends up holding every one of them — true when they
-    /// were already on the list, because the caller's question is "is it held", not "did I
-    /// change anything".
+    /// Adds kinds to the anchor directly (no Target row created) — used by the usage flow. Same
+    /// refusals as `addToAnchor`. Returns true if all are held, including already-held ones
+    /// (answers "is it held", not "did I change anything").
     @discardableResult
     func hold(_ kinds: [TargetKind]) -> Bool {
         var current = SharedStore.load()
@@ -1387,17 +1151,14 @@ final class AppModel {
         SharedStore.save(current)
         SharedStore.log("anchor: took in \(fresh.count) from the usage flow; now holds \(current.config.anchor.count) item(s)")
         enforce(reason: "anchor edit")
-        // Held here is worth holding there, the same as every other way onto the list.
         settleLink(reason: "anchor edit")
-        // Most of what lands here is a token and nothing else, so the grid would draw it with
-        // no name until the shield learns one. Off the critical path; nothing waits on it.
+        // Off the critical path — names are filled in later, not waited on.
         Task { await nameAnchoredKinds() }
         return true
     }
 
-    /// Takes those doors back off the anchor's list: the usage flow's Undo. No delay, for the
-    /// reason `removeFromAnchor` gives — the list is not a rule, and the tag is what makes it
-    /// hard to undo.
+    /// Removes kinds from the anchor (usage flow's Undo). No delay, same reasoning as
+    /// `removeFromAnchor`.
     func stopHolding(_ kinds: [TargetKind]) {
         var current = SharedStore.load()
         guard !current.config.anchor.isAnchored, !current.config.anchor.anchorsEverything else { return }
@@ -1409,14 +1170,9 @@ final class AppModel {
         enforce(reason: "anchor edit")
     }
 
-    /// The rules half's row for `kind`, made if there is not one yet: the landing for the
-    /// anchor grid's "Give it hours too", which is the one place a thing can already be held
-    /// and not yet be a target at all.
-    ///
-    /// A target with no rule enforces nothing — that is the fact the first-rule card exists to
-    /// say — so this only opens the door; the editor writes the rule. A category is the one
-    /// kind that arrives with one, exactly as the picker gives it, because a category has no
-    /// hours to give. Returns the id to open the editor on.
+    /// Returns the target id for `kind`, creating a ruleless Target if needed (the anchor
+    /// grid's "Give it hours too"). Categories get `.alwaysBlocked` immediately since they have
+    /// no hours to configure.
     func targetForRule(_ kind: TargetKind) -> UUID {
         var current = SharedStore.load()
         if let existing = current.config.target(kind: kind) { return existing.id }
@@ -1428,15 +1184,9 @@ final class AppModel {
         return target.id
     }
 
-    /// Chooses how far the anchor reaches: its list, or the whole phone except its list.
-    /// Refused while anchored, like every other change to it.
-    ///
-    /// The list does not survive the switch, because it cannot: under one scope it is what
-    /// goes and under the other it is what stays, so a list carried across would turn TikTok
-    /// into the one app left open. Widening to the whole phone starts the allowlist from every
-    /// target tiered Essential (`Config.essentialKinds`); narrowing back starts the list empty,
-    /// where the rules sheet offers everything already blocked again in one tap. The Anchor
-    /// screen says both before asking.
+    /// Switches anchor scope (its list vs. everything-except). The list can't carry over —
+    /// under one scope it's what's blocked, under the other it's what's allowed — so widening
+    /// seeds from essential-tier targets and narrowing starts empty.
     func setAnchorScope(_ scope: AnchorProfile.Scope) {
         var current = SharedStore.load()
         guard !current.config.anchor.isAnchored, current.config.anchor.scope != scope else { return }
@@ -1447,11 +1197,9 @@ final class AppModel {
         enforce(reason: "anchor scope")
     }
 
-    /// Anchoring is tightening, so it needs no tag. It does need a paired tag to exist, or there
-    /// would be no way back. `until` makes it a timed drop: it lifts by itself then, or sooner
-    /// with the tag. The drop itself is `AnchorDrop`, shared with the intent that runs in the
-    /// widget extension; the app adds only what it alone can do, which is register the wake at
-    /// `until` through `enforce`.
+    /// Anchoring needs no tag (a tightening) but requires one paired, or there'd be no way back.
+    /// `until` schedules a timed lift. Drop logic is shared with the widget extension via
+    /// `AnchorDrop`; only the app can register the wake.
     func anchor(until: Date? = nil) -> AnchorOutcome {
         switch AnchorDrop.drop(until: until, reason: "anchor") {
         case .refused(.alreadyAnchored):
@@ -1462,19 +1210,14 @@ final class AppModel {
             return .failed(why.message)
         case .anchored:
             enforce(reason: "anchor")
-            // The guide's last step is "drop it", and this is it — from the guide's own button,
-            // the widget, or Siri. It lifts later; the guide is not owed a second showing.
+            // Guide's last step is dropping the anchor, from any entry point (button, widget, Siri).
             finishGuide(.anchor)
             return .anchored
         }
     }
 
-    /// Replaces the anchor's drop times. Refused while anchored, like every other change to it.
-    /// More drops or longer holds land at once; fewer or shorter ones queue behind the delay the
-    /// anchor's contents earn (`Config.anchorDelayHours`) as `PendingKind.setAnchorSchedules`,
-    /// so the pending list shows and cancels them like any other loosening. Saving the schedule
-    /// the anchor already has drops any queued change to it, the way choosing a saved tier back
-    /// cancels a queued tier.
+    /// Replaces anchor drop schedules. Tightening (more/longer) applies now; loosening queues
+    /// behind `anchorDelayHours`. Re-saving the current schedule cancels any queued change.
     func setAnchorSchedules(_ schedules: [AnchorSchedule]) -> ProposalResult {
         var current = SharedStore.load()
         let now = current.now
@@ -1485,10 +1228,8 @@ final class AppModel {
         let dropped = before - current.pending.count
         guard schedules != current.config.anchor.schedules else {
             guard dropped > 0 else { return .unchanged }
-            // Emptying the queue and putting nothing in its place is a cancellation, and the only
-            // one here that is: the branch below drops a queued change to *replace* it, which is
-            // changing your mind about the figure rather than backing out of the wait. Counted by
-            // what actually left the queue, the way `cancelPending` counts it.
+            // True cancellation (vs. replacing a queued value) — counted the same way
+            // cancelPending does.
             Record.noteCancelled(dropped, in: &current, now: now)
             SharedStore.save(current)
             SharedStore.log("anchor schedule: cancelled the queued change")
@@ -1519,18 +1260,14 @@ final class AppModel {
     /// which of the three things it means is `AnchorProfile.reading(of:)`.
     enum TagRead: Equatable {
         case read(AnchorProfile.TagReading)
-        /// The sheet closed with nothing read — cancelled, or the minute run out. Nothing to
-        /// say: a reader armed without being asked for is allowed to come to nothing.
+        /// Cancelled or timed out — a reader armed unprompted is allowed to find nothing.
         case quiet
         case failed(String)
     }
 
-    /// Reads one tag and says what it would mean, without acting on it. The Anchor screen arms
-    /// this the moment it appears, so the only thing left is holding the tag up; what happens
-    /// then is the tag's to decide rather than a button's.
-    ///
-    /// Read against the store rather than `state`, because the scan is a long await and the
-    /// anchor can move under it — a schedule can drop it while the sheet is open.
+    /// Reads a tag and reports what it would mean, without acting. Reads fresh from the store
+    /// (not `state`) since the scan is a long await during which a schedule could change the
+    /// anchor.
     func readTag(prompt: String) async -> TagRead {
         let scanned: Data
         do {
@@ -1545,8 +1282,7 @@ final class AppModel {
     /// Ends an armed read: the Anchor screen going away with its sheet still up.
     func stopReadingTags() { scanner.cancel() }
 
-    /// The only unblock in Furlough: scans a tag and, if it is one of the paired ones, lifts the
-    /// anchor. Every paired tag is equal here — they are keys to one lock.
+    /// The only unblock in Furlough: scans a tag and, if paired, lifts the anchor.
     func unanchorWithTag() async -> AnchorOutcome {
         let scanned: Data
         do {
@@ -1557,9 +1293,8 @@ final class AppModel {
         return weighAnchor(with: scanned)
     }
 
-    /// Lifts the anchor with a tag already read. Split from the scan so the Anchor screen's one
-    /// armed session can end in this or in a pairing, decided by the tag rather than by which
-    /// button opened the sheet.
+    /// Lifts the anchor with a tag already read. Split from the scan so one armed session can
+    /// end in either this or a pairing, decided by the tag rather than the button.
     @discardableResult
     func weighAnchor(with scanned: Data) -> AnchorOutcome {
         var current = SharedStore.load()
@@ -1586,18 +1321,12 @@ final class AppModel {
     /// A notification from iCloud that the other device wrote the anchor's record.
     @ObservationIgnored private var cloudObserver: (any NSObjectProtocol)?
 
-    /// Whether iCloud can carry the anchor off this phone. Read once per activation and when
-    /// iCloud says the account moved, rather than in the view: the Anchor screen would ask it
-    /// on every rebuild, and the answer changes only when someone signs in or out.
-    ///
-    /// The phone has no equivalent of the Mac's `phoneSeen`, so this is the whole of what it
-    /// can honestly say about the crossing — but it is the half that fails silently, and a
-    /// phone whose tag cannot release a locked Mac should not have to be guessed at.
+    /// Whether iCloud can carry the anchor off this phone. Read once per activation/account
+    /// change, not per view rebuild.
     private(set) var cloudAvailable = AnchorCloud.isAvailable
 
-    /// Re-reads whether iCloud is there, and logs the move. Nothing is enforced off the back
-    /// of it: the phone's own rules never depended on iCloud, and an anchor already down here
-    /// stays down. What changes is only what this phone can promise about the other device.
+    /// Re-reads whether iCloud is reachable and logs the change. Nothing is enforced — the
+    /// phone's own rules never depended on iCloud.
     func refreshCloudAvailability(reason: String) {
         let available = AnchorCloud.isAvailable
         guard available != cloudAvailable else { return }
@@ -1605,9 +1334,8 @@ final class AppModel {
         SharedStore.log("iCloud is \(available ? "reachable again" : "unreachable; the anchor cannot cross") (\(reason))")
     }
 
-    /// Listens for the other device's writes, once. iCloud posts the change to a running app
-    /// only, so the reconciler pulls on every wake besides — the monitor's callbacks reach the
-    /// record while the app is closed.
+    /// iCloud only notifies a running app; the monitor's own pull-on-wake covers the
+    /// closed-app case.
     private func observeCloud() {
         guard cloudObserver == nil else { return }
         cloudObserver = NotificationCenter.default.addObserver(
@@ -1621,8 +1349,7 @@ final class AppModel {
         }
     }
 
-    /// The link to the Mac, as the Anchor screen shows it. Re-read on demand: it costs a read
-    /// of the key-value store, and the screen asks when it opens and when Check now is pressed.
+    /// The link to the Mac. Re-read on demand (costs a key-value store read).
     private(set) var link = AnchorSync.linkStatus()
 
     /// Asks iCloud for whatever it has, merges it, and re-reads the link — what Check now does.
@@ -1634,16 +1361,15 @@ final class AppModel {
         SharedStore.log("link check: \(link.headline) — \(link.detail(now: clock.now))")
     }
 
-    /// Merges what the other devices wrote — the anchor through `AnchorSync.merge`, and what
-    /// they added through `LinkFlow.takeArrivals` — and enforces if any of it changed anything.
-    /// Called on activation, when iCloud says something changed, and by every reconcile besides.
+    /// Merges what other devices wrote — the anchor via `AnchorSync.merge`, additions via
+    /// `LinkFlow.takeArrivals` — and enforces if anything changed.
     func applyRemoteAnchor(reason: String) {
         var current = SharedStore.load()
         let note = AnchorSync.pull(into: &current.config, now: current.now)
         let arrivals = LinkFlow.takeArrivals(&current, installed: { [:] })
         self.arrivals = arrivals.asks
-        // An app another device anchored that landed here under Always still needs a token; the
-        // tables are the one place to get one without the picker.
+        // An anchored arrival still needs a token; the tables are the one place to get one
+        // without the picker.
         if !LinkFlow.anchorOwed.isEmpty { Task { await anchorArrivalsFromTheTables() } }
         guard note != nil || !arrivals.landed.isEmpty else { return }
         SharedStore.save(current)
@@ -1713,18 +1439,14 @@ final class AppModel {
         return nil
     }
 
-    /// Settles what this phone owes the site and the other devices, now that it may be able to.
-    ///
-    /// Two things, in this order. First, under Always, the website an app is also at is linked
-    /// onto its row wherever the app has a name — one save for all of them. Then whatever is
-    /// awaiting is sent, or offered under Ask; second, so that a YouTube that has just learned
-    /// its name goes out with youtube.com beside it. Both are quiet when there is nothing to do,
-    /// which is nearly always, since it is called from every place a name can arrive.
+    /// Settles what this phone owes: links companion sites (Always mode) first, then
+    /// sends/offers pending additions — in that order, so a freshly named app goes out with
+    /// its site already linked.
     func settleLink(reason: String) {
         autoLinkCompanions(reason: reason)
         outgoing = LinkFlow.settleAwaiting(config: state.config, now: state.now) {
-            // Only what the anchor still holds, so a name learned for something since taken off
-            // the list cannot send it. Read once per settle, and only when the walk asks.
+            // Only what the anchor still holds, so a name learned for something since taken
+            // off the list cannot send it.
             SharedStore.pruneAnchorNames(keeping: state.config.anchor.kinds)
             return SharedStore.anchorNames()
         }
@@ -1738,9 +1460,8 @@ final class AppModel {
         return learnedName(of: target) == nil && !companionDismissed.contains(target.id.uuidString)
     }
 
-    /// Links the site beside every app that has a name and no site, under Always. Zach's
-    /// default (2026-09-10): adding an app blocks the site, and taking the site back off is the
-    /// unlink the editor offers — free for a quarter of an hour, a loosening after.
+    /// Links sites onto named apps under Always mode. Removing later goes through `unlink`
+    /// (free within the undo window, a loosening after).
     private func autoLinkCompanions(reason: String) {
         guard state.config.link.companionSite == .always else { return }
         var current = SharedStore.load()
@@ -1791,8 +1512,8 @@ final class AppModel {
                 ? " Only Apple's picker can add the \(landing.addition.title) app itself: Change apps on this screen. Furlough adds it without asking where Screen Time data access lets it match the name."
                 : " The \(landing.addition.title) app needs Apple's picker; its row offers it."
         }
-        // The app half of an anchored arrival, where the tables can find it. Off the critical
-        // path: it needs a Screen Time query, and the sentence above is already honest without it.
+        // Off the critical path — needs a Screen Time query, and the message above is already
+        // honest without it.
         if landing.appNeedsPicker, landing.addition.half == .anchor {
             Task { await anchorArrivalsFromTheTables() }
         }
@@ -1805,11 +1526,9 @@ final class AppModel {
         arrivals.removeAll { $0.addition.id == landing.addition.id }
     }
 
-    /// Asked for by the Weigh Anchor intent, which opens the app to get here.
-    ///
-    /// Held rather than run on the spot when Furlough is not yet in front: an intent that
-    /// opens the app can perform before or after the scene goes active, and NFC only reads
-    /// for a foreground app. Whichever of the two happens second is the one that scans.
+    /// Called by the Weigh Anchor intent. Deferred until foreground: the intent can run before
+    /// or after the scene activates, and NFC only works in the foreground, so whichever happens
+    /// second triggers the scan.
     func requestWeighAnchor() {
         wantsWeighAnchor = true
         weighAnchorIfInFront()
@@ -1834,10 +1553,9 @@ final class AppModel {
         }
     }
 
-    /// Pairs another tag. Refused while anchored — a key cut under the lock is no lock — and
-    /// refused past the cap, which is checked twice because the scan is a long await and the
-    /// state can move under it. Adding a key does not queue behind the loosen delay: it can only
-    /// be done with the anchor already off, where nothing is being held to wait for.
+    /// Pairs a new tag. Refused while anchored or past the cap (checked twice — before and
+    /// after the scan, since state can move during the long await). No delay: only possible
+    /// while unanchored.
     func pairTag() async -> AnchorOutcome {
         if let refusal = state.config.anchor.pairingRefusal { return .failed(refusal) }
         let scanned: Data
@@ -1849,8 +1567,8 @@ final class AppModel {
         return pair(identifier: scanned)
     }
 
-    /// Pairs a tag already read. The cap and the lock are checked again here rather than only
-    /// at the scan, because the scan is a long await and the state can move under it.
+    /// Pairs a tag already read. Cap and lock are re-checked here since the scan is a long
+    /// await during which state can move.
     @discardableResult
     func pair(identifier scanned: Data) -> AnchorOutcome {
         var current = SharedStore.load()
@@ -1865,22 +1583,15 @@ final class AppModel {
         SharedStore.save(current)
         SharedStore.log("paired an anchor tag: \(tag.name)")
         reload()
-        // The one moment where the tag is in hand and has not yet been put down anywhere. Both
-        // ways in — the armed reader on the Anchor page and Pair a tag on the Tags screen —
-        // land here, so the screen is raised once from the model rather than twice from two
-        // views. See `TagPlacementView`.
+        // Both pairing entry points land here, so the placement screen is raised once from the
+        // model rather than from each view. See `TagPlacementView`.
         if isFirst, !hasSeenTagPlacement { noteTagPlacementShown(for: tag) }
         return .paired(tag)
     }
 
-    /// The where-to-leave-it screen is owed, and owed only once. The flag is written now rather
-    /// than when the screen is dismissed: a sheet swiped away has still been seen, and a second
-    /// showing of advice is worse than none.
-    ///
-    /// Raised after a beat, like everything else this app presents on the heels of something
-    /// else: one of the two pairing paths is an alert, and a sheet asked for while an alert is
-    /// still dismissing is the one SwiftUI drops. The wait is also what lets the name the
-    /// person typed into that alert land before the screen reads it.
+    /// Flag is set immediately (not on dismiss) since a swiped-away sheet still counts as
+    /// shown. Delayed by a beat because SwiftUI drops a sheet presented while an alert is still
+    /// dismissing — one pairing path is an alert.
     private func noteTagPlacementShown(for tag: PairedTag) {
         UserDefaults.standard.set(true, forKey: Self.tagPlacementKey)
         hasSeenTagPlacement = true
@@ -1935,11 +1646,9 @@ final class AppModel {
         return (text, warning.utility == .essential)
     }
 
-    /// Puts `id` in a tier. Moving toward hazard lengthens its delay and lands now; moving
-    /// toward essential shortens it, so it queues behind the delay the target has *today* —
-    /// which is what keeps "call it essential, then loosen it" from being a way round the wait.
-    /// A target with no rule yet is enforcing nothing, so its first tier is free, exactly as
-    /// its first rule is. Choosing the tier the target already has cancels a queued change.
+    /// Changes a target's tier. Toward hazard (longer delay) lands now; toward essential
+    /// (shorter delay) queues behind the *current* delay, preventing "reclassify then loosen"
+    /// as a bypass. First tier is free, like a first rule.
     func setUtility(_ level: Utility, for id: UUID) -> ProposalResult {
         var current = SharedStore.load()
         guard let target = current.config.target(id: id) else { return .unchanged }
@@ -1949,8 +1658,7 @@ final class AppModel {
         }
         let plan = Policy.plan(utility: level, for: target, queued: queued)
         guard plan != .unchanged else { return .unchanged }
-        // Dropped whatever happens next: choosing the saved tier back is how a queued change
-        // is cancelled, and a new one replaces it rather than stacking on it.
+        // A new change replaces any queued one rather than stacking on it.
         current.pending.removeAll { change in
             if case .setUtility(let targetID, _) = change.kind { return targetID == id }
             return false
@@ -2005,35 +1713,16 @@ final class AppModel {
     #if DEBUG || TESTING_TOOLS
     // MARK: Testing
 
-    /// Wipes every target, rule, pending change, the Anchor and its tag, lifts every shield,
-    /// hands Screen Time access back and enforces the empty state, so the phone matches a fresh
-    /// install and comes up where one does: onboarding, then the usage step, then Home. That is
-    /// the whole point of the button during a test pass — the first run is the part hardest to
-    /// get back to, and Zach asked on 2026-09-09 to land there every time.
-    ///
-    /// Access used to be the one thing the reset kept, on the grounds that the app could not
-    /// give it back. It can: `revokeAuthorization` hands it in and the onboarding button asks
-    /// for it again, one tap, no trip through Settings. The first week comes back with it, so
-    /// nothing starts one here any more — granting access does, exactly as on a fresh install,
-    /// and `startTrialIfNeeded` is free to say yes because `SharedStore.reset` has just cleared
-    /// the marker that refuses a second one.
-    ///
-    /// The revoke is asynchronous and iOS can refuse it, so it is not what the root reads.
-    /// `restartsOnboarding` is, and only the grant lifts it: a phone that kept its access still
-    /// lands on the first screen and still leaves it through that button.
-    ///
-    /// What is kept is the notification permission, which iOS only ever asks about once, and
-    /// the activity log, which is the record of what just happened, including this.
-    ///
-    /// Compiled in only when the build asked for the testing tools — see `TestingTools` — so
-    /// the App Store build keeps its promise of no unblock button.
+    /// Testing-only: wipes all state and revokes Screen Time access so the phone matches a
+    /// fresh install (onboarding, usage step, Home). `restartsOnboarding` — not the async,
+    /// possibly-refused revoke — is what the root actually reads, since only a fresh grant
+    /// clears it. Notification permission and the activity log are kept. Compiled out of App
+    /// Store builds — see `TestingTools`.
     func resetEverything() {
         SharedStore.reset()
         ShieldReconciler.clearEverything()
         // A stale drop left in iCloud would anchor the phone again on its next pull.
         AnchorCloud.clear()
-        // Off the link, with its entry and its additions out of iCloud: a fresh install has
-        // never joined, and the grandfather question is open again.
         DeviceLink.forget()
         LinkFlow.forget()
         outgoing = []
@@ -2041,11 +1730,7 @@ final class AppModel {
         refreshLink()
         companionDismissed = []
         UserDefaults.standard.removeObject(forKey: AppModel.companionDismissedKey)
-        // Everything that records what has been shown rather than what is blocked, put back to
-        // what a fresh install has: no access remembered for the launch screen to trust, the
-        // usage step unseen so it comes round again after the grant, no half chosen so the
-        // start pane asks again, and the first screen asked for whatever iOS does with the
-        // revoke below.
+        // Reset everything that tracks "has this been shown" rather than "is this blocked".
         UserDefaults.standard.set(false, forKey: Self.wasAuthorizedKey)
         UserDefaults.standard.removeObject(forKey: Self.usageStepKey)
         hasSeenUsageStep = false
@@ -2058,17 +1743,16 @@ final class AppModel {
         anchorPageAdds = .anchor
         UserDefaults.standard.removeObject(forKey: Self.autoArmsReaderKey)
         autoArmsReader = false
-        // A reset takes the tags with it, so the next pairing is a first pairing again and the
-        // where-to-leave-it screen is owed again with it.
+        // A reset takes the tags with it, so the next pairing is a first pairing again.
         UserDefaults.standard.removeObject(forKey: Self.tagPlacementKey)
         hasSeenTagPlacement = false
         placingTagID = nil
         // Removed rather than set true: absent is what a fresh install has, and a fresh
-        // install's answer is yes. In the App Group, so it goes with the state above.
+        // install's answer is yes.
         PendingNotifications.forgetWeeklyDigest()
         weeklyDigest = true
-        // Removed rather than emptied: absent is what "never asked" means, so the next launch
-        // seeds from a config that a reset has just emptied and both guides come round again.
+        // Removed rather than emptied: absent is what "never asked" means, so both guides come
+        // round again on next launch.
         UserDefaults.standard.removeObject(forKey: Self.finishedGuidesKey)
         finishedGuides = []
         UserDefaults.standard.set(true, forKey: Self.restartsOnboardingKey)
@@ -2081,10 +1765,8 @@ final class AppModel {
         Task { await revokeAuthorization() }
     }
 
-    /// Hands Screen Time access back to iOS, so the onboarding a reset returns to has something
-    /// left to ask for. Quiet when iOS refuses — the flag has already put that screen up and its
-    /// button re-requests either way — but the log says which of the two happened, because from
-    /// the screen itself the two look the same.
+    /// Hands Screen Time access back to iOS. Quiet when iOS refuses — the onboarding screen and
+    /// its re-request button work either way.
     private func revokeAuthorization() async {
         await withCheckedContinuation { continuation in
             AuthorizationCenter.shared.revokeAuthorization { result in
@@ -2098,10 +1780,8 @@ final class AppModel {
         SharedStore.log("reset: Screen Time access is \(isAuthorized ? "still granted" : "handed back")")
     }
 
-    /// The first run a reset asked for is over, because access has just been granted again.
-    /// Only a grant clears it: activation and the authorization stream both run through `note`,
-    /// and clearing it there would take the first screen back off a phone whose revoke iOS
-    /// refused — the one case the flag exists for.
+    /// Clears `restartsOnboarding` on grant only — clearing it in `note()` generally would hide
+    /// onboarding even when iOS refused the revoke.
     private func finishOnboardingRestart() {
         guard restartsOnboarding else { return }
         UserDefaults.standard.set(false, forKey: Self.restartsOnboardingKey)

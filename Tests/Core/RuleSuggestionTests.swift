@@ -5,10 +5,8 @@ import Testing
 struct RuleSuggestionTierTests {
     @Test("The two tiers worth keeping say nothing")
     func quietTiers() {
-        // Blocking an essential is the risk Furlough interrupts a person about, so suggesting a
-        // budget for one would be the app arguing with its own caution banner. A work tool has no
-        // healthy amount, and the only figure generous enough to stand for `.useful` is looser
-        // than the 30 minutes the editor's slider already sits at.
+        // A budget on essential would contradict Furlough's own caution banner; useful has no
+        // figure generous enough to be worth suggesting.
         #expect(RuleSuggestion.draft(for: .essential) == nil)
         #expect(RuleSuggestion.draft(for: .useful) == nil)
     }
@@ -35,8 +33,7 @@ struct RuleSuggestionTierTests {
             guard let draft = RuleSuggestion.draft(for: tier) else { continue }
             #expect(draft.rule.validationError == nil, "\(tier.label) suggests a rule that would not save")
             if let window = draft.window {
-                // 15 minutes is the floor and a stored window never crosses midnight, so a
-                // suggestion costs exactly one activity span and no night's worth of arithmetic.
+                // Never crosses midnight, so a suggestion costs exactly one activity span.
                 #expect(window.isValidDraft)
                 #expect(!window.isNight)
                 #expect(draft.rule.windows.count == 1)
@@ -67,8 +64,7 @@ struct RuleSuggestionTierChoiceTests {
         let tiktok = Target(kind: .macApp(bundleID: "com.zhiliaoapp.musically"))
         // Called useful by the person holding the phone: Furlough stops suggesting hours for it.
         #expect(RuleSuggestion.suggestion(for: tiktok, chosen: .useful) == nil)
-        // And the other way: a tier chosen for something the table has never heard of still gets
-        // the tier's own starting rule.
+        // A chosen tier still gets its starting rule even for an app the table has never heard of.
         let unknown = Target(kind: .macApp(bundleID: "com.nobody.at.all"))
         #expect(RuleSuggestion.suggestion(for: unknown) == nil)
         #expect(RuleSuggestion.suggestion(for: unknown, chosen: .hazard)?.window == RuleSuggestion.hazardWindow)
@@ -81,9 +77,8 @@ struct RuleSuggestionGuardTests {
     func existingRulesAreNeverOverwritten() {
         var netflix = Target(kind: .macApp(bundleID: "com.netflix.netflix"))
         #expect(RuleSuggestion.suggestion(for: netflix) != nil)
-        // The same target, once it has a rule of its own: nothing more is offered, whatever that
-        // rule says. A suggestion is for the cold start; one that could land on top of a rule
-        // someone is living under would be a second way to edit it.
+        // A suggestion is only for the cold start; once a rule exists, offering another would be
+        // a second way to edit it.
         netflix.rule = Rule(windows: [window(8 * 60, 9 * 60)], dailyBudgetMinutes: 15)
         #expect(RuleSuggestion.suggestion(for: netflix) == nil)
         netflix.rule = .unrestricted
@@ -94,12 +89,11 @@ struct RuleSuggestionGuardTests {
 
     @Test("A typed site is offered hours and never minutes")
     func uncountedTargetsGetTheWindowOrNothing() {
-        // Nothing counts a typed site's minutes, so a budget on one would be a figure that is
-        // never enforced. Its hours are enforced, so a hazard site keeps its window…
+        // A typed site's minutes are never counted, so only its (enforced) hours are suggested.
         let tiktok = makeTarget("TikTok", rule: nil)
         #expect(tiktok.isCounted == false)
         #expect(RuleSuggestion.suggestion(for: tiktok)?.window == RuleSuggestion.hazardWindow)
-        // …and an idle one, whose whole suggestion is a budget, is offered nothing at all.
+        // An idle site's whole suggestion is a budget, so it gets nothing at all.
         let netflix = makeTarget("Netflix", rule: nil)
         #expect(AppUtility.suggestion(for: netflix)?.utility == .idle)
         #expect(RuleSuggestion.suggestion(for: netflix) == nil)
@@ -110,8 +104,7 @@ struct RuleSuggestionGuardTests {
 struct RuleSuggestionTableTests {
     @Test("Long-form video is watched in sittings, so an hour is not the figure")
     func longFormBeatsTheIdleDefault() {
-        // By bundle identifier, by host, and by the name a Mac target was called: the three ways
-        // `AppUtility` is keyed, answered here the same way.
+        // The three ways `AppUtility` is keyed — bundle ID, host, nickname — all answered the same.
         #expect(RuleSuggestion.suggestion(for: Target(kind: .macApp(bundleID: "com.netflix.netflix")))?.budgetMinutes == 120)
         #expect(RuleSuggestion.suggestion(for: Target(kind: .macApp(bundleID: "com.hulu.plus")))?.budgetMinutes == 120)
         #expect(RuleSuggestion.suggestion(for: Target(kind: .macApp(bundleID: "com.apple.TV")))?.budgetMinutes == 120)
@@ -129,8 +122,7 @@ struct RuleSuggestionTableTests {
         let snapchat = Target(kind: .macApp(bundleID: "com.toyopagroup.picaboo"))
         let draft = RuleSuggestion.suggestion(for: snapchat)
         #expect(draft?.budgetMinutes == 30)
-        // Closing it from 10 PM to 9 AM would shut the door somebody is knocked on, which is the
-        // harm `.essential` exists to warn about arriving through the back of a suggestion.
+        // A 10 PM–9 AM window would shut the door somebody is knocking on — the harm `.essential` warns about.
         #expect(draft?.window == nil)
         // The rest of the hazard tier is unaffected.
         #expect(RuleSuggestion.suggestion(for: Target(kind: .macApp(bundleID: "com.burbn.instagram")))?.window == RuleSuggestion.hazardWindow)
@@ -139,8 +131,7 @@ struct RuleSuggestionTableTests {
     @Test("An exception written for one tier does not follow its app to another")
     func exceptionsAreTiedToTheirTier() {
         let netflix = Target(kind: .macApp(bundleID: "com.netflix.netflix"))
-        // Called a hazard by the person holding the phone: the "two hours for a film" argument
-        // was about Netflix while Netflix was idle, so it has nothing to say here.
+        // The "two hours for a film" exception was written for idle Netflix, not hazard Netflix.
         #expect(RuleSuggestion.suggestion(for: netflix, chosen: .hazard)?.budgetMinutes == 30)
         #expect(RuleSuggestion.suggestion(for: netflix, chosen: .hazard)?.window == RuleSuggestion.hazardWindow)
         #expect(RuleSuggestion.suggestion(for: netflix, chosen: .useful) == nil)
@@ -148,9 +139,8 @@ struct RuleSuggestionTableTests {
 
     @Test("Every exception still agrees with the tier it was written against")
     func exceptionsHaveNotDrifted() {
-        // The one place the two tables touch. Retiering an app in `AppUtility` — a table of
-        // facts, edited whenever a fact changes — would otherwise switch its exception off in
-        // silence. Here it fails instead.
+        // The one place the two tables touch: retiering an app in AppUtility would otherwise
+        // silently disable its exception here.
         for (key, exception) in RuleSuggestion.names {
             #expect(AppUtility.names[key]?.utility == exception.utility, "\(key) is tiered elsewhere in AppUtility")
         }

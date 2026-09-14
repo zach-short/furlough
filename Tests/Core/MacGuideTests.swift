@@ -1,12 +1,9 @@
 import Foundation
 import Testing
 
-/// The Mac's two three-step guides. The steps are derived from the config, apart from the last
-/// of each, which is a flag — so what these check is that the derivation matches what is actually
-/// set up, and that the live step is the first thing still owed.
-///
-/// The phone's guides live in its app target with the views; the Mac's are here in Shared/Core,
-/// where they are pure enough to be tested without a window. See `HalfGuide`.
+/// The Mac's two three-step guides: each step but the last is derived from config, so these
+/// check the derivation matches what's actually set up and the live step is what's still owed.
+/// The phone's guides live with its views; the Mac's are pure enough to test here. See `HalfGuide`.
 @Suite("The Mac's guides")
 struct MacGuideTests {
     // MARK: Rules
@@ -39,8 +36,7 @@ struct MacGuideTests {
         #expect(!HalfGuide.macRules(config: config, finished: true).isRunning)
     }
 
-    /// Restarting the guides clears the flag and nothing else, so a Mac that is set up comes back
-    /// showing its third step live rather than pretending the apps were never picked.
+    // Restarting clears only the flag, so an already-set-up Mac comes back on its third step.
     @Test func restartingRulesComesBackOnTheThirdStep() {
         let config = makeConfig([makeTarget("YouTube", rule: Rule(windows: [window(540, 1320)], dailyBudgetMinutes: 45))])
         let guide = HalfGuide.macRules(config: config, finished: false)
@@ -51,9 +47,8 @@ struct MacGuideTests {
 
     // MARK: The Anchor
 
-    /// The phone's first step is *Pair a tag*. This Mac has no reader, so what stands in its
-    /// place is the latch that says a phone has written the shared record — the same fact from
-    /// the other end, and the thing `AnchorSync.macDrop` refuses a drop without.
+    // No reader on the Mac, so this step stands in for "Pair a tag": has a phone written the
+    // shared record — the same thing `AnchorSync.macDrop` requires.
     @Test func theAnchorStartsByWaitingForThePhone() {
         let guide = HalfGuide.macAnchor(config: Config(), finished: false, hasKey: false)
         #expect(guide.live == 0)
@@ -74,8 +69,7 @@ struct MacGuideTests {
         #expect(guide.live == 2)
     }
 
-    /// An empty allowlist is still something to lock — it is the whole Mac — where an empty
-    /// chosen list is nothing.
+    // An empty allowlist is still the whole Mac to lock; an empty chosen list is nothing.
     @Test func theEverythingExceptScopeIsSomethingToHoldWhileEmpty() {
         var config = Config()
         config.anchor.scope = .everythingExcept
@@ -91,8 +85,7 @@ struct MacGuideTests {
         #expect(!HalfGuide.macAnchor(config: config, finished: true, hasKey: true).isRunning)
     }
 
-    /// The last step counts what is held. Before anything is chosen that count is zero, which is
-    /// a true sentence about a step that has not happened and a poor one to read two ahead of it.
+    // Zero is technically true before anything is chosen, but a poor thing to read two steps early.
     @Test func theDropStepDoesNotCountAnEmptyList() {
         let empty = HalfGuide.macAnchor(config: Config(), finished: false, hasKey: true)
         #expect(!empty.steps[2].detail.contains("0 items"))
@@ -105,8 +98,6 @@ struct MacGuideTests {
 
     // MARK: The card
 
-    /// The footnote belongs to the live step, so the fact arrives with the step rather than
-    /// three screens earlier.
     @Test func theCardShowsTheLiveStepsFootnote() {
         let guide = HalfGuide.macAnchor(config: Config(), finished: false, hasKey: false)
         #expect(guide.footnote == guide.steps[0].footnote)

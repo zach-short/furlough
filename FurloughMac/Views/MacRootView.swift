@@ -25,47 +25,30 @@ struct MacRootView: View {
     }
 }
 
-/// The main window: two halves under one segment. Rules is the list of apps and sites on the
-/// left with the selected one's rule on the right; the Anchor is what it holds on the left with
-/// the drop on the right.
-///
-/// The Anchor used to be a padlock in the toolbar opening a sheet — an unlabelled lock icon over
-/// a stack of eleven blocks, which is the shape of a feature rather than of half an app. The
-/// segment is how you get there now, and the padlock is gone: the app draws its own anchor mark
-/// everywhere else, and it draws it here too, on the state card the segment leads to.
 struct MacHomeView: View {
     @Environment(MacModel.self) private var model
     @Environment(HelpRoute.self) private var route
     @Environment(\.openWindow) private var openWindow
-    /// Which half is on screen. Seeded from the intro's answer and this view's own after that.
     @State private var half: Half
     @State private var selection: UUID?
-    /// The Application / Website popover under the + button.
     @State private var showAddChoice = false
-    /// The same popover, under the Rules guide's first step and under the row at the foot of what
-    /// the anchor holds. A popover anchors to the view it is attached to, and the toolbar's + is
-    /// nowhere near either of them — one shared flag would pop the question off the wrong control.
+    // Popover anchors to the view it's attached to; can't share the toolbar's flag or it
+    // opens on the wrong control.
     @State private var showGuideAddChoice = false
     @State private var showHeldAddChoice = false
     @State private var showAddApp = false
     @State private var showAddSite = false
-    /// Which half the add being made belongs to: a rule target, or the anchor's list. Set by
-    /// whatever opened the picker, read when it comes back with something.
     @State private var addDestination: Half = .rules
     @State private var showPending = false
     @State private var showSettings = false
-    /// Why an add to the anchor was refused, if it was.
     @State private var anchorMessage: String?
-    /// The other half of what was just added, held until the add sheet has fully gone: a sheet
-    /// presented over one still leaving is dropped, so the offer waits for `onDismiss`.
+    // A sheet presented while another is still dismissing is dropped, so this is held until
+    // onDismiss.
     @State private var pendingCompanion: CompanionPrompt?
     @State private var companionPrompt: CompanionPrompt?
-    /// A website was just added and the filter has never been offered. Held until every other
-    /// sheet in the chain has finished, for the reason `offerCompanion` gives: a sheet presented
-    /// over one still leaving is dropped.
+    // Same sheet-drop issue as pendingCompanion; waits for the whole chain to finish.
     @State private var pendingFilterHost: String?
     @State private var filterOfferHost: FilterOfferHost?
-    /// The window's clock, kept on the model so the sidebar and the detail pane count in step.
     private var now: Date { model.now }
 
     init(start: Half) { _half = State(initialValue: start) }
@@ -115,9 +98,6 @@ struct MacHomeView: View {
 
     // MARK: The add flow
 
-    /// One picker for both halves, told where what it finds is going. The Anchor used to carry
-    /// its own search field and its own host field inside the sheet; there is one pipeline now,
-    /// so the + button and the half's own Choose apps row cannot drift apart.
     private var addAppSheet: some View {
         AddAppSheet { app in
             guard addDestination == .rules else {
@@ -127,8 +107,6 @@ struct MacHomeView: View {
             let isNew = model.state.config.target(bundleID: app.bundleID) == nil
             let outcome = model.addApp(bundleID: app.bundleID, name: app.name)
             selection = outcome.added?.id
-            // The sheet is the Ask. Told Always, the model has added the sites already and the
-            // filter below finds nothing; told Never, it is not asked.
             guard isNew, let added = outcome.added, model.state.config.link.companionSite != .never else { return }
             pendingCompanion = CompanionPrompt(added: added, items: companionSites(for: app))
         }
@@ -156,7 +134,6 @@ struct MacHomeView: View {
         }
     }
 
-    /// The Application-or-Website question, worded for where the answer is going.
     private func addChoice(for destination: Half) -> some View {
         AddChoicePopover(
             applicationCaption: destination == .anchor ? "Any app on this Mac, held while anchored" : "Any app on this Mac",
@@ -174,8 +151,6 @@ struct MacHomeView: View {
         }
     }
 
-    /// The + button: opens the picker for the half being looked at — over Rules a rule target,
-    /// over the Anchor its list, unless Settings has been told otherwise.
     private func add(on half: Half) {
         addDestination = model.addDestination(on: half)
         showAddChoice = true
@@ -183,17 +158,14 @@ struct MacHomeView: View {
 
     // MARK: Toolbar
 
-    /// The window's actions. macOS 26 draws the Liquid Glass, groups adjacent items into one
-    /// capsule, and keeps the traffic lights clear.
+    // macOS 26 groups adjacent toolbar items into one Liquid Glass capsule automatically.
     @ToolbarContentBuilder
     private var windowActions: some ToolbarContent {
         let summary = toolbarSummary
-        // With no window title to sit beside, a primary action packs against the traffic
-        // lights instead of the trailing edge. The flexible spacer is what sends it right.
+        // No title bar text, so items pack left by default; this spacer pushes them right.
         ToolbarSpacer(.flexible, placement: .primaryAction)
         ToolbarItem(placement: .primaryAction) {
-            // The count in words, not a badge: a toolbar item has nowhere to hang one, and
-            // saying it is how the phone says it too.
+            // Toolbar items can't carry a badge, so the count is in words.
             if summary.pendingCount > 0 {
                 Button("\(summary.pendingCount) pending") { showPending = true }
                     .tint(Ember.pending)
@@ -210,13 +182,10 @@ struct MacHomeView: View {
                 .help("Settings")
         }
         ToolbarItem(placement: .primaryAction) {
-            // The hub, not wherever Help was left: the question mark is the way in, and a page
-            // still showing from the last visit would silently stand in for it.
             Button("Help", systemImage: "questionmark") { openHelp(on: nil) }
                 .tint(Ember.cream)
                 .help("Help")
         }
-        // Add is its own capsule, away from the two that only open something.
         ToolbarSpacer(.fixed, placement: .primaryAction)
         ToolbarItem(placement: .primaryAction) {
             Button("Add", systemImage: "plus") { add(on: half) }
@@ -230,58 +199,44 @@ struct MacHomeView: View {
         }
     }
 
-    /// What the toolbar needs to know. The sidebar works out its own from the same call: this
-    /// is a loop over the targets, not a query, and both are rebuilt on the same clock.
     private var toolbarSummary: Policy.Summary { Policy.summary(state: model.state, now: now) }
 
-    /// What was just added and what goes with it.
     private struct CompanionPrompt: Identifiable {
         let id = UUID()
         let added: Target
         let items: [CompanionSheet.Item]
     }
 
-    /// The site the filter offer is about. `String` is not `Identifiable`, and the sheet needs
-    /// something to be presented by.
+    // Wraps String because sheet(item:) requires Identifiable.
     private struct FilterOfferHost: Identifiable {
         let value: String
         var id: String { value }
     }
 
-    /// Runs once the add sheet is gone. Nothing to offer means no sheet — and then the web
-    /// filter gets its turn, since it is the last thing in the chain either way.
     private func offerCompanion() {
         defer { pendingCompanion = nil }
         guard let pending = pendingCompanion, !pending.items.isEmpty else { return offerWebFilter() }
         companionPrompt = pending
     }
 
-    /// The web filter, once a website is actually in Furlough and every sheet the add raised has
-    /// gone. Asks `MacModel` rather than deciding here: the condition is about the config and the
-    /// filter's own state, not about which button was pressed. See `shouldOfferWebFilter`.
     private func offerWebFilter() {
         defer { pendingFilterHost = nil }
         guard let host = pendingFilterHost, model.shouldOfferWebFilter else { return }
         filterOfferHost = FilterOfferHost(value: host)
     }
 
-    /// Puts Help on a page, then brings its window up — in that order, since the window reads
-    /// the route rather than being handed one. Already open, it comes forward showing the page
-    /// just asked for.
+    // Must set route before openWindow — the window reads the route, isn't handed one.
     private func openHelp(on topic: HelpTopic?) {
         route.topic = topic
         openWindow(id: HelpRoute.windowID)
     }
 
-    /// The websites `app` is also at that are not in Furlough yet; a host already covered by a
-    /// parent domain counts as in.
     private func companionSites(for app: InstalledApp) -> [CompanionSheet.Item] {
         app.companionHosts
             .filter { model.state.config.target(host: $0) == nil }
             .map { CompanionSheet.Item(kind: .host($0), title: $0, subtitle: "The site and its subdomains, in every browser") }
     }
 
-    /// The installed apps `host` is also in that are not in Furlough yet.
     private func companionApps(for host: String) -> [CompanionSheet.Item] {
         AppCatalog.apps(for: host)
             .filter { model.state.config.target(bundleID: $0.bundleID) == nil }
@@ -300,7 +255,6 @@ struct MacHomeView: View {
                 .padding(.top, 12)
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    // What the link is asking about on this half, when it is asking anything.
                     MacLinkTraffic(half: half)
                         .padding(.bottom, 8)
                     switch half {
@@ -315,9 +269,6 @@ struct MacHomeView: View {
         }
     }
 
-    /// The same three lines for both halves — eyebrow, headline, sub — with the words changing.
-    /// The Rules half also says when the anchor is down, because an anchor changes what every
-    /// rule on the list means for as long as it holds.
     @ViewBuilder
     private var header: some View {
         let anchor = model.state.config.anchor
@@ -369,7 +320,6 @@ struct MacHomeView: View {
         return "ready to drop"
     }
 
-    /// Everything Furlough manages, grouped by when it next opens.
     @ViewBuilder
     private var rulesList: some View {
         let state = model.state
@@ -421,14 +371,11 @@ struct MacHomeView: View {
                         .emberDisplaySmall(13.5)
                         .foregroundStyle(Ember.cream)
                         .lineLimit(1)
-                    // The rule line stays, as on the phone: a change waiting says so on a line
-                    // of its own rather than hiding the rule being enforced until then.
                     HStack(spacing: 5) {
                         Text(RowCopy.detail(target: target, status: status, now: now))
                             .emberBody(11)
                             .foregroundStyle(Ember.muted)
                             .lineLimit(1)
-                        // The other half, in one mark: this row is on the anchor's list too.
                         if anchor.willHold(target) { HeldMark() }
                     }
                     if let pending {
@@ -450,8 +397,6 @@ struct MacHomeView: View {
         .contextMenu { anchorMenu(for: target) }
     }
 
-    /// The way across from a rules row: hold this one too, or stop holding it. The mirror of the
-    /// held list's own menu, and the reason neither half grows a list of the other's contents.
     @ViewBuilder
     private func anchorMenu(for target: Target) -> some View {
         let anchor = model.state.config.anchor
@@ -468,9 +413,6 @@ struct MacHomeView: View {
         }
     }
 
-    /// What the anchor holds — or, under the other scope, what stays open. The list lives here
-    /// rather than in the pane beside it for the reason the rules list does: this is the window's
-    /// left-hand column, and the half's list belongs in it.
     @ViewBuilder
     private var heldList: some View {
         let anchor = model.state.config.anchor
@@ -534,7 +476,6 @@ struct MacHomeView: View {
                 .emberBody(13, .medium)
                 .foregroundStyle(Ember.cream)
                 .lineLimit(1)
-            // The mirror of the anchor on a rules row: this one has hours in the other half.
             if target?.rule != nil { RuledBadge(size: 13) }
             Spacer(minLength: 6)
             if !isHolding {
@@ -555,7 +496,6 @@ struct MacHomeView: View {
         .contextMenu { heldMenu(for: kind, target: target) }
     }
 
-    /// The other half, from a held row: hours for something the anchor already holds.
     @ViewBuilder
     private func heldMenu(for kind: TargetKind, target: Target?) -> some View {
         if let target {
@@ -565,8 +505,6 @@ struct MacHomeView: View {
         }
     }
 
-    /// Something the anchor holds that Furlough has no rule target for yet: make one, then open
-    /// its editor on the empty rule, on the other half.
     private func openNewRule(for kind: TargetKind) {
         let added: Target?
         switch kind {
@@ -578,7 +516,6 @@ struct MacHomeView: View {
         if let added { openRule(added.id) }
     }
 
-    /// The way across: the rules half, with that target's editor open.
     private func openRule(_ id: UUID) {
         selection = id
         withAnimation(.snappy(duration: 0.25)) { half = .rules }
@@ -602,8 +539,6 @@ struct MacHomeView: View {
         }
     }
 
-    /// Nothing selected, but something is managed: the phone's hero, paging through every app
-    /// with the living hourglass, so the window opens on the sand rather than on an invitation.
     private var hero: some View {
         let state = model.state
         let config = Policy.effectiveConfig(state, now: now)
@@ -671,9 +606,7 @@ struct MacHomeView: View {
         }
     }
 
-    /// The editor for what is selected, the guide while this half is still being set up, and the
-    /// hero the rest of the time. Selection first, because the guide's second step opens an
-    /// editor and would otherwise be covering the thing it just asked for.
+    // Selection checked first — the guide's step 2 opens an editor that would otherwise cover it.
     @ViewBuilder
     private var rulesDetail: some View {
         let guide = HalfGuide.macRules(config: model.state.config, finished: model.finishedGuides.contains(.rules))
@@ -681,8 +614,6 @@ struct MacHomeView: View {
             MacRuleEditor(targetID: selection)
                 .id(selection)
         } else if guide.isRunning {
-            // Centred in the pane, like the hero and the empty state it stands in for, rather
-            // than pinned to the top left of a pane three times its height.
             GuideCard(guide: guide) { rulesGuideButton(at: guide.live) }
                 .frame(maxWidth: 560, alignment: .leading)
                 .padding(40)
@@ -715,8 +646,6 @@ struct MacHomeView: View {
         }
     }
 
-    /// The half is set up and then emptied again: every target removed, with the guide long
-    /// finished. Rare, and still a screen somebody can be on.
     private var emptyDetail: some View {
         VStack(spacing: 14) {
             LivingHourglass(state: .open(level: 0.62, warned: false))

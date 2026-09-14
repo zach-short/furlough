@@ -3,8 +3,7 @@ import Foundation
 import ManagedSettings
 #endif
 
-/// Days of the week as a bit set. Bit 0 is Sunday, so bits line up with Calendar's weekday
-/// numbers (1 = Sunday … 7 = Saturday) whatever the user's first day of the week is.
+/// Days of the week as a bit set. Bit 0 is Sunday, matching Calendar's weekday numbers (1…7).
 struct Weekdays: OptionSet, Hashable {
     let rawValue: UInt8
 
@@ -30,9 +29,7 @@ struct Weekdays: OptionSet, Hashable {
     func contains(weekday: Int) -> Bool { contains(Weekdays(weekday: weekday)) }
     mutating func toggle(weekday: Int) { formSymmetricDifference(Weekdays(weekday: weekday)) }
 
-    /// The same days moved forward through the week. The morning after a Saturday night is a
-    /// Sunday, so a night's two halves sit on days one apart. Sunday is bit 0, so a day later
-    /// is a bit up, and Saturday comes round to Sunday again.
+    /// Rotates days forward by `days` in the week; used to move a night's evening to its morning.
     func shifted(by days: Int) -> Weekdays {
         let step = ((days % 7) + 7) % 7
         let bits = Int(rawValue)
@@ -49,8 +46,7 @@ struct Weekdays: OptionSet, Hashable {
         Weekdays.ordered(calendar: calendar).firstIndex { contains(weekday: $0) } ?? 7
     }
 
-    /// The order groups of days are listed in: earliest day first, then the broader group
-    /// ("Every day" before "Sat, Sun"), then a stable tiebreak.
+    /// Sort key for display order: earliest day first, then broader group first, then a stable tiebreak.
     func groupOrder(calendar: Calendar = .current) -> (Int, Int, UInt8) {
         (firstPosition(calendar: calendar), -count, rawValue)
     }
@@ -68,11 +64,8 @@ extension Weekdays: Codable {
     }
 }
 
-/// A span of minutes inside one calendar day, on the days of the week it applies.
-/// `endMinute` is exclusive and may be 1440 (midnight). A stored span never crosses midnight;
-/// an evening that runs late is an evening window plus an early-morning window on the next day.
-/// The editors let one be written the way it is said — "5 PM until 4 AM" — and `split` turns
-/// that night into the pair Furlough keeps, with `folded` reading it back as one row.
+/// A span of minutes inside one calendar day, on the days of the week it applies. `endMinute`
+/// is exclusive and may be 1440; a stored span never crosses midnight (see `split`/`folded`).
 struct TimeWindow: Codable, Hashable, Identifiable, Comparable {
     var startMinute: Int
     var endMinute: Int
@@ -87,10 +80,8 @@ struct TimeWindow: Codable, Hashable, Identifiable, Comparable {
             && durationMinutes >= Furlough.minimumWindowMinutes
     }
 
-    /// An evening that runs into the next morning: the end falls earlier in the day than the
-    /// start. Only ever drafted, never stored — both the rules engine and DeviceActivity work
-    /// a day at a time — but it is how a late night is said, so the editors take one and split
-    /// it on the way in.
+    /// True when end falls before start (an evening running past midnight). Never stored —
+    /// only ever a draft the editors split on input.
     var isNight: Bool { endMinute < startMinute }
 
     /// How long the window is, a night's two halves counted together.
@@ -98,16 +89,13 @@ struct TimeWindow: Codable, Hashable, Identifiable, Comparable {
         isNight ? Furlough.minutesPerDay - startMinute + endMinute : durationMinutes
     }
 
-    /// True when every window this becomes is one Furlough can keep. A night is judged by its
-    /// halves, because the halves are what DeviceActivity is given and each has its own minimum.
+    /// True when every window this splits into is valid; a night is judged by its two halves.
     var isValidDraft: Bool {
         let parts = split
         return !parts.isEmpty && parts.allSatisfy(\.isValid)
     }
 
-    /// The windows this really is: itself, or, for a night, the evening on the days it starts
-    /// and the early morning on the days after. An evening that runs to exactly midnight has
-    /// no morning half and comes back alone.
+    /// Splits a night into its evening and next-day morning halves; a non-night returns itself.
     var split: [TimeWindow] {
         guard isNight else { return [self] }
         var parts = [TimeWindow(startMinute: startMinute, endMinute: Furlough.minutesPerDay, days: days)]
@@ -117,15 +105,11 @@ struct TimeWindow: Codable, Hashable, Identifiable, Comparable {
         return parts
     }
 
-    /// Half of a night as stored: an evening that ends at midnight, and the morning that starts
-    /// at it. The all-day window is neither.
+    /// A night's stored halves: evening ends at midnight, morning starts at it.
     private var isEveningHalf: Bool { startMinute > 0 && endMinute == Furlough.minutesPerDay }
     private var isMorningHalf: Bool { startMinute == 0 && endMinute < Furlough.minutesPerDay }
 
-    /// `split` in reverse: an evening ending at midnight and a morning starting at midnight on
-    /// the days after are one night again. Exact rather than a guess — those two windows and
-    /// that one night allow the very same minutes of the week — so a night reads back as the
-    /// row it was written as, and a pair someone wrote by hand reads as the night it is.
+    /// `split` in reverse: rejoins an evening-at-midnight with the next day's morning-from-midnight.
     static func folded(_ windows: [TimeWindow]) -> [TimeWindow] {
         let sorted = windows.sorted()
         var mornings = sorted.filter(\.isMorningHalf)
@@ -143,8 +127,7 @@ struct TimeWindow: Codable, Hashable, Identifiable, Comparable {
         return result + mornings
     }
 
-    /// The same span on every day. DeviceActivity is told about each distinct span once; the
-    /// rules engine decides per day.
+    /// The same span with `days` dropped, since DeviceActivity is told about each distinct span once.
     var span: TimeWindow { TimeWindow(startMinute: startMinute, endMinute: endMinute) }
 
     func applies(on weekday: Int) -> Bool { days.contains(weekday: weekday) }
@@ -175,9 +158,8 @@ struct TimeWindow: Codable, Hashable, Identifiable, Comparable {
         }
     }
 
-    /// Where a new window on `days` goes among `windows`: from the latest end on those days
-    /// when there is room before midnight, else the first free stretch of the day. Up to an
-    /// hour long, never shorter than the minimum. Nil when those days are already full.
+    /// Next free slot on `days`: after the latest existing end if room remains, else the first
+    /// free stretch. Up to an hour, at least the minimum; nil when full.
     static func nextFree(after windows: [TimeWindow], on days: Weekdays) -> TimeWindow? {
         let related = windows.filter { !$0.days.isDisjoint(with: days) }
         var taken = [Bool](repeating: false, count: Furlough.minutesPerDay)
@@ -204,8 +186,7 @@ struct TimeWindow: Codable, Hashable, Identifiable, Comparable {
         return nil
     }
 
-    /// Windows on the same days that overlap or touch, joined into one, in order. Windows on
-    /// different days are left alone.
+    /// Windows on the same days that overlap or touch, merged in order; different days untouched.
     static func joined(_ windows: [TimeWindow]) -> [TimeWindow] {
         var result: [TimeWindow] = []
         for window in windows.sorted() {
@@ -230,17 +211,13 @@ extension TimeWindow {
     }
 }
 
-/// When a target may be used, and for how many minutes per day in total. No windows means
-/// open all day, every day: only the budget limits it. Windows narrow that to their hours,
-/// and once there are any, a day none of them covers is blocked.
+/// When a target may be used and its daily budget. No windows means open all day (budget-limited
+/// only); once windows exist, a day none of them covers is blocked.
 struct Rule: Codable, Hashable {
     var windows: [TimeWindow] = []
     var dailyBudgetMinutes: Int = Furlough.defaultBudgetMinutes
-    /// Seven minute counts, Sunday first, when the week is not one number; nil when
-    /// `dailyBudgetMinutes` is the whole answer. Read it through `budget(on:)` rather than
-    /// directly: everything that limits a person reads today's, and only that accessor knows
-    /// which day is today. Anything but seven entries decodes as nil, so a hand-edited or
-    /// truncated file falls back to the one budget rather than to a day with no limit at all.
+    /// Seven minute counts, Sunday first, when the week isn't one number; nil otherwise.
+    /// Read via `budget(on:)`, not directly. Anything but exactly seven entries decodes as nil.
     var budgetByWeekday: [Int]?
 
     /// Midnight to midnight: what a rule without windows allows on every day.
@@ -255,10 +232,8 @@ struct Rule: Codable, Hashable {
     var isAllDay: Bool { windows.isEmpty }
     /// Allowed at some minute of some day.
     var isEverAllowed: Bool { (1...7).contains { isEverAllowed(on: $0) } }
-    /// The daily limit, or nil when there is not really one. A whole day of budget is no
-    /// budget at all — `Rule.unrestricted` has always carried one — and on iOS a typed host
-    /// always does, because DeviceActivity counts only tokens and so nothing counts it. Read
-    /// this rather than `dailyBudgetMinutes` wherever a limit is being shown to a person.
+    /// The daily limit, or nil when a full day of budget means no real limit (e.g. `.unrestricted`
+    /// or an uncounted typed host). Prefer this over `dailyBudgetMinutes` for display.
     func limit(on weekday: Int) -> Int? {
         let minutes = budget(on: weekday)
         return minutes < Furlough.minutesPerDay ? minutes : nil
@@ -269,9 +244,7 @@ struct Rule: Codable, Hashable {
 
     // MARK: The budget, day by day
 
-    /// The minutes allowed on `weekday` (Calendar's 1…7). Every reading of the budget goes
-    /// through here: a rule with one number answers it seven times over, so a caller never has
-    /// to know which kind it is holding.
+    /// The minutes allowed on `weekday` (Calendar's 1…7); the one accessor every budget read goes through.
     func budget(on weekday: Int) -> Int {
         guard let byWeekday = budgetByWeekday, byWeekday.count == 7, (1...7).contains(weekday) else {
             return dailyBudgetMinutes
@@ -286,9 +259,7 @@ struct Rule: Codable, Hashable {
         return byWeekday.allSatisfy { $0 == byWeekday[0] }
     }
 
-    /// The same rule with the per-day budget dropped when it says nothing the one number does
-    /// not. Editors save through this, so seven equal days and no array at all are one rule
-    /// rather than two that only `isEquivalent` can tell apart.
+    /// The same rule with a redundant per-day budget collapsed to one number. Editors save through this.
     var normalized: Rule {
         guard !isSameBudgetEveryDay else {
             var copy = self
@@ -299,11 +270,8 @@ struct Rule: Codable, Hashable {
         return self
     }
 
-    /// The one figure that stands for the week, for an editor collapsing seven sliders back
-    /// into one: the budget most days already carry, and the smaller of two that tie. Read
-    /// instead of `dailyBudgetMinutes`, which is only a shadow once a per-day budget is set —
-    /// in an imported or hand-written rule it can be any figure at all, and a person turning
-    /// "Same budget every day" back on should be shown their ordinary day, not that shadow.
+    /// The most common day's budget (ties go to the smaller), for collapsing sliders back to one.
+    /// Use instead of `dailyBudgetMinutes`, which is a stale shadow once a per-day budget is set.
     var representativeBudget: Int {
         guard budgetByWeekday != nil else { return dailyBudgetMinutes }
         var counts: [Int: Int] = [:]
@@ -311,8 +279,7 @@ struct Rule: Codable, Hashable {
         return counts.max { ($0.value, -$0.key) < ($1.value, -$1.key) }?.key ?? dailyBudgetMinutes
     }
 
-    /// The budget that will really be spent on `weekday`: zero on a day nothing is allowed,
-    /// so a day with hours but no budget and a day with budget but no hours read alike.
+    /// Actual spendable budget on `weekday`: zero if the day is never allowed, regardless of the stored number.
     func effectiveBudget(on weekday: Int) -> Int {
         isEverAllowed(on: weekday) ? budget(on: weekday) : 0
     }
@@ -323,18 +290,13 @@ struct Rule: Codable, Hashable {
         return isAllDay || windows.contains { $0.applies(on: weekday) }
     }
 
-    /// The same rule whatever order the windows are listed in, and whichever way its budget is
-    /// written down: seven equal days are the one number they add up to.
+    /// Equal regardless of window order or whether the budget is per-day or a single number.
     func isEquivalent(to other: Rule) -> Bool {
         (1...7).allSatisfy { budget(on: $0) == other.budget(on: $0) } && sortedWindows == other.sortedWindows
     }
 
-    /// The windows that apply on `weekday` (Calendar's 1…7), in order: the whole day when
-    /// the rule has none of its own, and none at all on a day with no budget. A day worth no
-    /// minutes has no open hours to speak of, so the status, the next-open search and the row
-    /// copy all say "closed today" from the hours alone. `allowedMask` and `window(containing:)`
-    /// still guard on `isEverAllowed(on:)` as well: both are read by the shield's own decision,
-    /// and the one place worth saying a thing twice is the one that decides what is locked.
+    /// Windows applying on `weekday`: the whole day if the rule has none, none if the day has
+    /// no budget. Callers that gate the shield also check `isEverAllowed(on:)` directly.
     func windows(on weekday: Int) -> [TimeWindow] {
         guard budget(on: weekday) > 0 else { return [] }
         return isAllDay ? [Self.allDay] : sortedWindows.filter { $0.applies(on: weekday) }
@@ -353,16 +315,13 @@ struct Rule: Codable, Hashable {
         return mask
     }
 
-    /// The window on the day after that this day's last one runs into: the morning half of a
-    /// night, whose evening half ends at midnight. Nil when the day ends where it says it does.
-    /// A rule without windows has none — midnight only resets its budget.
+    /// The next day's morning window if this day's evening runs into it; nil otherwise.
     func continuation(after weekday: Int) -> TimeWindow? {
         guard !isAllDay else { return nil }
         return windows(on: weekday % 7 + 1).first { $0.startMinute == 0 && $0.endMinute < Furlough.minutesPerDay }
     }
 
-    /// The window on the day before that runs into this one, when this day opens at midnight
-    /// because the evening before never closed. Nil when the day begins on its own.
+    /// The previous day's evening window if it runs into this day's midnight-start; nil otherwise.
     func continues(into weekday: Int) -> TimeWindow? {
         guard !isAllDay,
               windows(on: weekday).contains(where: { $0.startMinute == 0 && $0.endMinute < Furlough.minutesPerDay })
@@ -376,10 +335,8 @@ struct Rule: Codable, Hashable {
         return windows(on: weekday).first { $0.contains(minuteOfDay: minute) }
     }
 
-    /// True when this rule allows no minute of any day that `other` forbids and, on every day
-    /// of the week, no more minutes than `other` does. Budgets are compared day by day rather
-    /// than in total: two hours moved off Saturday onto Monday leaves the week the same size
-    /// and Monday looser, and a looser Monday is a loosening.
+    /// True when this allows nothing `other` forbids, and no day's budget exceeds `other`'s —
+    /// compared per day, not summed, so shifting time between days still counts as loosening.
     func isTighterOrEqual(to other: Rule) -> Bool {
         for weekday in 1...7 {
             let mine = allowedMask(on: weekday)
@@ -411,10 +368,7 @@ struct Rule: Codable, Hashable {
 }
 
 extension Rule {
-    /// `budgetByWeekday` arrived after the first stored rules, so its absence means the one
-    /// daily figure covers the week. A list that is not seven long is read as absent too: the
-    /// safe reading of a damaged field is the budget the rule already had, never a day left
-    /// without one.
+    /// Absent or non-seven-length `budgetByWeekday` falls back to `dailyBudgetMinutes` for the whole week.
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         windows = try container.decodeIfPresent([TimeWindow].self, forKey: .windows) ?? []
@@ -431,15 +385,9 @@ enum TargetKind: Codable, Hashable {
     case application(ApplicationToken)
     case webDomain(WebDomainToken)
     case category(ActivityCategoryToken)
-    /// A website typed by name rather than minted by Apple's picker: "youtube.com", subdomains
-    /// too. Blocked through `WebContentSettings.blockedByFilter`, which takes a plain string,
-    /// so it needs no token and carries its own name from the moment it is added — unlike
-    /// `.webDomain`, which says nothing until the shield learns a name.
-    ///
-    /// It buys that with two things a picked site has. Nothing counts it: a DeviceActivity
-    /// budget event needs a token, so a typed host has windows and no daily budget. And iOS
-    /// draws its own "Website Not Allowed" page over it rather than Furlough's shield.
-    /// Verified on the phone 2026-09-08; see the note in `ShieldReconciler.apply`.
+    /// A website typed by name (not minted by Apple's picker), blocked via `blockedByFilter`.
+    /// Unlike `.webDomain` it has no token: never counted toward a budget, and iOS shows its
+    /// own "Website Not Allowed" page instead of Furlough's shield.
     case host(String)
     #else
     /// A Mac app, by bundle identifier: "com.google.Chrome".
@@ -455,8 +403,7 @@ enum TargetKind: Codable, Hashable {
         return false
     }
 
-    /// An app, on whichever platform is asking. Read where a sentence has to name what it is
-    /// holding rather than count it — see `AnchorProfile.blockedDescription`.
+    /// An app on whichever platform is asking; used where a sentence names what it holds rather than counts it.
     var isApplication: Bool {
         #if os(iOS)
         if case .application = self { return true }
@@ -467,17 +414,11 @@ enum TargetKind: Codable, Hashable {
     }
 }
 
-/// The rule an edit replaced, and when it landed. What makes a change takeable-back for
-/// `Furlough.undoWindowMinutes` after it is saved.
-///
-/// It holds the rule that *was* there, never a looser one someone would like, and that is the
-/// whole of why it is safe: undo can only ever put a target back exactly where it stood before
-/// the edit. Someone who wants TikTok open cannot reach for it, because before the edit TikTok
-/// was shut too. So there is no count to spend, nothing to hoard, and nothing to negotiate with
-/// at 11 PM — which is what a pass count would have been.
+/// The rule an edit replaced, so a change is takeable-back for `Furlough.undoWindowMinutes`.
+/// Always the exact prior rule, never a looser one — this is what stops undo from being usable
+/// as a way to loosen something that was already open.
 struct RuleUndo: Codable, Hashable {
-    /// The rule before the edit. Nil means the target had none at all: nothing was enforced,
-    /// and undoing puts it back to unconfigured.
+    /// The rule before the edit; nil means unconfigured.
     var rule: Rule?
     /// Furlough's own time when the edit landed, never the device's — `SharedState.now`.
     var savedAt: Date
@@ -487,60 +428,36 @@ struct RuleUndo: Codable, Hashable {
         savedAt.addingTimeInterval(TimeInterval(Furlough.undoWindowMinutes) * 60)
     }
 
-    /// Still open at `now`. Every reader asks this rather than trusting the field's presence:
-    /// `Policy.applyDuePending` clears expired ones, but it has not necessarily run.
+    /// Still open at `now`; check this rather than trusting the field's presence, since expiry
+    /// isn't always pruned yet.
     func isOpen(at now: Date) -> Bool { now < expiresAt }
 }
 
 /// One app, website, or category that Furlough manages.
 struct Target: Codable, Hashable, Identifiable {
     var id = UUID()
-    /// The face of this thing: the app, wherever there is one. Blocking the YouTube app and
-    /// leaving youtube.com open is the gap everyone finds a week later, so the two halves are
-    /// one target — and the app is the half with real artwork and Apple's own name, so it is
-    /// the half the row shows.
+    /// The face of this target: the app half, where there is one (shown in the row; see `also`).
     var kind: TargetKind
-    /// The other doors into the same thing, blocked on the same rule.
-    ///
-    /// Two doors into one habit should not cost two rules to close. Everything downstream reads
-    /// `kinds` rather than `kind`, so one status, one schedule, one budget, one removal delay and
-    /// one row cover every half: `Policy.decide` shields them together, and `Monitoring.include`
-    /// puts their tokens in *one* DeviceActivity event, so 45 minutes is 45 across the app and
-    /// the site together rather than 45 each. Where a half has no token — a site typed by name —
-    /// it shares the windows and nothing counts it; the editor says so.
-    ///
-    /// Optional for the same reason `systemName` and `utilityLevel` are: a synthesised
-    /// `init(from:)` demands every non-optional key, and the state already on the phone has none.
-    /// Read it through `kinds`.
+    /// Other doors into the same thing, sharing one rule/budget/status — read via `kinds`, not
+    /// directly. A typed-host half shares the windows but is never counted toward the budget.
+    /// Optional so old stored state (predating this field) still decodes.
     var also: [TargetKind]?
     var nickname = ""
     /// nil means "not configured yet": nothing is enforced until the first rule is saved.
     var rule: Rule?
     var addedAt = Date.now
-    /// The name iOS gave this one, learned from the shield the first time Furlough blocked it.
-    /// A Screen Time token is opaque: only `Label(token)`, drawn inside the app, ever shows a
-    /// name, so without this the widget, the notifications and the Live Activity have nothing
-    /// to call an app but "This app". Optional so state written before it existed still
-    /// decodes; `SharedStore` folds the learned names in on every load.
-    ///
-    /// Since 2026-09-08 one other thing may write it: when the companion nudge adds the app
-    /// half beside a website, Furlough already knows from the `Companions` table what it just
-    /// added, so it says so rather than waiting to be told. A name Screen Time teaches later
-    /// still wins — `SharedStore.load` folds the learned names over the top.
+    /// The name learned from the shield the first time this was blocked — a Screen Time token
+    /// is opaque otherwise, and only `Label(token)` can render one. `SharedStore` folds learned
+    /// names in on every load, which always wins over a name set any other way.
     var systemName: String?
-    /// What this target's rule was before the edit that is still takeable back, or nil when
-    /// there is nothing to undo. Written only where a rule lands *now*; a loosening that
-    /// finally arrives after its delay leaves this alone, because undoing a loosening is a
-    /// tightening and those are already instant.
+    /// The still-takeable-back prior rule, or nil. Only set when a rule lands immediately —
+    /// a delayed loosening landing later leaves this alone, since undoing it would be an
+    /// (already-instant) tightening.
     var undo: RuleUndo?
-    /// The tier Zach put this in, or nil while he has not said. Stored optional for the same
-    /// reason `systemName` is: a synthesised `init(from:)` demands every non-optional key, and
-    /// state written before tiers existed has none. Read it through `utility`.
+    /// The chosen tier, or nil if unset (old stored state predates this field). Read via `utility`.
     var utilityLevel: Utility?
 
-    /// Every door into this thing, the face first. Read this rather than `kind` anywhere the
-    /// question is "what does this target cover": one target may be an app *and* the website it
-    /// is also at, and both are blocked on the one rule.
+    /// Every door into this thing, face first. Use instead of `kind` to ask what this target covers.
     var kinds: [TargetKind] { [kind] + (also ?? []) }
 
     /// True when this target covers more than one door.
@@ -574,10 +491,8 @@ struct Target: Codable, Hashable, Identifiable {
 
     var displayName: String { nickname.isEmpty ? defaultName : nickname }
 
-    /// Whether `displayName` is a name rather than a stand-in. A nickname or a name Screen Time
-    /// has taught is; so is a typed host, which names itself. An app that has never yet been
-    /// blocked is not, and reads "This app" until it is. The widget lists the named ones first,
-    /// so that when three open together the two a person knows are the two it shows.
+    /// Whether `displayName` is a real name rather than a stand-in like "This app". The widget
+    /// lists named targets first so recognisable ones show when space is limited.
     var isNamed: Bool {
         if !nickname.isEmpty { return true }
         if let systemName, !systemName.isEmpty { return true }
@@ -590,9 +505,8 @@ struct Target: Codable, Hashable, Identifiable {
     }
 }
 
-/// One tag paired with the anchor: the hardware identifier read over NFC, and a name. The name
-/// is what makes more than one usable — two identifiers are four hex digits apiece, and nobody
-/// tells those apart. A tag lives in a place; the name is which place.
+/// One tag paired with the anchor: its NFC identifier and a name (identifiers alone are
+/// indistinguishable hex, so the name is what tells tags apart).
 struct PairedTag: Codable, Equatable, Identifiable {
     /// Hardware identifier read over NFC. Unique per tag, so it is the identity.
     var id: Data
@@ -602,23 +516,16 @@ struct PairedTag: Codable, Equatable, Identifiable {
     static let maxNameLength = 24
 }
 
-/// A set of apps, sites, or categories locked behind a physical NFC tag. Anchoring is instant
-/// from the app; weighing anchor needs one of the paired tags. This is the only unblock path in
-/// Furlough, and it exists only here: rule-based targets never get one. While anchored, the list
-/// and the tags cannot be changed.
-///
-/// Since 2026-09-09 the anchor has a `scope`: the list, or the whole phone except the list.
-/// One list, read the right way round by `holds`, so everything downstream asks the anchor
-/// what it takes away rather than reading `kinds` for itself.
+/// Apps/sites/categories locked behind a physical NFC tag — dropping is instant, lifting needs
+/// a paired tag. While anchored, the list and tags cannot be changed. `scope` decides whether
+/// `kinds` is what's held or what's exempted; read through `holds` rather than checking `kinds`.
 struct AnchorProfile: Codable, Equatable {
     /// How far the anchor reaches when it drops.
     enum Scope: String, Codable, CaseIterable, Sendable {
         /// The listed kinds and nothing else: what the anchor has always done.
         case chosen
-        /// Every app and every website on the phone, except the listed kinds. `kinds` is the
-        /// allowlist under this scope, and it starts from every target tiered Essential
-        /// (`Config.essentialKinds`) so that Messages and the authenticator stay reachable
-        /// unless someone takes them off it on purpose.
+        /// Everything except the listed kinds (the allowlist), seeded from Essential-tiered
+        /// targets (`Config.essentialKinds`) so Messages/authenticator stay reachable by default.
         case everythingExcept
     }
 
@@ -627,42 +534,33 @@ struct AnchorProfile: Codable, Equatable {
     var kinds: [TargetKind] = []
     var isAnchored = false
     var anchoredAt: Date?
-    /// When a timed anchor lifts by itself, or nil for the tag alone. Read it through
-    /// `isHolding(at:)`: an `until` already past is released whatever `isAnchored` says, and
-    /// the next reconcile clears the flag. Since 2026-09-09.
+    /// When a timed anchor lifts by itself, or nil for the tag alone. Read via `isHolding(at:)`:
+    /// a past `until` is released regardless of `isAnchored` until the next reconcile clears it.
     var until: Date?
-    /// Times of day at which the anchor drops by itself, on their days. The monitor extension
-    /// performs them (`Policy.scheduledDrop`); the app registers their wakes. Since 2026-09-09.
+    /// Times the anchor drops by itself; the monitor extension performs them, the app registers the wakes.
     var schedules: [AnchorSchedule] = []
-    /// One higher on every drop and every release, on either device, and moved on to whatever
-    /// the other device last wrote: the clock `AnchorSync.merge` orders records by. Since
-    /// 2026-09-09; a store without it starts at zero.
+    /// Increments on every drop/release on either device; the clock `AnchorSync.merge` orders by.
     var sequence: Int = 0
-    /// Every tag that releases this anchor. They are keys to one lock, not a sequence: any of
-    /// them lifts it, so a tag at each place you live keeps the friction at "walk to the drawer"
-    /// in both. Capped at `Furlough.maxAnchorTags`, since the failure here is not two keys but
-    /// enough of them that one is always within reach.
+    /// Tags that release this anchor — any one of them works (not a sequence). Capped at
+    /// `Furlough.maxAnchorTags`.
     var tags: [PairedTag] = []
 
     var isPaired: Bool { !tags.isEmpty }
-    /// Room for another key. Pairing is refused past the cap rather than evicting the oldest:
-    /// silently dropping a key is how someone finds out at the drawer that it no longer opens.
+    /// Room for another key; past the cap, pairing is refused rather than silently evicting the oldest.
     var canPairMore: Bool { tags.count < Furlough.maxAnchorTags }
     /// How long the list is: what is held under the chosen scope, what stays open under the
     /// other. Read `heldDescription` for a line a person sees.
     var count: Int { kinds.count }
     /// The anchor is down over the whole phone when it drops, not over a list.
     var anchorsEverything: Bool { scope == .everythingExcept }
-    /// Something to lock: a list, or the whole phone, which an empty allowlist still is where
-    /// an empty chosen list is nothing.
+    /// Whether there's something to lock: everything-except always is (even with an empty
+    /// allowlist); chosen needs a non-empty list.
     var hasSomethingToHold: Bool { anchorsEverything || !kinds.isEmpty }
     /// Ready to anchor: something to lock and a tag to unlock it with.
     var canAnchor: Bool { hasSomethingToHold && isPaired && !isAnchored }
     /// Whether `kind` is on the list. Says nothing about whether it is held: read `holds`.
     func contains(_ kind: TargetKind) -> Bool { kinds.contains(kind) }
-    /// Whether the anchor takes `kind` away when it drops: on the list under the chosen scope,
-    /// off the list under everything-except. The one place the list is read the right way
-    /// round, so nothing else has to know which way that is.
+    /// Whether the anchor takes `kind` away: on the list under `.chosen`, off it under `.everythingExcept`.
     func holds(_ kind: TargetKind) -> Bool {
         switch scope {
         case .chosen: contains(kind)
@@ -677,19 +575,15 @@ struct AnchorProfile: Codable, Equatable {
         case .everythingExcept: kinds.isEmpty ? "Everything" : "Everything except \(kinds.count)"
         }
     }
-    /// What the drop just shut, for the sentence an intent says back: "1 application blocked",
-    /// "3 applications blocked", and "items" when the list is not all apps. Worth naming rather
-    /// than counting, because a drop from Control Center or Spotlight has no app on screen —
-    /// this line is the whole of the confirmation. `heldDescription` is the other half, for the
-    /// allowlist scope, where what matters is what stays open.
+    /// The confirmation line for a Control Center/Spotlight drop, which has no app UI to show:
+    /// "1 application blocked", or "N items" when the list isn't all apps.
     var blockedDescription: String {
         let noun = kinds.allSatisfy(\.isApplication) ? "application" : "item"
         return "\(kinds.count) \(noun)\(kinds.count == 1 ? "" : "s") blocked"
     }
     /// The paired tag a scan matches, if any.
     func tag(matching scanned: Data) -> PairedTag? { tags.first { $0.id == scanned } }
-    /// A placeholder for a tag just paired, never a duplicate of one already here, because a
-    /// name only earns its place by telling one drawer from another.
+    /// A default name for a newly paired tag, never colliding with an existing one.
     var nextTagName: String {
         var n = tags.count + 1
         while tags.contains(where: { $0.name == "Tag \(n)" }) { n += 1 }
@@ -698,11 +592,8 @@ struct AnchorProfile: Codable, Equatable {
 }
 
 extension AnchorProfile {
-    /// The anchor was called the Brick until 2026-09-08, and held a single `tagID` until
-    /// 2026-09-08. Read the old names when the new ones are missing; encoding always writes the
-    /// new. A lone stored identifier becomes the first of the list, named rather than blank, so
-    /// the phone comes back with the key it already had. The scope arrived on 2026-09-09; a
-    /// store without one is the chosen list, which is what every store before it meant.
+    /// Reads legacy keys (`brick`/`isBricked`/`brickedAt`/`tagID`) when the current ones are
+    /// missing, for backward compatibility with pre-rename stored state.
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let legacy = try decoder.container(keyedBy: LegacyKeys.self)
@@ -712,14 +603,12 @@ extension AnchorProfile {
             ?? legacy.decodeIfPresent(Bool.self, forKey: .isBricked) ?? false
         anchoredAt = try container.decodeIfPresent(Date.self, forKey: .anchoredAt)
             ?? legacy.decodeIfPresent(Date.self, forKey: .brickedAt)
-        // The clock arrived on 2026-09-09: a store without it is an anchor only the tag lifts,
-        // with nothing scheduled, which is what every store before it meant.
+        // Absent means an anchor only the tag lifts, with nothing scheduled.
         until = try container.decodeIfPresent(Date.self, forKey: .until)
         schedules = try container.decodeIfPresent([AnchorSchedule].self, forKey: .schedules) ?? []
         sequence = try container.decodeIfPresent(Int.self, forKey: .sequence) ?? 0
         if let stored = try container.decodeIfPresent([PairedTag].self, forKey: .tags) {
-            // Trimmed on the way in as well as on the way out: a file written when the cap was
-            // higher, or by hand, does not get to hand the anchor more keys than it allows.
+            // Trimmed on read too, in case the cap was once higher or the file was hand-edited.
             tags = Array(stored.prefix(Furlough.maxAnchorTags))
         } else if let single = try legacy.decodeIfPresent(Data.self, forKey: .tagID) {
             tags = [PairedTag(id: single, name: "Tag 1")]
@@ -733,28 +622,21 @@ struct Config: Codable, Equatable {
     var targets: [Target] = []
     var loosenDelayHours: Int = Furlough.defaultLoosenDelayHours
     var anchor = AnchorProfile()
-    /// When the first week ends, set once, the first time Screen Time access is granted, and
-    /// never moved after. Kept even after it has run out, because it is also the record that
-    /// this install has already had its week: turning Screen Time access off and on again is
-    /// the documented way out of Furlough, and without this it would also be a way to draw a
-    /// fresh trial every Sunday.
+    /// Set once, the first time Screen Time access is granted, and never moved after — this is
+    /// also the record that the install already had its trial, so toggling access off/on can't
+    /// grant a fresh one.
     var trialStartedAt: Date?
     var trialEndsAt: Date?
-    /// Whether that week is still running. A stored fact rather than a comparison made on every
-    /// read, for the same reason a due pending change is not folded in until something folds
-    /// it: `delayHours` is asked from a dozen places that have no business knowing the time,
-    /// and `Policy.applyDuePending` — which every enforce, every widget read and every
-    /// `effectiveConfig` goes through — is the one place that moves the clock forward.
+    /// Whether the trial is still running — a stored fact, not computed on read, so callers
+    /// don't each need to know the time; `Policy.applyDuePending` is what advances it.
     var isInTrial = false
-    /// What crosses to and from other devices, and whether an app's site is blocked beside it.
-    /// Since 2026-09-10; a state without it gets the defaults.
+    /// What crosses to/from other devices, and whether an app's site is blocked alongside it.
     var link = LinkPreferences()
     var schemaVersion = 1
 
     init() {}
 
-    /// The anchor arrived after the first stored states, so its absence must decode cleanly,
-    /// and it was stored under `brick` until the rename, so that key still reads.
+    /// Decodes the legacy `brick` key when `anchor` is absent, for older stored state.
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let legacy = try decoder.container(keyedBy: LegacyKeys.self)
@@ -764,9 +646,8 @@ struct Config: Codable, Equatable {
             ?? legacy.decodeIfPresent(AnchorProfile.self, forKey: .brick)
             ?? AnchorProfile()
         schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
-        // Absent in every state written before the trial existed, and absent means "no trial":
-        // a week of forgiveness is granted at the moment access is first given, and an upgrade
-        // is not that moment. An install already running keeps the delays it already had.
+        // Absent means no trial: an already-running install keeps its existing delays rather
+        // than getting a fresh grace period.
         trialStartedAt = try container.decodeIfPresent(Date.self, forKey: .trialStartedAt)
         trialEndsAt = try container.decodeIfPresent(Date.self, forKey: .trialEndsAt)
         isInTrial = try container.decodeIfPresent(Bool.self, forKey: .isInTrial) ?? false
@@ -777,15 +658,12 @@ struct Config: Codable, Equatable {
 
     var loosenDelay: TimeInterval { TimeInterval(loosenDelayHours) * 3600 }
 
-    /// Whether `target` is locked by the anchor at `now`. Any door being anchored anchors the
-    /// target: the halves are one thing, and one of them held is the whole of it held. Takes
-    /// the moment because a timed anchor is released the instant its time passes.
+    /// Whether `target` is locked by the anchor at `now`: any one of its doors held anchors the whole target.
     func isAnchored(_ target: Target, at now: Date) -> Bool { target.kinds.contains { anchor.blocks($0, at: now) } }
 
     func target(id: UUID) -> Target? { targets.first { $0.id == id } }
-    /// The target `kind` is a door into, whether it is the face or a linked half. Reading only
-    /// `kind` here would let the picker and an import add a second target for a half that is
-    /// already covered.
+    /// The target `kind` is a door into (face or linked half) — checks `covers`, not just `kind`,
+    /// to avoid the picker/import adding a duplicate target for an already-covered half.
     func target(kind: TargetKind) -> Target? { targets.first { $0.covers(kind) } }
 }
 
@@ -795,14 +673,11 @@ enum PendingKind: Codable, Hashable {
     case setDelay(hours: Int)
     /// Moving a target toward essential shortens its delay, so that is a loosening and queues.
     case setUtility(targetID: UUID, level: Utility)
-    /// Taking one half off a linked target: the website an app is also at stops being blocked
-    /// while the app stays. Something shielded a moment ago is not any more, so it is a
-    /// loosening and queues, exactly as removing the whole row does. Linking is the tightening
-    /// and lands at once.
+    /// Removes one half of a linked target (e.g. the site, leaving the app). A loosening, so it
+    /// queues like removal does; linking itself is a tightening and lands at once.
     case unlink(targetID: UUID, kind: TargetKind)
-    /// The anchor's drop times replaced with fewer, or shorter, ones. A schedule that can be
-    /// deleted at 9:59 PM is not a commitment, so a removal waits out the delay like every
-    /// other loosening; adding a drop lands at once. Zach's call, 2026-09-09.
+    /// Replaces the anchor's drop schedules. Removing/shortening one queues as a loosening
+    /// (else it isn't a real commitment); adding one lands at once.
     case setAnchorSchedules([AnchorSchedule])
 }
 
@@ -825,19 +700,15 @@ struct PendingChange: Codable, Hashable, Identifiable {
 struct RuntimeState: Codable, Equatable {
     var exhausted: [String: String] = [:]
     var warned: [String: String] = [:]
-    /// The moment each warning fired, beside the day it fired on. Screen Time hands Furlough
-    /// two facts about a budget and no others — "about five minutes left" and "spent" — so this
-    /// is the only instant at which the minutes remaining are actually known. From it the Live
-    /// Activity gets a real deadline to count down to; without it there is nothing to count.
-    /// Since 2026-09-09; a store without it warns exactly as before, with no countdown.
+    /// When each warning fired. Screen Time only ever reports "~5 minutes left" or "spent", so
+    /// this warning moment is the only real deadline the Live Activity can count down to.
     var warnedAt: [String: Date] = [:]
     /// Both clocks as they stood at the last save, so a wall clock moved forward is visible.
     var clock: ClockMark?
     var lastReconcile: Date?
     var lastRegistration: Date?
     var registrationError: String?
-    /// The record of the contract, by `Policy.dayKey`, kept for `Record.retainedDays`. Written
-    /// only through `Record`; never read by `Policy.decide`.
+    /// The record, keyed by `Policy.dayKey`; written only through `Record`, never read by `Policy.decide`.
     var days: [String: DayRecord] = [:]
     /// How far the record has counted. Whole minutes only, so the part-minute between two
     /// reconciles is carried rather than lost or double counted.
@@ -847,17 +718,13 @@ struct RuntimeState: Codable, Equatable {
 
     func isExhausted(_ id: UUID, dayKey: String) -> Bool { exhausted[id.uuidString] == dayKey }
     func wasWarned(_ id: UUID, dayKey: String) -> Bool { warned[id.uuidString] == dayKey }
-    /// When today's warning fired, or nil if it has not — or if it fired before this was
-    /// recorded, which is the same thing to everything that reads it.
+    /// When today's warning fired; nil if it hasn't, or if it fired before this field existed.
     func warnedMoment(_ id: UUID, dayKey: String) -> Date? {
         guard wasWarned(id, dayKey: dayKey) else { return nil }
         return warnedAt[id.uuidString]
     }
 
-    /// Tolerant, like `Config`'s: a phone that has been running since before the record existed
-    /// has no `days` key, and a synthesised decoder would throw on it rather than fall back to
-    /// the default. Everything here is a fact about today that can be recovered, so a missing
-    /// key is always the empty value and never a refusal to load the whole state.
+    /// Tolerant decoding: every missing key falls back to its empty value rather than throwing.
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         exhausted = try container.decodeIfPresent([String: String].self, forKey: .exhausted) ?? [:]
@@ -872,21 +739,17 @@ struct RuntimeState: Codable, Equatable {
     }
 }
 
-/// One day of the record. Written from the events that already move the shields — a threshold
-/// callback, a reconcile, a change queued or cancelled or landing — and read only by the two
-/// screens that show it. See `Record`.
+/// One day of the record, written from the events that already move the shields. See `Record`.
 struct DayRecord: Codable, Equatable {
     /// By target id, as a string: the same shape `exhausted` and `warned` are stored in.
     var targets: [String: TargetDay] = [:]
     /// Loosenings queued on this day.
     var queued = 0
-    /// Loosenings cancelled before they landed. The number worth showing: it is the count of
-    /// times the delay did its job.
+    /// Loosenings cancelled before landing — the count of times the delay did its job.
     var cancelled = 0
     /// Loosenings that waited out the delay and landed.
     var landed = 0
-    /// The longest stretch the Anchor held that ended on this day, in minutes. Recorded on
-    /// release rather than accumulated, so a stretch that ran over midnight is one number.
+    /// Longest Anchor stretch ending this day; recorded on release, so one spanning midnight counts once.
     var longestAnchorMinutes = 0
 
     init() {}
@@ -901,9 +764,8 @@ struct DayRecord: Codable, Equatable {
     }
 }
 
-/// What one target did on one day. The minutes are minutes of the day, not minutes of use:
-/// the phone cannot see use without Screen Time's data-access entitlement, so `spent` is the
-/// only thing here that knows a budget ran out, and the copy must not pretend otherwise.
+/// What one target did on one day. Minutes are minutes of the *day* (shielded/open), not usage —
+/// the phone can't see actual use without the Screen Time data-access entitlement.
 struct TargetDay: Codable, Equatable {
     /// The daily budget ran out.
     var spent = false
@@ -936,13 +798,11 @@ struct SharedState: Codable, Equatable {
 
 // MARK: - Host lookups
 
-/// Finding a target by its host. Both platforms have `.host` since 2026-09-08 — the Mac has
-/// only ever had it, and the phone gained typed sites alongside the picker's — so this is not
-/// Mac-only the way the bundle-identifier lookups below are.
+/// Finding a target by its host. Unlike the bundle-identifier lookups below, this applies on
+/// both platforms.
 extension Config {
-    /// The target whose host is `host` or a parent domain of it: "m.youtube.com" matches
-    /// "youtube.com". Searches every door, so a site linked to an app is found through the app's
-    /// target — which is the point of linking: one row answers for both halves.
+    /// The target whose host is `host` or a parent domain of it ("m.youtube.com" matches
+    /// "youtube.com"); searches every door, including a linked app's.
     func target(host: String) -> Target? {
         let host = host.lowercased()
         return targets
@@ -970,8 +830,7 @@ extension TargetKind {
 }
 
 extension Target {
-    /// The face's host, or "" when the face is not a typed site. `hosts` is what to read when
-    /// the question is which sites this target covers.
+    /// The face's host, or "" if it isn't a typed site; use `hosts` to ask what sites this target covers.
     var host: String { kind.hostName ?? "" }
 
     /// Every typed site this target covers, the face first.
@@ -992,20 +851,15 @@ extension Target {
         }
     }
 
-    /// Whether anything this target covers is counted against its budget.
-    ///
-    /// DeviceActivity counts tokens and nothing else, so a site typed by name is never counted —
-    /// on its own that leaves a target with hours and no budget at all. Linked to an app it is
-    /// different: the pair shares one budget event and the app's minutes draw it down, so the
-    /// budget is real and only the browser half is invisible. The editor says which it is.
+    /// Whether anything this target covers is counted against its budget. DeviceActivity counts
+    /// only tokens, so a typed-host-only target has hours but no real budget.
     var isCounted: Bool { kinds.contains { !$0.isHost } }
 
     /// Typed sites that share this target's budget without being counted towards it: the honest
     /// gap in a linked pair, and empty when there is none.
     var uncountedHosts: [String] { isCounted ? hosts : [] }
 
-    /// Whether this target covers the website half, however it got there: Apple's picker mints a
-    /// token, and a name typed into Furlough is a `.host`. Both are the site.
+    /// Whether this target covers the website half, whether picked (token) or typed (`.host`).
     var coversSite: Bool {
         kinds.contains { kind in
             #if os(iOS)
@@ -1019,8 +873,8 @@ extension Target {
 #if !os(iOS)
 // MARK: - Mac lookups
 
-/// Finding a Mac app by its bundle identifier. Here rather than beside the Mac's model because
-/// the import reads it too, and `Shared/Core` is the only place both can see.
+/// Finding a Mac app by its bundle identifier. Lives here (not with the Mac model) since the
+/// import also needs it.
 extension Config {
     func target(bundleID: String) -> Target? {
         targets.first { $0.kind == .macApp(bundleID: bundleID) }

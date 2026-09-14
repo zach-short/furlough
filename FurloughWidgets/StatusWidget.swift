@@ -19,16 +19,14 @@ struct StatusProvider: TimelineProvider {
         completion(StatusEntry(date: .now, summary: Policy.summary(state: SharedStore.load(), now: .now)))
     }
 
-    /// One entry per status change over the next day and a half, plus one every three
-    /// minutes while a window or an all-day app is open so the hourglass keeps draining.
-    /// Entries are free; only reloads count against the widget budget.
+    /// One entry per status change over the next 36h, plus every 3 min while draining so the
+    /// hourglass animates. Entries are free; only reloads count against the widget budget.
     func getTimeline(in context: Context, completion: @escaping (Timeline<StatusEntry>) -> Void) {
         let state = SharedStore.load()
         let clock = state.clock()
         var entries: [StatusEntry] = []
-        // The cursor runs on Furlough's own time, because that is what decides the timeline;
-        // each entry is then dated on the device's clock, because that is what WidgetKit
-        // compares against, and its summary moved with it so the countdowns read right.
+        // Cursor runs on Furlough's own time (what decides transitions); entries are dated on
+        // the device clock (what WidgetKit compares against), with the summary shifted to match.
         var cursor = clock.now
         let horizon = cursor.addingTimeInterval(36 * 3600)
         while entries.count < 200, cursor < horizon {
@@ -48,22 +46,16 @@ struct StatusProvider: TimelineProvider {
 
 struct StatusWidgetView: View {
     @Environment(\.widgetFamily) private var family
-    /// False wherever the system has taken the wall away: StandBy, the iPad Lock Screen,
-    /// CarPlay. It is the only signal any of those give — there is no StandBy widget family and
-    /// no StandBy environment value — so it is what the enlarged layout is keyed on. StandBy
-    /// takes the **small** widget and scales it up to half the screen, which is why the layout
-    /// changes rather than a new family being declared.
+    /// False in StandBy, iPad Lock Screen, CarPlay — the only signal for those, since there's
+    /// no StandBy widget family or environment value; enlarged layout keys off this instead.
     @Environment(\.showsWidgetContainerBackground) private var showsBackground
-    /// `.vibrant` on the iPad Lock Screen and in StandBy Night Mode, where the widget is
-    /// desaturated and re-coloured by the system — red, after dark, in the stand. Colour says
-    /// nothing there, so anything that was carrying meaning in a hue has to carry it in
-    /// contrast instead.
+    /// `.vibrant` on iPad Lock Screen / StandBy Night Mode, where the system desaturates and
+    /// re-colours the widget; meaning carried in hue elsewhere must carry in contrast instead.
     @Environment(\.widgetRenderingMode) private var renderingMode
     let entry: StatusEntry
 
-    /// The wall is gone, so this is StandBy, CarPlay or an iPad Lock Screen: read from across a
-    /// room rather than from a hand. Type goes up, the secondary lines go, and the content
-    /// margins shrink on their own.
+    /// True in StandBy/CarPlay/iPad Lock Screen: read from across a room, so type grows and
+    /// secondary lines drop.
     private var enlarged: Bool { !showsBackground }
 
     var body: some View {
@@ -72,19 +64,14 @@ struct StatusWidgetView: View {
                 .containerBackground(.clear, for: .widget)
         } else {
             home
-                // Removable by default, which is exactly right: in StandBy the system drops the
-                // wall and puts the type on the dark screen beside the other widget.
+                // In StandBy the system drops the wall and puts type on the dark screen beside
+                // the other widget.
                 .containerBackground(for: .widget) { EmberWall() }
         }
     }
 
-    /// Home-screen sizes: eyebrow, name in Display, countdown or next time in Geist Mono, detail,
-    /// and the status hourglass in the bottom corner.
-    ///
-    /// The glass is laid over the corner rather than given a column of its own: in the small
-    /// widget a column left the text 87 points, which cut "tmrw 1:00 AM" to "tmrw 1…" and
-    /// three names to "YouT…". Only the status lines at the bottom share a row with it, and
-    /// they keep clear of it with trailing padding.
+    /// The glass overlays the corner rather than taking its own column — a column left text
+    /// only 87pt wide, truncating names and times.
     private var home: some View {
         homeText
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -93,10 +80,8 @@ struct StatusWidgetView: View {
                     .frame(width: enlarged ? 42 : 30, height: enlarged ? 56 : 40)
             }
             .overlay(alignment: .topTrailing) {
-                // The medium widget has room for one action, and there is only one Furlough
-                // allows from a widget: dropping the anchor, which can only tighten. It runs
-                // the same intent Control Center does, in this extension; release stays in the
-                // app behind the tag.
+                // Medium widget has room for one action: dropping the anchor (same intent as
+                // Control Center) — release stays behind the tag in-app.
                 if family == .systemMedium, entry.summary.canDropAnchor {
                     Button(intent: DropAnchorIntent()) {
                         HStack(spacing: 5) {
@@ -156,9 +141,8 @@ struct StatusWidgetView: View {
                 detail("\(summary.blockedCount) blocked all day")
             }
             Spacer(minLength: 0)
-            // With the wall gone the widget is being read from across a room, so only the line
-            // that changes what you would do stays: the anchor, which is the one state the
-            // glass alone could be mistaken about at that distance.
+            // Enlarged (read from a distance): only the anchor line stays, since it's the one
+            // state the glass alone could be mistaken about.
             Group {
                 if !summary.allDayNames.isEmpty, !allDayOnly, !enlarged {
                     Text("\(headline(summary.allDayNames)) open all day")
@@ -184,21 +168,17 @@ struct StatusWidgetView: View {
 
     // MARK: Sizes
     //
-    // One set for a widget on a screen in your hand, one for a phone on a stand three feet
-    // away. Nothing conditional about *what* is said — the same lines, larger — because a
-    // widget that says something different in StandBy is a second widget to keep true.
+    // Same lines, just larger when enlarged — a widget saying something different in StandBy
+    // would be a second widget to keep true.
 
     private var eyebrowSize: CGFloat { enlarged ? 12 : 10 }
     private var numeralSize: CGFloat { enlarged ? 36 : 22 }
     private var nameSize: CGFloat { enlarged ? 24 : 15 }
     private var detailSize: CGFloat { enlarged ? 13.5 : 11 }
 
-    /// The glass this moment draws, adjusted for a rendering mode that has taken the colour
-    /// out of it. Under `.vibrant` the system desaturates the whole widget and re-colours it,
-    /// so the dim and grey glasses — 4.5 % and 3.5 % white, chosen against the app's dark room —
-    /// come out as an outline with nothing in it, and the soft ember halo comes out as a
-    /// smudge. The brightest of the existing glasses and no halo is the same drawing with the
-    /// contrast it needs; no new colour is introduced, because the palette is settled.
+    /// Under `.vibrant` the dim/grey glasses and the ember halo lose contrast against the
+    /// system's desaturating recolour, so this swaps to the brightest existing glass with no
+    /// halo rather than introduce a new colour.
     private var glass: HourglassState {
         var state = HourglassState.of(entry.summary, now: entry.date)
         guard renderingMode == .vibrant else { return state }
@@ -252,9 +232,8 @@ struct StatusWidgetView: View {
             .padding(.top, 3)
     }
 
-    /// One name and a count rather than a list cut off mid-word: "TikTok +2" in the small
-    /// widget, "TikTok, YouTube +1" in the medium. The summary lists named targets before
-    /// the ones still called "This app", so the names shown are the ones a person knows.
+    /// "TikTok +2" rather than a name cut off mid-word. Named targets are listed before
+    /// unnamed ones, so the names shown are ones the person recognizes.
     private func headline(_ names: [String]) -> String {
         let shown = family == .systemSmall ? 1 : 2
         let lead = names.prefix(shown).joined(separator: ", ")
@@ -262,7 +241,6 @@ struct StatusWidgetView: View {
         return rest > 0 ? "\(lead) +\(rest)" : lead
     }
 
-    /// "3 anchored", "Everything anchored", and the lift when the anchor has one.
     private func anchoredLine(_ summary: Policy.Summary) -> String {
         let what = summary.anchorsEverything ? "Everything anchored" : "\(summary.anchoredCount) anchored"
         guard let until = summary.anchorUntil else { return what }
@@ -278,21 +256,19 @@ struct StatusWidgetView: View {
             .padding(.top, 2)
     }
 
-    /// The part of a next-open time the numerals cannot carry at widget size: nil for later
-    /// today, "tomorrow", else the short weekday.
+    /// What the numerals alone can't carry at widget size: nil for later today, "tomorrow",
+    /// else the short weekday.
     private func nextDay(_ date: Date) -> String? {
         if Calendar.current.isDateInToday(date) { return nil }
         if Calendar.current.isDateInTomorrow(date) { return "tomorrow" }
         return date.formatted(.dateTime.weekday(.abbreviated))
     }
 
-    /// "Next" for later today. The day joins it otherwise, because "1:00 AM" on its own
-    /// reads as tonight.
+    /// Day joins "Next" except for later today, because "1:00 AM" alone reads as tonight.
     private func nextEyebrow(_ date: Date) -> String {
         nextDay(date).map { "Next · \($0)" } ?? "Next"
     }
 
-    /// The lock-screen line under the name: "opens 1:00 AM" today, else the day first.
     private func accessoryNext(_ date: Date) -> String {
         let time = date.formatted(date: .omitted, time: .shortened)
         return nextDay(date).map { "\($0) \(time)" } ?? "opens \(time)"
@@ -306,10 +282,8 @@ struct StatusWidget: Widget {
         }
         .configurationDisplayName("Furlough")
         .description("What is open now and when the next window starts.")
-        // Three families and no more. StandBy and CarPlay both take the **small** one and
-        // scale it up — there is no StandBy family and no StandBy API — so supporting StandBy
-        // is a layout question inside `systemSmall`, not a fourth entry here. `systemLarge`
-        // would be a new Home Screen tile nobody asked for and would not reach StandBy at all.
+        // No StandBy family exists; StandBy/CarPlay reuse systemSmall scaled up, so that's a
+        // layout question inside systemSmall, not a fourth family here.
         .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular])
     }
 }

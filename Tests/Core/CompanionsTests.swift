@@ -109,10 +109,8 @@ struct CompanionsTests {
         }
     }
 
-    /// Two pairs claiming the same host is a bug: `pair(forHost:)` answers with the first and
-    /// the second becomes unreachable from the web side. A *subdomain* of another pair's host is
-    /// the one legal overlap — music.youtube.com is YouTube Music, not YouTube — because the
-    /// longest match wins, and that is tested above.
+    // A shared host is a bug (the second pair becomes unreachable); a *subdomain* of another
+    // pair's host is the one legal overlap, resolved by longest-match above.
     @Test("No host or identifier is claimed by two pairs")
     func nothingIsClaimedTwice() {
         var hosts: [String: String] = [:]
@@ -129,8 +127,7 @@ struct CompanionsTests {
         }
     }
 
-    /// A name that normalizes to nothing would match every app whose name the shield has not
-    /// learned yet, so the table must never carry one.
+    // An empty-after-normalizing name would match every unlearned app name.
     @Test("Every name survives normalizing, and no pair is listed twice")
     func namesAreRealAndPairsAreDistinct() {
         var seen: [String: String] = [:]

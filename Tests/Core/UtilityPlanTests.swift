@@ -1,9 +1,8 @@
 import Foundation
 import Testing
 
-/// `Policy.plan` decides what a tier edit does. The case that matters is the one that used to
-/// be missed: the rule editor seeds its picker from a *queued* tier, so choosing the saved tier
-/// back has to cancel the queued change rather than quietly leave it in place.
+/// The picker seeds from a *queued* tier, so choosing the saved tier back must cancel the
+/// queued change rather than quietly leave it in place — the case that used to be missed.
 @Suite("Policy.plan(utility:)")
 struct UtilityPlanTests {
     func target(_ level: Utility?, rule: Rule? = Rule(windows: [window(600, 660)], dailyBudgetMinutes: 30)) -> Target {
@@ -17,8 +16,7 @@ struct UtilityPlanTests {
         #expect(Policy.plan(utility: .hazard, for: target(.hazard), queued: false) == .unchanged)
     }
 
-    /// A target nobody has tiered is already effectively `.useful`, so choosing that is not a
-    /// change — and must not quietly record a choice that turns off the suggestion.
+    // Already effectively `.useful`; must not quietly record a choice that turns off the suggestion.
     @Test("choosing the default on an untiered target is nothing to do")
     func untieredDefault() {
         #expect(Policy.plan(utility: .unset, for: target(nil), queued: false) == .unchanged)
@@ -44,9 +42,7 @@ struct UtilityPlanTests {
 
     // MARK: Cancelling a queued tier change
 
-    /// The defect this function exists to close. The picker shows the queued tier; picking the
-    /// saved one back used to compare equal and return "nothing to do", leaving the queued
-    /// loosening to land anyway.
+    // Used to compare equal to the queued tier and return "nothing to do", leaving it to land anyway.
     @Test("choosing the saved tier back cancels a queued change")
     func cancelsQueued() {
         #expect(Policy.plan(utility: .hazard, for: target(.hazard), queued: true) == .now)
@@ -68,8 +64,8 @@ struct UtilityPlanTests {
     }
 }
 
-/// Anchoring is instant, unrecoverable without the tag, and reaches things that are not even
-/// targets, so it says something one tier wider than an ordinary block does.
+/// Anchoring is instant and unrecoverable without the tag, so it warns one tier wider than an
+/// ordinary block does.
 @Suite("Anchoring warns one tier wider")
 struct AnchorWarningWidthTests {
     @Test("idle is worth a word before anchoring, but not before a rule")
@@ -92,8 +88,7 @@ struct AnchorWarningWidthTests {
         }
     }
 
-    /// Idle gets words that fit it: it is not flattered as "worth having around", which is what
-    /// the useful tier's line says.
+    // Not flattered as "worth having around", which is the useful tier's line.
     @Test("an idle anchor warning says what is true, that it goes")
     func idleCopy() {
         let text = UtilityText.anchoring(names: ["Instagram"], utility: .idle, detail: nil)
@@ -107,7 +102,6 @@ struct AnchorWarningWidthTests {
         #expect(UtilityText.blocking(name: "Instagram", utility: .idle, detail: nil) == nil)
     }
 
-    /// An anchor holding only idle things now speaks, where before it was silent.
     @Test("an anchor holding only idle targets warns")
     func anchorOfIdleWarns() {
         var idle = makeTarget("Instagram", rule: nil)
@@ -119,7 +113,6 @@ struct AnchorWarningWidthTests {
         #expect(warning?.names == ["Instagram"])
     }
 
-    /// The most-essential tier still speaks over the rest.
     @Test("an essential in the anchor still outranks an idle one")
     func essentialOutranksIdle() {
         var idle = makeTarget("Instagram", rule: nil)

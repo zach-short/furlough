@@ -172,8 +172,7 @@ struct UsageAnalysisTests {
 
     @Test("a peak too wide to close leaves only a budget")
     func peakTooWideToClose() throws {
-        // Twenty minutes an hour from 7 AM to 6 PM: 60 % of it needs eight hours, and "closed
-        // 7 AM to 3 PM" is not a suggestion anybody takes.
+        // 20 min/hour, 7 AM–6 PM: 60% needs 8 hours, and "closed 7 AM to 3 PM" helps nobody.
         var spread: [Int: Double] = [:]
         for hour in 7...18 { spread[hour] = 20 }
         #expect((UsageAnalysis.peak(in: hourly(spread))?.spanMinutes ?? 0) > UsageAnalysis.longestPeakMinutes)
@@ -191,8 +190,7 @@ struct UsageAnalysisTests {
 
     @Test("a peak too wide to close becomes a bedtime when most of it is late")
     func bedtime() throws {
-        // Eleven minutes in each late hour and nine in each of 4 PM to 10 PM: the run holding
-        // 60 % is seven hours long, too wide to suggest, but 55 % of it lands after 10 PM.
+        // The 60%-holding run is 7 hours (too wide to suggest), but 55% of it is after 10 PM.
         var owl: [Int: Double] = [:]
         for hour in UsageAnalysis.lateHours { owl[hour] = 11 }
         for hour in 16...21 { owl[hour] = 9 }
@@ -220,8 +218,7 @@ struct UsageAnalysisTests {
     }
 }
 
-/// The two sentences a card says. Every one of them is checked whole, through `plainSpaces`,
-/// because a card is only as good as the line a stranger reads off it.
+/// Checked whole, through `plainSpaces`: a card is only as good as the line a stranger reads off it.
 @Suite("Suggestions in words")
 struct UsageWordsTests {
     private func advice(_ peaks: [Recommendation.Peak], budget: Int = 35) -> Recommendation {

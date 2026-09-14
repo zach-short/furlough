@@ -19,8 +19,8 @@ enum ProposalResult: Equatable {
     }
 }
 
-/// Single source of truth for the Mac UI. Every mutation goes through persisted state and
-/// then `enforce()`, exactly as on iOS; only the enforcement underneath is different.
+/// Every mutation goes through persisted state then `enforce()`, as on iOS; only enforcement
+/// underneath differs.
 @MainActor
 @Observable
 final class MacModel {
@@ -31,47 +31,28 @@ final class MacModel {
     var notificationsGranted: Bool?
     var isOnboarded = SharedStore.defaults.bool(forKey: MacModel.onboardedKey)
     var launchesAtLogin = SMAppService.mainApp.status == .enabled
-    /// Whether the launchd agent that reopens Furlough after a Force Quit is registered.
     var watchdogIsOn = Watchdog.isOn
-    /// Which browsers are running and whether Furlough may read their address bar.
     var browserAccess: [BrowserAccess] = []
     let enforcer = Enforcer.shared
-    /// Furlough's own time, re-read once a second. Every countdown and every used-today line
-    /// in the window reads it from here rather than keeping a timer of its own: the detail
-    /// pane is rebuilt on every tick of the window's clock, and a timer owned by a view that
-    /// is rebuilt that often is re-subscribed before it can ever fire, so anything counting on
-    /// it stands still until the view is made again.
+    /// A per-view `Timer` never fires here: the detail pane rebuilds every tick and
+    /// re-subscribes it first. Views read `now` from the model instead.
     private(set) var now = Date.now
 
-    /// The half the intro was told to start on: the one the window opens on, and the guide that
-    /// runs first. In the App Group beside `furlough.mac.onboarded`, and for the same reason as
-    /// the phone keeps its copy out of the shared state — it records what was asked for, not
-    /// what is blocked, so it must not travel in an exported setup or wait out a delay.
-    ///
-    /// Rules when nothing has been asked, so a Mac updating from a build that never had the
-    /// question comes up on the window it has always come up on.
+    /// Stored beside `furlough.mac.onboarded`, outside `SharedState`: like the phone's copy,
+    /// it records what was asked, not what is blocked, so it must not travel in an exported
+    /// setup or wait out a delay.
     private(set) var startHalf = MacModel.storedStartHalf
-    /// The start pane's third line, which is not a third choice: "Both" opens on `startHalf` and
-    /// leaves the other half's guide running too.
+    /// Not a third half — opens on `startHalf`, but keeps the other half's guide running too.
     private(set) var wantsBothHalves = SharedStore.defaults.bool(forKey: MacModel.bothHalvesKey)
-    /// What the + button adds while the Anchor half is the one on screen. The anchor, because the
-    /// + acts on the half you are looking at — with a way to change it, for somebody who set the
-    /// anchor up once and reads + as "give an app hours" wherever it is. See the phone's
+    /// Which half the + button adds to while the Anchor half is on screen. See the phone's
     /// `AppModel.anchorPageAdds`.
     private(set) var anchorHalfAdds = MacModel.storedAnchorHalfAdds
-    /// The halves whose three-step guide has been walked to the end. A flag rather than a derived
-    /// fact because the last step of each is not something the config can answer; the first two
-    /// are derived — see `HalfGuide`.
+    /// A flag, not derived: the last guide step can't be answered from config alone — the
+    /// first two can, see `HalfGuide`.
     private(set) var finishedGuides = MacModel.storedFinishedGuides
 
-    /// The web filter has been put in front of someone once, off the back of a website they
-    /// added. Asked once and not again: Settings > Web has the same buttons for anyone who says
-    /// no and changes their mind, and a prompt that comes back every time a site is added is the
-    /// thing people learn to click past.
     private(set) var hasOfferedWebFilter = SharedStore.defaults.bool(forKey: MacModel.filterOfferedKey)
-    /// Whether Monday morning brings this Mac's record as a notification. This Mac's own,
-    /// about this Mac's own week: the record does not cross devices, so neither does the
-    /// preference, and the phone keeps a separate one about its own. See
+    /// Per-device, like the record it's about — doesn't sync, unlike most settings. See
     /// `PendingNotifications.digestPreferenceKey`.
     private(set) var weeklyDigest = PendingNotifications.wantsWeeklyDigest
 
@@ -105,18 +86,14 @@ final class MacModel {
             SharedStore.save(stored)
             SharedStore.log("moved app names out of the nickname field")
         }
-        // The enforcer changes state on its own (a budget spent, a pending change landing),
-        // and the widget draws from that state, so every change refreshes it.
+        // The enforcer can change state on its own (a budget spent, a pending change landing);
+        // refresh the widget on every change.
         enforcer.onChange = { [weak self] in
             self?.reload()
             WidgetCenter.shared.reloadAllTimelines()
         }
-        // The one touch a week nobody opens Furlough still gets: `enforce(reason:)` is what
-        // re-plans the weekly digest everywhere else, but it only runs on launch and on a
-        // person's own edits, and this Mac has no midnight callback waking it the way the
-        // phone's monitor extension does. The usage ledger's own day-boundary check inside the
-        // enforcer's tick is the thing that already happens once a day regardless, so it is
-        // what stands in for one here — see `Enforcer.onDayRollover`.
+        // No midnight callback on Mac; the enforcer's day-boundary tick re-plans the digest
+        // here instead — see `Enforcer.onDayRollover`.
         enforcer.onDayRollover = { [weak self] state in
             guard let self else { return }
             let clock = state.clock()
@@ -133,8 +110,7 @@ final class MacModel {
         observeCloud()
         AnchorCloud.synchronize()
         SharedStore.log("iCloud at launch: \(cloudAvailable ? "reachable" : "unreachable; the anchor cannot cross")")
-        // Once, on the first launch of a build that has the roster: a Mac that was already
-        // talking to its phone stays on the link, and one that was not starts off it.
+        // One-time: grandfathers a Mac already talking to its phone onto the link.
         DeviceLink.decideGrandfathering(now: state.now)
         enforce(reason: "launch")
         refreshLink()
@@ -143,9 +119,8 @@ final class MacModel {
 
     // MARK: The two halves
 
-    /// The start pane, answered. Written when Continue is pressed rather than on each click, so
-    /// backing out of the intro and coming at it again does not leave a half chosen by a mouse
-    /// that was on its way somewhere else.
+    /// Written on Continue, not per-click, so backing out of the intro doesn't leave a stray
+    /// half chosen.
     func chooseStart(half: Half, both: Bool) {
         SharedStore.defaults.set(half.rawValue, forKey: Self.startHalfKey)
         SharedStore.defaults.set(both, forKey: Self.bothHalvesKey)
@@ -153,46 +128,36 @@ final class MacModel {
         wantsBothHalves = both
     }
 
-    /// The same answer, changed later from Settings. `wantsBothHalves` rides along unchanged:
-    /// moving the half the window opens on says nothing about whether the other half's guide
-    /// still runs.
+    /// `wantsBothHalves` is untouched: changing the opening half doesn't affect the other guide.
     func setStartHalf(_ half: Half) {
         guard half != startHalf else { return }
         chooseStart(half: half, both: wantsBothHalves)
     }
 
-    /// Which half the + adds to over the Anchor half. See `anchorHalfAdds`.
     func setAnchorHalfAdds(_ half: Half) {
         guard half != anchorHalfAdds else { return }
         SharedStore.defaults.set(half.rawValue, forKey: Self.anchorHalfAddsKey)
         anchorHalfAdds = half
     }
 
-    /// Where a + click lands, given the half it was clicked over. Rules always adds a rule
-    /// target; the Anchor half asks the preference.
     func addDestination(on half: Half) -> Half {
         half == .rules ? .rules : anchorHalfAdds
     }
 
-    /// One half's guide is done with: its last step was pressed, or the anchor it was walking
-    /// towards has been dropped.
     func finishGuide(_ half: Half) {
         guard !finishedGuides.contains(half) else { return }
         write(finishedGuides: finishedGuides.union([half]))
     }
 
-    /// Both checklists, asked for again from Settings. Only the last step of each is a flag, so
-    /// this is the whole of what can be undone: a half that is set up comes back showing its
-    /// third step live rather than pretending the apps were never picked.
+    /// Only the last step is a flag; the first two re-derive live from config, so this is the
+    /// whole of what needs resetting.
     func restartGuides() {
         guard !finishedGuides.isEmpty else { return }
         write(finishedGuides: [])
     }
 
-    /// A Mac that arrives already set up has no guide owed to it. Run once, on the first launch
-    /// of a build that has guides at all: without it an update would put a checklist in front of
-    /// somebody who has been using Furlough for months. The key being absent is what "never
-    /// asked" means, so writing an empty set is what closes the question.
+    /// Runs once, keyed by the key's absence (`nil` means "never asked"); writing even an
+    /// empty set closes it.
     private func seedFinishedGuides() {
         guard SharedStore.defaults.object(forKey: Self.finishedGuidesKey) == nil else { return }
         var seeded: Set<Half> = []
@@ -207,8 +172,6 @@ final class MacModel {
         finishedGuides = halves
     }
 
-    /// The four questions the old Enforcement section asked, answered as one sentence. The rows
-    /// themselves are a screen in now — see `Diagnostics` and `MacDiagnosticsView`.
     var diagnostics: Diagnostics {
         Diagnostics.macSummary(
             Diagnostics.MacReading(
@@ -220,9 +183,8 @@ final class MacModel {
         )
     }
 
-    /// The filter's nine states, as the four the row asks about. `notInApplications` is broken
-    /// rather than not-installed: it was asked for and macOS will not load it from where the app
-    /// is sitting.
+    /// `notInApplications` maps to broken, not not-installed: it was asked for but macOS
+    /// won't load it from here.
     private var filterReading: Diagnostics.MacReading.Filter {
         switch enforcer.webFilter.status {
         case .notInstalled: .notInstalled
@@ -237,13 +199,11 @@ final class MacModel {
     @ObservationIgnored private var cloudObserver: (any NSObjectProtocol)?
     @ObservationIgnored private var cloudPolls = 0
 
-    /// Whether iCloud can carry the anchor between this Mac and the phone. Kept here rather
-    /// than read in the view: asking is a round trip to the key-value store, and the anchor
-    /// sheet would ask on every rebuild of a window that rebuilds once a second.
+    /// Cached here, not read in the view: it's a KV-store round trip, and the view rebuilds
+    /// every second.
     private(set) var cloudAvailable = AnchorCloud.isAvailable
 
-    /// Listens for the phone's writes, once. iCloud posts the change to a running app, which
-    /// on the Mac is always, and the ticker asks again every half minute in case it did not.
+    /// iCloud's change notification isn't guaranteed; the ticker also polls every 30s as backup.
     private func observeCloud() {
         guard cloudObserver == nil else { return }
         cloudObserver = NotificationCenter.default.addObserver(
@@ -257,9 +217,8 @@ final class MacModel {
         }
     }
 
-    /// Re-reads whether iCloud is there, and says so in the log when the answer moves. Called
-    /// at launch, when iCloud reports an account change, and on the half-minute poll — the
-    /// account can be signed out in System Settings without the store saying a word.
+    /// The account can be signed out in System Settings with no notification; this is how
+    /// it's noticed.
     func refreshCloudAvailability(reason: String) {
         let available = AnchorCloud.isAvailable
         guard available != cloudAvailable else { return }
@@ -267,16 +226,11 @@ final class MacModel {
         SharedStore.log("iCloud is \(available ? "reachable again" : "unreachable; the anchor cannot cross") (\(reason))")
     }
 
-    /// The link to the phone, as the Anchor sheet shows it. Re-read on demand rather than
-    /// observed: it costs a read of the key-value store, and the sheet asks when it opens and
-    /// when Check now is pressed.
+    /// Re-read on demand, not observed: it's a KV-store read.
     private(set) var link = AnchorSync.linkStatus()
 
-    /// Asks iCloud for whatever it has, merges it, and re-reads the link. What Check now does,
-    /// and the one action in Furlough whose whole purpose is to answer "is this working".
-    ///
-    /// Deliberately does all three: a synchronize alone leaves the sheet showing what it read
-    /// before, and a re-read alone would not have asked iCloud for anything new.
+    /// Does all three deliberately: sync alone leaves stale data shown, re-read alone fetches
+    /// nothing new.
     func checkLink() {
         AnchorCloud.synchronize()
         refreshCloudAvailability(reason: "check link")
@@ -285,8 +239,6 @@ final class MacModel {
         SharedStore.log("link check: \(link.headline) — \(link.detail(now: now))")
     }
 
-    /// Merges what the other devices wrote — the anchor through `AnchorSync.merge`, and what
-    /// they added through `LinkFlow.takeArrivals` — and enforces if any of it changed anything.
     func applyRemoteAnchor(reason: String) {
         var current = SharedStore.load()
         let note = AnchorSync.pull(into: &current.config, now: current.now)
@@ -302,20 +254,13 @@ final class MacModel {
 
     // MARK: The link
 
-    /// Whether this Mac is on the link, as the screens read it.
     private(set) var isEnrolled = DeviceLink.isEnrolled
-    /// The other devices on the link, for the Devices screen. Read with the link status.
     private(set) var devices: [LinkedDevice] = []
-    /// Whether an iPhone is on the link with this Mac: the one thing that could ever release an
-    /// anchor dropped here. Cached with the roster for the window's sublines; `dropAnchor`
-    /// asks the store afresh.
+    /// Cached for display; `dropAnchor` re-reads fresh rather than trusting this.
     private(set) var hasKey = false
-    /// What the other devices added and this Mac is asking about, oldest first.
     private(set) var arrivals: [SharedAdditions.Landing] = []
-    /// What this Mac added and is asking whether to send.
     private(set) var outgoing: [SharedAddition] = []
 
-    /// Re-reads everything the Devices screen shows.
     func refreshLink() {
         link = AnchorSync.linkStatus()
         isEnrolled = DeviceLink.isEnrolled
@@ -324,7 +269,6 @@ final class MacModel {
         hasKey = isEnrolled && roster.hasKey(besides: AnchorSync.deviceID)
     }
 
-    /// What this Mac has, normalized identifier to name, for landing what a phone added.
     private static func installedByIdentifier() -> [String: String] {
         Dictionary(
             AppCatalog.installed().map { (Companions.normalize(bundleID: $0.bundleID), $0.name) },
@@ -332,8 +276,7 @@ final class MacModel {
         )
     }
 
-    /// The settings the Devices screen changes. Saved and nothing enforced: turning any of them
-    /// down blocks nothing that was blocked.
+    /// Saved only; none of these settings ever block anything themselves.
     func setLinkPreferences(_ preferences: LinkPreferences) {
         guard preferences != state.config.link else { return }
         SharedStore.mutate { $0.config.link = preferences }
@@ -343,7 +286,6 @@ final class MacModel {
         applyRemoteAnchor(reason: "link settings")
     }
 
-    /// Puts this Mac on the link under `name`, or renames it there.
     func enrollDevice(name: String) {
         DeviceLink.enroll(name: name, now: now)
         SharedStore.log("link: joined as \(DeviceLink.name)")
@@ -352,7 +294,6 @@ final class MacModel {
         settleLink(reason: "joined the link")
     }
 
-    /// Takes this Mac off the link. Why not, or nil.
     func leaveLink() -> String? {
         if let refusal = DeviceLink.leave(anchorHoldsHere: state.config.anchor.isHolding(at: now), now: now) {
             return refusal.message
@@ -363,7 +304,6 @@ final class MacModel {
         return nil
     }
 
-    /// Takes another device off the link from here. Why not, or nil.
     func revokeDevice(_ id: String) -> String? {
         if let refusal = DeviceLink.revoke(id, anchorHoldsHere: state.config.anchor.isHolding(at: now), now: now) {
             return refusal.message
@@ -372,12 +312,11 @@ final class MacModel {
         return nil
     }
 
-    /// Sends what is awaiting, or lines it up to ask about. A Mac app names itself, so this
-    /// settles in the same breath as the add.
+    /// A Mac app names itself, so this settles in the same breath as the add (no extra
+    /// confirmation step).
     func settleLink(reason: String) {
         outgoing = LinkFlow.settleAwaiting(config: state.config, now: now) {
-            // What this Mac calls the apps its anchor holds and no rule covers. Asked for only
-            // when the walk finds one, because it reads the Applications folders.
+            // Only computed when needed: reads the Applications folder, which isn't free.
             var names: [TargetKind: String] = [:]
             let installed = Self.installedByIdentifier()
             for kind in state.config.anchor.kinds {
@@ -400,7 +339,6 @@ final class MacModel {
         outgoing.removeAll { $0.id == addition.id }
     }
 
-    /// Lands one the person said yes to. What it did, for the alert.
     @discardableResult
     func acceptArrival(_ landing: SharedAdditions.Landing) -> String {
         var current = SharedStore.load()
@@ -421,16 +359,12 @@ final class MacModel {
         arrivals.removeAll { $0.addition.id == landing.addition.id }
     }
 
-    /// Drops the anchor on this Mac and tells the phone. No tag here, so no timed drop and no
-    /// release: only the phone's tag, arriving through iCloud, lifts it. Returns why not.
+    /// No NFC tag on the Mac: only the phone's tag, via iCloud, can release this anchor.
     func dropAnchor() -> String? {
         var current = SharedStore.load()
         let now = current.now
-        // Asked afresh, not read from the cache the banner draws from. The cache is refreshed
-        // when iCloud says the account moved and on the half-minute poll, and this is the one
-        // decision where being a poll behind is unrecoverable: an account signed out in System
-        // Settings a moment ago would otherwise buy a lock with no key. The roster likewise —
-        // the phone may have left the link since the subline last read it.
+        // Re-read fresh, not cached: a poll-stale iCloud/roster read here could lock the
+        // anchor with no key to release it.
         refreshCloudAvailability(reason: "about to drop")
         refreshLink()
         if let refusal = AnchorSync.macDrop(&current.config, now: now, hasKey: hasKey, cloudAvailable: cloudAvailable) {
@@ -440,14 +374,10 @@ final class MacModel {
         SharedStore.log("anchored (Mac): \(current.config.anchor.heldDescription)")
         enforce(reason: "anchor")
         AnchorSync.publish(current.config.anchor, origin: .drop, now: now)
-        // The guide's last step was Drop it, and this is a drop however it was asked for.
         finishGuide(.anchor)
         return nil
     }
 
-    /// Adds one app or website to the anchor's list — what the + button does over the Anchor
-    /// half. Refused while the anchor is down, like every other change to the list. Returns why
-    /// not, or nil.
     @discardableResult
     func addToAnchor(_ kind: TargetKind) -> String? {
         let current = SharedStore.load()
@@ -462,8 +392,6 @@ final class MacModel {
         return nil
     }
 
-    /// Replaces the anchor's list: bundle identifiers and hosts, what it holds or, under the
-    /// everything-except scope, what it lets through. Refused while anchored.
     func setAnchorKinds(_ kinds: [TargetKind]) {
         var current = SharedStore.load()
         guard !current.config.anchor.isHolding(at: current.now), kinds != current.config.anchor.kinds else { return }
@@ -471,14 +399,12 @@ final class MacModel {
         SharedStore.save(current)
         SharedStore.log("anchor: now \(current.config.anchor.anchorsEverything ? "lets through" : "holds") \(kinds.count) item(s)")
         enforce(reason: "anchor edit")
-        // Held here is worth holding there. Every way onto the list comes through here, and the
-        // list is what the link walks, so nothing has to be written down as awaiting — and an
-        // app the anchor holds that has no rule at all crosses exactly like one that has.
+        // Single entry point for the anchor list, so the link's sync needs no separate
+        // awaiting-state.
         settleLink(reason: "anchor edit")
     }
 
-    /// The phone's `setAnchorScope`, with the same rule: the list does not survive the switch.
-    /// Widening starts the allowlist from every target tiered Essential, narrowing empties it.
+    /// Same behavior as the phone's `setAnchorScope`: the list does not survive the switch.
     func setAnchorScope(_ scope: AnchorProfile.Scope) {
         var current = SharedStore.load()
         guard !current.config.anchor.isHolding(at: current.now), current.config.anchor.scope != scope else { return }
@@ -496,26 +422,15 @@ final class MacModel {
         setWatchdog(true)
     }
 
-    /// Whether the web filter is worth putting in front of someone right now.
-    ///
-    /// It used to be the last pane of the first run, which asked for a trip to System Settings
-    /// before there was a single rule to enforce — a cost paid up front for a benefit that did
-    /// not exist yet, and the one step most people met before they met anything else. The filter
-    /// does nothing at all until some host is blocked, which is the same condition `Enforcer`
-    /// already uses before it reads a browser at all. So the offer waits for the first website,
-    /// where the reason for it is concrete and on screen.
-    ///
-    /// Somebody who only ever blocks applications is never asked, which is the whole saving, and
-    /// it costs them no question to get it.
+    /// Waits for the first host target, matching the threshold `Enforcer` already uses before
+    /// reading any browser.
     var shouldOfferWebFilter: Bool {
         guard !hasOfferedWebFilter, isOnboarded else { return false }
         guard !enforcer.webFilter.isWanted, !enforcer.webFilter.status.isOn else { return false }
         return state.config.hasAnyHost
     }
 
-    /// Turns the weekly digest on or off. The enforce is what re-plans it, so turning it off
-    /// also withdraws the one already scheduled: `sync` takes away anything of Furlough's that
-    /// is no longer planned.
+    /// `enforce`'s `sync` withdraws any already-scheduled digest when turned off.
     func setWeeklyDigest(_ on: Bool) {
         guard on != weeklyDigest else { return }
         PendingNotifications.setWantsWeeklyDigest(on)
@@ -524,7 +439,6 @@ final class MacModel {
         enforce(reason: "weekly digest")
     }
 
-    /// The offer has been made, whichever way it was answered.
     func noteWebFilterOffered() {
         guard !hasOfferedWebFilter else { return }
         SharedStore.defaults.set(true, forKey: Self.filterOfferedKey)
@@ -559,28 +473,22 @@ final class MacModel {
         launchesAtLogin = SMAppService.mainApp.status == .enabled
     }
 
-    /// The watchdog is part of enforcement rather than a convenience, so turning it off is a
-    /// loosening — but it is deliberately not held behind the delay: System Settings can
-    /// switch the agent off anyway, and a toggle that lied about that would be worse.
+    /// Not held behind the loosening delay: System Settings can switch this off anyway regardless.
     func setWatchdog(_ on: Bool) {
         if !Watchdog.set(on) { lastError = Self.watchdogRefused }
         watchdogIsOn = Watchdog.isOn
     }
 
-    /// Said by the toggle and by the reset, so the two cannot drift apart.
     static let watchdogRefused = "Could not change the watchdog. System Settings > General > Login Items has the final say."
 
     func reload() {
         state = SharedStore.load()
     }
 
-    /// Furlough's own time and how far this Mac's clock is from it. Every view that shows a
-    /// countdown reads it through here; see `Clock`.
     var clock: Clock.Reading { state.clock() }
 
-    /// The window's second hand. The same shape as the enforcer's tick and the menu bar's:
-    /// built by hand and added to the common mode, so the countdowns keep moving while a menu
-    /// is open or a window is being dragged.
+    /// Added to `.common` RunLoop mode so it keeps firing while a menu is open or a window
+    /// is dragged.
     private func startTicking() {
         guard ticker == nil else { return }
         now = clock.now
@@ -588,13 +496,9 @@ final class MacModel {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 self.now = self.clock.now
-                // The key-value store is read locally and cheaply; iCloud is asked to refresh
-                // it every half minute, since its own change notification is not a promise.
                 self.cloudPolls += 1
                 if self.cloudPolls % 30 == 0 {
                     AnchorCloud.synchronize()
-                    // Signing out happens in System Settings, which the store has no opinion
-                    // about, so the banner would otherwise stay wrong until the next launch.
                     self.refreshCloudAvailability(reason: "poll")
                     self.applyRemoteAnchor(reason: "poll")
                 }
@@ -605,8 +509,6 @@ final class MacModel {
         ticker = timer
     }
 
-    /// Re-derives everything from persisted state: folds in due pending changes and makes
-    /// the Mac match the rules. Safe to call at any time.
     func enforce(reason: String) {
         var current = SharedStore.load()
         let clock = current.clock()
@@ -628,7 +530,6 @@ final class MacModel {
         reload()
     }
 
-    /// Seconds of use counted against a target's budget today.
     func usedSeconds(for id: UUID) -> Int {
         enforcer.usedSeconds(for: id)
     }
@@ -640,23 +541,21 @@ final class MacModel {
         var message: String
     }
 
-    /// Adds a Mac app by bundle identifier. Nothing is enforced until its first rule is saved.
+    /// Nothing is enforced until its first rule is saved.
     @discardableResult
     func addApp(bundleID: String, name: String) -> AddOutcome {
         var current = SharedStore.load()
         if let existing = current.config.target(bundleID: bundleID) {
             return AddOutcome(added: existing, message: "\(existing.displayName) is already in Furlough.")
         }
-        // The app's own name goes in `systemName`, not `nickname`: that is the field
-        // `defaultName` reads, so clearing a nickname later comes back to "Safari" rather
-        // than to com.apple.Safari. `nickname` stays what Zach called it, as on the phone.
+        // Goes in `systemName`, not `nickname`: `defaultName` reads `systemName`, so clearing
+        // a nickname falls back to this rather than the bundle id.
         let target = Target(kind: .macApp(bundleID: bundleID), systemName: name)
         current.config.targets.append(target)
         SharedStore.save(current)
         SharedStore.log("added app \(bundleID)")
         enforce(reason: "add app")
-        // The site it is also at, under Always: rows of their own, as the companion sheet
-        // would have added them, without the sheet. Under Ask the sheet still asks.
+        // Under Always, add companion host rows directly; under Ask, the sheet still prompts.
         if current.config.link.companionSite == .always {
             let hosts = Companions.hosts(forBundleID: bundleID, name: name).filter { current.config.target(host: $0) == nil }
             if !hosts.isEmpty { addHosts(hosts) }
@@ -666,7 +565,7 @@ final class MacModel {
         return AddOutcome(added: target, message: "Added. Set a schedule; nothing is enforced until you do.")
     }
 
-    /// Adds a website by host. Anything that looks like a URL is reduced to its host.
+    /// Anything that looks like a URL is reduced to its host.
     @discardableResult
     func addHost(_ raw: String) -> AddOutcome {
         guard let host = Hosts.normalize(raw) else {
@@ -686,9 +585,7 @@ final class MacModel {
         return AddOutcome(added: target, message: "Added. Set a schedule; nothing is enforced until you do.")
     }
 
-    /// Adds the websites offered beside an app just added, in one save, skipping any already
-    /// here. Each lands unconfigured like anything else: nothing is enforced until it has a
-    /// schedule. Returns what was added, for the log and the caller's selection.
+    /// Skips hosts already present; each lands unconfigured, same as any new target.
     @discardableResult
     func addHosts(_ hosts: [String]) -> [Target] {
         var current = SharedStore.load()
@@ -708,7 +605,7 @@ final class MacModel {
         return added
     }
 
-    /// `addHosts` the other way round: the apps offered beside a website just added.
+    /// `addHosts`, but for apps offered beside a website just added.
     @discardableResult
     func addApps(_ apps: [(bundleID: String, name: String)]) -> [Target] {
         var current = SharedStore.load()
@@ -729,8 +626,7 @@ final class MacModel {
 
     // MARK: Importing a setup
 
-    /// What a chosen file would do here. Reads the store rather than the view's copy of it,
-    /// and writes nothing: the plan exists to be shown before any of it happens.
+    /// Reads the store fresh and writes nothing; the plan is shown before anything happens.
     func review(fileAt url: URL) -> Result<ImportPlan, ConfigImport.Refusal> {
         do {
             let export = try ConfigImport.read(contentsOf: url)
@@ -747,17 +643,8 @@ final class MacModel {
         }
     }
 
-    /// Applies a whole plan in one save and one enforcement pass.
-    ///
-    /// `propose`, `setUtility` and the rest each save and re-enforce, which is right for one
-    /// edit typed by hand and wrong for twenty arriving together: it would be twenty writes and
-    /// twenty passes over every browser tab. So the plan is worked out against `Policy`
-    /// directly and applied whole, and the Mac is made to match it once at the end.
-    ///
-    /// Returns what it did, in the past tense, for the caller to say — the same sentence the
-    /// phone says, from `ImportPlan.confirmation`. Every other mutation on this model hands back
-    /// a `ProposalResult` that ends up in an alert, and an import is the one worth saying most:
-    /// the half of it that waits is invisible until it lands.
+    /// Batches the whole plan into one save/enforce pass instead of one per target — the way
+    /// `propose`/`setUtility` do it would mean N writes and N browser-tab sweeps for an import.
     func applyImport(_ plan: ImportPlan) -> String {
         SharedStore.mutate { state in
             let now = state.now
@@ -780,16 +667,13 @@ final class MacModel {
         SharedStore.save(current)
         SharedStore.log("rule edit for \(current.config.targets[index].displayName): \(result)")
         enforce(reason: "rule edit")
-        // A rule landing on something already sent goes out too, so the other devices get
-        // the hours as well as the name.
+        // A rule landing on something already sent goes out too.
         if result == .appliedNow, let target = state.config.target(id: id) {
             LinkFlow.resendIfSent(target, config: state.config, now: now)
         }
         return result
     }
 
-    /// What "Apply these windows to other apps" did: how many got the rule now, how many wait
-    /// out the delay, and when those land.
     struct ApplyOutcome: Equatable {
         var appliedNow = 0
         var scheduled = 0
@@ -811,10 +695,8 @@ final class MacModel {
         }
     }
 
-    /// One rule for several targets in one save: the editor's draft for the app it was written
-    /// on (with its name) and for every app chosen in "Apply these windows to other apps".
-    /// Each target is judged on its own, so the rule lands now where it tightens and waits out
-    /// the delay where it loosens, the same as saving each one by hand.
+    /// Each target is judged independently: tightening applies now, loosening waits the delay
+    /// — same as editing one by hand.
     func apply(rule: Rule, nickname: String, for id: UUID, andTo others: [UUID]) -> ApplyOutcome {
         var current = SharedStore.load()
         if let index = current.config.targets.firstIndex(where: { $0.id == id }) {
@@ -841,16 +723,14 @@ final class MacModel {
         return outcome
     }
 
-    /// The nickname for the target at `index`. An empty one is stored empty rather than
-    /// filled in with the app's own name: `displayName` already falls back to that, and
-    /// keeping the two apart is what lets a nickname be taken off again.
+    /// Stored empty, not backfilled: `displayName` already falls back, and this is what
+    /// lets a nickname be removed again.
     private static func rename(_ index: Int, to nickname: String, in state: inout SharedState) {
         state.config.targets[index].nickname = nickname.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// Gives `id` the rule, or leaves it alone when it already has it. A tightening lands in
-    /// the config; a loosening replaces any rule already pending for that target with one that
-    /// waits out the delay. Nothing is saved.
+    /// Tightening applies immediately; loosening replaces any pending change for this target
+    /// and waits out the delay. Caller saves.
     private static func assign(_ rule: Rule, to id: UUID, in state: inout SharedState) -> ProposalResult {
         guard let index = state.config.targets.firstIndex(where: { $0.id == id }) else { return .unchanged }
         let target = state.config.targets[index]
@@ -886,11 +766,8 @@ final class MacModel {
         return result
     }
 
-    /// Puts `id` in a tier. Moving toward hazard lengthens its delay and lands now; moving
-    /// toward essential shortens it, so it queues behind the delay the target has *today* —
-    /// which is what keeps "call it essential, then loosen it" from being a way round the wait.
-    /// A target with no rule yet is enforcing nothing, so its first tier is free, exactly as
-    /// its first rule is. Choosing the tier the target already has cancels a queued change.
+    /// Queues behind *today's* delay, not the new tier's — closing the "call it essential
+    /// first" loophole. A first tier (no rule yet) is free, like a first rule.
     func setUtility(_ level: Utility, for id: UUID) -> ProposalResult {
         var current = SharedStore.load()
         guard let target = current.config.target(id: id) else { return .unchanged }
@@ -900,8 +777,7 @@ final class MacModel {
         }
         let plan = Policy.plan(utility: level, for: target, queued: queued)
         guard plan != .unchanged else { return .unchanged }
-        // Dropped whatever happens next: choosing the saved tier back is how a queued change
-        // is cancelled, and a new one replaces it rather than stacking on it.
+        // Replaces, not stacks: reselecting the current tier is how a queued change gets cancelled.
         current.pending.removeAll { change in
             if case .setUtility(let targetID, _) = change.kind { return targetID == id }
             return false
@@ -956,62 +832,32 @@ final class MacModel {
     #if DEBUG || TESTING_TOOLS
     // MARK: Testing
 
-    /// Wipes every target, rule and pending change, forgets today's counted usage, puts the app
-    /// back to its first run, and enforces the empty state, so the Mac matches a fresh install
-    /// the way the phone's reset does.
-    ///
-    /// What it does not touch is drawn on a different line from the phone's. There the reset
-    /// hands Screen Time access back, because the app can ask for it again with the button on
-    /// its own onboarding screen. Nothing the Mac keeps can be asked for from inside the app:
-    /// the web filter — a system extension that costs two trips through System Settings to
-    /// approve — and the per-browser Automation permissions, which are macOS's to grant and not
-    /// ours to revoke. Both stay, and the onboarding that follows reads the filter's live
-    /// status rather than a stored flag, so it finds the extension in place and says so. The
-    /// activity log is kept for the same reason it is on the phone: it is the record of what
-    /// just happened, including this.
-    ///
-    /// The first week is deliberately not started — and the phone's reset no longer starts one
-    /// either: it hands access back, and the grant on the way through onboarding starts the
-    /// week, the way a fresh install does. Nothing grants the Mac a week — see `Forgiveness`
-    /// and the handoff — so starting one here would make the reset the only way to a Mac state
-    /// that no real install can reach.
-    ///
-    /// Compiled in only when the build asked for the testing tools — see `TestingTools` — so the
-    /// shipping build keeps its promise of no unblock button.
+    /// Doesn't touch the web filter or per-browser Automation permissions: both are macOS's
+    /// to grant, and the app has no button to re-request them the way iOS re-requests Screen
+    /// Time access. Onboarding reads the filter's live status, so it finds the extension in
+    /// place regardless.
     func resetEverything() {
-        // Before the work rather than after it, so a login item or an agent that refuses to
-        // come off still has something to say when this returns.
+        // Cleared first so a login-item/agent refusal further down still has somewhere to report.
         lastError = nil
         SharedStore.reset()
         enforcer.resetUsage()
         AnchorCloud.clear()
         AnchorSync.forgetPhone()
-        // Off the link, with its entry and its additions out of iCloud: a fresh install has
-        // never joined, and the grandfather question is open again.
+        // Also clears iCloud link entries; a fresh install has never joined.
         DeviceLink.forget()
         LinkFlow.forget()
         outgoing = []
         arrivals = []
         refreshLink()
-        // Everything `finishOnboarding` switches on, switched back off: a fresh install has
-        // neither, and onboarding is about to be run again and will turn them both on. Neither
-        // is asked unless it is actually on — the login item here, the watchdog inside
-        // `Watchdog.set` — because `unregister()` throws on a job launchd is not holding, and a
-        // reset that raised "Could not change the login item" over the onboarding it was
-        // opening would be reporting a failure that never happened.
+        // Only unregister if actually registered: `unregister()` throws on a job launchd isn't holding.
         if SMAppService.mainApp.status == .enabled { setLaunchAtLogin(false) }
         launchesAtLogin = SMAppService.mainApp.status == .enabled
-        // Only when the login item had nothing to report: one alert stands at a time, and the
-        // first thing that refused is the one worth naming.
+        // Only overwrite `lastError` if nothing already failed above.
         if !Watchdog.forget(), lastError == nil { lastError = Self.watchdogRefused }
         watchdogIsOn = Watchdog.isOn
         SharedStore.defaults.removeObject(forKey: Self.onboardedKey)
         isOnboarded = false
-        // The intro's answer and the guides with it, so the reset opens on the start pane with
-        // nothing chosen and both checklists owed — which is what a fresh install is. Removed
-        // rather than written empty: an absent `finishedGuides` key is what "never asked" means
-        // to `seedFinishedGuides`, and a Mac that has just forgotten every rule seeds to nothing
-        // anyway.
+        // Removed, not set empty: `seedFinishedGuides` treats an absent key as "never asked".
         SharedStore.defaults.removeObject(forKey: Self.startHalfKey)
         SharedStore.defaults.removeObject(forKey: Self.bothHalvesKey)
         SharedStore.defaults.removeObject(forKey: Self.anchorHalfAddsKey)
@@ -1020,8 +866,7 @@ final class MacModel {
         wantsBothHalves = false
         anchorHalfAdds = .anchor
         finishedGuides = []
-        // Removed rather than written true: absent is what a fresh install has, and its answer
-        // is yes.
+        // Removed, not set true: absence is what a fresh install has, and its default is yes.
         PendingNotifications.forgetWeeklyDigest()
         weeklyDigest = true
         SharedStore.log("reset everything (Debug build)")

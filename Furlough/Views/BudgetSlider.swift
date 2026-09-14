@@ -1,31 +1,22 @@
 import SwiftUI
 
-/// The daily budget slider: 5–240 minutes in steps of 5, Ember-to-Amber fill, glass knob.
-/// The track is piecewise linear between the tick anchors so the common range under an hour
-/// gets half of the width, which is also why the ticks sit evenly spaced.
+/// Track is piecewise-linear between anchors, so the common sub-hour range gets half the width.
 struct BudgetSlider: View {
     @Binding var value: Int
-    /// The anchor figures under the track. Off in the per-day rows, where seven copies of the
-    /// same five numbers would be noise and each row already says its own figure.
+    /// Off in per-day rows, where seven repeats of the same ticks would be noise.
     var showsTicks = true
     @State private var dragging = false
 
-    /// Offer the detent past four hours that means no daily limit at all. Only worth it where
-    /// windows already narrow the day: without them "no budget" is a rule that enforces
-    /// nothing, which is what "Remove from Furlough" is for.
+    /// Only meaningful where windows already narrow the day; otherwise it's a rule that enforces nothing.
     var allowsNoBudget = false
 
     static let anchors = [5, 30, 60, 120, 240]
-    /// A whole day of budget is how the model has always written "no budget": `Rule.limit(on:)`
-    /// stops calling it a limit at `Furlough.minutesPerDay`, and `Rule.unrestricted` carries
-    /// exactly this figure. So the stop past 240 is not a bigger number — it is that number,
-    /// and everything downstream already understands it.
+    /// Matches `Furlough.minutesPerDay`, the exact figure `Rule.unrestricted` carries — not an arbitrary max.
     static let noBudget = Furlough.minutesPerDay
     static let step = 5
     private let knob: CGFloat = 24
 
-    /// The figures the track is laid out against, with the no-limit stop on the end when it is
-    /// offered. Everything positional reads this rather than `anchors`.
+    /// Positional code should read this, not `anchors`.
     static func stops(allowsNoBudget: Bool) -> [Int] {
         allowsNoBudget ? anchors + [noBudget] : anchors
     }
@@ -91,8 +82,7 @@ struct BudgetSlider: View {
         GeometryReader { geo in
             let usable = max(1, geo.size.width - knob)
             ForEach(Self.stops(allowsNoBudget: allowsNoBudget), id: \.self) { tick in
-                // The last stop is a state, not a quantity, so it is named rather than counted:
-                // "1440" under a slider would read as a figure somebody chose.
+                // Named rather than counted: "1440" would read as a chosen figure, not a state.
                 Text(tick >= Self.noBudget ? "None" : "\(tick)")
                     .font(EmberFont.numerals(9.5))
                     .foregroundStyle(Ember.faint)
@@ -127,9 +117,7 @@ struct BudgetSlider: View {
         let segments = Double(stops.count - 1)
         let scaled = min(max(fraction, 0), 1) * segments
         let index = min(Int(scaled), stops.count - 2)
-        // The stretch past four hours is one detent rather than a range: there is nothing worth
-        // choosing between 240 minutes and no limit, and a slider that could stop at 900 would
-        // be offering it. Half of that stretch lands on 240, half on no budget at all.
+        // One detent, not a range: nothing between 240 and no-limit is worth choosing.
         if allowsNoBudget, index == stops.count - 2 {
             return (scaled - Double(index)) >= 0.5 ? noBudget : (anchors.last ?? 240)
         }
@@ -140,8 +128,6 @@ struct BudgetSlider: View {
     }
 }
 
-/// One weekday's budget: its name, its figure, and a slider. The per-day half of the rule
-/// editor's budget card on both platforms.
 struct DayBudgetRow: View {
     let weekday: Int
     @Binding var minutes: Int

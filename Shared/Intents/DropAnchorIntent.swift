@@ -3,18 +3,13 @@ import AppIntents
 import Foundation
 import WidgetKit
 
-/// Drops the anchor without opening Furlough.
+/// Drops the anchor without opening Furlough. Safe to run from anywhere because it only
+/// tightens — anchoring needs no tag, weighing it does — so it works from Spotlight, Shortcuts
+/// automations, the medium widget, and Control Center.
 ///
-/// Safe to run from anywhere precisely because it only tightens. Anchoring needs no tag —
-/// weighing anchor does — so this is the one half that can happen in the background, and it
-/// is the half worth having at the end of a Spotlight search, on a Shortcuts automation
-/// ("at 10pm, drop anchor"), on the medium widget and in Control Center. Nothing here can let
-/// anything through.
-///
-/// Compiled into the app and the widget extension both, which is what a Control Center
-/// control needs: the control lives in the widget extension and runs its intent there, with
-/// no app process to reach. So this goes through `AnchorDrop`, never `AppModel`; the app
-/// finds out through the change notification the drop posts.
+/// Compiled into both the app and the widget extension: the Control Center control lives in the
+/// widget extension with no app process to reach, so this goes through `AnchorDrop`, never
+/// `AppModel` — the app learns about it via the change notification the drop posts.
 struct DropAnchorIntent: AppIntent {
     static let title: LocalizedStringResource = "Drop Anchor"
     static let description = IntentDescription(
@@ -35,9 +30,7 @@ struct DropAnchorIntent: AppIntent {
             answer = why.message
         }
         WidgetCenter.shared.reloadAllTimelines()
-        // The control draws the anchor's state, so it has to be told the state moved — a
-        // Control Center button that still says "Drop Anchor" after a drop is the one thing
-        // this whole path cannot afford, since there is no app on screen to check against.
+        // Without this the control keeps showing "Drop Anchor" after it's already dropped.
         ControlCenter.shared.reloadControls(ofKind: Furlough.anchorControlKind)
         return .result(dialog: "\(answer)")
     }

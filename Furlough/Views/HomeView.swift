@@ -1,25 +1,16 @@
 import SwiftUI
 
-/// Home: the two halves as two pages under one toolbar.
-///
-/// Rules and the Anchor are co-equal, and this screen used to say otherwise. The hero, the list
-/// and the + were Rules', and the Anchor was a card in the middle of them that pushed a screen
-/// away — a feature of the app rather than half of it. Now the segment in the title's place
-/// switches between two pages, a swipe does the same, and the toolbar is about whichever page
-/// is under it. Which one it opens on is the intro's question, answered on the start pane and
-/// kept in `AppModel.startHalf`.
+/// Home: Rules and the Anchor as two co-equal pages under one toolbar. Initial page comes
+/// from `AppModel.startHalf`.
 struct HomeView: View {
     @Environment(AppModel.self) private var model
-    /// Which half is on screen. Seeded from the intro's answer and this view's own after that,
-    /// so a swipe holds for the rest of the run rather than snapping back on every rebuild.
+    /// Kept in view state (not re-derived) so a swipe doesn't snap back on rebuild.
     @State private var half: Half
-    /// The Application / Website popover under the + button.
     @State private var showAddChoice = false
-    /// What the popover asked for; `addTargetsFlow` takes it from here to Apple's picker.
+    /// Feeds `addTargetsFlow`, which takes it to Apple's picker.
     @State private var addRequest: AddRequest?
-    /// The rule editors pushed on top of the pages. Held here rather than left to the links,
-    /// because the anchor grid's "Give it hours too" pushes one from a context menu, where
-    /// there is no link to tap.
+    /// Held here rather than as links, since the anchor grid's "Give it hours too" pushes
+    /// one from a context menu, which has no link to attach to.
     @State private var path: [UUID] = []
     @State private var showSettings = false
     @State private var showHelp = false
@@ -29,20 +20,12 @@ struct HomeView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            // A pager rather than a switch, so the two halves can be swiped between as well as
-            // tapped. Selection is the same `half` the segment reads, so the two ways of moving
-            // cannot disagree.
+            // TabView (not a switch) so swiping and the segment tap drive the same selection.
             TabView(selection: $half) {
-                // The guide's first step opens the same picker the + does, so it hands the
-                // request up rather than growing a second add flow of its own.
                 RulesPage(onChooseApps: { addRequest = .plain(.application) })
                     .tag(Half.rules)
-                // The Anchor arms an NFC reader on sight, and a pager builds the page beside the
-                // one you are looking at. So it is told whether it is the page in front, and
-                // only the page in front listens.
-                //
-                // Its Choose apps row and its grid's "Give it hours too" both come back up here:
-                // one add flow for both halves, and one navigation stack for both pages.
+                // A page-style TabView renders the page beside the one shown; the Anchor arms
+                // NFC on sight, so only the current page may listen (see `isCurrent`).
                 AnchorPage(
                     isCurrent: half == .anchor,
                     onChooseApps: { addRequest = .anchor },
@@ -79,13 +62,9 @@ struct HomeView: View {
                     }
                     ToolbarSpacer(.fixed, placement: .topBarTrailing)
                 }
-                // The + acts on the page it is over: a rule over Rules, the anchor's list over
-                // the Anchor — unless Settings has been told otherwise, for the person who set
-                // the anchor up once and reads + as "give an app hours" wherever it is.
-                //
-                // Adding to the anchor asks no Application-or-Website question: both are picked
-                // in the one picker, and a site typed by name is a target, so it reaches the
-                // anchor by being taken in rather than by being added here.
+                // The + targets whichever page it's on, unless Settings overrides the
+                // destination (see `addDestination`). Anchor add skips the App/Website
+                // popover: both come from the one picker there.
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Add", systemImage: "plus") {
                         if model.addDestination(on: half) == .anchor {
@@ -115,8 +94,8 @@ struct HomeView: View {
     }
 }
 
-/// Rules · Anchor, in the title's place: the one control that says the app is two things and
-/// neither of them is the main one. Glass, because it sits in the toolbar with the buttons.
+/// Rules/Anchor segment shown in the toolbar's title position; glass style matches the
+/// buttons beside it.
 struct HalfSegment: View {
     @Binding var half: Half
 
@@ -125,8 +104,7 @@ struct HalfSegment: View {
             ForEach(Half.allCases, id: \.self) { value in
                 Button {
                     guard value != half else { return }
-                    // withAnimation, because a page-style TabView slides for a gesture but jumps
-                    // for a plain assignment, and the two ways across should be one movement.
+                    // withAnimation needed: a page TabView jumps (doesn't slide) on a plain assignment.
                     withAnimation(.snappy(duration: 0.3)) { half = value }
                 } label: {
                     Text(value.title)
@@ -149,14 +127,7 @@ struct HalfSegment: View {
     }
 }
 
-/// The everyday half: the hero, and the list grouped by next opening — with the three-step
-/// guide above them until this half is set up.
-///
-/// The guide sits over the page rather than replacing it, because its own last step is about
-/// the list: by the time "Read your list" is live there is a list to read, and hiding it to
-/// show a card telling you to read it would be the joke this pass is trying not to make. On an
-/// empty page there is nothing underneath anyway — `EmptyHero` stands down while the guide
-/// runs, since the guide is the better version of the same sentence.
+/// Rules page: hero, list grouped by next opening, and the setup guide (until finished).
 private struct RulesPage: View {
     @Environment(AppModel.self) private var model
     let onChooseApps: () -> Void
@@ -177,7 +148,6 @@ private struct RulesPage: View {
                         GuideCard(guide: guide) { button(at: guide.live, config: config) }
                             .padding(.bottom, 6)
                     }
-                    // What the link is asking about on this half, when it is asking anything.
                     LinkTraffic(half: .rules)
                         .padding(.bottom, 6)
                     HomeContent(now: model.clock.honest(context.date), showsEmptyHero: !guide.isRunning)
@@ -192,8 +162,7 @@ private struct RulesPage: View {
     private func button(at live: Int?, config: Config) -> some View {
         switch live {
         case 0:
-            // Where Furlough can read the fortnight, the shortest way to a first rule is the
-            // fortnight. Where it cannot, the picker is the step and the tour stays in Settings.
+            // With usage data, guide to the fortnight view; otherwise to the app picker.
             if hasUsageNumbers {
                 NavigationLink { UsageView() } label: {
                     GuideButtonLabel(title: "See where the time went", systemImage: "chart.bar.fill")
@@ -217,14 +186,11 @@ private struct RulesPage: View {
     }
 }
 
-/// Everything below the toolbar on the Rules page: the hero and the list grouped by next
-/// opening. The Anchor's card used to sit between the two; it is the page beside this one now.
+/// Everything below the toolbar on the Rules page: the hero and the list grouped by next opening.
 struct HomeContent: View {
     @Environment(AppModel.self) private var model
     let now: Date
-    /// False while the guide is running: an empty hero saying "tap +" under a checklist whose
-    /// live step is a Choose apps button would be the same instruction twice, in the weaker
-    /// words.
+    /// False while the guide runs, to avoid duplicating its "tap +" instruction.
     var showsEmptyHero = true
     /// The hero page being shown; survives the minute ticks that rebuild this view.
     @State private var featured: UUID?
@@ -266,8 +232,8 @@ struct HomeContent: View {
     }
 }
 
-/// The list order from the spec: Open now · Later today · Tomorrow · Later this week · Always blocked ·
-/// Needs a schedule, with Anchored first whenever the anchor is on.
+/// Section order: Anchored (when armed) · Open now · Later today · Tomorrow · Later this week ·
+/// Always blocked · Needs a schedule.
 struct HomeGroups {
     struct Section: Identifiable {
         let title: String
@@ -333,14 +299,11 @@ struct HomeGroups {
         ].filter { !$0.targets.isEmpty }
     }
 
-    /// Every target in the list's order: one hero page each.
     var ordered: [Target] { sections.flatMap(\.targets) }
 }
 
-/// The header (H1 in design/HOURGLASS.md): one page per managed app in the list's order,
-/// swiped horizontally, with a strip of tiny status hourglasses as the page indicator, so
-/// the strip itself is a status summary. Lands on the first open app. Tapping a page opens
-/// its rule editor.
+/// H1 in design/HOURGLASS.md: one page per managed app, swiped horizontally; the page
+/// indicator is a strip of status hourglasses. Lands on the first open app.
 struct HeroPager: View {
     let groups: HomeGroups
     let statuses: [UUID: TargetStatus]
@@ -374,12 +337,8 @@ struct HeroPager: View {
                 .scrollTargetBehavior(.paging)
                 .scrollPosition(id: $featured)
                 .scrollIndicators(.hidden)
-                // The glass throws its light a good deal further than the page it is drawn on,
-                // and a scroll view clips to its bounds: the halo used to stop dead on a
-                // straight line a few points under the base, with flat black beneath it. So the
-                // pager's own clip comes off and a looser one goes on — the same left and right
-                // edges, so the next page's glass cannot bleed in from the side, and open above
-                // and below, where there is nothing but the wall for the light to land on.
+                // scrollClipDisabled + a looser clip shape: the default clip cut off the glow's
+                // halo at the page edge. Left/right edges are kept to avoid bleed from neighbors.
                 .scrollClipDisabled()
                 .clipShape(SpillingRect(spill: HeroPage.glowSpill))
                 .padding(.horizontal, -16)
@@ -395,8 +354,7 @@ struct HeroPager: View {
     }
 }
 
-/// A rectangle grown past the top and bottom of the bounds it is given. A shape is handed its
-/// view's frame, so this is all it takes to clip one axis and leave the other alone.
+/// Shape receives its view's frame, so growing rect vertically only re-clips that axis.
 private struct SpillingRect: Shape {
     let spill: CGFloat
 
@@ -404,7 +362,7 @@ private struct SpillingRect: Shape {
 }
 
 /// One page: the living hourglass, eyebrow, name, the big line and a sub line for one
-/// target's status. Ticks once a second so the sand and the countdown share a clock.
+/// target's status. Ticks once a second so the sand and countdown share a clock.
 struct HeroPage: View {
     @Environment(AppModel.self) private var model
     let target: Target
@@ -412,9 +370,8 @@ struct HeroPage: View {
     let runtime: RuntimeState
     let anchor: AnchorProfile
 
-    /// How far the glow reaches past the page. A blur of `glowRadius` is spent by about three
-    /// times it, so the pager's clip is opened this far and the halo ends where it ends rather
-    /// than where the scroll view does.
+    /// A blur of `glowRadius` fades out by ~3x that distance, so the pager's clip is opened
+    /// this far to avoid cutting off the halo.
     static let glowSpill: CGFloat = 3 * glowRadius
     private static let glowRadius: CGFloat = 20
 
@@ -549,7 +506,6 @@ struct HeroPage: View {
     }
 }
 
-/// The hero before anything is managed: an empty glass and the one thing to do.
 struct EmptyHero: View {
     var body: some View {
         HStack(alignment: .center, spacing: 14) {
@@ -561,9 +517,6 @@ struct EmptyHero: View {
                     .emberDisplay(24)
                     .foregroundStyle(Ember.cream)
                     .padding(.top, 4)
-                // Both ways in, because there are two and only one of them used to be offered.
-                // The Anchor is the page beside this one now, not a card under this hero, so
-                // "below" would send someone looking at the list for it.
                 Text("Tap + to give an app hours and a budget. The Anchor — one tap, one tag — is the page beside this one.")
                     .emberBody(11.5)
                     .foregroundStyle(Ember.muted)
@@ -583,9 +536,7 @@ struct TargetRow: View {
     let status: TargetStatus
     let glass: HourglassState
     let pending: PendingChange?
-    /// The anchor would take this row away if it dropped. A mark, not a row: the other half
-    /// says so in four points of ink beside the rule, and neither list grows a copy of the
-    /// other.
+    /// Whether the anchor also holds this target; shown as a mark, not a duplicate row.
     var held = false
     var now: Date = .now
 
@@ -593,8 +544,6 @@ struct TargetRow: View {
         HStack(spacing: 10) {
             TokenTile(kind: target.kind, size: 34)
             VStack(alignment: .leading, spacing: 1) {
-                // A nickname takes the name's place in the display face, as it does on the
-                // hero; without one the system name can only be sized, not restyled.
                 if target.nickname.isEmpty {
                     TokenName(kind: target.kind)
                 } else {
@@ -608,10 +557,8 @@ struct TargetRow: View {
                         .emberBody(11.5)
                         .foregroundStyle(Ember.muted)
                         .lineLimit(1)
-                    // The other half, in one mark: this row is on the anchor's list too.
                     if held { HeldMark() }
-                    // One row for one habit, and one small mark to say the row is two doors. A
-                    // second row would be the bug this feature exists to remove.
+                    // Shown as a mark on the existing row, not a second row, to avoid duplicating it.
                     if target.isLinked {
                         HStack(spacing: 2.5) {
                             Image(systemName: "globe")

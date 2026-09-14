@@ -1,11 +1,8 @@
 import SwiftUI
 
-/// The pieces both apps draw the link with: an offer, the traffic waiting for an answer, a
-/// three-way setting, the four things to know before joining, and one device on the roster.
-///
-/// Self-contained the way `CompanionNudge` is — Ember and the theme helpers only, no
-/// `SectionLabel` or `CardDivider` — because Shared/UI is compiled into extensions that carry
-/// none of each app's own components. Each app composes these into its Devices screen.
+/// Self-contained like `CompanionNudge` — Ember/theme helpers only, no `SectionLabel` or
+/// `CardDivider` — since Shared/UI is compiled into extensions that lack each app's own
+/// components. Each app composes these into its Devices screen.
 
 // MARK: - An offer
 
@@ -63,10 +60,8 @@ struct LinkNudge: View {
 
 // MARK: - The traffic
 
-/// Everything the link is waiting on an answer for, on one half: what this device added and
-/// has been told to ask before sending, and what the others added and this device has been
-/// told to ask before taking. One card each, oldest first, and nothing at all when there is
-/// nothing to ask — which is nearly always.
+/// Everything waiting on an answer: outgoing (added here, confirm before sending) and
+/// arrivals (added elsewhere, confirm before taking). Usually empty.
 struct LinkTrafficCard: View {
     let outgoing: [SharedAddition]
     let arrivals: [SharedAdditions.Landing]
@@ -104,10 +99,9 @@ struct LinkTrafficCard: View {
         }
     }
 
-    /// What sending one would do, in the words of the half it is on. The anchor's half is not
-    /// "block it": it puts the thing on each device's own anchor list, so it goes away the next
-    /// time any of them drops — and only a tag on an iPhone brings it back. That is worth saying
-    /// before the tap, not after.
+    /// Anchor half isn't "block it" — it queues on each device's own anchor list until one
+    /// drops, and only an iPhone tag restores it; said here since it should be known before
+    /// the tap.
     static func offer(_ addition: SharedAddition, to others: String) -> String {
         switch addition.half {
         case .rules:
@@ -120,8 +114,7 @@ struct LinkTrafficCard: View {
 
 // MARK: - A three-way setting
 
-/// Always · Ask · Never, under a title and a line saying what the thing is. The row every
-/// setting about the link is, so the scale is learned once.
+/// Always · Ask · Never — one shared row so the scale is learned once.
 struct LinkChoiceRow: View {
     let title: String
     let detail: String
@@ -170,10 +163,8 @@ struct LinkChoiceRow: View {
 
 // MARK: - The four things to know
 
-/// The guide a device is walked through before it joins: four numbered facts, none of them a
-/// step to take, and the one action — Link this device — under all of them in the caller's
-/// card. Numbered like a `GuideCard` so it reads as the same kind of thing, but nothing here
-/// is live or done: it is read, not worked through.
+/// Numbered like `GuideCard` for visual consistency, but these are facts to read, not steps
+/// to complete — the join action lives in the caller's card below.
 struct LinkStepsCard: View {
     let platform: AnchorRecord.Platform
 
@@ -211,8 +202,6 @@ struct LinkStepsCard: View {
 
 // MARK: - One device
 
-/// A device on the roster: its name, what it is, when it was last heard from, and the way to
-/// take it off. The one for this device says so and carries Leave instead.
 struct LinkedDeviceRow: View {
     let device: LinkedDevice
     let isThisDevice: Bool

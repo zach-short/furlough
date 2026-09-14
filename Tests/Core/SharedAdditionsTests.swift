@@ -1,9 +1,8 @@
 import Foundation
 import Testing
 
-/// What crosses when a linked device adds something, added 2026-09-10. This bundle is built for
-/// macOS, so the receiving side here is the Mac's — `.macApp` exists and the phone's tokens do
-/// not — and the phone-only branches are pinned by their `isApp`/`appNeedsPicker` shape.
+/// Built for macOS, so the receiving side is the Mac's (`.macApp` exists, phone tokens don't);
+/// phone-only branches are pinned by their `isApp`/`appNeedsPicker` shape.
 @Suite("Shared additions: saying what was added")
 struct SharedAdditionsDescribeTests {
     let noon = at(8, 12, 0)
@@ -16,8 +15,7 @@ struct SharedAdditionsDescribeTests {
         #expect(addition.title == "YouTube")
         #expect(addition.isApp)
         #expect(addition.bundleIDs == ["com.google.ios.youtube"])
-        // The table's hosts are not sent: the sender says what it blocks, the receiver decides
-        // what to add beside it under its own setting.
+        // The sender says what it blocks; the receiver decides what to add under its own setting.
         #expect(addition.hosts.isEmpty)
         #expect(addition.rule == nil)
         #expect(addition.half == .rules)
@@ -111,8 +109,7 @@ struct SharedAdditionsHearTests {
         #expect(SharedAdditions.unseen(rings: rings, watermarks: ["phone": 2], thisDevice: "mac", roster: roster).isEmpty)
     }
 
-    /// This bundle is the Mac's, where every door is a row of its own: the app lands as one row
-    /// and the site as another, the way the Mac's companion sheet has always added them.
+    // On the Mac, every door is its own row: the app lands as one and the site as another.
     @Test("the Mac lands an installed app and the site as rows of their own")
     func macFindsTheApp() {
         var config = makeConfig([])
@@ -181,8 +178,8 @@ struct SharedAdditionsHearTests {
         var config = makeConfig([row])
         let same = addition("YouTube", bundleIDs: ["com.google.ios.youtube"], hosts: ["youtube.com"])
         #expect(SharedAdditions.landing(for: same, in: config, installed: ["com.google.ios.youtube": "YouTube"], companion: .always, now: noon).isNothing)
-        // The sender's first rule arrives: the row here has none, so it takes it, with the undo
-        // window open on it exactly as a rule saved by hand gets.
+        // The row has no rule, so the sender's first rule is taken, with the same undo window a
+        // hand-saved rule gets.
         let rule = Rule(windows: [window(18 * 60, 20 * 60)], dailyBudgetMinutes: 45)
         let ruled = addition("YouTube", bundleIDs: ["com.google.ios.youtube"], hosts: ["youtube.com"], rule: rule)
         let landing = SharedAdditions.landing(for: ruled, in: config, installed: ["com.google.ios.youtube": "YouTube"], companion: .always, now: noon)
@@ -259,9 +256,8 @@ struct SharedAdditionsHearTests {
     }
 }
 
-/// What crosses when a linked device anchors something, added 2026-09-10. The anchor's list is
-/// kinds rather than targets, so it has its own way of saying what is on it; this bundle is
-/// built for macOS, so what is described here is a bundle identifier or a host.
+/// The anchor's list is kinds rather than targets, so it describes itself differently; built for
+/// macOS, so what's described here is a bundle identifier or a host.
 @Suite("Shared additions: what the anchor holds")
 struct SharedAdditionsAnchorTests {
     let noon = at(8, 12, 0)
@@ -296,8 +292,7 @@ struct SharedAdditionsAnchorTests {
 
     @Test("a name it has not learned keeps it here until it has one")
     func namelessWaits() {
-        // The phone's case, in the shape this bundle can build: nothing names the kind, so the
-        // table is asked and answers nothing better than the identifier itself.
+        // Nothing names the kind, so the table is asked and answers with the bare identifier.
         let config = anchored([.macApp(bundleID: "com.example.unknown")])
         #expect(list(config).map(\.title) == ["com.example.unknown"])
         #expect(list(config, names: [.macApp(bundleID: "com.example.unknown"): "Unknown"]).map(\.title) == ["Unknown"])
@@ -326,15 +321,14 @@ struct SharedAdditionsAnchorTests {
 
     @Test("two kinds the table calls the same thing are one offer, and a site is its own name")
     func oneOfferPerName() {
-        // An Apple silicon Mac runs the iPhone app under its own identifier, so the same app
-        // can be on the list twice. A name is what crosses, so it is asked once.
+        // Apple silicon can run the iPhone app under its own identifier too, so the same app
+        // can appear twice; a name is what crosses, so it's asked once.
         let twice = anchored([
             .macApp(bundleID: "com.google.ios.youtube"),
             .macApp(bundleID: "maccatalyst.com.google.ios.youtube"),
         ])
         #expect(list(twice).map(\.title) == ["YouTube"])
-        // The site is not folded into the app: a host names itself here exactly as it does on
-        // the rules half, and blocking youtube.com is a thing to ask about in its own right.
+        // The site is its own thing to ask about, not folded into the app.
         let both = anchored([.macApp(bundleID: "com.google.ios.youtube"), .host("youtube.com")])
         #expect(list(both).map(\.title) == ["YouTube", "youtube.com"])
     }
@@ -349,11 +343,9 @@ struct SharedAdditionsAnchorTests {
     @Test("the id an unruled thing goes out under follows its name, and only its name")
     func derivedID() {
         #expect(SharedAdditions.anchorID(forTitle: "YouTube") == SharedAdditions.anchorID(forTitle: "YouTube"))
-        // The same normalization the rest of the table matches on, so a ring entry does not
-        // double over a difference nothing else here treats as one.
         #expect(SharedAdditions.anchorID(forTitle: "YouTube") == SharedAdditions.anchorID(forTitle: " youtube "))
         #expect(SharedAdditions.anchorID(forTitle: "YouTube") != SharedAdditions.anchorID(forTitle: "TikTok"))
-        // Well-formed: version 4 and the RFC variant, so nothing downstream chokes on it.
+        // Well-formed: version 4, RFC variant, so nothing downstream chokes on it.
         let text = SharedAdditions.anchorID(forTitle: "YouTube").uuidString
         #expect(text.dropFirst(14).first == "4")
         #expect("89AB".contains(text.dropFirst(19).first!))
@@ -381,9 +373,8 @@ struct SharedAdditionsAnchorLandingTests {
         )
     }
 
-    /// The case the whole feature turns on. Both devices already block YouTube; the phone
-    /// anchors it; the Mac has no app to add, no host to add and no rule to take — and must
-    /// still put it on its own anchor's list, which is the only thing the message was about.
+    // Both devices already block YouTube; the phone anchors it; the Mac has nothing to add or
+    // take, but must still put it on its own anchor's list — the only thing the message was about.
     @Test("something already blocked here and not anchored here is not nothing")
     func alreadyBlockedNotYetHeld() {
         var row = Target(kind: .macApp(bundleID: "com.google.ios.youtube"), systemName: "YouTube")
@@ -456,8 +447,8 @@ struct SharedAdditionsAnchorLandingTests {
     }
 }
 
-/// The one arrival the phone cannot act on by name. This bundle is the Mac's, so the phone's
-/// branch is pinned by the `appNeedsPicker` shape rather than reached through `landing`.
+/// The one arrival the phone cannot act on by name; its branch is pinned via the
+/// `appNeedsPicker` shape rather than reached through `landing`, since this bundle is the Mac's.
 @Suite("Shared additions: an anchored app a phone cannot mint a token for")
 struct SharedAdditionsOwedAppTests {
     let noon = at(8, 12, 0)
@@ -474,9 +465,8 @@ struct SharedAdditionsOwedAppTests {
         )
     }
 
-    /// An app with no website, anchored on the Mac. Nothing here can be blocked under that
-    /// name, and yet this is exactly the message the anchor half is for: it has to survive
-    /// long enough for the tables, or the person, to find the app.
+    // Nothing here can be blocked under that name, yet it must survive long enough for the
+    // tables (or the person) to find the app — the exact case the anchor half exists for.
     @Test("an anchored app with no site to fall back on is not nothing")
     func owed() {
         let anchored = landing(half: .anchor)

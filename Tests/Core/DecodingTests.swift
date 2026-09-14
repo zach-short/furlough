@@ -1,8 +1,7 @@
 import Foundation
 import Testing
 
-/// The store on Zach's phone was written by older builds. Every field added since has to
-/// decode from a JSON that never had it.
+/// Every field added since has to decode from a JSON that never had it.
 @Suite("Decoding older stored state")
 struct DecodingTests {
     let decoder: JSONDecoder = {
@@ -122,7 +121,6 @@ struct DecodingTests {
         #expect(json.contains("\"anchor\""))
         #expect(json.contains("\"isAnchored\""))
         #expect(!json.contains("brick"))
-        // And it reads back.
         #expect(try decode(Config.self, json).anchor.anchoredAt == at(8, 18, 12))
     }
 
@@ -165,17 +163,11 @@ struct DecodingTests {
     }
 }
 
-/// What a `TargetKind` looks like on disk.
-///
-/// This matters more than it looks. `TargetKind` gained a case on 2026-09-08 — websites by
-/// name on the phone — and the state on Zach's phone was written by builds that had never
-/// heard of it. Swift synthesises an enum's `Codable` as a single-key object named after the
-/// case, so a new case adds a name nothing older ever wrote and changes nothing about the
-/// names already there. These pin that shape, so a later hand-written `init(from:)` or a
-/// renamed case cannot quietly make an existing phone's targets undecodable.
-///
-/// Read on macOS, so the cases here are the Mac's. The mechanism is the same one the phone's
-/// three token cases go through; there is no iOS test bundle to read those in.
+/// Swift synthesizes an enum's `Codable` as a single-key object named after the case, so a new
+/// case (like the 2026-09-08 website-by-name one) never disturbs existing cases' encoding.
+/// These pin that shape so a later hand-written `init(from:)` or renamed case can't quietly
+/// break decoding of state an older build wrote. Read on macOS; the phone's token cases go
+/// through the same mechanism but have no iOS test bundle here.
 @Suite("How a target kind is stored")
 struct TargetKindDecodingTests {
     let decoder = JSONDecoder()

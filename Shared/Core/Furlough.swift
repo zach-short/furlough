@@ -3,15 +3,13 @@ import Foundation
 /// Constants shared by the app and every extension.
 enum Furlough {
     static let appGroupID = "group.com.zachshort.furlough"
-    /// The Mac app and its widget share this container. It starts with the team identifier
-    /// rather than "group." because on the Mac a group named that way needs no provisioning
-    /// profile, and so no registered Mac: the signing team is the proof.
+    /// Starts with the team identifier rather than "group." — on the Mac that needs no
+    /// provisioning profile, so no registered Mac: the signing team is the proof.
     static let macAppGroupID = "X9V4L6HR2R.com.zachshort.furlough"
     static let storeName = "furlough"
     static let bundleID = "com.zachshort.furlough"
-    /// The Control Center control's kind. Here rather than on `DropAnchorControl` because the
-    /// thing that has to ask for a redraw is the drop itself, which runs in the app as well as
-    /// in the widget extension where the control lives.
+    /// Here rather than on `DropAnchorControl` because the drop itself (not just the control)
+    /// needs to ask for a redraw.
     static let anchorControlKind = "com.zachshort.furlough.dropAnchor"
     static let minutesPerDay = 1440
     /// DeviceActivity rejects schedules shorter than 15 minutes.
@@ -20,31 +18,21 @@ enum Furlough {
     static let maxActivities = 20
     static let warningMinutes = 5
     static let defaultLoosenDelayHours = 24
-    /// However short the base delay and however essential the app, a loosening still
-    /// waits this long. Without it a low base times the essential tier rounds to nothing.
+    /// A floor so a low base delay times the essential tier can't round to nothing.
     static let minimumLoosenDelayHours = 1
     static let defaultBudgetMinutes = 30
-    /// How long the delays are held back after Screen Time access is first granted. Long
-    /// enough to cover a first whole week, weekend included, because a weekend is when window
-    /// rules are first really exercised. Fixed the moment it is granted, and never extended.
+    /// Covers a first whole week including a weekend, when window rules first get exercised.
+    /// Fixed the moment access is granted, never extended.
     static let trialDays = 7
-    /// What a loosening waits while that week runs. Not nothing: a first week with no wait at
-    /// all would teach a habit the second week then breaks. An hour is short enough that a
-    /// mistake costs a lunch break, and long enough that it is still a wait.
+    /// Not zero — a first week with no wait would teach a habit the second week then breaks.
     static let trialDelayHours = 1
-    /// How long after an edit lands it can be taken back, exactly as it was. Long enough for
-    /// "wait, no", short enough that it cannot be used as a pause.
+    /// Long enough for "wait, no", short enough it can't be used as a pause.
     static let undoWindowMinutes = 15
-    /// When the weekly digest goes out: Monday (Gregorian weekday 2) at nine in the morning,
-    /// on whatever clock the device keeps. Monday because the week it reports is the seven
-    /// days behind it, whole and finished; nine because a record is a thing to read once the
-    /// day has started, not a thing to be woken by. Two constants rather than a setting: the
-    /// notification can be turned off, and moving it is a one-line change here if it is ever
-    /// worth a screen.
+    /// Monday (weekday 2) because the week it reports just finished; 9am because it's a thing
+    /// to read once the day has started, not to be woken by.
     static let digestWeekday = 2
     static let digestHour = 9
-    /// How many tags may release one anchor. More than one because a person can live in more
-    /// than one place, and a key three hours away is not a stronger lock — it is a lock nobody
-    /// dares close. Capped so the count cannot drift upward until one is always in a pocket.
+    /// More than one tag since a person can live in more than one place; capped so it can't
+    /// drift upward until one is always in a pocket.
     static let maxAnchorTags = 3
 }

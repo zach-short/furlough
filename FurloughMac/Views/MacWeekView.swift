@@ -1,10 +1,6 @@
 import SwiftUI
 
-/// The editor's windows as seven per-day lists of spans: what the week grid draws and the
-/// day editor changes. Each day's spans are joined wherever they overlap or touch. Going back
-/// to windows merges identical spans across days into one window on all of those days, so
-/// the editor's list stays as short as it can be. The same bridge as the phone's
-/// (Furlough/Views/WeekView.swift), kept here so that file stays untouched.
+/// Mirrors the phone's Furlough/Views/WeekView.swift; kept separate so that file stays untouched.
 struct WeekDraft: Equatable {
     private var spans: [Int: [TimeWindow]] = [:]
 
@@ -16,14 +12,12 @@ struct WeekDraft: Equatable {
 
     func spans(on weekday: Int) -> [TimeWindow] { spans[weekday] ?? [] }
 
-    /// No spans on any day: the rule is open all day, every day, up to the budget.
     var isAllDay: Bool { spans.values.allSatisfy(\.isEmpty) }
 
     mutating func set(_ hours: [TimeWindow], on weekday: Int) {
         spans[weekday] = TimeWindow.joined(hours.map(\.span))
     }
 
-    /// Adds the hours of `source` to every day in `days`, on top of what each already had.
     mutating func apply(from source: Int, to days: Weekdays) {
         let hours = spans(on: source)
         for weekday in 1...7 where weekday != source && days.contains(weekday: weekday) {
@@ -31,7 +25,6 @@ struct WeekDraft: Equatable {
         }
     }
 
-    /// One window per distinct span, on every day that has it.
     var windows: [TimeWindow] {
         var days: [TimeWindow: Weekdays] = [:]
         for weekday in 1...7 {
@@ -45,8 +38,6 @@ struct WeekDraft: Equatable {
     }
 }
 
-/// The week at a glance: seven columns on a 24-hour grid. Click a day to see and change its
-/// hours; the day editor takes the sheet over and Back returns to the grid.
 struct WeekSheet: View {
     @Binding var week: WeekDraft
     @State private var selectedDay: Int?
@@ -95,7 +86,6 @@ struct WeekSheet: View {
     }
 }
 
-/// Day initials across the top, hours down the side, one clickable column per day.
 struct WeekGrid: View {
     let week: WeekDraft
     let today: Int
@@ -143,7 +133,6 @@ struct WeekGrid: View {
         }
     }
 
-    /// Each label centred on its hour line, right-aligned with a gap before the columns.
     private var hourLabels: some View {
         ZStack(alignment: .topLeading) {
             ForEach(Array(stride(from: 0, through: 21, by: 3)), id: \.self) { hour in
@@ -177,8 +166,6 @@ struct WeekGrid: View {
     }
 }
 
-/// One day of the grid as a button: it brightens under the pointer so the columns read as
-/// clickable, which a phone does not need.
 struct DayColumnButton: View {
     let spans: [TimeWindow]
     let hourHeight: CGFloat
@@ -197,7 +184,6 @@ struct DayColumnButton: View {
     }
 }
 
-/// One day of the grid: a faint tint when it is today, and an amber block per window.
 struct DayColumn: View {
     let spans: [TimeWindow]
     let hourHeight: CGFloat
@@ -218,7 +204,6 @@ struct DayColumn: View {
     }
 }
 
-/// An amber block with its start at the top and, when tall enough, its end at the bottom.
 struct WindowBlock: View {
     let span: TimeWindow
     let height: CGFloat
@@ -245,8 +230,6 @@ struct WindowBlock: View {
     }
 }
 
-/// One day's hours: a 24-hour bar, the editable windows, and "apply to other days". Every
-/// edit lands in the week at once; Back returns to the grid.
 struct DayEditor: View {
     @Binding var week: WeekDraft
     let weekday: Int
@@ -341,8 +324,6 @@ struct DayEditor: View {
         rows = week.spans(on: weekday).map { MacRuleEditor.DraftWindow(window: $0) }
     }
 
-    /// A new row where the day has room, slotted into time order. Nothing is added when the
-    /// day is full.
     private func addWindow() {
         guard let window = TimeWindow.nextFree(after: windows, on: .all) else { return }
         withAnimation(.snappy) {
@@ -354,7 +335,6 @@ struct DayEditor: View {
         withAnimation(.snappy) { rows.removeAll { $0.id == row.id } }
     }
 
-    /// The week always holds this day's hours joined, whatever the rows look like mid-edit.
     private func sync() {
         week.set(windows, on: weekday)
         appliedNote = nil
@@ -370,7 +350,6 @@ struct DayEditor: View {
     }
 }
 
-/// A horizontal 24-hour bar with an amber segment per window and ticks at 6, 12 and 18.
 struct DayBar: View {
     let spans: [TimeWindow]
 

@@ -27,7 +27,7 @@ final class ShieldExtension: ShieldConfigurationDataSource {
         let config = Policy.effectiveConfig(state, now: now)
 
         var target = kind.flatMap { config.target(kind: $0) }
-        // Whichever of the two matched is the one iOS has just named for us.
+        // Whichever path matched (app/domain or category) is the one iOS just named for us.
         var learned = systemName
         if target == nil, let token = category?.token {
             target = config.target(kind: .category(token))
@@ -42,12 +42,9 @@ final class ShieldExtension: ShieldConfigurationDataSource {
             let anchoredDirectly = kind.map { config.anchor.blocks($0, at: now) } ?? false
             let anchoredByCategory = category?.token.map { config.anchor.blocks(.category($0), at: now) } ?? false
             if anchoredDirectly || anchoredByCategory { status = .anchored }
-            // This is the only moment iOS ever says what one of these is called: it is on the
-            // anchor's list, no rule covers it, and so nothing has a `systemName` to learn a
-            // name onto. Write it down against the kind, so the link can tell the other devices
-            // what this phone is holding — until now the anchor's list could not cross at all.
-            // `systemName` rather than `learned`, which by here may have been replaced by the
-            // name of the *category* this thing falls in: that names the category, not the app.
+            // Only place iOS names something anchored-but-ruleless: write it against the kind
+            // so cross-device sync can show what this phone holds. `systemName`, not `learned`,
+            // since `learned` may now be the category's name.
             if anchoredDirectly, let kind, let name = systemName, !name.isEmpty {
                 if SharedStore.learnAnchorName(name, for: kind) {
                     SharedStore.log("learned the name of something anchored: \(name)")
@@ -56,8 +53,8 @@ final class ShieldExtension: ShieldConfigurationDataSource {
         }
         let text = ShieldText.text(name: name, status: status, rule: target?.rule)
 
-        // Ember Glass tokens (design/DESIGN.md). The shield sees Shared/Core, plus the
-        // hourglass drawing and its colours, which are on its source list in project.yml.
+        // Ember Glass tokens (design/DESIGN.md); the shield's project.yml source list includes
+        // Shared/Core plus the hourglass drawing/colours.
         let amber = UIColor(red: 0xF5 / 255, green: 0x9E / 255, blue: 0x4A / 255, alpha: 1)
         let cream = UIColor(red: 0xF5 / 255, green: 0xEF / 255, blue: 0xE6 / 255, alpha: 1)
         let muted = UIColor(red: 0xB8 / 255, green: 0xAF / 255, blue: 0xA3 / 255, alpha: 1)
@@ -66,40 +63,34 @@ final class ShieldExtension: ShieldConfigurationDataSource {
         if let target, let status {
             glass = HourglassState.of(target, status: status, runtime: state.runtime, now: now)
         } else if status == .anchored {
-            // Something the anchor holds that Furlough has no rule for: there is no target to
-            // read a sand level from, but the anchored glass does not have one — it is stopped,
-            // with the anchor across the neck. Without this the shield fell through to the flat
-            // SF hourglass below, so the one screen that should look most like Furlough looked
-            // least like it (seen on the phone, 2026-09-09).
+            // Anchored-but-ruleless: no target for a sand level, but the anchored glass is
+            // stopped anyway (anchor across the neck). Without this the shield fell through to
+            // the flat SF hourglass (seen 2026-09-09).
             glass = .anchored
         }
         return ShieldConfiguration(
-            // The app's own ground over the most opaque dark material: the shield reads as a
-            // Furlough screen, not as a smear of whatever it is covering.
+            // App's own ground over the most opaque dark material, so the shield reads as
+            // Furlough, not a smear of what it covers.
             backgroundBlurStyle: .systemChromeMaterialDark,
             backgroundColor: ground.withAlphaComponent(0.92),
             icon: icon(for: glass, fallbackTint: amber),
             title: ShieldConfiguration.Label(text: text.title, color: cream),
             subtitle: ShieldConfiguration.Label(text: text.subtitle, color: muted),
-            // The card fill from the app, not a shouting cream pill: Close is the only thing
-            // here, so it does not have to fight for the eye.
+            // Card fill from the app, not a shouting cream pill — Close is the only action, no
+            // need to fight for the eye.
             primaryButtonLabel: ShieldConfiguration.Label(text: "Close", color: cream),
             primaryButtonBackgroundColor: UIColor.white.withAlphaComponent(0.14),
             secondaryButtonLabel: nil
         )
     }
 
-    /// The icon slot takes a UIImage, so the glass is one still frame of the app's own drawing,
-    /// at the sand level this rule has reached, without the timeline.
-    ///
-    /// It is drawn with Core Graphics (`HourglassStill`), not rendered from the SwiftUI view:
-    /// iOS asks for the configuration off the main thread, and `ImageRenderer` is main-actor
-    /// work, so a render that waited for the main thread never ran and the phone showed the
-    /// symbol below every time (2026-09-08). The symbol stays for the one case with no glass
-    /// to draw: an app iOS shields that no rule of ours knows.
+    /// A still frame of the glass, not the live drawing. Drawn with Core Graphics
+    /// (`HourglassStill`), not the SwiftUI view: iOS asks for this off the main thread, and
+    /// `ImageRenderer` is main-actor work, so it never rendered and fell back to the symbol
+    /// every time (2026-09-08).
     private func icon(for glass: HourglassState?, fallbackTint: UIColor) -> UIImage? {
-        // No view context out here to read a trait from, and the slot is small: @3x covers
-        // every device that draws a shield, and UIKit takes it down on a @2x screen.
+        // No trait environment here to read a scale from; @3x covers every device and UIKit
+        // downscales for @2x.
         if let glass, let still = HourglassStill.uiImage(glass, size: CGSize(width: 132, height: 176), scale: 3) {
             return still
         }
@@ -108,10 +99,8 @@ final class ShieldExtension: ShieldConfigurationDataSource {
             .withTintColor(fallbackTint, renderingMode: .alwaysOriginal)
     }
 
-    /// The shield is the one place Screen Time tells us what an app is called; everywhere else
-    /// a token is opaque. Write the name down — in its own key, never the state, which the
-    /// shield must not touch — so the widget, the notifications and the Live Activity can say
-    /// it instead of "This app".
+    /// The shield is the only place Screen Time names an app; write it to its own key (never
+    /// `state`, which the shield mustn't touch) so other surfaces can use it instead of "This app".
     private func remember(_ name: String, for target: Target) {
         guard target.systemName != name, SharedStore.learnName(name, for: target.id) else { return }
         SharedStore.log("learned a name from the shield: \(name)")

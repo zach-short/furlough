@@ -1,20 +1,12 @@
 import SwiftUI
 
-/// The nine pages behind the question mark. Each one answers a single question and stops.
-///
-/// All of them are in the binary rather than on the site, because help is wanted at the moment
-/// the app is in the way: on a train with no signal, on a phone whose browser may itself be
-/// shielded, and with the numbers this phone would actually serve. Anything with a number in
-/// it reads the number out of the config rather than repeating a default, so a phone with a
-/// week-long delay is not told about 24 hours, and a phone that allows three tags does not
-/// say two. furloughapp.com carries the same topics for anyone deciding whether to install
-/// Furlough; these are the copies the app answers from.
+// Copy here reads numbers out of config rather than hardcoding them, so text can't drift
+// from a phone's actual settings (delay hours, tag limit, etc).
 
 // MARK: - Windows and budgets
 
 struct WindowsHelp: View {
-    /// The two limits iOS imposes, read from the constants the editor enforces rather than
-    /// written into the sentence, so the page cannot drift from what a save will accept.
+    // Read from the enforced constants so this text can't drift from what a save will accept.
     private var shortestWindow: Int { Furlough.minimumWindowMinutes }
     private var windowBudget: Int { Furlough.maxActivities - 1 }
 
@@ -265,14 +257,8 @@ struct AnchorHelp: View {
 
 // MARK: - Across your devices
 
-/// The page nobody could find, because there is nothing to find: the link between the phone and
-/// the Mac is an Apple Account, so it has no screen, no switch and no setup step, and until this
-/// page existed the only way to learn it was already working was to watch it work.
-///
-/// Written from the phone's side. `HelpTopic.devices` on the Mac answers the same questions from
-/// the other end, and the two are deliberately not one shared string: the interesting fact on
-/// this device is that its tag is the only key either device has, and on the Mac it is that it
-/// holds a lock it cannot open.
+// Mirrors `HelpTopic.devices` on the Mac, written separately per device: here the tag is the
+// only key either device has; on the Mac side it holds a lock it cannot open.
 struct DevicesHelp: View {
     @Environment(AppModel.self) private var model
 
@@ -325,9 +311,7 @@ struct DevicesHelp: View {
         }
     }
 
-    /// Read live, because it is the one line on this page that can be false while it is being
-    /// read, and a phone whose tag cannot release a locked Mac should be told so where it is
-    /// looking rather than left to work it out.
+    // Computed live: iCloud availability can change while this page is open.
     private var cloudLine: String {
         model.cloudAvailable
             ? "The Anchor stops at the device it was dropped on: a drop here would not lock your Mac, and your tag could not release one. Both apps say so on the Anchor screen if it happens, rather than letting you find out at the tag."

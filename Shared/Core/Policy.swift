@@ -8,11 +8,9 @@ enum TargetStatus: Equatable {
     case anchored
     case unconfigured
     case blockedAllDay
-    /// Inside a window with budget remaining. `until` is the window's end minute, midnight
-    /// for a rule without windows, and past 1440 for a night: an evening that runs into the
-    /// next morning is stored as two windows, but it is one window to whoever is using it, so
-    /// it says the morning it really ends. `Policy.date(atMinute:of:)` reads those minutes on
-    /// into the next day; `TimeFormat.until` says them.
+    /// Inside a window with budget remaining. `until` is the end minute — midnight for an
+    /// all-day rule, past 1440 for a night whose two stored windows are one logical window
+    /// to the user.
     case open(until: Int)
     case exhausted(nextOpen: NextOpen?)
     case closed(nextOpen: NextOpen)
@@ -60,36 +58,25 @@ struct Decision {
     var shieldedApps: Set<ApplicationToken> = []
     var shieldedWeb: Set<WebDomainToken> = []
     var categories: Set<ActivityCategoryToken> = []
-    /// Typed hosts to block through the web content filter rather than the shield. A `.host`
-    /// target has no token, so it cannot be shielded; `ShieldReconciler` writes these into
-    /// `store.webContent.blockedByFilter` instead. There is no allowed counterpart: the filter
-    /// takes the whole blocked list or nothing, and a host that is open right now is simply
-    /// absent from it.
+    /// Typed hosts blocked via the web content filter rather than the shield (no token to
+    /// shield). No allowed counterpart — an open host is just absent from the list.
     var filteredHosts: Set<String> = []
-    /// The anchor is down over the whole phone: every app and every website is shielded
-    /// except what `allowedApps`, `allowedWeb` and `allowedHosts` name. Under this the three
-    /// allowed sets are the anchor's allowlist less whatever a rule shields right now — an
-    /// allowlisted app outside its window is in `shieldedApps` already and is kept out of the
-    /// exceptions rather than left to a precedence nobody has written down. `ShieldReconciler`
-    /// turns it into the `.all(except:)` policies below.
+    /// Anchor is down over the whole phone: everything shielded except `allowedApps`/`allowedWeb`/
+    /// `allowedHosts`, which already exclude anything a rule shields right now.
     var shieldsEverything = false
-    /// Typed hosts the web filter lets through while `shieldsEverything`. Empty otherwise: a
-    /// specific blocked list has no allowed hosts, only absent ones.
+    /// Typed hosts let through while `shieldsEverything`; empty otherwise (a blocked list has
+    /// no allowed hosts, only absent ones).
     var allowedHosts: Set<String> = []
     var statuses: [UUID: TargetStatus] = [:]
 
-    /// Counts a filter-blocked host. `denyAppRemoval` follows this, and Zach's call on
-    /// 2026-09-08 was that a host counts: the flag's job is stopping Furlough itself from
-    /// being deleted to escape, and deleting Furlough clears the filter exactly as it clears
-    /// a shield. Counts the whole phone too, for the same reason.
+    /// Includes filter-blocked hosts: deleting Furlough clears the filter just like a shield,
+    /// so `denyAppRemoval` needs to count them too.
     var isAnythingShielded: Bool {
         shieldsEverything || !shieldedApps.isEmpty || !shieldedWeb.isEmpty || !categories.isEmpty || !filteredHosts.isEmpty
     }
 
-    /// What `shield.applicationCategories` should be set to: nil with no category to shield,
-    /// the blocked categories with the open apps excepted, or — with the anchor over the whole
-    /// phone — every category with the allowlist excepted. Here rather than in the reconciler
-    /// so the three cases sit beside the sets they are built from; the reconciler only writes.
+    /// What `shield.applicationCategories` should be: nil, blocked categories excepting open
+    /// apps, or (anchor-everything) all categories excepting the allowlist.
     var appCategoryPolicy: ShieldSettings.ActivityCategoryPolicy<Application>? {
         if shieldsEverything { return .all(except: allowedApps) }
         return categories.isEmpty ? nil : .specific(categories, except: allowedApps)
@@ -101,13 +88,9 @@ struct Decision {
         return categories.isEmpty ? nil : .specific(categories, except: allowedWeb)
     }
 
-    /// What `blockedByFilter` should be set to. Nil when nothing is filtered; the closed typed
-    /// hosts otherwise, by name, and nothing else (`.specific`, verified on the phone
-    /// 2026-09-08). With the anchor over the whole phone, the whole web except the allowlist:
-    /// its typed hosts by name and its picked sites by token, which `WebDomain` takes either
-    /// way. The filter reaches every browser where the shield may only reach Safari, and it is
-    /// the only thing that can let a typed host through, since a host has no token to except
-    /// from the shield.
+    /// What `blockedByFilter` should be: nil, the closed typed hosts (`.specific`), or — with
+    /// the anchor over everything — `.all(except:)` the allowlist. The filter reaches every
+    /// browser (the shield may only reach Safari) and is the only way to let a typed host through.
     var webFilter: WebContentSettings.FilterPolicy? {
         if shieldsEverything {
             var allowed = Set(allowedHosts.map { WebDomain(domain: $0) })
@@ -122,10 +105,9 @@ struct Decision {
 struct Decision {
     var blockedApps: Set<String> = []
     var blockedHosts: Set<String> = []
-    /// The anchor is down over the whole Mac: every app and every site is blocked except what
-    /// `allowedApps` and `allowedHosts` name. Since 2026-09-09 the Mac acts on it (`Enforcer`
-    /// reads `blocks(app:)` and `blocks(host:)`), keeping the apps the Mac cannot do without
-    /// (`AppCatalog.excluded`) and anything without a Dock presence out of it.
+    /// Anchor is down over the whole Mac: everything blocked except `allowedApps`/`allowedHosts`.
+    /// `Enforcer` reads this via `blocks(app:)`/`blocks(host:)`, keeping apps the Mac can't do
+    /// without (`AppCatalog.excluded`) and anything without a Dock presence out of it.
     var shieldsEverything = false
     /// The allowlist, by bundle identifier and host, while `shieldsEverything`.
     var allowedApps: Set<String> = []
@@ -134,16 +116,16 @@ struct Decision {
 
     var isAnythingShielded: Bool { shieldsEverything || !blockedApps.isEmpty || !blockedHosts.isEmpty }
 
-    /// Whether the Mac should keep `bundleID` from running: on the blocked list, or, with the
-    /// anchor over everything, off the allowlist. A rule still blocks what it blocks — an
-    /// allowlisted app outside its window is in `blockedApps` — so the list is asked first.
+    /// Whether to block `bundleID`: on the blocked list, or (anchor-everything) off the
+    /// allowlist. The blocked list is checked first, since a rule still blocks an allowlisted
+    /// app outside its window.
     func blocks(app bundleID: String) -> Bool {
         if blockedApps.contains(bundleID) { return true }
         return shieldsEverything && !allowedApps.contains(bundleID)
     }
 
-    /// The same for a site: a blocked host or a subdomain of one, or, with the anchor over
-    /// everything, anything not under an allowlisted host.
+    /// The same for a site: a blocked host (or subdomain), or, under anchor-everything,
+    /// anything not under an allowlisted host.
     func blocks(host: String) -> Bool {
         if blockedHosts.contains(where: { Hosts.matches(host, rule: $0) }) { return true }
         return shieldsEverything && !allowedHosts.contains { Hosts.matches(host, rule: $0) }
@@ -194,15 +176,10 @@ enum Policy {
 
     // MARK: Pending changes
 
-    /// Applies every pending change whose time has come. Returns true when anything changed.
-    /// `now` is Furlough's own time, never the device's: it defaults to `state.now` so that a
-    /// caller who forgets cannot let a clock moved forward land a loosening early.
-    ///
-    /// The first week running out and an undo window closing are changes coming due like any
-    /// other, so they are folded in here rather than compared against the clock on every read.
-    /// This is the pass every enforce, every widget read and every `effectiveConfig` goes
-    /// through, which is what lets `Config.delayHours` — asked from a dozen places with no
-    /// business knowing the time — answer with no date at all.
+    /// Applies every pending change whose time has come; true if anything changed. `now`
+    /// defaults to `state.now` so a caller can't accidentally land a loosening early using a
+    /// device clock. Trial expiry and undo-window closing are folded in here too, as changes
+    /// due like any other.
     @discardableResult
     static func applyDuePending(
         _ state: inout SharedState, now: Date? = nil, calendar: Calendar = .current
@@ -217,10 +194,8 @@ enum Policy {
             apply(change, to: &state.config)
         }
         state.pending.removeAll { $0.effectiveAt <= now }
-        // The one place a loosening lands, so the one place the record can count it. A caller
-        // folding pending changes into a throwaway copy of the state — `effectiveConfig`, and
-        // so every widget timeline entry and the shield's display — counts into that copy and
-        // throws it away with the rest.
+        // The one place a loosening lands, so the one place the record counts it (a throwaway
+        // call via `effectiveConfig` counts into its discarded copy too).
         Record.noteLanded(due.count, in: &state, now: now, calendar: calendar)
         changed = true
         return changed
@@ -241,10 +216,8 @@ enum Policy {
                 config.targets[index].utilityLevel = level
             }
         case .unlink(let id, let kind):
-            // Only ever a linked half: the face is what the row *is*, so dropping it would leave
-            // a target with no identity rather than a looser one. `AppModel.unlink` refuses to
-            // queue that, and this refuses to perform it, because a change can sit in the queue
-            // across an edit that changes which half is the face.
+            // Refuses to drop the face (only a linked half), since a queued change can outlive
+            // an edit that changes which half is the face.
             if let index = config.targets.firstIndex(where: { $0.id == id }), config.targets[index].kind != kind {
                 var remaining = config.targets[index].also ?? []
                 remaining.removeAll { $0 == kind }
@@ -256,7 +229,7 @@ enum Policy {
     }
 
     /// The config as it stands at `now`, with due pending changes folded in but nothing
-    /// persisted. `now` is Furlough's own time; the widget passes future ones to draw a timeline.
+    /// persisted; the widget passes future times to draw a timeline.
     static func effectiveConfig(_ state: SharedState, now: Date) -> Config {
         var copy = state
         applyDuePending(&copy, now: now)
@@ -270,17 +243,11 @@ enum Policy {
         return new.isTighterOrEqual(to: old) ? .tightening : .loosening
     }
 
-    /// What setting `level` on `target` should do. `queued` says whether a tier change is
-    /// already waiting for this target.
-    ///
-    /// A queued tier change is dropped whichever answer comes back, and that is the point: the
-    /// rule editor seeds its picker from the queued tier rather than the saved one, so choosing
-    /// the saved tier back is the obvious way to cancel a queued change. It used to be a silent
-    /// no-op that left the loosening in place, which is the wrong way for a commitment device
-    /// to fail.
-    ///
-    /// The comparison is against `target.utility`, not `target.utilityLevel`: a target nobody
-    /// has tiered is already effectively `.unset`, so choosing that tier is not a change.
+    /// What setting `level` on `target` should do. Always drops a queued tier change — the
+    /// editor seeds its picker from the queued tier, so re-choosing the saved one is how a
+    /// person cancels it, and this must not silently leave the loosening in place. Compares
+    /// against `target.utility` (not `utilityLevel`), since an untiered target is already
+    /// effectively `.unset`.
     static func plan(utility level: Utility, for target: Target, queued: Bool) -> UtilityPlan {
         guard target.utility != level || queued else { return .unchanged }
         // The tier is already what was asked for, so only the queued change is being dropped.
@@ -290,10 +257,9 @@ enum Policy {
         return classify(newUtility: level, against: target) == .tightening ? .now : .queue
     }
 
-    /// A tier changes nothing about what is allowed, only how long the next loosening waits —
-    /// so it is classified on the delay it buys, not with `Rule.isTighterOrEqual`. Moving
-    /// toward hazard lengthens the wait and lands now; moving toward essential shortens it and
-    /// queues, which is what stops "mark everything essential" from being a way out of the delay.
+    /// Classified by the delay the tier buys, not `Rule.isTighterOrEqual`, since a tier changes
+    /// nothing about what's allowed. Moving toward hazard lands now; toward essential queues —
+    /// otherwise "mark everything essential" would be a way around the delay.
     static func classify(newUtility: Utility, against target: Target?) -> ChangeClass {
         let old = target?.utility ?? .unset
         return newUtility.delayMultiplier >= old.delayMultiplier ? .tightening : .loosening
@@ -325,47 +291,29 @@ enum Policy {
         return .closed(nextOpen: nextOpen(in: rule, afterWeekday: weekday) ?? NextOpen(minuteOfDay: 0, daysAhead: 1))
     }
 
-    /// When a window really ends, counted from the start of `weekday`. An evening that ends at
-    /// midnight where the next day opens at midnight is half of a night: it runs on past 1440,
-    /// to the end of the morning half. Nothing shuts at the join, so nothing says it does.
+    /// When a window really ends, from the start of `weekday`: past 1440 for a night's evening
+    /// half, since nothing actually shuts at the midnight join.
     static func end(of window: TimeWindow, in rule: Rule, on weekday: Int) -> Int {
         guard window.endMinute == Furlough.minutesPerDay,
               let morning = rule.continuation(after: weekday) else { return window.endMinute }
         return Furlough.minutesPerDay + morning.endMinute
     }
 
-    /// Whether a trip through Apple's picker should schedule `target`'s removal, given the kinds
-    /// that came back in `selected`.
-    ///
-    /// The picker's answer is the whole truth about **tokens** and nothing else, and two kinds of
-    /// door have to be held back from it.
-    ///
-    /// A target with no tokenised door at all — a website typed by name — is never in any
-    /// selection, because it has no token and Apple's picker has never heard of it. Without this,
-    /// one trip through the picker would queue the removal of every site added by name.
-    ///
-    /// And a linked target survives while *any* of its tokenised doors is still picked. Unpicking
-    /// one half of a pair is not how a pair is broken: breaking one is a loosening that waits out
-    /// the delay, and a removal scheduled from here would be a second, quieter way to do the same
-    /// thing — one that takes the whole row rather than the half that was unpicked.
-    ///
-    /// Pure and here rather than inside `AppModel.applyPicker` so that it can be tested: the
-    /// picker itself is iOS-only and unreachable from a test bundle, and this is the rule that
-    /// decides whether a removal is queued.
+    /// Whether a picker trip should schedule `target`'s removal, given `selected`. A target with
+    /// no tokenised door (a typed-by-name site) is excluded — it never appears in any selection,
+    /// so it must not be treated as removed. A linked target survives while any of its tokenised
+    /// doors is still picked — unpicking one half is `unlink`'s job, not a removal.
     static func picker(removes target: Target, selected: Set<TargetKind>) -> Bool {
         let tokenised = target.kinds.filter { !$0.isHost }
         guard !tokenised.isEmpty else { return false }
         return !tokenised.contains { selected.contains($0) }
     }
 
-    /// When the window that opens at `next` closes again, as a date. Nil for a rule with no
-    /// windows: midnight only resets its budget, so there is nothing to close and nothing to
-    /// count down to. A night is one window here as everywhere else, so an evening that runs
-    /// into the morning says the morning it really ends.
+    /// When the window that opens at `next` closes again. Nil for an all-day rule, where
+    /// midnight only resets the budget and nothing actually closes.
     static func close(of next: NextOpen, in target: Target, from now: Date, calendar: Calendar = .current) -> Date? {
-        // `windows(on:)` answers with the whole day for a rule that has none, which is right
-        // for deciding what is allowed and wrong here: nothing closes at that midnight, the
-        // budget merely resets.
+        // `windows(on:)` returns the whole day for an all-day rule, which is wrong here —
+        // nothing actually closes at that midnight.
         guard let rule = target.rule, !rule.isAllDay else { return nil }
         let weekday = weekday(now, calendar: calendar)
         let day = (weekday - 1 + next.daysAhead) % 7 + 1
@@ -394,8 +342,7 @@ enum Policy {
         for target in config.targets {
             let status = status(of: target, config: config, runtime: runtime, now: now, calendar: calendar)
             decision.statuses[target.id] = status
-            // Every door, not just the face. One status covers the app and the website it is
-            // also at, so linking costs nothing here: the status was only ever per target.
+            // Every door, not just the face — status is per target, so linking costs nothing here.
             for kind in target.kinds {
                 switch kind {
                 case .application(let token):
@@ -429,14 +376,10 @@ enum Policy {
                     }
                 }
             case .everythingExcept:
-                // The whole phone goes behind the shield and the list is what stays open. Every
-                // target off the list is already `.anchored` above, so its doors are in the
-                // shielded sets; the allowed sets are replaced outright, because an app that is
-                // open by its rule and not on the list is exactly what this scope shields.
-                // A rule still shields what it shields: an allowlisted app outside its window
-                // stays in `shieldedApps` and is kept out of the exceptions. A category cannot
-                // be excepted from `.all` — `setAnchorSelection` drops them, and one that got
-                // here anyway is simply ignored, its apps having been picked as apps.
+                // Everything goes behind the shield; the allowed sets are replaced outright by
+                // the allowlist minus whatever a rule still shields (so an allowlisted app
+                // outside its window stays shielded). A category can't be excepted from `.all`,
+                // so one on the list here is simply ignored.
                 decision.shieldsEverything = true
                 var apps: Set<ApplicationToken> = []
                 var web: Set<WebDomainToken> = []
@@ -481,10 +424,8 @@ enum Policy {
                     }
                 }
             case .everythingExcept:
-                // The list is what stays open. Every target off it is `.anchored` above and
-                // blocked through its status; everything else on the Mac is blocked through
-                // `blocks(app:)` and `blocks(host:)`, except the list, less what a rule blocks
-                // right now, as on the phone.
+                // The list stays open; everything else is blocked via `blocks(app:)`/`blocks(host:)`,
+                // minus what a rule already blocks (as on the phone).
                 decision.shieldsEverything = true
                 for kind in config.anchor.kinds {
                     switch kind {
@@ -537,10 +478,8 @@ enum Policy {
         var openWarned = false
         /// Today's budget for that target, in minutes, or nil where there is no real limit.
         var openBudgetMinutes: Int?
-        /// When its warning fired, so a countdown can run to the moment the budget is spent.
-        /// This is the only budget deadline iOS ever makes knowable: before the warning there
-        /// is no figure at all, because Screen Time reports usage to nobody but its own report
-        /// extension. Nil until the warning, and nil for a warning recorded before 2026-09-09.
+        /// When its warning fired, for a countdown to the budget running out — the only budget
+        /// deadline iOS ever exposes.
         var openWarnedAt: Date?
         /// Open with no windows of their own: usable all day, up to the budget. Kept apart from
         /// `openNames` so they get no closing countdown and no Live Activity.
@@ -548,10 +487,8 @@ enum Policy {
         /// One of those has had its 5-minute budget warning.
         var allDayWarned = false
         var nextOpenAt: Date?
-        /// When that window closes again, so a Live Activity can be scheduled for the whole of
-        /// it before it starts. Nil when the thing opening next has no window to close — an
-        /// all-day rule whose budget resets at midnight — which is the same set that gets no
-        /// Live Activity while it is open.
+        /// When that window closes again, to schedule a Live Activity ahead of it; nil for an
+        /// all-day rule (nothing to close).
         var nextOpenUntil: Date?
         var nextOpenNames: [String] = []
         /// Budget of the target opening next, for the widget's detail line.
@@ -563,11 +500,9 @@ enum Policy {
         var unconfiguredCount = 0
         var pendingCount = 0
         var isAnchored = false
-        /// Everything the anchor holds, targets or not, while anchored — or, while it is over
-        /// the whole phone, how many things it lets through. Read `anchorsEverything` first.
+        /// What the anchor holds (or, if `anchorsEverything`, how many it lets through).
         var anchoredCount = 0
-        /// The anchor is down over the whole phone: every app and site but `anchoredCount` of
-        /// them. What the widget and the spoken answer say instead of a count.
+        /// Anchor is down over the whole phone (everything but `anchoredCount`); shown instead of a count.
         var anchorsEverything = false
         /// When a timed anchor lifts by itself; nil for the tag alone, and while it is up.
         var anchorUntil: Date?
@@ -579,9 +514,8 @@ enum Policy {
                 && unconfiguredCount == 0 && anchoredCount == 0 && !anchorsEverything
         }
 
-        /// The same summary with its dates moved onto the device's clock. A widget entry and a
-        /// Live Activity's timer are drawn by the system against its own clock, so they have to
-        /// be handed device time even while Furlough is running on its own.
+        /// The same summary with dates moved onto the device's clock, since the system draws
+        /// widget/Live Activity timers against its own clock.
         func shifted(by drift: TimeInterval) -> Summary {
             guard drift != 0 else { return self }
             var copy = self
@@ -608,8 +542,8 @@ enum Policy {
         let weekday = weekday(now, calendar: calendar)
         var soonestOpen: (until: Int, start: Int, warned: Bool, budget: Int?, warnedAt: Date?)?
         var soonest: (date: Date, until: Date?, names: [String], budget: Int?, exhausted: Bool)?
-        // Targets still called "This app" go to the end of every list, after the loop, so a
-        // widget that shows one name and a count shows a name somebody recognises.
+        // Unnamed targets go to the end of every list, so a widget with limited space shows a
+        // recognisable name.
         var unnamedAllDay: [String] = []
         var unnamedOpen: [String] = []
         var unnamedNext: [String] = []
@@ -655,10 +589,8 @@ enum Policy {
         func consider(_ next: NextOpen, _ target: Target, exhausted: Bool) {
             let date = date(at: next, from: now, calendar: calendar)
             let name = target.displayName
-            // nil where there is no real limit, so the widget says what is blocked instead of
-            // offering "24 hours budget" as if it were one. Read on the day it next opens, not
-            // today: a rule that is shut all Sunday and worth two hours on Monday is offering
-            // the two hours, and saying today's nothing would be a countdown to a closed door.
+            // Read on the day it next opens (not today), so a Sunday-closed/Monday-open rule
+            // offers Monday's budget, not today's nothing.
             let budget = target.rule?.limit(on: Policy.weekday(date, calendar: calendar))
             let until = close(of: next, in: target, from: now, calendar: calendar)
             if let current = soonest {

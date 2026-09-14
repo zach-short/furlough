@@ -1,27 +1,9 @@
 import SwiftUI
 
-/// The first run: the promise, and the question.
-///
-/// Two panes, and the second one is the point. Furlough is two things — Rules, which are hours
-/// and budgets and a delay on anything that hands time back, and the Anchor, which is one click
-/// and your phone's tag as the only key. This screen used to name both and then hand everyone
-/// the same window, built around Rules, with the Anchor a padlock somebody had to find. So the
-/// second pane asks which half you came for, and the answer is what the window opens on and
-/// which guide runs. The pane that used to explain the Anchor is gone: every sentence on it now
-/// lands inside the guide step it describes, where it can be acted on rather than read once.
-///
-/// The web filter used to be a third pane here, and it is gone. It does nothing until some
-/// website is blocked, so asking for a trip to System Settings before there is a single rule
-/// charged everybody up front for something most people would never need — and anyone who only
-/// blocks applications was answering for a feature that could not do anything for them. It is
-/// offered at the first website instead; see `WebFilterOfferSheet`.
 struct MacOnboardingView: View {
     @Environment(MacModel.self) private var model
     @State private var requesting = false
     @State private var pane = Pane.promise
-    /// The start pane's answer, held until Continue. The Anchor leads: it is the half nobody was
-    /// being offered, and a preselected first row asks the question without putting a dead button
-    /// under it.
     @State private var chosen: Half = .anchor
     @State private var wantsBoth = false
 
@@ -33,8 +15,6 @@ struct MacOnboardingView: View {
             HStack(spacing: 40) {
                 mark
                     .frame(width: 170, height: 200)
-                // Scrolls so a pane taller than a short window is still reachable rather than
-                // cut off at the bottom.
                 ScrollView(.vertical) {
                     Group {
                         switch pane {
@@ -51,8 +31,6 @@ struct MacOnboardingView: View {
         }
     }
 
-    /// The glass on the panes about the whole app, and both marks together on the one that asks
-    /// you to choose between them — the picture of the question, in the order the rows are in.
     @ViewBuilder private var mark: some View {
         if pane == .start {
             HStack(spacing: 16) {
@@ -75,8 +53,6 @@ struct MacOnboardingView: View {
         }
     }
 
-    /// Both halves on one screen, named, with a row each. Whatever else is skipped, this is the
-    /// screen that has to leave behind the fact that there are two of them.
     private var promise: some View {
         VStack(alignment: .leading, spacing: 0) {
             Eyebrow(text: "Furlough for Mac", color: Ember.amber)
@@ -89,8 +65,6 @@ struct MacOnboardingView: View {
                 .foregroundStyle(Ember.muted)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 14)
-            // The Anchor first here and on the next pane, so the intro lists the two halves in
-            // one order throughout and the row you read first is the row you land on.
             VStack(spacing: 0) {
                 MacHalfRow(
                     title: "The Anchor",
@@ -110,9 +84,6 @@ struct MacOnboardingView: View {
             .padding(.top, 18)
             Footnote(text: "Use either on its own. Neither one needs the other.")
                 .padding(.top, 10)
-            // The one thing about this Mac that has to be said before anything is agreed to: it
-            // enforces by hand because there is no Screen Time API here, which is why it has to
-            // keep running and why Force Quit is the way out.
             Text("The Mac has no Screen Time API for apps like this, so Furlough quits blocked apps itself and macOS will ask once per browser whether it may read the address bar. Furlough opens at login and refuses to quit while something is blocked; Force Quit is the one escape.")
                 .emberBody(12.5)
                 .foregroundStyle(Ember.faint)
@@ -137,9 +108,6 @@ struct MacOnboardingView: View {
         }
     }
 
-    /// The question the app never asked. Two rows and a quieter third line; the answer sets the
-    /// half the window opens on and the guide that runs in it. Clicking a row only selects it —
-    /// Continue is what commits, and it is live from the moment the pane arrives.
     private var start: some View {
         VStack(alignment: .leading, spacing: 0) {
             Eyebrow(text: "Two halves", color: Ember.amber)
@@ -177,8 +145,6 @@ struct MacOnboardingView: View {
             }
             .emberCard()
             .padding(.top, 18)
-            // Quieter and outside the card, because it is not a third thing to be — it is the
-            // two above, in the order they are in.
             Button {
                 chosen = .anchor
                 wantsBoth = true
@@ -201,12 +167,7 @@ struct MacOnboardingView: View {
             Footnote(text: "Nothing is decided here. Both halves are one click apart afterwards, whichever you pick.")
                 .padding(.top, 10)
             HStack(spacing: 10) {
-                // The last button of the first run now that the filter pane has gone, so it says
-                // where it lands rather than "Continue", which promised another pane.
                 Button(wantsBoth ? "Start with the Anchor" : "Start with \(chosen == .anchor ? "the Anchor" : "Rules")") {
-                    // Committed on the way forward rather than on each click, so backing out and
-                    // coming at it again does not leave a half chosen by a mouse on its way
-                    // somewhere else.
                     model.chooseStart(half: chosen, both: wantsBoth)
                     model.finishOnboarding()
                 }
@@ -228,7 +189,6 @@ struct MacOnboardingView: View {
 }
 
 
-/// One half of the app on the promise pane: its mark, its name, and what it is in two lines.
 private struct MacHalfRow<Icon: View>: View {
     let title: String
     let detail: String
@@ -260,9 +220,6 @@ private struct MacHalfRow<Icon: View>: View {
     }
 }
 
-/// One half offered on the start pane: `MacHalfRow` with a click and a chosen state. The mark
-/// keeps its own colour when the row is not chosen — an anchor greyed out is a different anchor
-/// — and the row says which it is with its tint and its check.
 private struct MacStartRow<Icon: View>: View {
     let title: String
     let detail: String

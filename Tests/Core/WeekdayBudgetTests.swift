@@ -1,15 +1,11 @@
 import Foundation
 import Testing
 
-/// Per-weekday budgets: `Rule.budgetByWeekday`, seven figures Sunday first, and everything
-/// that used to read one budget now reading today's.
-///
-/// September 2026 in `cal`: the 6th is a Sunday and the 12th a Saturday, so the 7th is a
-/// Monday (Calendar weekday 2) and the 8th a Tuesday (weekday 3).
+/// `Rule.budgetByWeekday`: seven figures Sunday first, and everywhere that used to read one
+/// budget now reading today's. In `cal`, the 7th is a Monday and the 8th a Tuesday.
 @Suite("Per-weekday budgets")
 struct WeekdayBudgetTests {
-    /// Five minutes on Monday, two hours on Saturday, thirty everywhere else. The week the
-    /// hand-back asks for, and the one most of these tests are about.
+    // 5 min Monday, 2 hours Saturday, 30 everywhere else — the week most of these tests use.
     let mixed = Rule(
         windows: [window(20 * 60, 22 * 60)],
         dailyBudgetMinutes: 30,
@@ -101,15 +97,13 @@ struct WeekdayBudgetTests {
             dailyBudgetMinutes: 60,
             budgetByWeekday: [0, 60, 60, 60, 60, 60, 60]
         )
-        // Saturday the 12th at 11 PM: the morning half is on a Sunday worth nothing, so the
-        // night is not joined and the window really does shut at midnight.
+        // Sunday's morning half is worth nothing, so the night is not joined and shuts at midnight.
         #expect(rule.continuation(after: 7) == nil)
         let target = makeTarget("TikTok", rule: rule)
         let saturday = Policy.status(of: target, config: makeConfig([target]), runtime: RuntimeState(), now: at(12, 23), calendar: cal)
         #expect(saturday == .open(until: Furlough.minutesPerDay))
-        // And 1 AM on that Sunday is shut, not the tail of the night before. The next open is
-        // the following Saturday evening, six days out: Sunday's own morning half is worth
-        // nothing, and no other day carries hours at all.
+        // 1 AM Sunday is shut (not the tail of the night before); next open is the following
+        // Saturday evening, since no other day carries hours.
         let sunday = Policy.status(of: target, config: makeConfig([target]), runtime: RuntimeState(), now: at(13, 1), calendar: cal)
         #expect(sunday == .closed(nextOpen: NextOpen(minuteOfDay: 17 * 60, daysAhead: 6)))
         #expect(rule.continues(into: 1) == nil)
@@ -140,14 +134,13 @@ struct WeekdayBudgetTests {
 
     @Test("the editor collapsing seven sliders back to one offers the week's ordinary day")
     func representativeBudget() {
-        // Mon 5, Sat 120, 30 on the other five: 30 is the figure the week is really about,
-        // not the shadow `dailyBudgetMinutes`, which an imported rule can set to anything.
+        // 30 is the figure the week is really about, not the shadow `dailyBudgetMinutes`,
+        // which an imported rule can set to anything.
         let imported = Rule(windows: [], dailyBudgetMinutes: 1440, budgetByWeekday: [30, 5, 30, 30, 30, 30, 120])
         #expect(imported.representativeBudget == 30)
         // A tie goes to the smaller, so collapsing never quietly buys minutes.
         let tied = Rule(windows: [], dailyBudgetMinutes: 999, budgetByWeekday: [15, 15, 15, 60, 60, 60, 90])
         #expect(tied.representativeBudget == 15)
-        // Without a per-day budget the one figure is still the answer.
         #expect(Rule(windows: [], dailyBudgetMinutes: 45).representativeBudget == 45)
     }
 
@@ -223,15 +216,13 @@ struct WeekdayBudgetTests {
 
     @Test("the monitor keeps another day's threshold out: 30 on a five-minute Monday, 5 on a two-hour Saturday")
     func thresholdsAreJudgedAgainstToday() {
-        // `eventDidReachThreshold` exhausts when the fired minutes are at or above today's
-        // budget, and logs the rest as stale. Monday is worth 5 and Saturday 120.
+        // Monday is worth 5, Saturday 120; exhausts at or above today's own budget.
         func exhausts(_ fired: Int, on weekday: Int) -> Bool { fired >= mixed.effectiveBudget(on: weekday) }
         #expect(exhausts(5, on: 2))
         #expect(exhausts(30, on: 2))
         #expect(!exhausts(5, on: 7))
         #expect(exhausts(120, on: 7))
-        // `eventWillReachThresholdWarning` is exact, so only the day's own budget warns: a
-        // Monday must not get its five-minute warning off the weekend's larger event.
+        // Warning is exact, so a Monday must not fire off the weekend's larger event.
         func warns(_ fired: Int, on weekday: Int) -> Bool { fired == mixed.effectiveBudget(on: weekday) }
         #expect(warns(5, on: 2))
         #expect(!warns(30, on: 2))
@@ -241,9 +232,9 @@ struct WeekdayBudgetTests {
 
     // MARK: What it reads as
 
-    /// The weekend leads because `cal` starts its week on Sunday and groups are ordered by
-    /// their earliest day — the same `groupOrder` that orders the hours half of the very same
-    /// sentence. Both halves of a rule line read in one order, whichever day a calendar starts on.
+    // Weekend leads because `cal` starts on Sunday and groups sort by earliest day — the same
+    // `groupOrder` the hours half of the sentence uses, so both halves agree whichever day a
+    // calendar starts on.
     @Test("two groups read as one phrase, and three fall back to varies by day")
     func budgetGrammar() {
         let weekdaysAndWeekends = Rule(

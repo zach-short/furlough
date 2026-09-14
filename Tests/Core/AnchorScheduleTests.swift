@@ -1,9 +1,8 @@
 import Foundation
 import Testing
 
-/// The anchor's clock, added 2026-09-09: a timed drop (`until`), scheduled drops
-/// (`schedules`), and the pure decisions the monitor and the app make with them. The 8th is a
-/// Tuesday in the fixed calendar, the 12th a Saturday.
+/// A timed drop (`until`), scheduled drops (`schedules`), and the decisions built on them.
+/// Fixed calendar: the 8th is a Tuesday, the 12th a Saturday.
 @Suite("Anchor schedule: a timed drop")
 struct AnchorUntilTests {
     let openAllDay = Rule(windows: [], dailyBudgetMinutes: 30)
@@ -103,8 +102,7 @@ struct AnchorUntilTests {
         #expect(config.anchor.anchoredAt == at(8, 12, 0))
         #expect(config.anchor.until == at(8, 12, 15))
         #expect(Policy.drop(&config, now: at(8, 12, 1)) == .alreadyAnchored)
-        // Once the time has passed the expired anchor is folded and it can drop again, this
-        // time until the tag.
+        // Past its time, the expired anchor is folded and can drop again, now until the tag.
         #expect(Policy.drop(&config, now: at(8, 12, 15)) == nil)
         #expect(config.anchor.until == nil)
         #expect(config.anchor.anchoredAt == at(8, 12, 15))

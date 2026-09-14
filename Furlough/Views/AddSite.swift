@@ -1,20 +1,9 @@
 import SwiftUI
 
-/// Adding a website by typing it, which since 2026-09-08 is what Website means on the phone.
-///
-/// It used to mean Apple's picker and nothing else, because a `WebDomainToken` can only be
-/// minted in there — three levels down, under every app in a category. But
-/// `WebContentSettings.blockedByFilter` takes a plain host string, so Furlough can take one
-/// too, and the phone now does what the Mac always has.
-///
-/// The two are not the same thing and this sheet says so rather than letting them look alike.
-/// A typed site gets its hours enforced and nothing else: nothing counts it, so it has no
-/// daily limit, and iOS covers it with its own "Website Not Allowed" page instead of
-/// Furlough's shield. The picker's version has both. Typing is offered first because it is the
-/// thing wanted nine times in ten; the other is one line away.
+/// A typed site gets only its hours enforced — no daily limit, and iOS shows its own "Website
+/// Not Allowed" page instead of Furlough's shield. A site picked via Apple's picker gets both.
 struct AddSiteSheet: View {
-    /// Hand over to Apple's picker instead. The sheet dismisses itself; the caller opens the
-    /// guide once this one is fully gone.
+    /// Dismisses the sheet; the caller opens the picker guide once it's fully gone.
     let onUsePicker: () -> Void
 
     @Environment(AppModel.self) private var model
@@ -22,11 +11,9 @@ struct AddSiteSheet: View {
     @FocusState private var typing: Bool
     @State private var text = ""
     @State private var outcome: AppModel.AddHostOutcome?
-    /// The sheet hugs its content. Seeded near the real height so it does not resize on open.
+    /// Seeded near the real content height so the sheet doesn't resize on open.
     @State private var contentHeight: CGFloat = 430
 
-    /// What Furlough would call it, so the button can say the thing it is about to add rather
-    /// than whatever was typed: "https://www.YouTube.com/feed" reads back as "youtube.com".
     private var host: String? { Hosts.normalize(text) }
 
     var body: some View {
@@ -63,10 +50,7 @@ struct AddSiteSheet: View {
                         .submitLabel(.done)
                         .focused($typing)
                         .onSubmit(add)
-                        // The return key adds the site, so it cannot double as the way to put
-                        // the keyboard away, and until this there was none: the sheet fits its
-                        // content, so a drag collapses the sheet instead of scrolling it, and a
-                        // tap above it lands on the backdrop and dismisses it.
+                        // Return submits, so a separate Done button is needed to dismiss the keyboard.
                         .toolbar {
                             ToolbarItemGroup(placement: .keyboard) {
                                 Spacer()
@@ -127,8 +111,6 @@ struct AddSiteSheet: View {
         .onAppear { typing = true }
     }
 
-    /// What just happened, or what is wrong with what has been typed so far. Silent while the
-    /// field is empty: nothing has gone wrong yet.
     private var message: String? {
         switch outcome {
         case .added(let host): "\(host) added. Give it hours on Home; nothing is blocked until you do."
@@ -147,8 +129,7 @@ struct AddSiteSheet: View {
         guard host != nil else { return }
         let result = model.addHost(text)
         outcome = result
-        // Cleared only on success, so a second site can be typed straight after; a rejected
-        // one is left in the field to be corrected rather than retyped.
+        // Cleared only on success; a rejected entry stays in the field for correction.
         if case .added = result {
             text = ""
             typing = true

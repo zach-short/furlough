@@ -1,28 +1,22 @@
 import Foundation
 
-/// What one device says about the anchor, as the other receives it. The anchor's *state* and
-/// nothing else: rules cannot travel (a Screen Time token means nothing off the phone that
-/// minted it, a bundle identifier nothing on it), so each device keeps its own list and this
-/// carries only whether the anchor is down, since when, until when, who wrote that, and how.
+/// What one device tells the other about the anchor's *state* only — never rules, since a
+/// Screen Time token or bundle identifier means nothing off the device that minted it.
 struct AnchorRecord: Codable, Equatable {
-    /// What wrote it. An iPad is its own case since the roster (2026-09-10): it runs the phone
-    /// app but has no tag reader, so it can be anchored and can never release, which is the
-    /// Mac's position, and `merge` must not take a release from it.
+    /// iPad is its own case: it runs the phone app but has no tag reader, so — like the Mac —
+    /// it can be anchored but never release. `merge` must not accept a release from it.
     enum Platform: String, Codable, Sendable {
         case phone
         case pad
         case mac
     }
 
-    /// How the write came about. Only a `tagScan` from a phone is a release the other device
-    /// will take; everything else is a drop, or a lift each device works out for itself.
+    /// Only a `tagScan` from a phone counts as a release the other device will take.
     enum Origin: String, Codable {
-        /// A drop: by hand, from a widget or Control Center, or by the schedule.
         case drop
-        /// The one release: a paired tag read by a phone.
         case tagScan
-        /// A timed anchor's `until` passed. Informational — the receiver computes the same
-        /// expiry from the `until` it already holds, and refuses this as a release.
+        /// A timed anchor's `until` passing. Informational only — the receiver computes this
+        /// itself and never treats it as a remote release.
         case lift
     }
 
@@ -37,13 +31,9 @@ struct AnchorRecord: Codable, Equatable {
     var writtenAt: Date
 }
 
-/// The anchor across devices: dropping on either locks both, and scanning the tag on the
-/// phone releases the Mac too. The Mac has no NFC, so a release only ever originates on a
-/// phone, and `merge` refuses any other.
-///
-/// The transport is the iCloud key-value store (`AnchorCloud`): no account of ours, no server
-/// of ours, and it works when the devices are apart, which is the case Zach named — anchor at
-/// work and the Mac at home locks. A device that cannot reach iCloud keeps its last state.
+/// Syncs the anchor across devices via the iCloud key-value store (`AnchorCloud`) — no server
+/// of ours. A release only ever originates from a phone's tag scan; `merge` refuses any other.
+/// A device that can't reach iCloud just keeps its last state.
 enum AnchorSync {
     private static let deviceKey = "furlough.device.v1"
     private static let phoneSeenKey = "furlough.sync.phoneSeen"
@@ -52,8 +42,7 @@ enum AnchorSync {
     /// When this device last read a record the *other* device wrote. Nil until it ever has.
     static var lastHeard: Date? { SharedStore.defaults.object(forKey: lastHeardKey) as? Date }
 
-    /// This device, for the record's `writer`. Made once and kept in the App Group, so every
-    /// process on the device signs the same way.
+    /// Persisted in the App Group so every process on this device signs the same way.
     static var deviceID: String {
         if let id = SharedStore.defaults.string(forKey: deviceKey) { return id }
         let id = UUID().uuidString
@@ -61,9 +50,8 @@ enum AnchorSync {
         return id
     }
 
-    /// What this device is. An iPad runs the phone build, and Core has no UIKit to ask which
-    /// it is on, so the app notes it at launch (`notePlatform`) and every process reads the
-    /// note; a phone is what an iOS build is until told otherwise.
+    /// Core has no UIKit to check device idiom, so the app notes iPad-ness at launch
+    /// (`notePlatform`) and every process reads it back; defaults to phone.
     static var platform: AnchorRecord.Platform {
         #if os(iOS)
         SharedStore.defaults.string(forKey: platformKey) == AnchorRecord.Platform.pad.rawValue ? .pad : .phone
@@ -74,24 +62,17 @@ enum AnchorSync {
 
     private static let platformKey = "furlough.link.platform"
 
-    /// Writes down whether this iOS device is an iPad. Called once at launch by the app, the
-    /// one process that can ask.
+    /// Called once at launch by the app — the only process that can actually check.
     static func notePlatform(isPad: Bool) {
         SharedStore.defaults.set((isPad ? AnchorRecord.Platform.pad : .phone).rawValue, forKey: platformKey)
     }
 
-    /// Whether a phone has ever written the record this device reads. The Mac's anchor can be
-    /// released only by a phone's tag scan arriving through iCloud, so until one has been
-    /// heard from, a Mac drop would be a lock with no key, and `macDrop` refuses it.
+    /// Guards against a Mac dropping a lock with no key — until a phone has been heard from,
+    /// `macDrop` refuses.
     static var phoneSeen: Bool { SharedStore.defaults.bool(forKey: phoneSeenKey) }
 
-    /// What to say when iCloud cannot carry the anchor, in the words the banner on each device
-    /// uses. Both halves of the same broken feature, so both are said here rather than drifting
-    /// apart in two views; each names the harm on the device reading it, because the phone's
-    /// worry is a lock that does not arrive and the Mac's is a lock with no key.
-    ///
-    /// Furlough never says this as a passing failure. A signed-out account is a standing state,
-    /// and until it changes the two devices are two separate installs that happen to look alike.
+    /// Kept here for both platforms so the wording can't drift apart. Phrased as a standing
+    /// state, not a passing failure — a signed-out account doesn't fix itself.
     static var cutOffWarning: String {
         #if os(iOS)
         """
@@ -110,77 +91,46 @@ enum AnchorSync {
     }
 
     #if DEBUG || TESTING_TOOLS
-    /// Forgets that a phone has ever written the record, for Settings > Testing > Reset
-    /// everything on the Mac. Without it a reset Mac would still take a drop that a fresh
-    /// install refuses, and `macDrop`'s lock-with-no-key guard would be untestable after the
-    /// first sync.
+    /// Lets a reset Mac be tested from a clean `phoneSeen` state again — otherwise the
+    /// lock-with-no-key guard is untestable after the first sync.
     static func forgetPhone() {
         SharedStore.defaults.removeObject(forKey: phoneSeenKey)
     }
     #endif
 
-    /// What the link between the two devices looks like from this one, in words.
-    ///
-    /// Exists because the anchor crossing had no visible state at all: a drop on the phone
-    /// either showed up on the Mac or it did not, and there was nothing anywhere to say which
-    /// half had failed — whether the write left the phone, whether it reached iCloud, whether
-    /// this device had ever heard anything. "Nothing happened" was the entire diagnostic.
-    ///
-    /// So this reports the shared record itself rather than a verdict derived from it. The
-    /// record carries who wrote it, which device they were on and when, and that is the only
-    /// end-to-end proof available without inventing a ping the other side has to answer: if
-    /// what sits in iCloud is your phone's write from a minute ago, the link works, and no
-    /// round trip could say it better.
-    ///
-    /// Pure, and given everything it needs, so the two platforms word it identically and the
-    /// awkward cases can be tested without an iCloud account.
+    /// Reports the raw shared record rather than a derived verdict — the record (who wrote it,
+    /// which device, when) is the only end-to-end proof available without a round-trip ping to
+    /// answer. Pure, so both platforms word it identically and edge cases are testable without
+    /// an iCloud account.
     struct LinkStatus: Equatable {
-        /// Whether the key-value store answered at all — `AnchorCloud.isAvailable`.
+        /// Mirrors `AnchorCloud.isAvailable`.
         var cloudAvailable: Bool
-        /// Whether this device is on the link at all. Off it, nothing below is asked: the
-        /// record may well be there, and it is deliberately not read.
+        /// Off the link, the record is deliberately not read even if one is present.
         var enrolled = true
-        /// What is in the shared record right now, if anything.
         var record: AnchorRecord?
-        /// This device's `deviceID`, to tell its own writes from the other device's.
         var thisDevice: String
-        /// Which of the two this is.
         var platform: AnchorRecord.Platform
-        /// When this device last read the other's record.
         var lastHeard: Date?
 
-        /// What the other device is called, from here.
         var otherName: String { platform == .phone ? "Mac" : "iPhone" }
 
-        /// True once the path has been proven: the record in iCloud is the other device's, or
-        /// this device has read one of theirs before.
-        ///
-        /// A write of our own does not undo that. It used to: this asked only who wrote the
-        /// record sitting in iCloud, so dropping the anchor overwrote the other device's write
-        /// with your own and the row fell back to a caution — on the phone, permanently, since
-        /// every drop is a write and the Mac can drop but never release, so it may not write
-        /// again for days. The row was saying "no proof" about a link proven minutes earlier,
-        /// which is the opposite of what a row that exists to answer "is this working" is for.
+        /// True once proven: the record is the other device's, or we've read theirs before. A
+        /// write of our own no longer resets this — it used to, which could show "no proof"
+        /// immediately after a link had just been proven.
         var isLinked: Bool {
             guard cloudAvailable, enrolled, let record else { return false }
             return record.writer != thisDevice || lastHeard != nil
         }
 
-        /// The short verdict, for a status line.
         var headline: String {
             guard cloudAvailable else { return "Not linked" }
             guard enrolled else { return "Off the link" }
             guard let record else { return "Nothing shared yet" }
             guard record.writer == thisDevice else { return "Linked" }
-            // Ours is the newest write, so whether this is a link still waiting on the other
-            // device or one already proven is the whole question — and the proof carries its
-            // time, because "when" is what someone doubting the link wants next.
             guard let lastHeard else { return "Waiting to hear back" }
             return "Linked · last heard \(TimeFormat.clock(lastHeard))"
         }
 
-        /// The sentence under it: what is actually in iCloud, and what that means. Says what
-        /// to do next in each case where there is something to do.
         func detail(now: Date) -> String {
             guard cloudAvailable else {
                 return "Furlough cannot reach iCloud, so nothing can cross between this device and your \(otherName)."
@@ -194,9 +144,8 @@ enum AnchorSync {
             let when = TimeFormat.clock(record.writtenAt)
             let what = record.isAnchored ? "a drop" : "a release"
             if record.writer == thisDevice {
-                // Never heard from, and heard from before, are two different sentences. The
-                // second one used to be told the first, which was false the moment the other
-                // device had ever been read.
+                // Distinct sentences: this used to always say "never heard back", which was
+                // false as soon as the other device had ever been read once before.
                 guard let lastHeard else {
                     return "The last thing in iCloud is \(what) this device wrote at \(when). Your \(otherName) has not written since, so there is nothing yet to prove it is hearing you."
                 }
@@ -232,34 +181,28 @@ enum AnchorSync {
         )
     }
 
-    /// Writes this device's anchor to iCloud. Called after every anchor write the phone makes,
-    /// the monitor's scheduled drops included, and after a local drop on the Mac.
+    /// Called after every anchor write: the phone's (including the monitor's scheduled drops)
+    /// and the Mac's local drops.
     static func publish(_ anchor: AnchorProfile, origin: AnchorRecord.Origin, now: Date) {
         AnchorCloud.write(record(anchor, origin: origin, now: now))
         SharedStore.log("published the anchor to iCloud (\(origin.rawValue), sequence \(anchor.sequence))")
     }
 
-    /// Reads iCloud's record and merges it into `config`. Returns a note for the log when the
-    /// anchor changed, nil when there was nothing to read or nothing new in it.
+    /// Returns a log note only when the anchor actually changed; nil otherwise.
     @discardableResult
     static func pull(into config: inout Config, now: Date) -> String? {
-        // Off the link, the record is not read at all — not merged and refused, not read and
-        // ignored. A device that opted out has said the Anchor stops at its edge. The roster
-        // is read first because another device may have taken this one off since it last
-        // looked, and that has to land before the record does.
+        // Roster read first: another device may have de-linked this one since last check, and
+        // that must land before the record does.
         DeviceLink.obeyRevocation()
         guard DeviceLink.isEnrolled, let remote = AnchorCloud.read() else { return nil }
-        // Only a device on the link can lock this one. A record left behind by a device that
-        // has since left is a lock with no owner, and a device never enrolled has no say.
+        // Only a still-linked writer can lock this device — a departed device's leftover
+        // record has no owner.
         guard remote.writer == deviceID || DeviceLink.roster().isLinked(remote.writer) else { return nil }
         if remote.platform == .phone, !phoneSeen {
             SharedStore.defaults.set(true, forKey: phoneSeenKey)
         }
-        // Stamped before the writer check, and whatever the record turns out to say. A record
-        // that changes nothing here — a release over an anchor already up, a sequence already
-        // seen — still proves the two devices are talking, and that is the whole question the
-        // link status answers. Only this device's own writes are skipped: hearing yourself is
-        // no evidence of anything.
+        // Stamped regardless of what the record says — even a no-op record proves the two
+        // devices are talking. Only our own writes are skipped.
         if remote.writer != deviceID {
             SharedStore.defaults.set(now, forKey: lastHeardKey)
         }
@@ -272,16 +215,9 @@ enum AnchorSync {
             : nil
     }
 
-    /// The profile to keep, given what the other device wrote. Pure; the rules:
-    ///
-    /// - The highest sequence wins, and the sequence moves on whatever is decided, so the next
-    ///   local write is one higher than anything either device has seen.
-    /// - A release is accepted only when the record says it came from a tag scan on a phone.
-    ///   The Mac never writes one, and a `lift` is not one: each device computes a timed
-    ///   anchor's expiry from the `until` it already holds.
-    /// - A remote `until` is judged by this device's own clock — `now` is Furlough's time, the
-    ///   trusted one, never the wall clock — so a drop already over here does not drop here,
-    ///   and a drop over an anchor already down can only lengthen the hold.
+    /// Pure. Rules: highest sequence wins; a release is accepted only from a phone's tagScan
+    /// (never the Mac, and `lift` is always computed locally, never accepted remotely); a
+    /// remote `until` is judged against Furlough's own trusted clock, not the wall clock.
     static func merge(local: AnchorProfile, remote: AnchorRecord, now: Date) -> (profile: AnchorProfile, note: String) {
         var profile = local
         guard remote.sequence > local.sequence else {
@@ -313,18 +249,9 @@ enum AnchorSync {
         return (profile, "anchored by the other device")
     }
 
-    /// The Mac's drop. No tag here, so no `until` and no `canAnchor`: it needs something to
-    /// hold, an iCloud account a release could arrive through, and a phone on the link, since
-    /// only that phone's tag can ever lift it.
-    ///
-    /// Both of those last two are the same guard wearing two faces — a Mac must never hold an
-    /// anchor whose key cannot reach it — and they are checked in the order they can be fixed
-    /// in. A signed-out account is refused first because it is the one that makes the other
-    /// unanswerable: what the roster says was read from an account the Mac may no longer be
-    /// signed in to, so trusting it alone would let exactly the lock-with-no-key through that
-    /// it exists to stop. `hasKey` is the roster's answer — this Mac on the link, and an
-    /// iPhone on it besides — where it used to be a latch set the first time a phone was ever
-    /// heard from; the latch stayed true after that phone left.
+    /// No tag on the Mac, so no `until`. Requires cloud availability (checked first — a
+    /// signed-out account makes the roster's answer untrustworthy) and a linked phone
+    /// (`hasKey`), since only that phone's tag can ever release it.
     static func macDrop(_ config: inout Config, now: Date, hasKey: Bool, cloudAvailable: Bool) -> Policy.DropRefusal? {
         Policy.liftExpiredAnchor(&config, now: now)
         guard config.anchor.hasSomethingToHold else { return .noList }
@@ -339,34 +266,22 @@ enum AnchorSync {
     }
 }
 
-/// The iCloud key-value store, as the anchor's transport. One key, one JSON record. Apple
-/// keeps it under the user's own Apple Account; Furlough has no server that could see it, and
-/// the privacy page says so in those words.
+/// One key, one JSON record, under the user's own Apple Account — Furlough has no server of
+/// its own.
 enum AnchorCloud {
     static let key = "furlough.anchor.v1"
 
     static var changeNotification: Notification.Name { NSUbiquitousKeyValueStore.didChangeExternallyNotification }
 
-    /// Whether iCloud could carry a record at all.
-    ///
-    /// The token tracks iCloud Drive, and that is the point rather than a mismatch: the
-    /// key-value store rides on iCloud Drive, so a Mac with Drive switched off has a store that
-    /// still reads and writes but only ever to itself. Nil means exactly the thing worth
-    /// warning about — signed out, or Drive off.
-    ///
-    /// Not a question about the network. A device with no signal still has a token and its
-    /// writes go out when it next has one.
-    ///
-    /// Briefly replaced with `NSUbiquitousKeyValueStore.synchronize()`, which was a mistake
-    /// worth recording: on 2026-09-09 a Mac with Drive off returned *true* from synchronize
-    /// while receiving nothing for half an hour, so the app cheerfully reported a link that did
-    /// not exist. synchronize answers "is this store configured", never "will anything cross".
+    /// Nil means signed out or iCloud Drive off (the store rides on Drive, so a Mac with Drive
+    /// off reads/writes only to itself) — not a network check; an offline device still has a
+    /// token. Do NOT swap this for `NSUbiquitousKeyValueStore.synchronize()`: on 2026-09-09 it
+    /// returned true on a Drive-off Mac while receiving nothing for 30 minutes — it only
+    /// confirms the store is configured, never that anything will actually sync.
     static var isAvailable: Bool { FileManager.default.ubiquityIdentityToken != nil }
 
-    /// Whether a change notification is iCloud saying the account itself moved — signed in,
-    /// signed out, or switched. `isAvailable` has to be read again when it does, and the
-    /// record with it, since what arrives next belongs to a different account than what came
-    /// before.
+    /// True when the account itself changed (signed in/out/switched) — `isAvailable` and the
+    /// record must be re-read, since what follows belongs to a different account.
     static func isAccountChange(_ notification: Notification) -> Bool {
         guard let reason = notification.userInfo?[NSUbiquitousKeyValueStoreChangeReasonKey] as? Int else { return false }
         return reason == NSUbiquitousKeyValueStoreAccountChange
@@ -376,8 +291,7 @@ enum AnchorCloud {
 
     static func write(_ record: AnchorRecord) { write(record, key: key) }
 
-    /// Any record under any key: the roster's entries and each device's additions live beside
-    /// the anchor under their own keys (`DeviceLink`), one JSON value each.
+    /// Generic since `DeviceLink`'s roster entries share this same one-key-one-JSON transport.
     static func read<Value: Decodable>(key: String) -> Value? {
         guard let data = NSUbiquitousKeyValueStore.default.data(forKey: key) else { return nil }
         return try? decoder.decode(Value.self, from: data)
@@ -394,20 +308,18 @@ enum AnchorCloud {
         NSUbiquitousKeyValueStore.default.synchronize()
     }
 
-    /// Every key in the store starting with `prefix`, which is how the roster is enumerated
-    /// without a list that two devices would have to agree on.
+    /// Lets the roster be enumerated without both devices needing to agree on a shared list.
     static func keys(withPrefix prefix: String) -> [String] {
         NSUbiquitousKeyValueStore.default.dictionaryRepresentation.keys.filter { $0.hasPrefix(prefix) }.sorted()
     }
 
-    /// Asks iCloud for whatever it has. Called at launch and on activation; changes that arrive
-    /// afterwards come through `changeNotification`.
+    /// Called at launch and on activation; later changes arrive via `changeNotification`.
     static func synchronize() {
         NSUbiquitousKeyValueStore.default.synchronize()
     }
 
-    /// Forgets the record. Debug builds only, beside Reset everything: a reset that left a
-    /// stale drop in iCloud would anchor the phone again on its next pull.
+    /// Debug-only, beside Reset everything — a stale drop left in iCloud would otherwise
+    /// re-anchor the phone on its next pull.
     static func clear() {
         NSUbiquitousKeyValueStore.default.removeObject(forKey: key)
         NSUbiquitousKeyValueStore.default.synchronize()

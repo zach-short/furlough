@@ -1,8 +1,8 @@
 import Foundation
 import Testing
 
-/// The link between devices, added 2026-09-10: who is on it, joining, leaving and the refusal
-/// to leave under an anchor. Only the pure parts are here; the iCloud store is not touched.
+/// Who is on the link, joining, leaving, and the refusal to leave under an anchor. Only the
+/// pure parts; the iCloud store is not touched.
 @Suite("Device link: the roster")
 struct DeviceLinkRosterTests {
     let noon = at(8, 12, 0)
@@ -48,8 +48,8 @@ struct DeviceLinkRosterTests {
         #expect(device("phone", .phone).canRelease)
         #expect(roster.hasKey(besides: "mac"))
         #expect(roster.hasKey(besides: "pad"))
-        // A phone alone on the link has no key *besides* itself, which is the right answer for
-        // a question only the Mac asks; the phone's own drop never asks it.
+        // A lone phone has no key *besides* itself — the right answer to a question only the
+        // Mac asks; the phone's own drop never asks it.
         var alone = DeviceLink.Roster()
         alone.devices = [device("phone", .phone)]
         #expect(!alone.hasKey(besides: "phone"))
@@ -153,7 +153,6 @@ struct DeviceLinkJoinLeaveTests {
         #expect(preferences.companionSite == .always)
         #expect(preferences.sendAdditions == .ask)
         #expect(preferences.acceptAdditions == .ask)
-        // A state written before the settings existed decodes to the same defaults.
         let json = #"{"targets":[],"loosenDelayHours":24}"#
         let config = try JSONDecoder().decode(Config.self, from: Data(json.utf8))
         #expect(config.link == LinkPreferences())
@@ -165,8 +164,7 @@ struct DeviceLinkJoinLeaveTests {
 struct DeviceLinkStatusTests {
     let noon = at(8, 12, 0)
 
-    /// The record may well be there, and it is deliberately not read: off the link, the status
-    /// says so and stops.
+    // Deliberately not read even if present: off the link, the status says so and stops.
     @Test("off the link is not linked, whatever is in iCloud")
     func offTheLink() {
         let record = AnchorRecord(

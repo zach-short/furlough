@@ -1,9 +1,8 @@
 import Foundation
 import Testing
 
-/// The Mac's grace between asking a blocked app to quit and forcing it. The two rules that
-/// matter: a working session gets long enough to answer a save dialog, and relaunching a
-/// blocked app does not buy another one.
+/// The Mac's grace between asking a blocked app to quit and forcing it: a working session gets
+/// long enough to answer a save dialog, and relaunching does not buy another one.
 struct QuitGraceTests {
     private let pid: pid_t = 501
 
@@ -31,8 +30,7 @@ struct QuitGraceTests {
         #expect(grace.step(pid: pid, age: QuitGrace.settled, now: deadline) == .force(first: true))
     }
 
-    /// The app is force-quit on every tick until it is actually gone, but only the first says so
-    /// in the log.
+    // Force-quit fires every tick until it's actually gone, but only the first logs it.
     @Test func forcingIsAnnouncedOnce() {
         var grace = QuitGrace()
         let now = at(8, 12, 0)
@@ -42,8 +40,7 @@ struct QuitGraceTests {
         #expect(grace.step(pid: pid, age: QuitGrace.settled, now: after) == .force(first: false))
     }
 
-    /// Quitting and relaunching would hand out a fresh 45 seconds every time if the grace went
-    /// by app rather than by process age. The relaunched process is young, so it does not.
+    // Grace is by process age, not by app, so a relaunched (young) process gets no fresh full grace.
     @Test func relaunchingDoesNotBuyAnotherFullGrace() {
         var grace = QuitGrace()
         let now = at(8, 12, 0)

@@ -186,8 +186,7 @@ struct RuleTests {
 
 @Suite("Target")
 struct TargetTests {
-    /// A Screen Time token has no name until iOS says one on the shield, and that learned name
-    /// is what the widget and the notifications read. A nickname still wins over it.
+    // A token has no name until iOS supplies one on the shield; a nickname still wins over it.
     @Test("a learned name stands in until a nickname is set")
     func names() {
         var target = Target(kind: .host("youtube.com"))
@@ -199,9 +198,8 @@ struct TargetTests {
     }
 }
 
-/// An evening that runs into the next morning. The editors take it as one row; Furlough keeps
-/// the two windows it really is, because the rules engine and DeviceActivity work a day at a
-/// time, and reads them back as the row it was written as.
+/// An evening into the next morning: editors show it as one row, but the rules engine and
+/// DeviceActivity work a day at a time, so it's stored as two windows and read back as one row.
 @Suite("A night")
 struct NightTests {
     @Test("days move forward through the week, Saturday coming round to Sunday")
@@ -306,8 +304,7 @@ struct NightTests {
         #expect(!rule.allowedMask(on: 7)[60])
         // Monday 1 AM is open too, because Sunday night is one of the nights asked for.
         #expect(rule.allowedMask(on: 2)[60])
-        // One span rather than an evening and a morning apart. The times themselves come from
-        // the formatter, which spaces AM and PM its own way.
+        // One span, not an evening and a morning apart.
         let evening = TimeFormat.minute(17 * 60, calendar: cal)
         let morning = TimeFormat.minute(4 * 60, calendar: cal)
         #expect(TimeFormat.schedule(rule, calendar: cal) == "Weekends \(evening)–\(morning)")
@@ -356,8 +353,7 @@ struct AnchorTagTests {
         #expect(anchor.nextTagName == "Tag 1")
         anchor.tags = [tag(1, "Home")]
         #expect(anchor.nextTagName == "Tag 2")
-        // The count is only a starting guess: renaming leaves gaps, and a name in the way is
-        // stepped over rather than duplicated.
+        // A starting guess only: a name already in the way is stepped over, not duplicated.
         anchor.tags = [tag(1, "Tag 2")]
         #expect(anchor.nextTagName == "Tag 3")
         anchor.tags = [tag(1, "Tag 2"), tag(2, "Tag 3")]

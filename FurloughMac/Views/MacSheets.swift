@@ -3,7 +3,6 @@ import ServiceManagement
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Every app on this Mac, searchable. Picking one adds it.
 struct AddAppSheet: View {
     let onPick: (InstalledApp) -> Void
     @Environment(\.dismiss) private var dismiss
@@ -92,11 +91,8 @@ struct AddAppSheet: View {
     }
 }
 
-/// A website by host.
 struct AddSiteSheet: View {
-    /// Returns why not, or nil when it landed and the sheet should close. A refusal rather than
-    /// an outcome, because since the halves this sheet feeds two of them: what the Anchor does
-    /// with a host is put it on a list, and there is no `Target` to hand back.
+    /// Returns an error message on failure, or nil on success (dismisses the sheet).
     let onAdd: (String) -> String?
     @Environment(\.dismiss) private var dismiss
     @State private var text = ""
@@ -142,12 +138,7 @@ struct AddSiteSheet: View {
     }
 }
 
-/// Offered right after an app or a site is added: the other half of the same thing. Blocking
-/// the YouTube app and leaving youtube.com open is the gap most people find a week later, so
-/// the site is offered while the app is still in hand, one toggle each, all on to start.
-/// Nothing here enforces anything; like any add, each one waits for a schedule.
 struct CompanionSheet: View {
-    /// One thing to offer: what it would be added as, and how the row says it.
     struct Item: Identifiable, Hashable {
         let kind: TargetKind
         let title: String
@@ -155,7 +146,6 @@ struct CompanionSheet: View {
         var id: TargetKind { kind }
     }
 
-    /// What was just added, and whose other half these are.
     let added: Target
     let items: [Item]
     let onAdd: ([Item]) -> Void
@@ -169,13 +159,9 @@ struct CompanionSheet: View {
         _chosen = State(initialValue: Set(items.map(\.kind)))
     }
 
-    /// What one row measures: a 30pt tile with 8pt above and below, and the divider under it.
-    /// The sheet is sized in whole rows, so this has to be what a row really is — sized by the
-    /// row before it was drawn, the card sat in a taller box and the sheet had a band of air
-    /// under it that grew with every row.
+    /// Must match the row's actual rendered height — sheet height is computed from this.
     private let rowHeight: CGFloat = 50
 
-    /// True when what was added is an app, so the offer is its websites.
     private var addedIsApp: Bool { if case .macApp = added.kind { return true }; return false }
     private var selected: [Item] { items.filter { chosen.contains($0.kind) } }
 
@@ -274,9 +260,6 @@ struct CompanionSheet: View {
     }
 }
 
-/// Picks the other apps and sites that get this rule, any number at once. Each row shows what
-/// it has now; the line above the button says what applying will do, since each one is judged
-/// on its own: tighter lands now, looser waits out the delay.
 struct ApplyRuleSheet: View {
     let candidates: [Target]
     let rule: Rule
@@ -360,7 +343,6 @@ struct ApplyRuleSheet: View {
         .accessibilityAddTraits(on ? .isSelected : [])
     }
 
-    /// What applying does to the chosen rows, each judged against what it has now.
     private var summary: String {
         guard !chosen.isEmpty else {
             return "Gives each one these windows, days and daily budget, and saves them here too."
@@ -487,15 +469,10 @@ struct SettingsSheet: View {
     @State private var delayHours = Furlough.defaultLoosenDelayHours
     @State private var result: ProposalResult?
     @State private var showLog = false
-    /// The screen behind the one Diagnostics row. In place, with a Back link, like the log:
-    /// this is a sheet, and a sheet that grew a navigation stack for two pushes would be
-    /// carrying a bar it has no use for.
     @State private var showDiagnostics = false
-    /// The Devices screen behind the one Devices row, in place like the two above.
     @State private var showDevices = false
     @State private var confirmReset = false
     @State private var confirmRemoveFilter = false
-    /// Two seconds of "Copied" after the diagnostics go to the pasteboard.
     @State private var copiedDiagnostics = false
     @State private var setupFile: SetupDocument?
     @State private var setupName = ""
@@ -503,8 +480,7 @@ struct SettingsSheet: View {
     @State private var showImporter = false
     @State private var review: ImportPlan?
     @State private var importError: String?
-    /// What the import just did, waiting to be said. The review is dropped as the alert goes up,
-    /// so this is shown over Settings rather than over a screen that is on its way out.
+    /// Set after the review is dismissed, so the alert shows over Settings, not the review screen.
     @State private var imported: String?
     #if DEBUG || TESTING_TOOLS
     @State private var showTesting = TestingTools.isShown
@@ -538,8 +514,7 @@ struct SettingsSheet: View {
             delayHours = model.state.config.loosenDelayHours
             model.refreshBrowserAccess()
             #if DEBUG || TESTING_TOOLS
-            // Help is where the section is asked for — Version, five clicks — and Help is a
-            // sheet of its own, so this screen finds out on the way back in.
+            // Re-synced here since Help (a separate sheet) can toggle this.
             showTesting = TestingTools.isShown
             #endif
             Task { await model.enforcer.webFilter.refresh() }
@@ -597,10 +572,8 @@ struct SettingsSheet: View {
         #if DEBUG || TESTING_TOOLS
         .confirmationDialog("Reset everything?", isPresented: $confirmReset, titleVisibility: .visible) {
             Button("Reset everything", role: .destructive) {
-                // Dismissed before the reset, where the phone does it after. The reset puts the
-                // Mac back to onboarding, which swaps `MacHomeView` — the view presenting this
-                // sheet — out from under it; closing while the presenter is still there leaves
-                // AppKit nothing to tidy up after.
+                // Dismiss before reset: reset swaps out the presenting view, so dismissing
+                // after would leave AppKit nothing to tidy up.
                 dismiss()
                 model.resetEverything()
             }
@@ -647,8 +620,6 @@ struct SettingsSheet: View {
                         .padding(.top, 8)
                         .padding(.bottom, 20)
                 } else {
-                    // The same way back the phone has, for the same reason: the reset button is
-                    // used during a test pass, and a hidden gesture is a poor only route to it.
                     CardAction(title: "Show testing buttons") {
                         TestingTools.isShown = true
                         showTesting = true
@@ -665,8 +636,6 @@ struct SettingsSheet: View {
 
     // MARK: Devices
 
-    /// The link to the other devices: one row into the screen that joins, lists and settles
-    /// it, with the state on the row so a person who only wants to know reads it here.
     @ViewBuilder
     private var devicesCard: some View {
         SectionLabel(text: "Devices")
@@ -687,12 +656,6 @@ struct SettingsSheet: View {
 
     // MARK: Start
 
-    /// The three things about how Furlough opens: which half the window opens on, what the +
-    /// means over the Anchor half, and the checklists again.
-    ///
-    /// At the top because these are the settings a person came here to change. The intro asks
-    /// the first one once, in the pane that says the app is two halves; this is the only other
-    /// place it can be answered, and the pane is not coming back.
     @ViewBuilder
     private var startCard: some View {
         SectionLabel(text: "Start")
@@ -715,12 +678,6 @@ struct SettingsSheet: View {
             .padding(.top, 8)
     }
 
-    /// What + does over the Anchor half.
-    ///
-    /// The + acts on the half you are looking at, which over the Anchor means its list — and the
-    /// one person that reading fails is the one who set the anchor up months ago and has read +
-    /// as "give an app hours" ever since. So it is a preference rather than a rule, and only
-    /// about the Anchor half: over Rules the button has no second reading to choose between.
     private var addRow: some View {
         HStack(spacing: 12) {
             Text("On the Anchor half, + adds")
@@ -736,8 +693,6 @@ struct SettingsSheet: View {
         .padding(.vertical, 9)
     }
 
-    /// Says what pressing it would do, and then what it did — both derived from the same set, so
-    /// the row answers for itself rather than raising an alert to say something happened.
     private var guideDetail: String {
         let finished = model.finishedGuides
         guard !finished.isEmpty else { return "Both checklists are showing in the window." }
@@ -763,9 +718,6 @@ struct SettingsSheet: View {
         .padding(.vertical, 9)
     }
 
-    /// One of a pair: the chosen one is filled, the other an outline. Not a `Picker`, because
-    /// both choices have to be readable at once — the question is which of two things this
-    /// means, and a menu that shows one answer at a time is a poor way to ask it.
     private func chip(_ title: String, isOn: Bool, _ perform: @escaping () -> Void) -> some View {
         Button(action: perform) {
             Text(title)
@@ -817,9 +769,6 @@ struct SettingsSheet: View {
 
     // MARK: Web
 
-    /// The filter, and the walkthrough — which is only here while there is something to walk
-    /// through. Six numbered steps under a status that reads On is a page of directions to a
-    /// place you are already standing in, and it was the tallest thing on this screen.
     @ViewBuilder
     private var webCard: some View {
         let status = model.enforcer.webFilter.status
@@ -868,9 +817,6 @@ struct SettingsSheet: View {
 
     // MARK: Enforcement
 
-    /// The two switches, and the one escape in a footnote rather than a paragraph. Everything
-    /// else that stood under this label was a status row or a button for when something looks
-    /// wrong, and all of it is one push behind Diagnostics now.
     @ViewBuilder
     private var enforcementCard: some View {
         SectionLabel(text: "Enforcement")
@@ -909,10 +855,6 @@ struct SettingsSheet: View {
 
     // MARK: The record
 
-    /// The record, once a week, without opening the window. On unless it is turned off, and
-    /// about this Mac's own week: the record does not cross devices, so the phone sends its own
-    /// and this sends this one. The numbers themselves stay at the foot of the sidebar
-    /// (`MacRecordSection`); this is only whether Monday morning brings them.
     @ViewBuilder
     private var recordCard: some View {
         SectionLabel(text: "The record")
@@ -967,10 +909,6 @@ struct SettingsSheet: View {
 
     // MARK: Diagnostics
 
-    /// One row: whether anything is wrong, and the first thing that is if something is.
-    ///
-    /// The rows it replaced are all still here, one push in. What changed is that a person who
-    /// came to Settings to change the delay no longer reads five statuses on the way.
     @ViewBuilder
     private var diagnosticsCard: some View {
         let summary = model.diagnostics
@@ -1006,7 +944,6 @@ struct SettingsSheet: View {
         }
     }
 
-    /// The web filter: its state, and the one action that state calls for.
     @ViewBuilder
     private var filterCard: some View {
         let filter = model.enforcer.webFilter
@@ -1017,8 +954,7 @@ struct SettingsSheet: View {
             case .notInstalled, .failed:
                 CardDivider()
                 CardAction(title: "Install the web filter") { filter.install() }
-            // Nothing for the states in the middle of the walk: their buttons belong to the step
-            // that calls for them, in the walkthrough below this card.
+            // Handled by the walkthrough below, not here.
             case .awaitingApproval, .disabledInSettings, .filterOff, .filterDenied:
                 EmptyView()
             case .on:
@@ -1071,9 +1007,7 @@ struct SettingsSheet: View {
         .padding(.vertical, 10)
     }
 
-    /// Builds the file and opens the save panel. Reading the store is the whole of it: an
-    /// export changes nothing, so alone among the buttons on this screen it needs no delay,
-    /// no confirmation and no enforcement pass afterwards.
+    /// Read-only — no delay, confirmation, or enforcement pass needed.
     private func exportSetup() {
         do {
             let export = ConfigExport.current()
@@ -1087,8 +1021,7 @@ struct SettingsSheet: View {
 }
 
 struct LogView: View {
-    /// What the Back link says. The log is one push behind Diagnostics now and Diagnostics is
-    /// one behind Settings, so the link has to name the screen it actually returns to.
+    /// Names whichever screen this actually returns to (Diagnostics or Settings).
     var backTitle = "Settings"
     let onBack: () -> Void
     @State private var entries = SharedStore.logEntries()
@@ -1140,13 +1073,6 @@ struct LogView: View {
     }
 }
 
-/// Everything the Settings screen used to say under Enforcement, one push behind the row that
-/// says whether any of it is wrong.
-///
-/// Nothing here is a setting. It is what Furlough can see about itself — the two permissions,
-/// the App Group the widget reads through, what the web filter is doing, when enforcement last
-/// ran — and the two things a person can do about it: run the whole pass again, and read what
-/// the enforcer has been doing. Help's *If something gets stuck* sends people here by name.
 struct MacDiagnosticsView: View {
     @Environment(MacModel.self) private var model
     let onBack: () -> Void
@@ -1169,9 +1095,7 @@ struct MacDiagnosticsView: View {
                     VStack(spacing: 0) {
                         row("Notifications", model.notificationsGranted == true ? "Allowed" : "Off")
                         CardDivider()
-                        // The phone shows this too. It matters more here: the desktop widget
-                        // reads the rules through the group, so without it the widget is simply
-                        // blank, with nothing anywhere to say why.
+                        // Widget reads rules through this App Group; if missing, it's silently blank.
                         row(
                             "App Group",
                             SharedStore.isAppGroupAvailable ? "OK" : "Missing",
@@ -1205,8 +1129,6 @@ struct MacDiagnosticsView: View {
         .onAppear { model.refreshBrowserAccess() }
     }
 
-    /// The per-browser rows stay in Settings > Browsers, where the button that asks for access
-    /// is. This is the count, so a refused one is visible from here without saying it twice.
     private var browserSummary: String {
         let running = model.browserAccess
         guard !running.isEmpty else { return "None running" }

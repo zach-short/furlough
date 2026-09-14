@@ -429,9 +429,11 @@ is a commodity sticker, that nothing ships or is sold with the app, and that it 
 any particular product, because "designated hardware" is the framing the rejection came in.
 
 **The URL is a placeholder.** The block below holds
-`[PASTE THE VIDEO URL HERE BEFORE SUBMITTING]`. `store-submit.sh` reads the notes straight out of
-this file and will push that text to Apple as written, so replace it before running the script —
-and grep for it if you are in any doubt.
+`[PASTE THE VIDEO URL HERE BEFORE SUBMITTING]`, and `store-submit.sh` reads the notes straight out
+of this file. It will not send it: since 2026-09-13 the script refuses to run while the notes hold
+a `[PASTE … ]`, printing the line number, before it mints a token or writes anything. That is the
+convention for anything in this block that has to be filled in by hand — mark it `[PASTE … ]` and
+the guard covers it too.
 
 ```
 WHAT FURLOUGH IS

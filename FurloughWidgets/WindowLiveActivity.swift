@@ -4,14 +4,9 @@ import WidgetKit
 
 /// The window on the Lock Screen and in the Dynamic Island.
 ///
-/// **What the big number counts.** The budget, wherever Furlough honestly knows it, and the
-/// window's close otherwise. That order is a constraint, not a preference: Screen Time reports
-/// a budget to us at exactly two moments — "about five minutes left" and "spent" — and reports
-/// usage itself only to a `DeviceActivityReport` extension that cannot pass a figure back. So
-/// for most of a window the minutes remaining are genuinely unknown here, and a ticking number
-/// claiming to be them would be invented. The allowance is on the line underneath from the
-/// start ("30 min a day"), the countdown becomes the real thing to spend the moment the warning
-/// fires (`ContentState.budgetDeadline`), and the caption says which of the two is on screen.
+/// The countdown shows the budget only once Screen Time reports it (at the 5-minute warning or
+/// exhaustion — it never reports usage directly); otherwise it counts down to the window's
+/// close rather than inventing a number.
 struct WindowLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: FurloughActivityAttributes.self) { context in
@@ -91,12 +86,11 @@ struct WindowLiveActivity: Widget {
         }
     }
 
-    /// The budget's last five minutes when they are running, and the window's close otherwise.
     @ViewBuilder
     private func countdown(_ context: ActivityViewContext<FurloughActivityAttributes>) -> some View {
         if let deadline = context.state.budgetDeadline {
-            // Counted from the warning rather than from now, so the system's own timer draws
-            // the same five minutes however often the activity is updated.
+            // Counted from the warning, not from now, so the system's timer draws the same
+            // five minutes however often the activity is updated.
             Text(
                 timerInterval: deadline.addingTimeInterval(-TimeInterval(Furlough.warningMinutes * 60))...deadline,
                 countsDown: true
@@ -106,28 +100,23 @@ struct WindowLiveActivity: Widget {
         }
     }
 
-    /// Which of the two the number is. Worth the two words: "12:04" means something very
-    /// different depending on whether it is the day's minutes or the window's hours.
+    /// Disambiguates the countdown: "12:04" means different things for budget vs window close.
     private func caption(_ context: ActivityViewContext<FurloughActivityAttributes>) -> String {
         context.state.budgetDeadline == nil ? "Until close" : "Left today"
     }
 
-    /// Amber once the number is the budget draining, Cream while it is only the window closing:
-    /// the same two colours the glass uses, so they agree at a glance.
+    /// Same two colours the glass uses (amber draining, cream closing), so they agree at a glance.
     private func numberColor(_ context: ActivityViewContext<FurloughActivityAttributes>) -> Color {
         context.state.budgetDeadline == nil ? Ember.cream : Ember.amber
     }
 
-    /// The day's allowance and when the window shuts, so the figure is on screen from the
-    /// start even while the minutes spent against it are unknowable.
     private func allowance(_ context: ActivityViewContext<FurloughActivityAttributes>) -> String {
         let close = context.attributes.windowEnd.formatted(date: .omitted, time: .shortened)
         guard let minutes = context.state.budgetMinutes else { return "Open until \(close)" }
         return "\(TimeFormat.budget(minutes)) a day · until \(close)"
     }
 
-    /// The open glass at the level of the last update. Live Activities cannot animate custom
-    /// views, so the sand only moves when the app syncs the activity.
+    /// Live Activities can't animate custom views, so the sand only moves when the app syncs it.
     private func glass(_ context: ActivityViewContext<FurloughActivityAttributes>) -> HourglassState {
         let attributes = context.attributes
         let total = attributes.windowEnd.timeIntervalSince(attributes.windowStart)

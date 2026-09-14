@@ -1,8 +1,5 @@
 import SwiftUI
 
-/// The rule for one app or site: nickname, allowed windows with their days, daily budget.
-/// Same semantics as the phone: the first rule is instant, tightening is instant, loosening
-/// waits out the delay.
 struct MacRuleEditor: View {
     @Environment(MacModel.self) private var model
     let targetID: UUID
@@ -10,38 +7,33 @@ struct MacRuleEditor: View {
     @State private var nickname = ""
     @State private var drafts: [DraftWindow] = []
     @State private var budget = Furlough.defaultBudgetMinutes
-    /// On when the week is seven figures rather than one, mirroring `byDay` for the windows.
     @State private var budgetByDay = false
-    /// Seven budgets, Sunday first so the index is Calendar's weekday minus one. Only read
-    /// while `budgetByDay` is on; `budget` keeps the single figure so turning the toggle back
-    /// on restores what the rule said before it was split.
+    // Sunday-first, index = weekday-1. `budget` keeps the last single figure so toggling back
+    // off restores it.
     @State private var dayBudgets = [Int](repeating: Furlough.defaultBudgetMinutes, count: 7)
     @State private var byDay = false
     @State private var loaded = false
     @State private var showApply = false
-    /// Targets chosen in the apply sheet, applied once the sheet has gone so the alert can show.
+    // Applied only after the sheet dismisses, so the resulting alert can show.
     @State private var applyTo: [UUID]?
     @State private var showWeek = false
-    /// What the last save did, shown in the Saved alert.
     @State private var saved: String?
     @State private var confirmRemove = false
-    /// The tier in the draft, saved through `MacModel.setUtility`.
     @State private var tier = Utility.unset
-    /// Whether anyone has touched the tier chips this visit. An untouched picker reads `.useful`
-    /// because that is what `Utility.unset` is, so `answeredTier` may not take it for an answer.
+    // Needed because Utility.unset renders as .useful; can't tell "untouched" from "chosen
+    // .useful" otherwise.
     @State private var tierTouched = false
     @State private var confirmBlockEssential = false
-    /// The window's clock. It has to be the model's: the window rebuilds this editor on every
-    /// tick of its own, which would restart a timer kept here before it could fire.
+    // Must read model.now, not a local timer — rebuild-on-tick would restart a local one before
+    // it fires.
     private var now: Date { model.now }
 
     struct DraftWindow: Identifiable {
         let id = UUID()
         var window: TimeWindow
 
-        /// Rows on the same days that overlap or touch, joined into the earlier row, in order.
-        /// A night is left out of it: its end is a time on the next morning, so it neither
-        /// swallows a later row nor is swallowed by an earlier one.
+        // Night windows excluded: their end is next-morning, so they can't correctly join/be
+        // joined.
         static func joined(_ rows: [DraftWindow]) -> [DraftWindow] {
             var result: [DraftWindow] = []
             for row in rows.sorted(by: { $0.window < $1.window }) {
@@ -57,7 +49,6 @@ struct MacRuleEditor: View {
             return result
         }
 
-        /// Rows by group of days, then by time of day: the order the list always reads in.
         static func sorted(_ rows: [DraftWindow]) -> [DraftWindow] {
             let order = TimeWindow.grouped(rows.map(\.window))
             return rows.sorted { a, b in
@@ -65,12 +56,10 @@ struct MacRuleEditor: View {
             }
         }
 
-        /// Joined, then sorted: what a committed edit leaves behind.
         static func tidy(_ rows: [DraftWindow]) -> [DraftWindow] { sorted(joined(rows)) }
     }
 
     private var target: Target? { model.state.config.target(id: targetID) }
-    /// The rows as Furlough stores them: a night becomes its evening and the morning after.
     private var windows: [TimeWindow] { drafts.flatMap { $0.window.split } }
     private var draft: Rule {
         Rule(windows: windows, dailyBudgetMinutes: budget, budgetByWeekday: budgetByDay ? dayBudgets : nil).normalized
@@ -83,34 +72,26 @@ struct MacRuleEditor: View {
             || target.utility != tier
     }
 
-    /// What Furlough would have guessed, offered only while Zach has not answered for himself.
     private var suggestion: Utility? {
         guard let target, !target.hasChosenUtility else { return nil }
         return AppUtility.suggestion(for: target)?.utility
     }
 
-    /// The rule Furlough would start this one on: the sibling of `suggestion` above, one
-    /// property over. Offered only while the target has no rule of its own and none is queued.
     private var ruleSuggestion: RuleSuggestion.Draft? {
         guard let target, pendingRule == nil else { return nil }
         return RuleSuggestion.suggestion(for: target, chosen: answeredTier)
     }
 
-    /// The tier the rule suggestion answers to, or nil while nobody has answered.
     private var answeredTier: Utility? {
         guard let target else { return nil }
         return target.hasChosenUtility || tierTouched ? tier : nil
     }
 
-    /// The name the tables already know for this row, while it is going by its bundle identifier
-    /// or its address and the field is still empty.
     private var nicknameOffer: String? {
         guard let target, trimmedNickname.isEmpty else { return nil }
         return AppUtility.offeredNickname(for: target)
     }
 
-    /// The chips, with a note that they were touched. `UtilityPicker` writes the tier straight
-    /// through; what it cannot say is whether the value is an answer or the default it opened on.
     private var tierBinding: Binding<Utility> {
         Binding(
             get: { tier },
@@ -121,7 +102,6 @@ struct MacRuleEditor: View {
         )
     }
 
-    /// The rule edit on this target that has not set yet, if there is one.
     private var pendingRule: Rule? {
         model.state.pending.compactMap { change -> Rule? in
             if case .setRule(let id, let rule) = change.kind, id == targetID { return rule }
@@ -129,7 +109,6 @@ struct MacRuleEditor: View {
         }.first
     }
 
-    /// What blocking this one costs, when it is worth saying.
     private var caution: String? {
         guard let target, !Rule.unrestricted.isEquivalent(to: draft) else { return nil }
         return UtilityText.blocking(
@@ -139,13 +118,11 @@ struct MacRuleEditor: View {
         )
     }
 
-    /// What a night takes from the day after it, said under the windows while one is drafted.
     static let nightNote = """
         A window that runs past midnight opens the early hours of the next day too, and the \
         budget resets at midnight, so those hours get a fresh one.
         """
 
-    /// A tier already queued for this target is what the editor should show, as a queued rule is.
     private var pendingTier: Utility? {
         model.state.pending.compactMap { change -> Utility? in
             if case .setUtility(let id, let level) = change.kind, id == targetID { return level }
@@ -153,8 +130,6 @@ struct MacRuleEditor: View {
         }.first
     }
 
-    /// The draft as a week for the visual editor. Writing back merges identical spans across
-    /// days into one window and sets the Same every day toggle to match.
     private var weekDraft: Binding<WeekDraft> {
         Binding(
             get: { WeekDraft(windows: windows) },
@@ -166,9 +141,6 @@ struct MacRuleEditor: View {
         )
     }
 
-    /// Turning it on returns to the single figure the editor still holds, discarding the seven;
-    /// turning it off seeds all seven from that figure, so the first thing a person sees is the
-    /// week they already had, not seven defaults.
     private var sameBudgetEveryDay: Binding<Bool> {
         Binding(
             get: { !budgetByDay },
@@ -181,7 +153,6 @@ struct MacRuleEditor: View {
         )
     }
 
-    /// One day's slider, bound into `dayBudgets` by Calendar's weekday number.
     private func dayBudget(_ weekday: Int) -> Binding<Int> {
         Binding(
             get: { dayBudgets.indices.contains(weekday - 1) ? dayBudgets[weekday - 1] : budget },
@@ -189,9 +160,6 @@ struct MacRuleEditor: View {
         )
     }
 
-    /// The week's figures into the seven sliders, and the toggle to match. Seeded even when the
-    /// rule has one budget, so switching the toggle off shows that budget on all seven days
-    /// rather than the default.
     private func seedBudgets(_ rule: Rule) {
         budgetByDay = !rule.isSameBudgetEveryDay
         dayBudgets = (1...7).map { rule.budget(on: $0) }
@@ -218,7 +186,6 @@ struct MacRuleEditor: View {
                 if let target {
                     header(target)
                     nicknameCard
-                    // The way back is only worth saying once there is something to undo.
                     Footnote(
                         text: "The nickname shows on the shield card, the menu bar's menu and the widget."
                             + (trimmedNickname.isEmpty ? "" : " Empty it to go back to \(target.defaultName).")
@@ -308,7 +275,6 @@ struct MacRuleEditor: View {
 
     // MARK: Sections
 
-    /// The phone's hero for this app: living hourglass, countdown, and what is used today.
     private func header(_ target: Target) -> some View {
         TargetHero(
             target: target,
@@ -327,8 +293,6 @@ struct MacRuleEditor: View {
                 Text("Nickname")
                     .emberBody(13)
                     .foregroundStyle(Ember.cream)
-                // The placeholder is the name the app came with, so an empty field reads as
-                // "called what it is called" rather than as a name gone missing.
                 TextField(target?.defaultName ?? "Optional", text: $nickname)
                     .textFieldStyle(.plain)
                     .emberBody(13, .medium)
@@ -413,16 +377,12 @@ struct MacRuleEditor: View {
         .emberCard()
     }
 
-    /// Whether there is anything to copy a rule *from*: another configured target, or Furlough's
-    /// own starting rule for this one, which is what makes the menu worth opening on the first
-    /// app anyone adds.
     private var hasCopySources: Bool { !copyCandidates.isEmpty || ruleSuggestion != nil }
 
     private var copyCandidates: [Target] {
         model.state.config.targets.filter { $0.id != targetID && ($0.rule?.isEverAllowed ?? false) }
     }
 
-    /// Every other app and site, set up or not.
     private var applyCandidates: [Target] {
         model.state.config.targets.filter { $0.id != targetID }
     }
@@ -540,13 +500,8 @@ struct MacRuleEditor: View {
         byDay = !rule.isSameEveryDay
     }
 
-    /// Takes Furlough's own suggestion into the fields: the budget onto the slider, the window
-    /// into the list. A draft like any other, editable, and written by nothing until Save.
-    ///
-    /// The window joins the rows rather than replacing them, so a tap can never throw away hours
-    /// somebody typed; on the usual cold start there are none, and it lands as the one row it
-    /// suggests. The budget does replace what the slider held, because a slider nobody has moved
-    /// is holding a default rather than an answer.
+    // Window joins (never overwrites drafted hours); budget replaces (an untouched slider holds
+    // a default, not an answer).
     private func applySuggestion(_ draft: RuleSuggestion.Draft) {
         withAnimation(.snappy) {
             budget = draft.budgetMinutes
@@ -559,7 +514,6 @@ struct MacRuleEditor: View {
         }
     }
 
-    /// Replaces the draft with another target's rule. Nothing is saved until Save.
     private func adopt(_ rule: Rule) {
         withAnimation(.snappy) {
             drafts = TimeWindow.grouped(TimeWindow.folded(rule.windows)).map { DraftWindow(window: $0) }
@@ -569,13 +523,8 @@ struct MacRuleEditor: View {
         }
     }
 
-    /// The first window is the one Furlough would have suggested for this target, or an evening
-    /// when it has nothing to say about it. Each one after that goes on the same days as the last
-    /// row, where those days have room: after the latest window, or from the first free hour
-    /// once the evening is taken, so "later on weekends" starts as the early-morning window
-    /// it has to be. Nothing is added when those days are full. Rows are only joined when
-    /// the rule is saved: the time fields commit as you type, so joining sooner would move a
-    /// row out from under the cursor.
+    // Joined only on save, not on each edit — joining live would move the row out from under
+    // the cursor.
     private func addWindow() {
         var window = TimeWindow(startMinute: 20 * 60, endMinute: 22 * 60)
         if let last = drafts.last {
@@ -587,16 +536,13 @@ struct MacRuleEditor: View {
         withAnimation(.snappy) { drafts = DraftWindow.sorted(drafts + [DraftWindow(window: window)]) }
     }
 
-    /// Blocking something essential is the one edit here that cannot be undone in a hurry, so
-    /// it is the one that asks twice.
     private func attemptSave() {
         if caution != nil, tier == .essential { confirmBlockEssential = true } else { save() }
     }
 
     private func save() {
         drafts = DraftWindow.tidy(drafts)
-        // The tier first: a tightening of it lands now and so lengthens the wait the rule
-        // itself is about to be given, while a loosening of it queues and changes nothing yet.
+        // Tier set first: a tightening lengthens the delay applied to the rule change right after.
         let tierResult = model.setUtility(tier, for: targetID)
         let ruleResult = model.propose(rule: draft, nickname: nickname, for: targetID)
         let message = [tierResult, ruleResult]
@@ -606,17 +552,14 @@ struct MacRuleEditor: View {
         saved = message.isEmpty ? ProposalResult.unchanged.message : message
     }
 
-    /// Saves the draft here and gives it to `ids` as well, in one go.
     private func applyToOthers(_ ids: [UUID]) {
         drafts = DraftWindow.tidy(drafts)
         saved = model.apply(rule: draft, nickname: nickname, for: targetID, andTo: ids).message
     }
 }
 
-/// One allowed window: two time fields, the duration, a quiet remove button, and, when the
-/// rule varies by day, a strip of day toggles beneath. An end of 12:00 AM means midnight, and
-/// an end earlier than the start is a night: marked "+1", counted through midnight, and stored
-/// as the evening and the morning after.
+// End=12:00 AM means midnight; end<start is an overnight window ("+1"), stored as evening +
+// next morning.
 struct WindowRow: View {
     @Binding var window: TimeWindow
     var showsDays = false
@@ -670,8 +613,6 @@ struct WindowRow: View {
     }
 }
 
-/// An hour-and-minute field bound to a minute of the day. 1440 (midnight) shows as 12:00 AM
-/// and is only meaningful as a window's end.
 struct TimeField: View {
     @Binding var minute: Int
     let allowsMidnight: Bool
@@ -695,12 +636,9 @@ struct TimeField: View {
     }
 }
 
-/// Seven round day toggles in the calendar's order, amber when on, with the days named beside them.
 struct DayStrip: View {
     @Binding var days: Weekdays
-    /// Shown in cream and not toggleable: the day whose hours are being applied elsewhere.
     var locked: Weekdays = []
-    /// Replaces "No days" when an empty pick is fine rather than an error.
     var placeholder: String?
     private let calendar = Calendar.current
 
@@ -735,7 +673,6 @@ struct DayStrip: View {
     }
 }
 
-/// The daily budget slider: 5–240 minutes in steps of 5, piecewise linear between the ticks.
 struct BudgetSlider: View {
     @Binding var value: Int
     @State private var dragging = false
@@ -813,8 +750,6 @@ struct BudgetSlider: View {
     }
 }
 
-/// One weekday's budget: its name, its figure, and a slider. The Mac's copy of the phone's row,
-/// the way `BudgetSlider` above is its copy of the phone's slider.
 struct DayBudgetRow: View {
     let weekday: Int
     @Binding var minutes: Int

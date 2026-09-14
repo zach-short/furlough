@@ -33,8 +33,7 @@ struct PendingNotificationTests {
         #expect(plan[1].title == "Change landed")
     }
 
-    /// A change queued with less than an hour to run would have both notifications land at
-    /// once, the warning saying there is still time to cancel when there is not.
+    // Otherwise both notifications would land at once, the warning falsely claiming time to cancel.
     @Test("a change due within the hour gets only the landing notification")
     func noLateWarning() {
         let youTube = makeTarget("YouTube", rule: .alwaysBlocked)
@@ -83,8 +82,7 @@ struct PendingNotificationTests {
         #expect(PendingNotifications.describe(queued, in: makeState([]).config, calendar: cal).hasPrefix("An app"))
     }
 
-    /// The system fires these against its own clock, so a device clock that is off has to be
-    /// compensated for or the warning arrives at the wrong moment.
+    // The system fires these against its own clock, so an off device clock must be compensated for.
     @Test("fire dates are moved onto the device's clock")
     func driftIsApplied() {
         let youTube = makeTarget("YouTube", rule: .alwaysBlocked)

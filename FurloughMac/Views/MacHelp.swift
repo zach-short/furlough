@@ -1,16 +1,8 @@
 import SwiftUI
 
-// The Mac's half of the help, behind the question mark beside the gear. The phone's pages are
-// in Furlough/Views/HelpTopics.swift, and almost none of this is a copy of one: the rules are
-// the same code on both sides, but nothing about how they are enforced is. Where a page would
-// say the same sentence on both, it does.
-//
-// The small pieces below are duplicated from the phone's HelpView.swift for the reason the rest
-// of MacComponents.swift is: the two sides move at different times. Unify them into Shared/UI
-// when both are quiet.
+// Some pieces below are duplicated from the phone's HelpView.swift on purpose — the two sides
+// move at different times. Unify into Shared/UI once both are quiet.
 
-/// A page of help and the row that opens it. One case per page, so the sheet's title and the
-/// hub's rows cannot drift apart.
 enum HelpTopic: String, Identifiable, CaseIterable {
     case windows, delay, targets, blocking, devices, elsewhere, stuck, about, whatsNew
 
@@ -59,25 +51,17 @@ enum HelpTopic: String, Identifiable, CaseIterable {
     }
 }
 
-/// Which page Help is showing, shared between the window that asks for it and the window that
-/// shows it. Help is a window of its own rather than a sheet, so the page cannot be handed to
-/// it as an argument the way a sheet's was: whoever opens Help sets this first.
+// Window (not sheet), so the page can't be passed as an argument — callers must set topic
+// before opening it.
 @MainActor
 @Observable
 final class HelpRoute {
-    /// The scene id, in one place so the toolbar button and the Help menu open the same window.
     static let windowID = "help"
-
-    /// nil is the hub. A topic is a page, for the places in the app that link to one — the
-    /// Anchor sheet's row about the phone. Back still lands on the hub, so arriving that way is
-    /// a shortcut into Help rather than a dead end inside it.
     var topic: HelpTopic?
 }
 
-/// The Help menu's one item. A view rather than a plain `Button` because `openWindow` is an
-/// environment value, and only a view can read one. The route is handed over rather than read
-/// from the environment: commands hang off the scene, not off a window's content, so nothing
-/// put in a window's environment reaches here.
+// A View, not a plain closure: openWindow is only readable via @Environment in a View, and
+// menu commands don't inherit a window's environment.
 struct HelpMenuItem: View {
     let route: HelpRoute
     @Environment(\.openWindow) private var openWindow
@@ -91,13 +75,8 @@ struct HelpMenuItem: View {
     }
 }
 
-/// Help: a hub of topics, and one page at a time over it.
-///
-/// A window of its own, not a sheet. As a sheet it was a fixed 560×640 pane, which is most of
-/// the main window and more than all of it once someone had made theirs small — the sheet hung
-/// off the bottom with its own scroll view inside. A window is resizable, can sit beside the
-/// rules while they are read, and can be opened from a screen that is itself a sheet, which the
-/// Anchor's link to the phone page needed and had to fake by closing itself first.
+// A window, not a sheet: sheets can't stack, and this needs to open from within one (the
+// Anchor's phone link).
 struct HelpWindow: View {
     @Environment(HelpRoute.self) private var route
 
@@ -105,8 +84,7 @@ struct HelpWindow: View {
         ZStack {
             EmberWall()
             VStack(spacing: 0) {
-                // The window has no title bar, so its content starts under the traffic lights.
-                // This is the strip they sit in, and the one that drags the window.
+                // No title bar — this strip sits under the traffic lights and drags the window.
                 Color.clear.frame(height: 32)
                 if let topic = route.topic {
                     HelpPage(topic: topic) { route.topic = nil }
@@ -126,8 +104,6 @@ struct HelpWindow: View {
                 header
                 SectionLabel(text: "The rules")
                 card([.windows, .delay, .targets])
-                // Its own group rather than a row in the middle of "On this Mac". The Anchor is
-                // a half of Furlough on both devices, not a detail of how this one enforces.
                 SectionLabel(text: "The Anchor")
                 card([.devices])
                 SectionLabel(text: "On this Mac")
@@ -138,13 +114,11 @@ struct HelpWindow: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 24)
         }
-        // AppKit measures a scroll view from the bottom, so a page whose text grows as it wraps
-        // opens partway down — the long pages did exactly that. This pins the top.
+        // AppKit scroll views measure from the bottom; long wrapped text opens partway down
+        // without this.
         .defaultScrollAnchor(.top)
     }
 
-    /// Both halves in three sentences, so someone who reads nothing else knows there are two of
-    /// them. It used to describe rules alone, which left the Anchor to be found by accident.
     private var header: some View {
         VStack(alignment: .leading, spacing: 0) {
             Eyebrow(text: "Furlough", color: Ember.amber)
@@ -183,8 +157,6 @@ struct HelpWindow: View {
 
 // MARK: - The pieces the pages are built from
 
-/// A symbol in the tile the app's own icons wear: `KindTile`'s proportions, so a help row and
-/// an app row read as the same list.
 struct HelpTile: View {
     let symbol: String
     var size: CGFloat = 32
@@ -205,7 +177,6 @@ struct HelpTile: View {
     }
 }
 
-/// One topic on the hub: its mark, what it covers, and where it goes.
 struct HelpRow: View {
     let topic: HelpTopic
 
@@ -232,8 +203,6 @@ struct HelpRow: View {
     }
 }
 
-/// A card of short points: the thing named, then what it does. The unit every page is written
-/// in, so no page turns into an essay.
 struct HelpPoints: View {
     struct Point: Identifiable {
         let title: String
@@ -272,7 +241,6 @@ struct HelpPoints: View {
     }
 }
 
-/// A paragraph with no card under it, for the one thing on a page that is not a list.
 struct HelpProse: View {
     let text: String
 
@@ -290,15 +258,11 @@ struct HelpProse: View {
 
 // MARK: - The pages
 
-/// One page: the way back, a display heading, the paragraph that answers the question, and
-/// then the detail.
 struct HelpPage: View {
     @Environment(MacModel.self) private var model
     let topic: HelpTopic
     let onBack: () -> Void
     #if DEBUG || TESTING_TOOLS
-    /// Set by the fifth click on Version, so the click that opens Settings > Testing says so.
-    /// Nothing else in Help changes.
     @State private var askedForTesting = false
     #endif
 
@@ -336,8 +300,7 @@ struct HelpPage: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 24)
             }
-            // As on the hub, and it matters more here: the longest pages opened a third of the
-            // way down, under a heading you had to scroll up to read.
+            // Same bottom-anchored scroll issue as the hub.
             .defaultScrollAnchor(.top)
         }
     }
@@ -379,13 +342,6 @@ struct HelpPage: View {
         }
     }
 
-    /// Names the version in hand, since that is what someone opening this came to check.
-    ///
-    /// Three cases, all of them true ones: the version changed something here; the version
-    /// shipped on both devices and changed nothing on this one — 1.2.0 is the phone's Settings
-    /// menu and nothing else, so the list below starts at 1.1.0 and would otherwise read as the
-    /// version this Mac is on; and a build the file has no entry for at all, which a Debug build
-    /// off a branch mid-version is.
     private var whatsNewLead: String {
         if let current = ReleaseNotes.current() {
             return "You are on \(current.version). \(current.headline) Every version is below, newest first."
@@ -513,17 +469,8 @@ struct HelpPage: View {
 
     // MARK: Across your devices
 
-    /// The page nobody could find, because there is nothing to find: the link between this Mac
-    /// and the phone is an Apple Account, so it has no screen, no switch and no setup step, and
-    /// until this page existed the only way to learn it was already working was to watch it work.
-    ///
-    /// Written from the Mac's side, where the interesting fact is that this device holds a lock
-    /// it cannot open. `DevicesHelp` on the phone answers the same questions from the end that
-    /// holds the key, which is why the two are not one shared string.
-    ///
-    /// Both live lines are read from the model rather than written down, on the principle the
-    /// rest of Help follows: a page that states what this Mac's own situation is has to be right
-    /// about it, and both of these can change while the sheet is open.
+    // Live lines read from the model rather than hardcoded — both can change while this page
+    // is open.
     @ViewBuilder
     private var devices: some View {
         HelpProse("No account of Furlough's and no server of Furlough's: the link rides on your own iCloud, under your Apple Account. Each device joins from its own Devices screen — Settings > Devices here — and nothing crosses to or from one that has not. What there is to manage is the roster: every device that has joined, by the name you gave it, and any can be taken off from any other, except while the anchor is down.")
@@ -566,9 +513,8 @@ struct HelpPage: View {
             .padding(.top, 2)
     }
 
-    /// Where this Mac actually stands: cut off, off the link, on it with no iPhone, or ready.
-    /// The states `AnchorSync.macDrop` decides between, said in the order it decides them, so
-    /// the page and the refused button never disagree.
+    // Order must match AnchorSync.macDrop's decision order, or the text and button could
+    // disagree.
     private var cloudAndPhoneLine: String {
         if !model.cloudAvailable {
             return "Right now Furlough cannot reach iCloud, so this Mac will not drop the anchor at all. Turn on iCloud Drive in System Settings > your name > iCloud."
@@ -627,17 +573,11 @@ struct HelpPage: View {
 
     // MARK: What's new
 
-    /// The list is `ReleaseList` in `Shared/UI`, drawn the same way on the phone; the text
-    /// behind both is `release-notes.json`, which the site imports too. Nothing here interrupts:
-    /// no window opens itself after an update, because an app whose whole argument is that it
-    /// will not nag you into opening something has no business nagging you into reading its own
-    /// release notes.
+    // Backed by release-notes.json, shared with the phone and the site.
     @ViewBuilder
     private var whatsNew: some View {
         let releases = ReleaseNotes.all()
         if releases.isEmpty {
-            // The resource is missing or would not decode. Say so rather than showing an empty
-            // page that reads as nothing having ever changed.
             HelpProse("The notes for this build could not be read. furloughapp.com/releases has them.")
                 .padding(.top, 12)
         } else {
@@ -685,9 +625,8 @@ struct HelpPage: View {
         #endif
     }
 
-    /// Five clicks on the Version row ask for Settings > Testing back. Nothing at all in a build
-    /// that does not carry it — see `TestingTools` for why the section hides itself even when it
-    /// is there.
+    // Five clicks on Version reveals Settings > Testing; see TestingTools for why it can still
+    // stay hidden.
     private func noteVersionClick() {
         #if DEBUG || TESTING_TOOLS
         if TestingTools.noteVersionClick() { askedForTesting = true }

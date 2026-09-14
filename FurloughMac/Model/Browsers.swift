@@ -9,26 +9,18 @@ struct BrowserAccess: Identifiable, Equatable {
     var id: String { bundleID }
 }
 
-/// Reads and rewrites tab addresses in Safari and the Chromium family through Apple Events.
-/// macOS asks once per browser whether Furlough may control it; refusing means that browser is
-/// not enforced, which Settings shows.
-///
-/// Every window of every running browser is read, not just the front one: a blocked site left
-/// playing in a window behind the one you are looking at, or in a browser that is not even in
-/// front, is the whole hole this closes.
+/// Reads/rewrites tab addresses via Apple Events; each browser must grant automation permission separately.
+/// Reads every window of every running browser, not just the front one, to catch tabs open in the background.
 @MainActor
 final class Browsers {
     enum Kind { case safari, chromium }
 
-    /// One browser window and the address of its front tab.
     struct Tab: Equatable {
-        /// AppleScript's window index, 1 being the front window, so the right window can be
-        /// sent to the shield page.
+        /// AppleScript's 1-based window index.
         let window: Int
         let url: URL
     }
 
-    /// A running browser and what is open in it.
     struct Snapshot {
         let bundleID: String
         let kind: Kind
@@ -55,19 +47,15 @@ final class Browsers {
     ]
 
     private var readers: [String: NSAppleScript] = [:]
-    /// Browsers that refused automation, and when, so the prompt is not repeated every second.
+    /// Throttles re-reading a browser that has already refused automation.
     private var refused: [String: Date] = [:]
     private static let retryAfter: TimeInterval = 60
-    /// The last read per browser, against the machine's own count of seconds.
+    /// Keyed to uptime, not wall clock, so a clock change can't skew the cache.
     private var cache: [String: (at: TimeInterval, tabs: [Tab])] = [:]
-    /// How often a browser is actually asked. Each read is an Apple Event round trip, and now
-    /// that it covers every window of every browser, once a second was more than this needs.
-    /// A window opened in between is caught on the next pass, a second or two later.
     static let pollInterval: TimeInterval = 2
 
     func kind(of bundleID: String) -> Kind? { Self.known[bundleID] }
 
-    /// Every running known browser and what is open in it.
     func snapshots() -> [Snapshot] {
         var seen: Set<String> = []
         return NSWorkspace.shared.runningApplications.compactMap { app in
@@ -77,9 +65,7 @@ final class Browsers {
         }
     }
 
-    /// Every window's front tab, front window first. Empty when the browser has no windows or
-    /// Furlough may not look. Re-read at most every `pollInterval` seconds; the count is the
-    /// machine's own, so changing the clock can neither stall the poll nor spin it.
+    /// Empty when the browser has no windows or Furlough isn't permitted to look.
     func tabs(of bundleID: String, kind: Kind) -> [Tab] {
         let uptime = Clock.uptime
         if let cached = cache[bundleID], uptime - cached.at < Self.pollInterval { return cached.tabs }
@@ -98,13 +84,10 @@ final class Browsers {
         return tabs
     }
 
-    /// The address of the front window's front tab: what the user is actually looking at, which
-    /// is what usage is counted against.
     func currentURL(of bundleID: String, kind: Kind) -> URL? {
         tabs(of: bundleID, kind: kind).first?.url
     }
 
-    /// Sends one window's front tab to `url`.
     func redirect(_ bundleID: String, kind: Kind, window: Int = 1, to url: URL) {
         guard let script = NSAppleScript(source: Self.writeSource(bundleID: bundleID, kind: kind, window: window, url: url)) else { return }
         var error: NSDictionary?
@@ -114,8 +97,7 @@ final class Browsers {
         cache[bundleID] = nil
     }
 
-    /// "1\thttps://…\n2\thttps://…" as the read script writes it. A line that does not parse is
-    /// a window with nothing readable in it, and is skipped.
+    /// Format: "1\thttps://…\n2\thttps://…"; an unparsable line is skipped.
     private static func parse(_ output: String) -> [Tab] {
         output.split(separator: "\n").compactMap { line in
             let parts = line.split(separator: "\t", maxSplits: 1)
@@ -124,7 +106,6 @@ final class Browsers {
         }
     }
 
-    /// Automation status for every known browser that is running.
     func access() -> [BrowserAccess] {
         NSWorkspace.shared.runningApplications.compactMap { app in
             guard let bundleID = app.bundleIdentifier, Self.known[bundleID] != nil else { return nil }
@@ -142,7 +123,6 @@ final class Browsers {
         .sorted { $0.name < $1.name }
     }
 
-    /// Asks macOS now, for every running browser, instead of the first time one is in front.
     func requestAccess() {
         for app in NSWorkspace.shared.runningApplications {
             guard let bundleID = app.bundleIdentifier, Self.known[bundleID] != nil else { continue }
@@ -164,14 +144,10 @@ final class Browsers {
         }
     }
 
-    /// Walks every window and reports its index and the address of its front tab. Each window
-    /// is read inside a `try`, because a browser's window list also holds windows that have no
-    /// tab at all — Safari's settings window, a downloads window — and one of those must not
-    /// stop the walk.
+    /// Each window read inside `try`: some windows (Safari's settings, a downloads window) have no tab and would abort the loop.
     private static func readSource(bundleID: String, kind: Kind) -> String {
         let tabRef = kind == .safari ? "current tab" : "active tab"
-        // The separator is spelled `character id 9` rather than `tab`, because inside a browser's
-        // `tell` block `tab` is that browser's tab class, not the character.
+        // `character id 9`, not `tab` — inside a browser's `tell` block, `tab` is its tab class.
         return """
         set sep to character id 9
         tell application id "\(bundleID)"

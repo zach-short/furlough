@@ -17,8 +17,7 @@ struct TokenCacheTests {
         return decoder
     }()
 
-    /// Two keys shaped the way `UsageCollector` keys an entry, over bytes standing in for the
-    /// encoded `TargetKind`s the real answer carries.
+    // Bytes stand in for the encoded `TargetKind`s the real answer carries.
     let answer: [String: Data] = [
         "com.burbn.instagram": Data("instagram-token".utf8),
         "web:youtube.com": Data("youtube-token".utf8),
@@ -56,8 +55,7 @@ struct TokenCacheTests {
     @Test("an empty answer is a failed query, and keeps the cache that is there")
     func emptyAnswerKeepsTheOldCache() throws {
         #expect(TokenCache.refreshed(with: [:], now: when) == nil)
-        // Which is what lets a caller write `if let fresh = ... { save(fresh) }` and leave a good
-        // cache alone when Screen Time comes back with nothing.
+        // Lets a caller write `if let fresh = ... { save(fresh) }` and keep a good cache otherwise.
         let good = try #require(TokenCache.refreshed(with: answer, now: when))
         let kept = TokenCache.refreshed(with: [:], now: when.addingTimeInterval(60)) ?? good
         #expect(kept == good)

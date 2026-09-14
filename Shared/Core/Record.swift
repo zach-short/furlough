@@ -1,37 +1,24 @@
 import Foundation
 
-/// The record of the contract: the numbers only a commitment device can produce. Days in a row
-/// with no budget spent, time held shut, loosenings cancelled rather than landed, the longest
-/// the Anchor ever held.
-///
-/// Pure, like `Policy`; every function that touches a day boundary takes a `calendar:`. The
-/// activity log is free text and capped, so nothing here parses it — the record is written
-/// from the same events that already move the shields, and read only by the two screens that
-/// show it. It never influences `Policy.decide`, and `SharedStore.reset` clears it with the
-/// rest of the runtime.
+/// The record of the contract: streaks, time held shut, loosenings cancelled/landed, longest
+/// Anchor hold. Pure, like `Policy`; written from the same events that move the shields, read
+/// only by the two screens that show it. Never influences `Policy.decide`.
 enum Record {
     /// Days kept. Older ones are dropped on the next write.
     static let retainedDays = 60
 
     // MARK: - Writing
 
-    /// Counts the minutes since the last count into the day records, splitting at midnight.
-    ///
-    /// A status only changes at a window edge, at midnight, or when a threshold callback lands,
-    /// and every one of those ends in a reconcile — so between two counts the status held still,
-    /// and attributing the whole span to the status at its start is exact rather than a sample.
-    /// The exception is an edit that changes a rule mid-span, which is attributed to the rule as
-    /// it stands now; it is worth at most the minutes since the last reconcile.
-    ///
-    /// Only whole minutes are counted and the stamp moves by whole minutes, so calling this
-    /// once a second (the Mac) and once an hour (the phone) come to the same total.
+    /// Counts minutes since the last count into the day records, splitting at midnight and at
+    /// every status-changing edge, so the status is attributed exactly rather than sampled.
+    /// Whole minutes only, so calling this once a second (Mac) or once an hour (phone) totals
+    /// the same either way.
     static func accumulate(_ state: inout SharedState, now: Date, calendar: Calendar = .current) {
         guard let stamp = state.runtime.recordedThrough, stamp < now else {
             state.runtime.recordedThrough = now
             return
         }
-        // Furlough is not always awake, and a phone that was off for a week was not holding
-        // anything shut. At most a day is ever counted at once.
+        // At most a day is ever counted at once — a phone off for a week wasn't holding anything shut.
         let earliest = calendar.date(byAdding: .day, value: -1, to: now) ?? now
         let from = max(stamp, earliest)
         let minutes = (now.timeIntervalSince(from) / 60).rounded(.down)
@@ -68,8 +55,7 @@ enum Record {
         prune(&state.runtime.days, on: now, calendar: calendar)
     }
 
-    /// The budget ran out. Called where `runtime.exhausted` is stamped, which is the one place
-    /// that knows it for the first time.
+    /// The budget ran out; called where `runtime.exhausted` is first stamped.
     static func markSpent(_ id: UUID, in state: inout SharedState, now: Date, calendar: Calendar = .current) {
         edit(id, in: &state, on: now, calendar: calendar) { $0.spent = true }
     }
@@ -79,15 +65,10 @@ enum Record {
         edit(id, in: &state, on: now, calendar: calendar) { $0.warned = true }
     }
 
-    /// Queues a loosening and counts it, in one call, so a new queueing site cannot forget the
-    /// second half. Everything in `state.pending` is a loosening: a tightening lands at once.
-    ///
-    /// **Every append that will be saved goes through here.** A bare `state.pending.append` is
-    /// only ever right on a state that is thrown away — `ActivityLimit.projecting` and
-    /// `reason(schedules:in:)` build one to ask "would this fit?" and persist nothing. That is
-    /// the whole of the exception, and it is worth knowing which one you are writing:
-    /// `AppModel.setAnchorSchedules` was a real queueing site appending by hand from step 24
-    /// until 2026-09-09, so its loosenings were never counted (step 29).
+    /// Queues a loosening and counts it in one call. Every append meant to be saved must go
+    /// through here — a bare `state.pending.append` is only correct on a throwaway state used
+    /// to ask "would this fit?" (see `ActivityLimit.projecting`); anywhere else it silently
+    /// skips the count.
     static func queue(
         _ change: PendingChange, in state: inout SharedState, now: Date, calendar: Calendar = .current
     ) {
@@ -103,8 +84,7 @@ enum Record {
         edit(day: now, in: &state, calendar: calendar) { $0.cancelled += count }
     }
 
-    /// A queued loosening waited out the delay and landed. Counted inside
-    /// `Policy.applyDuePending`, which is the one place that folds one in.
+    /// A queued loosening waited out the delay and landed. Counted only via `Policy.applyDuePending`.
     static func noteLanded(
         _ count: Int = 1, in state: inout SharedState, now: Date, calendar: Calendar = .current
     ) {
@@ -112,9 +92,8 @@ enum Record {
         edit(day: now, in: &state, calendar: calendar) { $0.landed += count }
     }
 
-    /// The Anchor was released. Call it while `anchor.anchoredAt` still says when it was set:
-    /// the stretch is recorded whole, on the day it ended, so one that ran over midnight stays
-    /// one number.
+    /// The Anchor was released; call before clearing `anchor.anchoredAt`. Recorded whole on the
+    /// day it ended, so a stretch spanning midnight stays one number.
     static func noteAnchorReleased(_ state: inout SharedState, now: Date, calendar: Calendar = .current) {
         guard let since = state.config.anchor.anchoredAt, now > since else { return }
         let minutes = Int(now.timeIntervalSince(since) / 60)
@@ -124,8 +103,8 @@ enum Record {
         }
     }
 
-    /// Drops everything older than `retainedDays`. Day keys are `yyyy-MM-dd`, which sorts as
-    /// text exactly as it sorts as a date, so the comparison is the whole of it.
+    /// Drops everything older than `retainedDays`. Day keys (`yyyy-MM-dd`) sort as text exactly
+    /// as they sort as dates.
     static func prune(_ days: inout [String: DayRecord], on now: Date, calendar: Calendar = .current) {
         guard let oldest = calendar.date(byAdding: .day, value: -(retainedDays - 1), to: now) else { return }
         let cutoff = Policy.dayKey(oldest, calendar: calendar)
@@ -138,8 +117,8 @@ enum Record {
     struct Card: Equatable {
         /// Days in a row, ending today, on which no budget was spent.
         var streakDays = 0
-        /// Whether the streak has just been broken — nothing was spent today, but something was
-        /// yesterday — so the screen can say so plainly instead of showing a proud "1".
+        /// Whether the streak just broke (nothing spent today, something yesterday), so the
+        /// screen doesn't show a misleading proud "1".
         var brokeYesterday = false
         /// Minutes held shut this week, added up across every app and site.
         var shieldedMinutes = 0
@@ -182,11 +161,9 @@ enum Record {
         return card
     }
 
-    /// Days in a row, ending today, on which no budget was spent.
-    ///
-    /// A day with no entry at all counts: a spend is only ever written down when it happens, so
-    /// silence is not a spend. The run stops at the earliest day the record has, which is what
-    /// keeps a fresh install from claiming sixty clean days it was not there for.
+    /// Days in a row, ending today, on which no budget was spent. A day with no entry counts as
+    /// clean; the run stops at the earliest recorded day, so a fresh install can't claim days
+    /// before it existed.
     static func streak(_ days: [String: DayRecord], upTo now: Date, calendar: Calendar = .current) -> Int {
         guard let earliest = days.keys.min() else { return 0 }
         var count = 0
@@ -208,12 +185,8 @@ enum Record {
         return spentAnything(days[Policy.dayKey(yesterday, calendar: calendar)])
     }
 
-    /// The seven whole days before today, most recent first: yesterday back to a week ago.
-    ///
-    /// Not `weekKeys`, which runs from the start of this week to right now and would be one
-    /// morning long on the day a digest goes out. Seven whole days is the same span wherever
-    /// the week is taken to start, and it is finished — nothing in it can still change, which
-    /// is what makes a number in the digest one that will still be true when it is read.
+    /// The seven whole days before today, most recent first. Unlike `weekKeys` (which could be
+    /// one morning long on digest day), this is always a finished span, so its numbers stay true.
     static func lastSevenDayKeys(before now: Date, calendar: Calendar = .current) -> [String] {
         var keys: [String] = []
         var day = calendar.startOfDay(for: now)
@@ -225,8 +198,7 @@ enum Record {
         return keys
     }
 
-    /// The day keys from the start of this week through today, most recent first. Never a day
-    /// in the future: a week is what has happened, not what is scheduled.
+    /// Day keys from the start of this week through today, most recent first; never a future day.
     static func weekKeys(upTo now: Date, calendar: Calendar = .current) -> [String] {
         var day = calendar.startOfDay(for: now)
         var keys: [String] = []
@@ -241,9 +213,8 @@ enum Record {
 
     // MARK: - Copy
     //
-    // Both screens say it in the same words, and the words are here rather than in either view,
-    // for the same reason `PendingText` is: the phone and the Mac must not be able to word the
-    // record differently. Nothing here is celebratory, and a streak that broke says so.
+    // Both screens say it in the same words, kept here for the same reason as `PendingText`.
+    // Nothing here is celebratory; a broken streak says so.
 
     /// The answer to "no budget spent", so the day a budget did go says "Not today."
     static func streakLine(_ card: Card) -> String {
@@ -254,14 +225,14 @@ enum Record {
         return card.streakDays == 1 ? "1 day, so far." : "\(card.streakDays) days in a row."
     }
 
-    /// The total, on its own: the anchored share is a row of its own rather than a clause, so
-    /// neither number is cut off in the sidebar's width.
+    /// The total on its own — the anchored share gets its own row so neither number is cut off
+    /// in the sidebar's width.
     static func shieldedLine(_ card: Card) -> String {
         card.shieldedMinutes > 0 ? TimeFormat.budget(card.shieldedMinutes) : "Nothing held shut yet."
     }
 
-    /// How much of the week's held-shut time was the Anchor holding it. Nil when it never was,
-    /// so the row is left out rather than showing a zero.
+    /// The Anchor's share of held-shut time; nil (not zero) when it never held anything, so the
+    /// row is left out.
     static func anchoredLine(_ card: Card) -> String? {
         card.anchoredMinutes > 0 ? TimeFormat.budget(card.anchoredMinutes) : nil
     }
@@ -288,20 +259,14 @@ enum Record {
         /// Calendar weekday, 1…7, for the letter under the bar.
         var weekday: Int
         var shieldedMinutes = 0
-        /// 0…1 against the tallest day in the seven, so a quiet week is not drawn as a flat
-        /// line and a busy one is not drawn off the top. Zero for every day of a week that
-        /// held nothing.
+        /// 0…1 against the tallest day of the seven, so bars scale to the week rather than a
+        /// fixed ceiling.
         var fraction: Double = 0
         var isToday = false
     }
 
-    /// The last seven days, oldest first, ending today. Pure, and the only arithmetic the menu
-    /// bar's trend does: the minutes are the ones `accumulate` already counted.
-    ///
-    /// Relative rather than absolute heights. There is no natural ceiling — a day can hold one
-    /// app shut for an hour or everything shut for twenty-four — so the week is drawn against
-    /// its own tallest day, which is what makes one week comparable inside itself rather than
-    /// against a scale nobody chose.
+    /// The last seven days, oldest first, ending today. Heights are relative to the week's own
+    /// tallest day rather than a fixed ceiling, since there's no natural maximum to scale against.
     static func week(_ days: [String: DayRecord], upTo now: Date, calendar: Calendar = .current) -> [DayBar] {
         var bars: [DayBar] = []
         let today = calendar.startOfDay(for: now)
@@ -332,19 +297,10 @@ enum Record {
         var body: String
     }
 
-    /// What the last seven whole days came to, in the same words the two record screens use —
-    /// each line is that screen's row, its label and its value, so the digest cannot say the
-    /// week differently from the screen it came from.
-    ///
-    /// Nil when the week held nothing shut, nothing waited and nothing landed: a fresh install
-    /// and a week Furlough spent doing nothing both read the same, and neither is worth a
-    /// notification.
-    ///
-    /// Every number, the streak included, is about whole days: the run is counted back from
-    /// the last one, not from `now`. A digest is written before it is read — it is scheduled
-    /// hours or days ahead, because a local notification's words are fixed when it is
-    /// scheduled — and a streak counted through today would be claiming a day that has not
-    /// happened yet.
+    /// What the last seven whole days came to, in the same words the record screens use. Nil
+    /// when nothing happened (not worth a notification). Every number, streak included, counts
+    /// back from yesterday, not `now` — a digest is scheduled ahead of when it's read, so
+    /// counting through today would claim a day that hasn't happened yet.
     static func weeklyDigest(
         _ days: [String: DayRecord], upTo now: Date, calendar: Calendar = .current
     ) -> Digest? {
@@ -408,21 +364,14 @@ enum Record {
         prune(&state.runtime.days, on: now, calendar: calendar)
     }
 
-    /// `[from, to)` cut at every midnight and every window edge in it, so that each piece has
-    /// one status for the whole of it. In the ordinary case — a count a minute or two after the
-    /// last one — that is a single piece; it matters when Furlough has been asleep and is
-    /// catching up over hours, where sampling the status once would call a whole evening open
-    /// because the window happened to be open when the phone went quiet.
-    ///
-    /// `Policy.nextTransition` already answers "when can a status next change", and its
-    /// fallback is the next midnight, so the two cuts are one call.
+    /// `[from, to)` cut at every status-changing edge (`Policy.nextTransition`), so a stretch
+    /// where Furlough was asleep for hours isn't sampled as one status for the whole span.
     private static func slices(
         from: Date, to: Date, config: Config, calendar: Calendar
     ) -> [(start: Date, end: Date)] {
         var slices: [(start: Date, end: Date)] = []
         var cursor = from
-        // A day of minutes cut at every edge of at most 19 spans; the cap is a stop against a
-        // transition that fails to move rather than a real limit.
+        // Cap guards against a transition that fails to advance, not a real limit.
         while cursor < to, slices.count < 128 {
             let next = Policy.nextTransition(config: config, after: cursor, calendar: calendar)
             let end = min(next, to)

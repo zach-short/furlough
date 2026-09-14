@@ -7,21 +7,21 @@
 #   … scripts/store-submit.sh --submit            the same, then submit 1.0 for review
 #
 # The last of the store scripts. archive.sh --upload sends the build, store-upload.sh the
-# screenshots; this one does the rest of what App Store Connect wants before the Submit button
-# works, all through the API and none of it in the web form:
+# screenshots; this one does the rest of what App Store Connect wants before Submit works, all
+# through the API:
 #
 #   - attaches the newest VALID build to the version (or BUILD=202609090423 to pin one)
 #   - sets the marketing URL (MARKETING_URL, default https://furloughapp.com)
 #   - creates the availability, worldwide except the EU, if the app has none yet
 #   - creates the price schedule if the app has none yet: PRICE=free, or a USD customer price
 #     such as PRICE=2.99, matched against Apple's price points for the USA
-#   - writes the App Review contact and the notes block from design/store/LISTING.md
+#   - writes the App Review contact and the notes block from design/store/LISTING.md, refusing
+#     to run at all while those notes still hold a [PASTE … ] placeholder
 #   - with --submit, creates the review submission for the version and submits it
 #
-# Each step reads before it writes and says what it found, so a re-run is safe: a record that
-# already exists is left alone, a value that already matches is not rewritten. What it cannot
-# do is the App Privacy questionnaire, which has no API; if that is unanswered, the submission
-# is refused with a message saying so, and it is one screen in the web form.
+# Each step reads before it writes, so a re-run is safe. Not covered: the App Privacy
+# questionnaire has no API — an unanswered one refuses the submission with a message saying so,
+# and it's one screen in the web form.
 #
 # Same credentials as the other scripts: export ASC_KEY_ID and ASC_ISSUER_ID, with the .p8 at
 # ~/.appstoreconnect/private_keys/AuthKey_<KEY_ID>.p8, and fastlane installed.
@@ -45,11 +45,21 @@ command -v fastlane >/dev/null || { echo "fastlane not installed: brew install f
 BUNDLE_ID="$(grep -m1 'PRODUCT_BUNDLE_IDENTIFIER:' project.yml | awk '{print $2}')"
 [[ -n "$BUNDLE_ID" ]] || { echo "Could not read PRODUCT_BUNDLE_IDENTIFIER from project.yml" >&2; exit 1; }
 
-# The review notes are the fenced block under "## App Review notes" in the listing, taken from
-# the file rather than pasted here so there is one copy of them.
+# The fenced block under "## App Review notes" in the listing — read from there so there's one
+# copy of it.
 NOTES_FILE="$(mktemp)"
 awk '/^## App Review notes/{s=1} s && /^```/{f++; next} s && f==1{print} s && f==2{exit}' design/store/LISTING.md > "$NOTES_FILE"
 [[ -s "$NOTES_FILE" ]] || { echo "Could not find the App Review notes block in design/store/LISTING.md" >&2; exit 1; }
+
+# A placeholder that reached Apple would be a rejection of its own — anything to fill in by hand
+# is marked [PASTE … ] in the notes (the demo video URL the 2.1 rejection asked for is the
+# first). Checked here, before the Fastfile, since it costs nothing: no token, no round trip.
+if PLACEHOLDERS="$(grep -n '\[PASTE [^]]*\]' "$NOTES_FILE")"; then
+  echo "The App Review notes still hold a placeholder:" >&2
+  echo "$PLACEHOLDERS" >&2
+  echo "Fill it in in design/store/LISTING.md — these notes reach Apple verbatim." >&2
+  exit 1
+fi
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK" "$NOTES_FILE"' EXIT

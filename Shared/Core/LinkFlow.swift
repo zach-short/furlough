@@ -2,20 +2,16 @@ import Foundation
 
 /// The link's traffic from a model's side: what to do when this device adds something, and
 /// what to do with what the others added. The I/O around `SharedAdditions`, which decides, so
-/// both apps make the same moves in the same order without each carrying a copy of them.
+/// both apps make the same moves in the same order.
 ///
-/// Sending is settled in two steps because the phone cannot always say what it added. A target
-/// is written down as *awaiting* the moment it is added; `outgoing` asks whether it can be
-/// described yet and what the setting says, and `send` is what actually writes. On the Mac the
-/// two steps happen in the same breath. On the phone the second may come hours after the first,
-/// when the shield has taught the app its name — see `SharedAdditions.describe`.
+/// Sending is two steps because the phone can't always name what it added right away: a target
+/// is written down as *awaiting*, `outgoing` asks whether it can be described yet, and `send`
+/// writes it. The Mac does both in one breath; the phone's second step may come hours later,
+/// once the shield has taught the app the target's name (`SharedAdditions.describe`).
 ///
-/// The two halves keep that ledger differently, because they hold what they hold differently.
-/// A rule is a target with an id, so the rules half writes ids down as awaiting. The anchor's
-/// list is kinds, and a kind it holds that no rule covers has no id at all — so the anchor half
-/// writes nothing down: `anchorAdditions` walks the list itself on every settle, and what has
-/// already gone out is remembered by name. Both end in the same `send`, and both cross as the
-/// same `SharedAddition`, tagged with the `Half` that tells the receiver where it belongs.
+/// The rules half tracks awaiting targets by id; the anchor's list is kinds, which can have no
+/// id, so it keeps no ledger — `anchorAdditions` just walks the list on every settle. Both end
+/// in the same `send`, tagged with the `Half` that tells the receiver where it belongs.
 enum LinkFlow {
     private static let awaitingKey = "furlough.link.awaiting"
     private static let sentKey = "furlough.link.sent"
@@ -27,12 +23,10 @@ enum LinkFlow {
 
     /// What to do about a target this device added.
     enum Outgoing: Equatable {
-        /// Off the link, told Never, or not nameable yet: nothing, for now or for good.
         case nothing
-        /// Send it now: told Always, or already sent once — a rule landing on something the
-        /// person has already agreed to send is not a second question.
+        /// Told Always, or already sent once — a rule landing on something already agreed to
+        /// isn't a second question.
         case send(SharedAddition)
-        /// Told Ask, and not asked yet: offer it.
         case ask(SharedAddition)
     }
 
@@ -45,27 +39,20 @@ enum LinkFlow {
         set { SharedStore.defaults.set(newValue.mapValues(\.rawValue), forKey: awaitingKey) }
     }
 
-    /// Targets this device has sent at least once, by id. A later change to one — its first
-    /// rule — goes out again without asking.
+    /// A later change to a sent target (its first rule) goes out again without asking.
     static var sent: Set<String> {
         get { Set(SharedStore.defaults.stringArray(forKey: sentKey) ?? []) }
         set { SharedStore.defaults.set(Array(newValue).sorted(), forKey: sentKey) }
     }
 
-    /// Targets the person said not to send, by id. Not asked again.
     static var sendDeclined: Set<String> {
         get { Set(SharedStore.defaults.stringArray(forKey: sendDeclinedKey) ?? []) }
         set { SharedStore.defaults.set(Array(newValue).sorted(), forKey: sendDeclinedKey) }
     }
 
-    /// What has gone out from the anchor's list, by normalized name, and what the person said
-    /// not to send from it. Names rather than ids, because the anchor's list is kinds and a
-    /// kind held by the anchor alone has no id — and a name is the only thing that crosses
-    /// anyway, so two things called the same thing are one question, asked once.
-    ///
-    /// The consequence, stated because it is a choice and not an oversight: taking something
-    /// off the anchor's list and putting it back does not ask again. The person has already
-    /// answered about that name, and a nudge that comes back is a nag.
+    /// By normalized name, not id — the anchor's list is kinds, which can have no id, and a
+    /// name is the only thing that crosses anyway. Taking something off the anchor's list and
+    /// back on does not ask again: the person already answered for that name.
     static var anchorSent: Set<String> {
         get { Set(SharedStore.defaults.stringArray(forKey: anchorSentKey) ?? []) }
         set { SharedStore.defaults.set(Array(newValue).sorted(), forKey: anchorSentKey) }
@@ -76,13 +63,9 @@ enum LinkFlow {
         set { SharedStore.defaults.set(Array(newValue).sorted(), forKey: anchorDeclinedKey) }
     }
 
-    /// Writes `targets` down as awaiting, where the setting allows any sending at all. Called
-    /// by every add to the rules half.
-    ///
-    /// The anchor's half keeps no ledger of its own: its list is the ledger. `anchorAdditions`
-    /// walks it on every settle and offers whatever it can name and has not sent, so a picked
-    /// app that is nameless when it goes on the list is offered whenever the name arrives,
-    /// without anything having had to write down that it was waiting.
+    /// Called by every add to the rules half, where the setting allows sending at all. The
+    /// anchor half needs no equivalent call: its list is its own ledger, walked by
+    /// `anchorAdditions` on every settle.
     static func noteAdded(_ ids: [UUID], half: Half, config: Config) {
         guard DeviceLink.isEnrolled, config.link.sendAdditions != .never else { return }
         var waiting = awaiting
@@ -104,9 +87,8 @@ enum LinkFlow {
         return .ask(addition)
     }
 
-    /// Sends it: stamps the next sequence, writes the ring, and remembers that this target has
-    /// gone out so its first rule follows without asking. An anchor addition is remembered by
-    /// name as well, which is what the anchor's walk reads.
+    /// Stamps the next sequence, writes the ring, and remembers the target so its first rule
+    /// follows without asking. An anchor addition is also remembered by name for the anchor's walk.
     static func send(_ addition: SharedAddition, now: Date) {
         var stamped = addition
         stamped.sequence = DeviceLink.nextAdditionSequence()
@@ -121,11 +103,8 @@ enum LinkFlow {
         awaiting = waiting
     }
 
-    /// Not this one: it is not asked about again.
-    ///
-    /// Per half, and deliberately. Declining to tell the others that something is anchored here
-    /// says nothing about whether a rule for it should cross later; they are two questions, and
-    /// answering the one is not answering the other.
+    /// Per half, deliberately: declining to share that something is anchored here says nothing
+    /// about whether a rule for it should cross later.
     static func decline(_ addition: SharedAddition) {
         if addition.half == .anchor {
             anchorDeclined = anchorDeclined.union([Companions.normalize(name: addition.title)])
@@ -138,17 +117,12 @@ enum LinkFlow {
     }
 
     /// What the anchor's list owes the other devices: everything on it this device can name and
-    /// has neither sent nor been told not to send, described as it would go out.
+    /// hasn't sent or been told not to send. The list is its own ledger — nothing is written
+    /// down when something goes on it, so a nameless app crosses whenever the shield finally
+    /// names it, and one never named simply never crosses.
     ///
-    /// The list is the ledger. Nothing is written down when something goes on it; this walks it
-    /// whenever a settle runs and offers what it can describe, so a picked app that is nameless
-    /// on Monday crosses on Thursday when the shield finally names it, and one that is never
-    /// named simply never crosses. `Half` is what tells the receiving device to put it on its
-    /// own anchor's list rather than only among its rules.
-    ///
-    /// `names` is what this device calls the things the anchor holds that no rule covers, asked
-    /// for once and only when something on the list still needs it: on the Mac it walks the
-    /// Applications folders, and this runs on every settle.
+    /// `names` (e.g. the Mac's Applications-folder walk) is only called when something on the
+    /// list still needs it, even though this runs on every settle.
     static func anchorAdditions(config: Config, names: () -> [TargetKind: String], now: Date) -> [SharedAddition] {
         guard DeviceLink.isEnrolled, config.link.sendAdditions != .never else { return [] }
         return SharedAdditions.anchorList(
@@ -161,14 +135,11 @@ enum LinkFlow {
         )
     }
 
-    /// Everything either half can settle now: sent under Always, or, under Ask, returned to be
-    /// offered. Targets that no longer exist are forgotten.
+    /// Everything either half can settle now: sent under Always, or returned to be offered
+    /// under Ask. Targets that no longer exist are forgotten.
     ///
-    /// The order matters on the phone: the caller links the companion site *before* this runs,
-    /// so a YouTube that has just learned its name goes out with youtube.com beside it.
-    ///
-    /// `anchorNames` is passed through to `anchorAdditions`, which is the anchor's whole side
-    /// of this — it has no `awaiting` of its own to walk.
+    /// Order matters on the phone: the caller links the companion site *before* this runs, so a
+    /// YouTube that just learned its name goes out with youtube.com beside it.
     @discardableResult
     static func settleAwaiting(
         config: Config,
@@ -189,18 +160,15 @@ enum LinkFlow {
             case .ask(let addition):
                 offers.append(addition)
             case .nothing:
-                // Off the link or told Never since it was added: forgotten. Not nameable yet:
-                // still waiting.
+                // Forgotten if off the link or told Never since added; else still waiting on a name.
                 if !DeviceLink.isEnrolled || config.link.sendAdditions == .never { waiting[id] = nil }
             }
         }
         awaiting = waiting
 
         for addition in anchorAdditions(config: config, names: anchorNames, now: now) {
-            // Always, or ask — and having agreed to send this thing's *rule* is not agreeing to
-            // this. Telling the other devices that something is anchored here anchors it there,
-            // and the Mac and the iPad have no tag to lift it with; that is a bigger thing than
-            // a set of hours, and it gets its own question.
+            // Agreeing to send this thing's *rule* is not agreeing to anchor it elsewhere too —
+            // a Mac or iPad with no tag to lift it is a bigger commitment, so it asks separately.
             if config.link.sendAdditions == .always {
                 send(addition, now: now)
             } else {
@@ -210,17 +178,11 @@ enum LinkFlow {
         return offers.sorted { $0.title < $1.title }
     }
 
-    /// A target already sent has changed in a way worth sending again — its first rule. Quiet
-    /// when it was never sent: that is `settleAwaiting`'s question.
-    ///
-    /// It keeps the half it last crossed under, which for something already sent from the
-    /// anchor's list is the anchor's. The ring is keyed by id, so a second write about the same
-    /// target replaces the first: sending an anchored target's new rule under the rules half
-    /// would take the anchoring back off the entry for any device that had not read it yet.
-    ///
-    /// Read off `anchorSent` rather than off the anchor's list, and that is the point. Being on
-    /// the list is this device's business; having been sent from it is the person's answer, and
-    /// a rule arriving later must not be the thing that quietly carries the anchoring across.
+    /// A target already sent has changed in a way worth resending — its first rule. Quiet when
+    /// never sent (that's `settleAwaiting`'s question). Keeps the half it last crossed under: the
+    /// ring is keyed by id, so resending under the wrong half would strip the anchoring off the
+    /// entry for a device that hasn't read it yet. Checked against `anchorSent`, not the anchor's
+    /// list, so a rule arriving later can't silently carry an anchoring the person never agreed to send.
     static func resendIfSent(_ target: Target, config: Config, now: Date) {
         guard sent.contains(target.id.uuidString) else { return }
         guard case .send(var addition) = outgoing(for: target, half: .rules, config: config, now: now) else { return }
@@ -236,13 +198,10 @@ enum LinkFlow {
         var asks: [SharedAdditions.Landing] = []
     }
 
-    /// Everything the other devices have added that this one has not dealt with. Under Always
-    /// it lands in `state` here and the caller saves and enforces; under Ask it comes back to
-    /// be offered, and stays pending until it is answered; under Never it is passed over. What
-    /// is already here is passed over whatever the setting says.
-    ///
-    /// `installed` is asked once, and only when something is actually waiting: on the Mac it
-    /// walks the Applications folders, which is not a thing to do on every half-minute poll.
+    /// Everything the other devices have added that this one hasn't dealt with. Always lands it
+    /// in `state` for the caller to save; Ask returns it to be offered; Never passes it over.
+    /// `installed` is only called when something is actually waiting — on the Mac it walks the
+    /// Applications folders, not something to do on every poll.
     static func takeArrivals(_ state: inout SharedState, installed: () -> [String: String]) -> Arrivals {
         var arrivals = Arrivals()
         guard DeviceLink.isEnrolled else { return arrivals }
@@ -289,29 +248,20 @@ enum LinkFlow {
     #if os(iOS)
     private static let anchorOwedKey = "furlough.link.anchorOwed"
 
-    /// Apps another device anchored that this phone has agreed to hold and cannot add yet, by
-    /// bundle identifier. Only Apple's picker mints a Screen Time token, so a name alone can
-    /// never put an app on this phone's anchor list — except where Screen Time data access
-    /// exists, which can match a bundle identifier to the token for it
-    /// (`AppModel.anchorArrivalsFromTheTables`). This is the queue that waits for that.
-    ///
-    /// Kept rather than acted on at once because the answer needs an async query and the
-    /// landing does not: the arrival lands what it can now, and the app follows.
+    /// Apps another device anchored that this phone agreed to hold but can't add yet — only
+    /// Apple's picker mints a Screen Time token, so a bare name can't do it directly (Screen
+    /// Time data access can match one later, see `AppModel.anchorArrivalsFromTheTables`). Kept
+    /// as a queue since that match needs an async query the landing itself doesn't wait for.
     static var anchorOwed: [String] {
         get { SharedStore.defaults.stringArray(forKey: anchorOwedKey) ?? [] }
         set { SharedStore.defaults.set(SharedAdditions.unique(newValue), forKey: anchorOwedKey) }
     }
     #endif
 
-    /// What taking one in leaves behind.
-    ///
-    /// The name is settled on the anchor's half: it has crossed, and the walk must not turn
-    /// round and offer to send it back to the device it came from. Every device reads every
-    /// ring, so nothing is lost by not forwarding — the third device on the link hears it from
-    /// the origin, not from here.
-    ///
-    /// And, on the phone, an anchored app it cannot add itself is queued for the tables. Nothing
-    /// on the Mac, where an app is a bundle identifier and there is nothing to wait for.
+    /// Marks the name settled on the anchor's half so the walk doesn't offer to send it back to
+    /// the device it came from — every device reads every ring, so nothing is lost by not
+    /// forwarding. On the phone, an anchored app it can't add itself is also queued for the
+    /// tables; nothing to do on the Mac, where an app is just a bundle identifier.
     private static func noteLanded(_ landing: SharedAdditions.Landing) {
         guard landing.addition.half == .anchor else { return }
         if landing.anchors {

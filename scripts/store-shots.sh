@@ -4,9 +4,8 @@
 #   ./scripts/store-shots.sh            # ten 1320x2868 frames + the panorama
 #   ./scripts/store-shots.sh 3          # just frame 3, while iterating
 #
-# Output lands in build/store-shots/ (gitignored). Upload the .jpg files:
-# App Store Connect rejects images with an alpha channel, and Chrome's PNGs
-# carry one, so each frame is flattened to JPEG at quality 100.
+# Output lands in build/store-shots/ (gitignored). Upload the .jpg files: App Store Connect
+# rejects images with an alpha channel, which Chrome's PNGs carry.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -18,7 +17,7 @@ W=1320; H=2868
 [ -x "$CHROME" ] || { echo "Google Chrome not found at $CHROME" >&2; exit 1; }
 mkdir -p "$OUT"
 
-shoot() { # shoot <name> <width> <height> <query>
+shoot() { # <name> <width> <height> <query>
   "$CHROME" --headless --disable-gpu --hide-scrollbars \
     --allow-file-access-from-files --force-device-scale-factor=1 \
     --virtual-time-budget=4000 --window-size="$2,$3" \

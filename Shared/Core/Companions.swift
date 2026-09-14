@@ -1,31 +1,19 @@
 import Foundation
 
-/// The website an app is also at, and the app a website is also in. Blocking the YouTube app
-/// and leaving youtube.com open is the gap most people find a week later, from a browser tab,
-/// so adding either side offers the other while it is still in hand.
-///
-/// A table, like `AppUtility`, and for the same reason: on the Mac a target already *is* a
-/// bundle identifier or a host, so a lookup is exact, offline and testable. This is the half
-/// that needs no Mac; `AppCatalog` adds the half that does, reading where a browser's
-/// "install as app" wrapper opens straight out of its bundle.
-///
-/// The phone comes at it a step later. A Screen Time token says nothing about which app it is,
-/// so nothing can be offered as it is added; but the shield learns the name the first time it
-/// covers something, and `missingHosts`/`missingApp` answer from a name alone. Adding the other
-/// half there is still Apple's picker's job — see `AddWebsiteGuideView` — so all the phone
-/// offers is a nudge towards it.
+/// Maps an app to the website it's also at, and vice versa — closes the gap where blocking the
+/// YouTube app still leaves youtube.com open in a browser tab. A static table for the same
+/// reason as `AppUtility` (exact, offline, testable); on the phone a Screen Time token can't
+/// identify the app, so `missingHosts`/`missingApp` only work once the shield has learned a
+/// name, and adding the other half there is still Apple's picker's job.
 enum Companions {
-    /// One thing, however many names, identifiers and hosts it goes by.
     struct Pair: Hashable, Sendable {
-        /// As the thing is written, first the name to show. Matching ignores case and spacing,
-        /// so the table can carry "YouTube Music" and still recognise what Finder shows on the
-        /// Mac and what the shield reports on iOS.
+        /// Matching ignores case/spacing, so entries like "YouTube Music" still match Finder's
+        /// and the shield's own casing.
         let names: [String]
-        /// Lowercased Mac and iOS identifiers. The iOS ones matter on the Mac too: an Apple
-        /// silicon Mac runs iPhone apps under their own identifier.
+        /// Lowercased Mac and iOS identifiers — the iOS ones matter on Apple silicon too,
+        /// since it runs iPhone apps under their own identifier.
         let bundleIDs: [String]
-        /// Where the same thing lives on the web. Subdomains match, so youtube.com covers
-        /// m.youtube.com, and the order is the order they are offered in.
+        /// Subdomains match, so youtube.com covers m.youtube.com.
         let hosts: [String]
 
         init(_ names: [String], _ bundleIDs: [String] = [], hosts: [String]) {
@@ -34,10 +22,8 @@ enum Companions {
             self.hosts = hosts
         }
 
-        /// What to call it: the first name in the table.
         var title: String { names[0] }
 
-        /// True when this is the app: by identifier first, then by the name on its bundle.
         func matches(bundleID: String, name: String) -> Bool {
             let key = Companions.normalize(name: name)
             return bundleIDs.contains(Companions.normalize(bundleID: bundleID))
@@ -47,19 +33,15 @@ enum Companions {
 
     // MARK: Lookups
 
-    /// What `bundleID` (or, failing that, `name`) is one half of, or nil when it has no website
-    /// worth offering. Nil is the common answer: most apps are not also a site.
     static func pair(forBundleID bundleID: String, name: String) -> Pair? {
         pairs.first { $0.matches(bundleID: bundleID, name: name) }
     }
 
-    /// The hosts to offer beside an app, in table order. Empty when there are none.
     static func hosts(forBundleID bundleID: String, name: String) -> [String] {
         pair(forBundleID: bundleID, name: name)?.hosts ?? []
     }
 
-    /// What a website is one half of; "m.youtube.com" is YouTube. The longest host that fits
-    /// wins, so a pair that claims a subdomain beats one that claims the whole domain.
+    /// Longest matching host wins, so a subdomain-specific pair beats a whole-domain one.
     static func pair(forHost raw: String) -> Pair? {
         guard let host = Hosts.normalize(raw) else { return nil }
         var best: (pair: Pair, length: Int)?
@@ -73,21 +55,13 @@ enum Companions {
 
     // MARK: The phone's half
 
-    /// The half of a thing that Furlough does not have yet.
     enum Half: Equatable, Sendable {
-        /// Websites the app is also at, in table order.
         case sites([String])
-        /// The app the website is also in, by name.
         case app(String)
     }
 
-    /// The websites an app is also at that Furlough does not have, in table order.
-    ///
-    /// This is the lookup the phone can use. A Screen Time token says nothing about what it
-    /// is, so nothing can be offered when a target is added; but the shield learns the name
-    /// the first time it covers something (`SharedStore.learnName`), and from a name alone
-    /// the table still answers. `knownHosts` is what Furlough already blocks — the domains
-    /// its website targets have been learned as — so a site that is in is never offered.
+    /// Works from a name alone (learned by the shield via `SharedStore.learnName`) since a
+    /// Screen Time token itself says nothing about what app it is.
     static func missingHosts(forAppNamed name: String, knownHosts: [String]) -> [String] {
         let hosts = hosts(forBundleID: "", name: name)
         guard !hosts.isEmpty else { return [] }
@@ -95,10 +69,8 @@ enum Companions {
         return hosts.filter { host in !known.contains { Hosts.matches($0, rule: host) } }
     }
 
-    /// What to call the app a website is also in, when Furlough does not have it already.
-    ///
-    /// A name, not something to add: on the phone only Apple's picker can mint an app token,
-    /// so the most anything can do is say which app to look for and open the picker.
+    /// Only a name, not something addable directly: on the phone only Apple's picker can mint
+    /// an app token.
     static func missingApp(forHost host: String, knownAppNames: [String]) -> String? {
         guard let pair = pair(forHost: host) else { return nil }
         guard !knownAppNames.contains(where: { pair.matches(bundleID: "", name: $0) }) else { return nil }
@@ -107,8 +79,7 @@ enum Companions {
 
     // MARK: Normalizing
 
-    /// Identifiers lowercased, with a Catalyst app's "maccatalyst." shed so the X app on a Mac
-    /// matches the X app on a phone.
+    /// Sheds a Catalyst app's "maccatalyst." prefix so the Mac and phone builds match.
     static func normalize(bundleID: String) -> String {
         let key = bundleID.lowercased()
         let catalyst = "maccatalyst."
@@ -121,8 +92,8 @@ enum Companions {
 
     // MARK: The table
 
-    /// Things that are both an app and a site. Only what is worth blocking: Mail is also at
-    /// gmail.com, but nobody adds Mail to keep themselves off it.
+    /// Only apps worth pairing for blocking purposes — e.g. Mail is also at gmail.com, but
+    /// nobody adds Mail to keep off it.
     static let pairs: [Pair] = [
         Pair(["YouTube"], ["com.google.ios.youtube"], hosts: ["youtube.com"]),
         Pair(["YouTube Music"], ["com.google.ios.youtubemusic"], hosts: ["music.youtube.com"]),

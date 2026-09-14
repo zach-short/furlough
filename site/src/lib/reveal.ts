@@ -1,5 +1,3 @@
-// Sections fade up as they come into view. Reduce Motion shows everything at once.
-
 export function startReveal() {
   const items = Array.from(document.querySelectorAll<HTMLElement>('[data-reveal]'));
   if (!items.length) return;

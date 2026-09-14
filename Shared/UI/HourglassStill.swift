@@ -1,16 +1,12 @@
 import CoreGraphics
 import SwiftUI
 
-/// One frame of the hourglass drawn straight into a Core Graphics context, for the one surface
-/// that cannot host a SwiftUI view: the shield extension's icon. iOS asks a
-/// `ShieldConfigurationDataSource` for its configuration off the main thread, and SwiftUI's
-/// `ImageRenderer` is main-actor work, so a render that waited for the main thread never ran
-/// and the shield showed its symbol fallback every time (seen on the phone 2026-09-08). Core
-/// Graphics has no such tie: the same paths and the same colours as `HourglassView`, on
-/// whatever thread the call arrives on.
+/// Renders a frame directly via Core Graphics for the shield extension's icon: iOS calls
+/// `ShieldConfigurationDataSource` off the main thread, but SwiftUI's `ImageRenderer` is
+/// main-actor-only, so it never rendered there (seen 2026-09-08) — CG has no such restriction.
 ///
-/// This is `HourglassView` with `motion: false`, the way the still was always taken: a solid
-/// stream, no grains, no pulse. Keep the two in step when the drawing changes.
+/// Mirrors `HourglassView` with motion off (solid stream, no grains/pulse) — keep both in
+/// step when the drawing changes.
 enum HourglassStill {
     /// The drawing's own space; the shapes lay themselves out in it unscaled.
     private static let space = CGRect(x: 0, y: 0, width: 120, height: 160)
@@ -26,16 +22,14 @@ enum HourglassStill {
                   bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
               )
         else { return nil }
-        // Core Graphics puts the origin bottom left; the drawing, like every UIKit and SwiftUI
-        // surface it matches, has it top left.
+        // CG's origin is bottom-left; the drawing (like UIKit/SwiftUI) is top-left.
         context.translateBy(x: 0, y: CGFloat(height))
         context.scaleBy(x: scale, y: -scale)
         draw(state, in: context, rect: CGRect(origin: .zero, size: size))
         return context.makeImage()
     }
 
-    /// Draws `state` into `rect` on a context whose origin is top left, the glass centred and
-    /// fitted the way `HourglassView` fits it.
+    /// Draws into `rect` (origin top-left), centred and fitted like `HourglassView`.
     static func draw(_ state: HourglassState, in context: CGContext, rect: CGRect) {
         let scale = min(rect.width / 120, rect.height / 160)
         guard scale > 0 else { return }
@@ -46,8 +40,8 @@ enum HourglassStill {
         )
         context.saveGState()
         defer { context.restoreGState() }
-        // From here on everything is in the drawing's 120 × 160 space. SwiftUI's gradients span
-        // the view rather than the glass, so `view` is that frame carried into the same space.
+        // SwiftUI gradients span the view, not the glass, so `view` carries that frame into
+        // drawing space.
         context.translateBy(x: origin.x, y: origin.y)
         context.scaleBy(x: scale, y: scale)
         let view = CGRect(
@@ -60,7 +54,7 @@ enum HourglassStill {
         let capHeight: Double = mini ? 10 : 8
         let streaming = state.isRunning || state.isFrozen
 
-        // The glow behind the base, at the middle of its breath: a still has no pulse.
+        // Fixed at pulse midpoint since a still has no animation.
         if let glow = state.glow {
             context.saveGState()
             context.translateBy(x: 60, y: 118)
@@ -83,7 +77,7 @@ enum HourglassStill {
             let edge = HourglassGeometry.topEdge(level: state.sandLevel)
             let sand = TopSandShape(level: state.sandLevel).path(in: space).cgPath
             linear(context, in: sand, stops: state.sand.stops, from: CGPoint(x: view.midX, y: view.minY), to: CGPoint(x: view.midX, y: view.maxY))
-            // The funnel: a shadow in the bowl where the sand slides down to the neck.
+            // Funnel shadow where sand slides to the neck.
             radial(
                 context, in: sand,
                 stops: [.init(color: .black.opacity(mini ? 0.2 : 0.34), location: 0), .init(color: .clear, location: 1)],
@@ -100,7 +94,7 @@ enum HourglassStill {
         if state.moundLevel > 0.002 {
             let mound = MoundShape(level: state.moundLevel).path(in: space).cgPath
             linear(context, in: mound, stops: state.mound.stops, from: CGPoint(x: view.midX, y: view.minY), to: CGPoint(x: view.midX, y: view.maxY))
-            // Fresh sand at the tip, where the stream lands, is lighter than the settled slopes.
+            // Fresh sand at the tip is lighter than settled slopes.
             radial(
                 context, in: mound,
                 stops: [.init(color: Ember.sandLight.opacity(mini ? 0.18 : 0.28), location: 0), .init(color: .clear, location: 1)],

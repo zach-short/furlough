@@ -1,24 +1,20 @@
 import Foundation
 import Testing
 
-/// One habit, one row: an app and the website it is also at as a single target.
+/// One habit, one row: an app and the website it is also at as a single target. Rests on
+/// everything downstream reading `Target.kinds` rather than `Target.kind`, so one status,
+/// schedule, budget and removal delay cover both halves — and pins what must *not* follow: the
+/// face can never be unlinked away, and linking must never shorten a wait.
 ///
-/// The whole feature rests on everything downstream reading `Target.kinds` rather than
-/// `Target.kind`, so that one status, one schedule, one budget and one removal delay cover both
-/// halves. These tests pin that, and pin the two things that must *not* follow from it: the face
-/// can never be unlinked away, and linking must never shorten a wait.
-///
-/// This bundle builds for macOS, so a target here is a bundle identifier or a host. That is the
-/// engine both platforms share — `Policy.decide`, `Config.target(host:)`, `anchorWarning` and the
-/// pending queue are one piece of code — and it is the only place they can be reached from a test.
-/// The iOS-only half is `Monitoring.include`, which puts both tokens in one `DeviceActivityEvent`;
-/// nothing in a test bundle can reach DeviceActivity, so that one is checked on the phone.
+/// Builds for macOS, so a target here is a bundle identifier or host, via the shared engine
+/// (`Policy.decide`, `Config.target(host:)`, `anchorWarning`, the pending queue). The iOS-only
+/// half (`Monitoring.include`, combining tokens into one `DeviceActivityEvent`) can't be reached
+/// from a test bundle and is checked on the phone.
 
 // MARK: - The model
 
 @Suite("A target with more than one door")
 struct LinkedTargetModelTests {
-    /// YouTube the app, with youtube.com linked onto it.
     func pair() -> Target {
         var target = Target(kind: .macApp(bundleID: "com.google.Chrome"), nickname: "YouTube", rule: .unrestricted)
         target.also = [.host("youtube.com")]
@@ -54,9 +50,7 @@ struct LinkedTargetModelTests {
         #expect(target.hasHost)
     }
 
-    /// The rung-B honesty check. Nothing counts a site typed by name, so a site on its own has no
-    /// budget at all — but linked to an app it shares that app's budget event, and the app's
-    /// minutes are real. So the pair is counted, and the site is the part that is not.
+    // A typed site alone has no budget event; linked to an app it shares that app's real one.
     @Test("A linked pair has a real budget; the typed half is the part nothing counts")
     func countedAndUncounted() {
         let target = pair()
@@ -65,8 +59,7 @@ struct LinkedTargetModelTests {
 
         let siteAlone = makeTarget("Reddit", rule: .unrestricted)
         #expect(!siteAlone.isCounted)
-        // Nothing to be honest about: the whole target is uncounted, and the editor says so
-        // instead with `hostBudgetNote`.
+        // Whole target uncounted: the editor says so with `hostBudgetNote` instead.
         #expect(siteAlone.uncountedHosts.isEmpty)
     }
 }
@@ -90,8 +83,7 @@ struct LinkedLookupTests {
         #expect(config.target(host: "vimeo.com") == nil)
     }
 
-    /// The longest matching host still wins across rows, so a row claiming a subdomain beats one
-    /// claiming the whole domain whichever of them happens to be linked.
+    // A subdomain row beats a whole-domain row, whichever happens to be linked.
     @Test("The most specific host wins, linked or not")
     func longestHostWins() {
         var app = Target(kind: .macApp(bundleID: "com.google.ios.youtubemusic"), nickname: "YT Music", rule: .unrestricted)
@@ -101,8 +93,7 @@ struct LinkedLookupTests {
         #expect(config.target(host: "youtube.com")?.displayName == "YouTube")
     }
 
-    /// This is what stops the picker and an import adding a second row for a half that is already
-    /// covered — the bug that would split every pair back into the two rows linking exists to join.
+    // Stops the picker/import adding a second row for an already-covered half.
     @Test("A linked kind is already managed, so nothing adds it twice")
     func kindLookupSeesLinkedHalves() {
         let config = config()
@@ -144,8 +135,7 @@ struct LinkedEnforcementTests {
         #expect(decision.blockedHosts.isEmpty)
     }
 
-    /// One status per target was always the shape; linking only widens what it applies to. So a
-    /// spent budget shuts the browser tab too, which is the gap the whole feature exists to close.
+    // One status per target; linking only widens what it applies to.
     @Test("A spent budget shuts the browser half as well")
     func exhaustionCoversBothHalves() {
         let config = config(windows: [window(20 * 60, 22 * 60)])
@@ -215,9 +205,8 @@ struct UnlinkTests {
         #expect(!state.config.targets[0].isLinked)
     }
 
-    /// The face is what the row *is*. Unlinking it would leave a target with no identity rather
-    /// than a looser one, so it is refused where it is queued and again where it is performed —
-    /// a change can sit in the queue across an edit that swaps which half is the face.
+    // Unlinking the face would leave the target with no identity, not just a looser one — refused
+    // both when queued and when performed, since an edit can swap the face while queued.
     @Test("The face is never unlinked away")
     func faceSurvives() {
         var state = state()
@@ -228,8 +217,6 @@ struct UnlinkTests {
         #expect(state.config.targets[0].also?.count == 2)
     }
 
-    /// A loosening, so it queues like every other one — and the card has to say what it costs
-    /// while there is still time to cancel.
     @Test("A queued unlink reads as what it takes away")
     func pendingCardWordsIt() {
         let state = state()
@@ -246,9 +233,8 @@ struct UnlinkTests {
 
 // MARK: - The picker
 
-/// The sharpest edge in the whole feature, and the reason the rule is pure rather than a line
-/// inside `applyPicker`: the picker reads a selection as the whole truth, so anything it cannot
-/// see looks unpicked, and anything that looks unpicked is queued for removal.
+/// Why the rule is pure rather than a line inside `applyPicker`: the picker reads a selection as
+/// the whole truth, so anything it cannot see looks unpicked, and unpicked means removed.
 @Suite("What a trip through the picker may remove")
 struct PickerRemovalTests {
     let app = TargetKind.macApp(bundleID: "com.google.ios.youtube")
@@ -267,8 +253,7 @@ struct PickerRemovalTests {
         #expect(!Policy.picker(removes: plain, selected: [app]))
     }
 
-    /// The bug that shipped once already, before typed hosts had this guard: a site added by name
-    /// is in no selection, so one visit to the picker would have queued the removal of every one.
+    // Shipped once already: a typed site is in no selection, so the picker would remove every one.
     @Test("A site added by name is in no selection and is never removed")
     func typedHostIsNeverRemoved() {
         let site = makeTarget("Reddit", rule: .unrestricted)
@@ -276,9 +261,8 @@ struct PickerRemovalTests {
         #expect(!Policy.picker(removes: site, selected: [app, other]))
     }
 
-    /// The bug this change would otherwise have introduced. A linked pair's typed half is invisible
-    /// to the picker; if the whole row were judged on that, every trip would queue every pair's
-    /// removal. The row survives on its app half.
+    // A linked pair's typed half is invisible to the picker; judged on that alone every trip
+    // would remove every pair, so the row survives on its app half instead.
     @Test("A linked pair survives on its app half")
     func linkedPairSurvivesOnItsAppHalf() {
         #expect(!Policy.picker(removes: linked(), selected: [app]))
@@ -291,15 +275,13 @@ struct PickerRemovalTests {
         #expect(Policy.picker(removes: linked(), selected: []))
     }
 
-    /// Unpicking one half of a pair is not how a pair is broken. Breaking one is a loosening and
-    /// waits out the delay; a removal queued from the picker would take the whole row instead, and
-    /// would do it without the confirmation the editor asks for.
+    // Breaking a pair is a loosening that waits out the delay; the picker must not do it as an
+    // unconfirmed whole-row removal.
     @Test("The picker cannot break a pair, only remove the whole of it")
     func pickerCannotUnlink() {
         var bothTokens = Target(kind: .macApp(bundleID: "com.google.ios.youtube"), rule: .unrestricted)
         bothTokens.also = [.macApp(bundleID: "com.google.ios.youtubemusic")]
-        // Only the face is still picked, and the linked half is not. Nothing is removed: the row
-        // is still wanted, and the half that is not comes off in the editor.
+        // Only the face is picked; nothing is removed, the unpicked half comes off in the editor.
         #expect(!Policy.picker(removes: bothTokens, selected: [app]))
     }
 }
@@ -336,7 +318,6 @@ struct LinkedExportTests {
         #expect(read.targets[0].alsoBlocks == ["youtube.com", "music.youtube.com"])
     }
 
-    /// A file written before linking existed has no `alsoBlocks`, and must still open.
     @Test("A file written before linking still reads")
     func olderFileStillReads() throws {
         let json = """
@@ -366,8 +347,7 @@ struct LinkedImportTests {
         )
     }
 
-    /// The halves land on the row the file's face maps to, and at once: more is blocked than a
-    /// moment ago, so there is no delay to wait out.
+    // More gets blocked than before, so there's no delay to wait out.
     @Test("Halves land on an existing row immediately")
     func halvesLandOnAnExistingRow() {
         let existing = Target(kind: .macApp(bundleID: "com.google.ios.youtube"), nickname: "YouTube", rule: .unrestricted)
@@ -378,7 +358,7 @@ struct LinkedImportTests {
         let match = ImportMatch(exported: exported, resolution: .existing(existing.id))
         let plan = ConfigImport.plan(file(exported), matches: [match], state: state, now: at(8))
         #expect(plan.edits.contains(.link(targetID: existing.id, hosts: ["youtube.com"])))
-        // Said out loud in the review rather than folded in silently: it changes what is blocked.
+        // Said out loud in the review, since it changes what's blocked.
         #expect(plan.items.contains { $0.subject == .half && $0.outcome == .now })
 
         ConfigImport.apply(plan, to: &state, now: at(8))
@@ -386,8 +366,7 @@ struct LinkedImportTests {
         #expect(state.config.targets.count == 1)
     }
 
-    /// A site the file wants to link is already a row of its own here. An import only ever adds,
-    /// so the row it has is left exactly as it is rather than being blocked a second time.
+    // Import only ever adds, so an already-managed row is left as is, not blocked a second time.
     @Test("A site already managed on its own is not blocked twice")
     func alreadyManagedIsLeftAlone() {
         let app = Target(kind: .macApp(bundleID: "com.google.ios.youtube"), nickname: "YouTube", rule: .unrestricted)
@@ -403,8 +382,7 @@ struct LinkedImportTests {
         #expect(state.config.targets[0].also == nil)
     }
 
-    /// A row the file brings with it arrives linked, and gets one line, not two: its halves are
-    /// part of what "added" means.
+    // Its halves are part of what "added" means: one line, not two.
     @Test("A new row arrives with its halves and one line")
     func newRowArrivesLinked() {
         var state = makeState([])
@@ -423,8 +401,7 @@ struct LinkedImportTests {
 
 @Suite("Stored state written before a target could have two doors")
 struct LinkedDecodingTests {
-    /// The reason `also` is optional: a synthesised `init(from:)` demands every non-optional key,
-    /// and the state already on Zach's phone has none.
+    // A synthesized `init(from:)` demands every non-optional key, but old stored state has none.
     @Test("A target stored without `also` decodes as one door")
     func decodesWithoutAlso() throws {
         let json = """
@@ -461,8 +438,6 @@ struct LinkedDecodingTests {
 
 @Suite("A name from the tables rather than the shield")
 struct TableNameTests {
-    /// The essentials each carry their own detail sentence, so exactly one display name maps to
-    /// each identifier's advice and the bridge between the two tables is unambiguous.
     @Test("An essential is named from its bundle identifier")
     func essentialsAreNamed() {
         #expect(AppUtility.name(forBundleID: "com.apple.mobilesms") == "Messages")
@@ -473,40 +448,30 @@ struct TableNameTests {
         #expect(AppUtility.properName("google maps") == "Google Maps")
     }
 
-    /// The quieter tiers share a bare advice between many apps, so the table genuinely cannot
-    /// tell which one an identifier is. Saying nothing is right: a wrong name would go on the
-    /// shield, which is worse than "This app".
+    // A wrong guessed name on the shield is worse than the generic "This app", so ambiguous stays unnamed.
     @Test("An ambiguous identifier is not guessed at")
     func ambiguousStaysUnnamed() {
-        // Nothing in the table at all.
         #expect(AppUtility.name(forBundleID: "com.nobody.at.all") == nil)
     }
 }
 
 // MARK: - The usage page
 
-/// Screen Time counts an app and a website separately, and it is right to: on the phone they are
-/// two things. Once they are linked they are one row on one shared budget, so the page has to add
-/// their minutes rather than rank them apart — otherwise it shows YouTube twice and offers a
-/// budget for each half of one that is already shared.
-///
-/// `UsageSummary.folded(in:)` does the merging and lives in `Shared/Usage`, which imports
-/// DeviceActivity and so cannot be reached from a macOS test bundle. The decision it acts on —
-/// which entries belong together and which one carries the pair — is `UsageAnalysis.folding`, and
-/// that is pure and here.
+/// Screen Time counts an app and a website separately, but once linked they're one row on one
+/// shared budget, so the page must add their minutes rather than show YouTube twice.
+/// `UsageSummary.folded(in:)` does the merging in `Shared/Usage` (imports DeviceActivity,
+/// unreachable here); the pure decision it acts on is `UsageAnalysis.folding`, tested here.
 @Suite("Folding the halves of a pair into one card")
 struct UsageFoldingTests {
     let app = TargetKind.macApp(bundleID: "com.google.ios.youtube")
 
-    /// YouTube the app, with youtube.com linked onto it.
     func config() -> Config {
         var pair = Target(kind: .macApp(bundleID: "com.google.ios.youtube"), nickname: "YouTube", rule: .unrestricted)
         pair.also = [.host("youtube.com")]
         return makeConfig([pair])
     }
 
-    /// The site half has no token — nothing mints one for a name typed into Furlough — so it is
-    /// found by the domain in its usage key instead. This is the common shape on the phone.
+    // A typed site has no token, so it's found by the domain in its usage key instead.
     @Test("A typed site folds into the app it is linked to")
     func typedSiteFoldsIntoTheApp() {
         let folding = UsageAnalysis.folding(
@@ -516,14 +481,13 @@ struct UsageFoldingTests {
             ],
             in: config()
         )
-        // Both halves point at the app, the app at itself, so a caller can tell a folded row from
-        // a lone one without a second lookup.
+        // The app maps to itself too, so a caller can spot a folded row without a second lookup.
         #expect(folding["web:youtube.com"] == "com.google.ios.youtube")
         #expect(folding["com.google.ios.youtube"] == "com.google.ios.youtube")
     }
 
-    /// The face is the app even when the browser half is the heavier of the two: the app is what a
-    /// rule is written on, and the only half with Apple's icon and name.
+    // The app is what a rule is written on and the only half with an icon/name, so it's the face
+    // even when the browser half weighs more.
     @Test("The app carries the pair even when the browser half is heavier")
     func faceWinsOverWeight() {
         let folding = UsageAnalysis.folding(
@@ -548,8 +512,6 @@ struct UsageFoldingTests {
         #expect(folding["web:m.youtube.com"] == "com.google.ios.youtube")
     }
 
-    /// The point of the whole exercise: nothing that is not a pair is touched, so the page keeps
-    /// ranking everything else exactly as it did.
     @Test("Nothing that is not a pair is folded")
     func unrelatedEntriesStandAlone() {
         let folding = UsageAnalysis.folding(
@@ -562,8 +524,6 @@ struct UsageFoldingTests {
         #expect(folding.isEmpty)
     }
 
-    /// A row Furlough manages but has not linked is still one thing, so its single entry is not a
-    /// group and nothing is rewritten.
     @Test("An unlinked target is not a group")
     func unlinkedTargetIsNotAGroup() {
         let alone = makeConfig([Target(kind: .macApp(bundleID: "com.google.ios.youtube"), rule: .unrestricted)])
@@ -578,7 +538,6 @@ struct UsageFoldingTests {
         #expect(folding.isEmpty)
     }
 
-    /// The answer must not depend on the order Screen Time happened to hand the entries over.
     @Test("The carrier is the same whichever order the halves arrive in")
     func orderDoesNotMatter() {
         let forwards = UsageAnalysis.folding(
@@ -592,8 +551,7 @@ struct UsageFoldingTests {
         #expect(forwards == backwards)
     }
 
-    /// Two sites linked onto one row and no app half at all: the heaviest carries the pair, since
-    /// there is no face among them to prefer.
+    // With no app half to prefer as the face, the heaviest site carries the pair.
     @Test("With no app half the heaviest site carries the row")
     func heaviestWinsWithoutAFace() {
         var pair = Target(kind: .host("youtube.com"), nickname: "YouTube", rule: .unrestricted)
@@ -617,9 +575,7 @@ struct UsageFoldingTests {
         #expect(UsageAnalysis.domain(inKey: "com.google.ios.youtube") == nil)
     }
 
-    /// The arithmetic the fold exists for, checked on the histogram itself: both halves were seen
-    /// over the same days, so the merged average is the sum over those days once — not twice, and
-    /// not two separate averages that each look small enough to ignore.
+    // Both halves were seen over the same days, so merging must sum once, not average twice.
     @Test("Merged minutes average over the days once")
     func mergedAverageIsOverTheSameDays() {
         var appHalf = UsageHistogram(daysObserved: [Int](repeating: 2, count: 7))
@@ -635,8 +591,7 @@ struct UsageFoldingTests {
         #expect(appHalf.daysObserved == [Int](repeating: 2, count: 7))
     }
 
-    /// And the consequence worth having: apart, each half was under the bar and got no card at
-    /// all; together the habit is over it and earns one.
+    // Apart, each half is under the recommendation bar; merged, the habit clears it.
     @Test("Two halves under the bar are one habit over it")
     func togetherTheyPassTheBar() {
         var appHalf = UsageHistogram(daysObserved: UsageHistogram.oneWeek)

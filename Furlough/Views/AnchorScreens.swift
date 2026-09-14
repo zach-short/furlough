@@ -1,26 +1,11 @@
 import SwiftUI
 
 /// The four screens behind the Anchor page's settings card: Schedule, Tags, Scope and Your Mac.
-///
-/// Each was a section on the Anchor screen itself — a label, a card, and a footnote underneath
-/// saying the one thing you had to know before touching it. Eleven blocks deep, the two controls
-/// a new person actually needed were sixth and ninth. So each section is a row now, and the
-/// footnote that used to sit under its card is the first sentence of the screen the row opens:
-/// the fact arrives when the thing it is about does, rather than three scrolls before it.
-///
-/// Every screen reads the anchor live and every one of them locks while it is down, the same as
-/// the cards did. The alerts and confirmations came with their cards, so each screen owns its
-/// own — the Anchor page keeps only the ones its reader can raise.
+/// Each reads the anchor live and locks while it's down; alerts/confirmations belong to
+/// whichever screen raises them.
 
-/// The chrome the four share: the title in the bar, the lead under it, the cards below. The
-/// sections behind Settings' menu are built the same way and share it.
-///
-/// No heading of its own above the lead. The bar already names the screen, and a page that
-/// opens by saying its own name twice is the thing the Anchor page's old header was doing.
-///
-/// The lead is optional because two of the screens have nothing to say before their first card
-/// — About and Diagnostics both open on rows that are already plain — and a paragraph written
-/// only to fill the gap would be the prose this pass took out.
+/// Chrome shared with Settings' own menu screens. `lead` is optional since some screens
+/// (About, Diagnostics) have nothing to say before their first card.
 struct AnchorSettingScreen<Content: View>: View {
     let title: String
     var lead = ""
@@ -57,8 +42,7 @@ struct AnchorSettingScreen<Content: View>: View {
 
 // MARK: Schedule
 
-/// The drop times, and the way to change them while the anchor is off. Edited as one draft in
-/// `AnchorScheduleSheet`, because the whole set is classified at once.
+/// Edited as one draft in `AnchorScheduleSheet` since the whole set is classified at once.
 struct AnchorScheduleScreen: View {
     @Environment(AppModel.self) private var model
     @State private var editing = false
@@ -148,21 +132,15 @@ struct AnchorScheduleScreen: View {
 
 // MARK: Tags
 
-/// The keys: what each is called, what it is, and the way to add or forget one.
-///
-/// Pairing from here is a scan asked for by hand, and it ends in the naming alert. The other way
-/// in — a tag Furlough does not know, held up at the Anchor page while its reader was armed —
-/// stays on that page, because that is where the tag was.
+/// Pairing an unknown tag held up at the Anchor page itself (while armed) is handled there,
+/// not here.
 struct AnchorTagsScreen: View {
     @Environment(AppModel.self) private var model
     @State private var forgetting: PairedTag?
     @State private var renaming: PairedTag?
     @State private var draftName = ""
     @State private var message: String?
-    /// The where-to-leave-it screen, asked for rather than owed. See `TagPlacementView`: it is
-    /// shown once by itself on a first pairing, and this is how anyone who paired a tag before
-    /// that screen existed — or read it in a hurry — gets back to it. One copy of the advice,
-    /// reachable from both places, rather than the same four sentences written twice.
+    /// Re-opens `TagPlacementView` (normally shown once on first pairing) on demand.
     @State private var placing = false
 
     private var anchor: AnchorProfile { model.state.config.anchor }
@@ -233,8 +211,6 @@ struct AnchorTagsScreen: View {
         }
     }
 
-    /// The question mark under the card: where a key should live, which is the part of the
-    /// Anchor that no amount of pairing teaches.
     private var placementRow: some View {
         Button {
             placing = true
@@ -253,9 +229,8 @@ struct AnchorTagsScreen: View {
         .buttonStyle(.plain)
     }
 
-    /// Whether arriving on the Anchor page arms the reader on its own, so holding a tag up is
-    /// the whole of it. Off by default: the reader row above and the guide's first step already
-    /// arm it by hand, and a scan sheet nobody asked for is the surprise this leaves off.
+    /// Off by default: arming is already reachable by hand, and an unrequested scan sheet
+    /// would surprise people who haven't opted in.
     private var autoArmCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 12) {
@@ -318,8 +293,7 @@ struct AnchorTagsScreen: View {
         }
     }
 
-    /// One key: what it is called, what it is, and the way to change either. Both controls are
-    /// gone while anchored, like the app list on the page behind this one.
+    /// Rename/Forget hidden while anchored, like the app list on the page behind this one.
     private func row(_ tag: PairedTag) -> some View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
@@ -366,8 +340,6 @@ struct AnchorTagsScreen: View {
 
     private func pair() async {
         switch await model.pairTag() {
-        // Straight into the name: an identifier's last four digits are not a place, and the
-        // scan is done, so nothing is waiting on the typing.
         case .paired(let tag):
             draftName = ""
             renaming = tag
@@ -384,13 +356,11 @@ struct AnchorTagsScreen: View {
 
 // MARK: Scope
 
-/// How far the anchor reaches: the list, or the whole phone but the list. Locked while anchored
-/// along with everything else. The list does not survive a switch (see `AppModel.setAnchorScope`),
-/// so a list that holds anything asks first.
+/// Switching scope resets the list (see `AppModel.setAnchorScope`), so a non-empty list
+/// confirms first.
 struct AnchorScopeScreen: View {
     @Environment(AppModel.self) private var model
-    /// The scope tapped while the list still holds something, waiting on a confirmation:
-    /// switching starts the list again, and a curated list is worth a second look first.
+    /// Pending scope, held while confirming a reset.
     @State private var switchingTo: AnchorProfile.Scope?
 
     private var anchor: AnchorProfile { model.state.config.anchor }
@@ -473,14 +443,9 @@ struct AnchorScopeScreen: View {
 
 // MARK: Devices
 
-/// The link to the other devices, from the Anchor page: joining it, who is on it, and what
-/// crosses. `DevicesScreen` is the content; Settings hosts the same screen under its own row,
-/// so the Anchor — the half the link is mostly about — carries a way in of its own.
-///
-/// The severe warning is the lead here rather than a banner on the page in front. A phone that
-/// cannot reach iCloud cannot release an anchor it drops on a Mac, which is the one failure
-/// Furlough has no other way out of; the row that opens this screen wears an ember dot and says
-/// so in its own words, and this is where the whole of it is said.
+/// `DevicesScreen` is the shared content; Settings hosts the same screen under its own row.
+/// The severe warning here matters because a phone that can't reach iCloud can't release an
+/// anchor dropped on a Mac — the one failure Furlough has no other way out of.
 struct AnchorMacScreen: View {
     @Environment(AppModel.self) private var model
 

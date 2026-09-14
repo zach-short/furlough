@@ -7,45 +7,22 @@
 #   scripts/archive-mac.sh --no-notarize   everything up to Apple, for reading the signature
 #   BUILD=202609131900 scripts/archive-mac.sh   pin the build number instead of stamping one
 #
-# There is no App Store submission for the Mac and there will not be one: FurloughMac is
-# unsandboxed, drives browsers through Apple Events, terminates other processes, installs a
-# LaunchAgent and carries a system extension, and the Mac App Store requires the sandbox without
-# exception. Its road is Developer ID plus notarization, from a page on furloughapp.com. That is
-# settled in section 3 of ~/Projects/archive/furlough/testflight-deployment/DEPLOYMENT.md.
+# No Mac App Store distribution: FurloughMac is unsandboxed, drives browsers via Apple Events,
+# terminates other processes, installs a LaunchAgent and carries a system extension — the sandbox
+# forbids all of that. Developer ID + notarization instead (DEPLOYMENT.md section 3).
 #
-# WHY THIS IS NOT `xcodebuild -exportArchive`. Xcode 26's Direct Distribution cannot sign an app
-# that embeds a system extension (DTS, r.108838909; fixed in the Xcode 27 beta). So the app is
-# built the ordinary way and then re-signed by hand, inside out — the extension, the widget, then
-# the app — with the Developer ID entitlements beside each target's development ones and the
-# Developer ID profiles from the portal. Everything Xcode would have done silently is done here
-# in the open, which is the only reason each step below can be checked.
+# Not `xcodebuild -exportArchive`: Xcode 26's Direct Distribution can't sign an app that embeds a
+# system extension (DTS r.108838909, fixed in the Xcode 27 beta). Built the ordinary way, then
+# re-signed by hand below, inside out, with the Developer ID entitlements and profiles.
 #
-# WHAT THIS MAC NEEDS, none of which a script can create for you:
+# Needs, none of which a script can create: a Developer ID Application certificate (Account
+# Holder only, via Xcode > Settings > Accounts > Manage Certificates); two Developer ID
+# provisioning profiles at ~/.furlough/signing/ (FURLOUGH_SIGNING overrides), each with the
+# Network Extension capability and the app's also with iCloud for the Anchor's key-value store;
+# and the App Store Connect key already used for TestFlight, for notarytool.
 #
-#   1. A **Developer ID Application** certificate. Account Holder only, and this is the step
-#      nobody else can do: Xcode > Settings > Accounts > (your Apple ID) > Manage Certificates >
-#      + > Developer ID Application. `security find-identity -v -p codesigning` should then list
-#      one. Keep the private key: losing it means a new certificate and, for anyone already
-#      running Furlough, a system extension macOS treats as a different app's.
-#
-#   2. Two **Developer ID provisioning profiles**, made at developer.apple.com > Certificates,
-#      Identifiers & Profiles > Profiles > + > Developer ID (under Distribution), one for
-#      com.zachshort.furlough.mac and one for com.zachshort.furlough.mac.filter, each with the
-#      Network Extension capability, and the app's also with iCloud (it carries the key-value
-#      store the Anchor travels through). Save them as:
-#
-#          ~/.furlough/signing/FurloughMac.provisionprofile
-#          ~/.furlough/signing/FurloughMacFilter.provisionprofile
-#
-#      Outside the repo, like the App Store Connect key, and overridable with FURLOUGH_SIGNING.
-#      A profile is needed even for Developer ID here because both bundles carry restricted
-#      entitlements; the App Group alone would not have needed one.
-#
-#   3. The App Store Connect key already used for TestFlight, which is what notarytool
-#      authenticates with: ASC_KEY_ID, ASC_ISSUER_ID and ~/.appstoreconnect/private_keys/.
-#
-# Run `scripts/archive-mac.sh --check` and it will tell you which of those are missing, in the
-# order to do them, rather than failing at signing time with a code.
+# Run `scripts/archive-mac.sh --check` first — it lists exactly what's missing rather than
+# failing at signing time with a bare error code.
 
 set -euo pipefail
 
@@ -58,10 +35,9 @@ case "$MODE" in
     *) echo "archive-mac.sh: no option $MODE (try --check or --no-notarize)" >&2; exit 1 ;;
 esac
 
-# A UTC timestamp always rises and says when the build was cut. It matters more here than on the
-# phone: macOS compares an extension's CFBundleVersion when it is asked to replace one, and this
-# project's CURRENT_PROJECT_VERSION sits at 1 in project.yml, so every unstamped build looked to
-# macOS like the version it already had. See HANDOFF's note on the filter surviving an update.
+# macOS compares an extension's CFBundleVersion on replace, and project.yml pins
+# CURRENT_PROJECT_VERSION at 1, so an unstamped build never looks newer to macOS (see HANDOFF's
+# note on the filter surviving an update).
 BUILD="${BUILD:-$(date -u +%Y%m%d%H%M)}"
 VERSION="$(grep -m1 'MARKETING_VERSION:' project.yml | awk '{print $2}' | tr -d '"')"
 
@@ -81,9 +57,7 @@ ASC_ISSUER_ID="${ASC_ISSUER_ID:-04f9fe5a-56e5-460f-80ac-c57e788fbdc6}"
 NOTARY_KEY="$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
 
 # ---------------------------------------------------------------------------------------------
-# The preflight. Everything that can be known before a build starts is checked here, and every
-# failure is collected rather than thrown, so `--check` prints the whole list of what to do
-# instead of one thing at a time across five runs.
+# The preflight. Failures are collected, not thrown, so `--check` prints the whole list at once.
 # ---------------------------------------------------------------------------------------------
 
 MISSING=()
@@ -92,8 +66,8 @@ missing() { MISSING+=("$*"); }
 
 echo "==> Checking what this Mac can sign with"
 
-# The certificate. Matched on the name rather than on a hash so a renewed certificate keeps
-# working; DEVELOPER_ID overrides it for a Mac with more than one.
+# Matched by name, not hash, so a renewed certificate still matches; DEVELOPER_ID overrides
+# for a Mac with more than one.
 IDENTITIES="$(security find-identity -v -p codesigning 2>/dev/null || true)"
 SIGN_ID="${DEVELOPER_ID:-}"
 if [[ -z "$SIGN_ID" ]]; then
@@ -108,9 +82,8 @@ else
     else here waits on it."
 fi
 
-# The profiles. Each is decoded and read rather than trusted by its file name: the two ways this
-# goes wrong quietly are a development profile saved under the release name, and a profile made
-# before the Network Extension capability was added to the App ID.
+# Decoded and inspected rather than trusted by filename — catches a development profile saved
+# under the release name, or one made before Network Extension was added to the App ID.
 check_profile() {
     local path="$1" identifier="$2" label="$3" wants_icloud="$4"
     if [[ ! -f "$path" ]]; then
@@ -163,7 +136,7 @@ for file in FurloughMac/FurloughMac-DeveloperID.entitlements \
     [[ -f "$ROOT/$file" ]] || missing "$file is gone. It is what codesign is handed below."
 done
 
-# Notarization. Checked now rather than after a ten-minute build and a signature.
+# Checked now rather than after a ten-minute build and a signature.
 if [[ "$MODE" != "--no-notarize" ]]; then
     if [[ -f "$NOTARY_KEY" ]]; then
         note "notary key: $NOTARY_KEY"
@@ -219,16 +192,13 @@ BUILT="$DERIVED/Build/Products/Release/Furlough.app"
 
 echo "==> Checking the build is what it says it is"
 APP_BINARY="$BUILT/Contents/MacOS/Furlough"
-# Read each tool's output into a variable before probing it. `nm ... | grep -q` exits at the
-# first match, the tool upstream takes SIGPIPE, and under `set -o pipefail` a probe that FOUND
-# something reports "not found" — the fail-open that scripts/archive.sh documents at length.
+# Read into a variable before probing — piping straight to `grep -q` triggers a SIGPIPE fail-open
+# under pipefail (see scripts/archive.sh for the full story).
 NM_OUT="$(nm -a "$APP_BINARY" 2>/dev/null || true)"
 STRINGS_OUT="$(strings -a "$APP_BINARY" 2>/dev/null || true)"
 
-# The control first. A Debug build splits the binary into a stub and Furlough.debug.dylib, and
-# every probe below would then be reading a 60KB stub that contains none of the app — reporting
-# whatever the caller hoped for. It is also fatal in its own right: a system extension has to be
-# one Mach-O, so a split build cannot install its filter at all.
+# Control check first: a Debug build splits into a stub + Furlough.debug.dylib, so probes below
+# would read an empty 60KB stub; also fatal on its own since a system extension must be one Mach-O.
 if ! grep -qF "no unblock button" <<<"$STRINGS_OUT"; then
     echo "REFUSING TO SHIP: the control string is missing from the built binary." >&2
     echo "This is either not a Release build, or it is the debug-dylib stub. The checks here are" >&2
@@ -259,8 +229,7 @@ if [[ ! -d "$BUILT/Contents/Library/SystemExtensions/$EXTENSION_ID.systemextensi
 fi
 
 # ---------------------------------------------------------------------------------------------
-# Signing, inside out. Every nested bundle is signed before the thing that contains it, because
-# signing a container seals whatever is inside it at that moment.
+# Signing, inside out — signing a container seals whatever is inside it at that moment.
 # ---------------------------------------------------------------------------------------------
 
 echo "==> Staging"
@@ -272,8 +241,8 @@ echo "==> Putting the Developer ID profiles in"
 cp "$APP_PROFILE" "$APP/Contents/embedded.provisionprofile"
 cp "$FILTER_PROFILE" "$SYSEX/Contents/embedded.provisionprofile"
 
-# --options runtime is the hardened runtime, which notarization requires; --timestamp is the
-# secure timestamp, without which the signature stops verifying the day the certificate expires.
+# --options runtime = hardened runtime, required for notarization; --timestamp keeps the
+# signature verifying past the certificate's expiry.
 sign() {
     local path="$1" entitlements="$2"
     echo "    signing $(basename "$path")"
@@ -312,10 +281,8 @@ for bundle in "$SYSEX" "$WIDGET" "$APP"; do
     note "$(basename "$bundle"): ${authority#Authority=}"
 done
 
-# The one entitlement a Developer ID build needs and a development build must not have. Read off
-# the signature rather than off the file that was handed to codesign, because what ships is what
-# was signed: an entitlement the profile does not grant is dropped here, silently, and the filter
-# then refuses to load on somebody else's Mac with nothing in the app to say why.
+# Read off the actual signature, not the file handed to codesign — an entitlement the profile
+# doesn't grant is dropped silently, and the filter then fails to load with nothing to say why.
 for bundle in "$APP" "$SYSEX"; do
     entitlements="$(codesign -d --entitlements :- "$bundle" 2>/dev/null || true)"
     grep -qF "content-filter-provider-systemextension" <<<"$entitlements" || {
@@ -335,8 +302,8 @@ fi
 
 # ---------------------------------------------------------------------------------------------
 # Notarization, then the DMG, then notarization again. The app is stapled before it goes into the
-# disk image so that a copy dragged out of the image carries its own ticket and opens on a Mac
-# that is offline; the image is stapled too, for the download itself.
+# image so a copy dragged out carries its own ticket and opens offline; the image is stapled too,
+# for the download itself.
 # ---------------------------------------------------------------------------------------------
 
 ZIP="$STAGE/Furlough-$VERSION-$BUILD.zip"

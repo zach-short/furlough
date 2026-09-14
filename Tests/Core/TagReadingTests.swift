@@ -1,10 +1,8 @@
 import Foundation
 import Testing
 
-/// One tag held up on the Anchor screen, and the branch it lands in. Added 2026-09-09, when
-/// the screen started arming a reader on sight rather than putting a scan behind each button:
-/// the tag decides what happens, so the deciding is here, where it can be tested without a
-/// reader. The phone is the only place a tag can be read and the simulator is not one of them.
+/// The tag decides what happens (rather than a scan behind each button), so the deciding logic
+/// is pure and tested here, without a reader — the simulator can't read a real tag.
 @Suite("Tag reading")
 struct TagReadingTests {
     private let known = Data([0x04, 0xA2, 0x24, 0x11])
@@ -34,8 +32,7 @@ struct TagReadingTests {
         #expect(anchor.reading(of: known) == .refused("Choose what the anchor holds first."))
     }
 
-    /// The wider scope locks the whole phone, so an empty list is a list — everything but
-    /// nothing. A tag held up against it anchors rather than being told to choose.
+    // An empty list under the wider scope still locks the whole phone (everything but nothing).
     @Test("under everything-except an empty list still has something to hold")
     func pairedTagUnderTheWiderScope() {
         var anchor = ready()
@@ -56,8 +53,7 @@ struct TagReadingTests {
         #expect(ready().reading(of: stranger) == .pairAnother(stranger))
     }
 
-    /// A key cut under the lock is no lock. The same refusal the Pair button gives, arrived at
-    /// from the other direction — the tag was held up rather than the button tapped.
+    // Same refusal as the Pair button, reached from the other direction (a tag, not a tap).
     @Test("an unknown tag is refused while the anchor is down")
     func unknownTagUnderTheLock() {
         var anchor = ready()
@@ -78,8 +74,7 @@ struct TagReadingTests {
         #expect(why.contains("\(Furlough.maxAnchorTags) tags is the limit"))
     }
 
-    /// The cap and the lock are one refusal read from two places, so the Pair button and a tag
-    /// held up cannot drift apart in what they say.
+    // One refusal read from two places, so the Pair button and a held-up tag can't drift apart.
     @Test("the pairing refusal is nil when there is room and no lock")
     func pairingRefusalIsTheSameAnswer() {
         var anchor = ready()

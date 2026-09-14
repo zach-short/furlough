@@ -1,42 +1,26 @@
 import FamilyControls
 import SwiftUI
 
-/// The phone's import: a remap, not a restore.
-///
-/// A Mac can take a setup file as it stands, because a Mac target is a bundle identifier or a
-/// host and the other Mac can look either one up. A phone cannot. A Screen Time target is an
-/// opaque token that Apple scopes to one device and one install of one app; it cannot be
-/// turned back into a bundle identifier and means nothing anywhere else, which is why a
-/// phone's export writes no identifier at all.
-///
-/// So everything he decided travels — the rules, the budgets, the tiers, the names — and the
-/// one thing that cannot is which app each of them belonged to. This screen asks. Each row is
-/// a rule from the file with what it was called beside it, and Apple's own picker is how he
-/// says which app that is now. Rows left alone are left out; nothing here has to be answered.
-///
-/// Websites are the exception since 2026-09-08. A `.website` row that carries a host is a
-/// plain string this phone can look up, so `ConfigImport.preresolved` answers those rows
-/// before the screen is drawn and they arrive already filled in — which is the whole reason a
-/// Mac setup is worth carrying to a phone. They can still be left out, and left out then
-/// answered through the picker, if the picker's version is wanted for its daily budget.
+/// A phone can't resolve a Screen Time target from an exported bundle identifier or host — it's
+/// an opaque token Apple scopes to one device and app install — so each row must be remapped to
+/// an app through the picker here, except website rows (a plain host string), which
+/// `ConfigImport.preresolved` resolves automatically before the screen draws. Rows left alone
+/// are left out.
 struct ImportSetupView: View {
     let export: ConfigExport
-    /// What this phone manages today, read once at the call site. `init` needs it to work out
-    /// which rows answer themselves, and the environment is not readable from an initialiser.
+    /// Read once at the call site since `init` needs it and the environment isn't readable there.
     let config: Config
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
 
-    /// One per row of the file, in its order. Everything starts unanswered, because "he has
-    /// not said yet" and "he said leave it out" are the same thing until he presses Import.
+    /// One per row of the file, in order; starts unanswered until Import is pressed.
     @State private var resolutions: [ImportResolution]
     @State private var picking: Int?
     @State private var selection = FamilyActivitySelection()
     @State private var review: ImportPlan?
     @State private var problem: String?
-    /// What the import just did. The sheet stays up behind the alert and closes on OK: half of
-    /// an import may not be in force for a day, and a screen that simply vanished would be the
-    /// same as saying nothing happened.
+    /// The sheet stays up behind this alert and closes on OK, since part of an import may not
+    /// take effect for a day and a screen that just vanished would look like nothing happened.
     @State private var applied: String?
 
     init(export: ConfigExport, config: Config) {
@@ -99,7 +83,7 @@ struct ImportSetupView: View {
             selection: $selection
         )
         .onChange(of: picking) { was, now in
-            // Apple's picker has no single-select mode, so the answer is read on the way out.
+            // No single-select mode in Apple's picker, so the answer is read on the way out.
             guard was != nil, now == nil else { return }
             if let index = was { answer(index) }
             selection = FamilyActivitySelection()
@@ -199,7 +183,6 @@ struct ImportSetupView: View {
         }
     }
 
-    /// Reads what the picker came back with for row `index`.
     private func answer(_ index: Int) {
         var kinds: [TargetKind] = []
         kinds += selection.applicationTokens.map(TargetKind.application)
@@ -210,8 +193,8 @@ struct ImportSetupView: View {
             problem = "Choose one app for \(matches[index].name). Each rule in the file belongs to one."
             return
         }
-        // Two rules cannot both be about the same app: the second would be judged against
-        // whatever the first just did, which is not a thing anyone asked for.
+        // Two rows can't map to the same app: the second would be judged against whatever the
+        // first just did.
         for (other, resolution) in resolutions.enumerated() where other != index {
             guard kind(of: resolution) == chosen else { continue }
             problem = "\(matches[other].name) is already mapped onto that one. Leave that row out first if you meant this one."

@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
 #
-# Polls App Store Connect for Furlough's App Store review state and fires a macOS
-# notification only when it changes from the last-seen state. Read-only (get_app_store_versions),
-# never writes anything to App Store Connect. Meant to run from the LaunchAgent
-# com.zachshort.furlough.reviewstatus, not by hand, though running it by hand is safe.
+# Polls App Store Connect for Furlough's review state and fires a macOS notification only when
+# it changes. Read-only; meant to run from the LaunchAgent com.zachshort.furlough.reviewstatus,
+# though running it by hand is safe.
 #
-# State lives outside the repo (~/Library/Application Support/Furlough) so it is not
-# something a git session ever sees or touches.
+# State lives outside the repo (~/Library/Application Support/Furlough) so no git session sees it.
 
 set -euo pipefail
 

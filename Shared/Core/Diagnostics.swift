@@ -1,22 +1,12 @@
 import Foundation
 
-/// The one line Settings gives to whether anything is wrong.
-///
-/// Five status rows and two timestamps used to sit on the settings screen under Enforcement,
-/// above the two controls a person actually came to change. They are all still there, one screen
-/// in — what belongs on the front is the answer, not the working: either nothing is wrong, or the
-/// first thing that is.
-///
-/// First, not worst-and-first: the checks are ordered by what they cost, so the line names the
-/// thing furthest upstream. Screen Time access being off means nothing at all is enforced, and
-/// says so even if notifications are off too, because fixing the notifications would leave the
-/// row saying the same thing for a different reason.
-///
-/// A value built from a reading rather than a view that inspects the app, so the Mac can hand it
-/// its own answers to the same questions and get the same sentence back.
+/// The one line Settings gives to whether anything is wrong. Checks are ordered by what they
+/// cost, first not worst-and-first, so the line names the thing furthest upstream (e.g. Screen
+/// Time access off, not notifications, even if both are off). Built from a `Reading` rather
+/// than inspecting the app directly, so the Mac can feed it its own answers to the same questions.
 struct Diagnostics: Equatable, Sendable {
-    /// How loudly the row says it. `warn` is for something switched off that costs you knowing;
-    /// `bad` is for something Furlough needs and has not got.
+    /// `warn` is for something switched off that costs you knowing; `bad` is for something
+    /// Furlough needs and has not got.
     enum Level: Equatable, Sendable {
         case well
         case warn
@@ -28,13 +18,10 @@ struct Diagnostics: Equatable, Sendable {
 
     var isWell: Bool { level == .well }
 
-    /// What the app can see about itself. Every field is a question the settings screen already
-    /// asked and answered in a row of its own.
     struct Reading: Equatable, Sendable {
         var screenTimeAllowed: Bool
         var appGroupAvailable: Bool
-        /// `nil` on a phone that has not been asked yet, which for this row is the same as off:
-        /// either way no notification arrives, and either way the fix is the same button.
+        /// `nil` (not yet asked) is treated the same as off: either way no notification arrives.
         var notificationsAllowed: Bool?
         var registrationError: String?
 
@@ -67,18 +54,16 @@ struct Diagnostics: Equatable, Sendable {
         return Diagnostics(line: "All good", level: .well)
     }
 
-    /// What the row reads under its line, whichever way the line went. Named here rather than in
-    /// the view so the Mac's copy of this row says the same thing.
+    /// Named here rather than in the view so the Mac's copy of this row says the same thing.
     static let detail = "Screen Time, notifications, shields"
 
     // MARK: The Mac
 
-    /// The same row, asked about a Mac. Different questions, because the Mac enforces on its own
-    /// — there is no Screen Time access to be without, and nothing here registers a schedule.
-    /// What it can be without is the two ways it reads the web.
+    /// The same row, asked about a Mac, which enforces on its own and has no Screen Time access
+    /// to be without.
     struct MacReading: Equatable, Sendable {
-        /// The web filter's state, reduced to what this row cares about. `WebFilter.Status` has
-        /// nine cases and belongs to the Mac app; this is the four answers they come to.
+        /// Reduces `WebFilter.Status` (nine cases, belongs to the Mac app) to the four answers
+        /// this row cares about.
         enum Filter: Equatable, Sendable {
             case notInstalled
             /// Installed, and macOS has not finished being asked yet.
@@ -89,11 +74,10 @@ struct Diagnostics: Equatable, Sendable {
         }
 
         var filter: Filter
-        /// The first browser that refused Automation, if any. Named, because "a browser" sends
+        /// The first browser that refused Automation, if any. Named, so it doesn't send
         /// somebody looking through five of them.
         var refusedBrowser: String?
         var appGroupAvailable: Bool
-        /// `nil` before macOS has been asked, which for this row is the same as off.
         var notificationsAllowed: Bool?
 
         init(
@@ -109,11 +93,9 @@ struct Diagnostics: Equatable, Sendable {
         }
     }
 
-    /// Ordered by what it costs, as on the phone. A filter that was installed and then switched
-    /// off is first because it is the widest hole and the one nobody meant to open: every app on
-    /// the Mac stops being filtered, and the tab reader only covers the browsers it can read. A
-    /// refused browser is next, because it is that hole in one place. The App Group only costs
-    /// the widget, and notifications only cost knowing.
+    /// Ordered by what it costs: a switched-off filter is the widest hole (every app stops being
+    /// filtered), a refused browser is that hole in one place, the App Group only costs the
+    /// widget, notifications only cost knowing.
     static func macSummary(_ reading: MacReading) -> Diagnostics {
         if reading.filter == .broken {
             return Diagnostics(line: "The web filter is switched off", level: .bad)
@@ -130,14 +112,12 @@ struct Diagnostics: Equatable, Sendable {
         if reading.notificationsAllowed != true {
             return Diagnostics(line: "Notifications are off", level: .warn)
         }
-        // Last of the warnings rather than first: not installing it is a thing somebody was
-        // offered and declined, where the four above are things that went wrong.
+        // Last of the warnings: not installing it was declined, where the others went wrong.
         if reading.filter == .notInstalled {
             return Diagnostics(line: "The web filter is not installed", level: .warn)
         }
         return Diagnostics(line: "All good", level: .well)
     }
 
-    /// The Mac row's second line. Its own, because the Mac has no shields and no Screen Time.
     static let macDetail = "The web filter, browsers, notifications"
 }

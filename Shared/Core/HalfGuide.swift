@@ -1,30 +1,23 @@
 import Foundation
 
-/// The three steps a half is set up in, and which of them is still owed.
+/// The three steps a half is set up in, and which is still owed. Derived from the config rather
+/// than stored, so it can't drift: adding a target, pairing a tag, dropping an anchor all move
+/// the guide along on their own. The one exception is each half's last step (reading your list,
+/// lifting the anchor) which the config can't answer, so those read a flag on the app's model
+/// (`AppModel.finishedGuides`, `MacModel.finishedGuides`).
 ///
-/// Derived from the config rather than stored, so it cannot drift from what is actually true:
-/// a target added from the widget, a tag paired from the Anchor's own row and an anchor dropped
-/// by Siri all move the guide along without anything having to tell it. The one thing the
-/// config cannot answer is the last step of each — reading your own list is done when you say
-/// it is, and an anchor lifts again without owing the guide a second showing — so that step
-/// reads a flag on the app's model (`AppModel.finishedGuides`, `MacModel.finishedGuides`).
-///
-/// The shape is here rather than beside either app's views because both platforms draw the same
-/// card from it. The steps themselves are not shared: the phone's first Rules step changes its
-/// words with Screen Time data access, and the Mac cannot pair a tag at all, so each app writes
-/// its own three — the phone's in `Furlough/Views/Guides.swift`, the Mac's below, where they are
-/// pure enough to be tested.
+/// The steps themselves aren't shared between platforms — the phone's first Rules step changes
+/// wording with Screen Time access, and the Mac can't pair a tag at all — so each app writes its
+/// own three: the phone's in `Furlough/Views/Guides.swift`, the Mac's below.
 struct HalfGuide {
     struct Step: Identifiable {
         var title: String
         var detail: String
-        /// Sits under the whole card while this step is the live one, so the fact that belongs
-        /// to a step arrives with the step rather than three screens earlier.
+        /// Sits under the card while this step is live.
         var footnote: String?
-        /// What the step has to show for itself: the apps picked, the list the anchor holds.
-        /// Drawn as icons under the words, at full strength whether the step is live or long
-        /// done, because a tick says a step happened and this says what it did. It is the only
-        /// place the checklist answers "did that go through?" without being left.
+        /// What the step has to show for itself (apps picked, what the anchor holds), drawn as
+        /// icons at full strength whether live or long done — a tick says a step happened, this
+        /// says what it did.
         var kinds: [TargetKind] = []
         var isDone: Bool
         var id: String { title }
@@ -33,14 +26,13 @@ struct HalfGuide {
     var half: Half
     var steps: [Step]
 
-    /// The step to act on: the first one not done. Nil once the guide has nothing left to say,
-    /// which is when the card folds away and the page underneath is the whole page.
+    /// The first step not done. Nil once the card folds away.
     var live: Int? { steps.firstIndex { !$0.isDone } }
     var isRunning: Bool { live != nil }
     var footnote: String? { live.flatMap { steps[$0].footnote } }
 
-    /// What the card is called. Not "Get started": it names the half, because the other half is
-    /// one swipe away and may be running a guide of its own.
+    /// Names the half rather than "Get started" — the other half is one swipe away and may be
+    /// running its own guide.
     var title: String {
         switch half {
         case .rules: "Setting up Rules"
@@ -51,10 +43,8 @@ struct HalfGuide {
 
 #if os(macOS)
 extension HalfGuide {
-    /// Pick the apps, give the first one a rule, read the list.
-    ///
-    /// The phone's first step offers the fortnight Screen Time just read; there is no such API
-    /// on the Mac, so the step is the picker and says what this Mac can hold.
+    /// Pick the apps, give the first one a rule, read the list. The phone's equivalent first
+    /// step offers Screen Time data; there's no such API on the Mac, so this step is the picker.
     static func macRules(config: Config, finished: Bool) -> HalfGuide {
         HalfGuide(half: .rules, steps: [
             Step(
@@ -78,13 +68,9 @@ extension HalfGuide {
         ])
     }
 
-    /// Link an iPhone, choose what it holds, drop it.
-    ///
-    /// The phone's first step is *Pair a tag*, and this Mac has no reader to pair one with. What
-    /// stands in its place is the same fact from the other end: the only thing that can release
-    /// an anchor dropped here is a tag scanned on an iPhone, arriving through iCloud, so this Mac
-    /// will not drop one until it and an iPhone are both on the link — see `AnchorSync.macDrop`.
-    /// `hasKey` is the roster's answer to that.
+    /// Link an iPhone, choose what it holds, drop it. The Mac has no reader to pair a tag, so
+    /// its first step is linking an iPhone instead — only an iPhone's tag can release an anchor
+    /// dropped here (see `AnchorSync.macDrop`), and `hasKey` is the roster's answer to whether one's linked.
     static func macAnchor(config: Config, finished: Bool, hasKey: Bool) -> HalfGuide {
         let anchor = config.anchor
         return HalfGuide(half: .anchor, steps: [
@@ -102,12 +88,9 @@ extension HalfGuide {
             ),
             Step(
                 title: "Drop it",
-                // Before anything is chosen `heldDescription` counts an empty list — "0 items" —
-                // which is a true sentence about a step that has not happened and a poor one to
-                // read two steps ahead of it.
-                // "\(heldDescription) goes out of reach" reads wrong half the time — a count
-                // takes a plural verb and "Everything except 3" a singular one. Naming the thing
-                // after the colon sidesteps the agreement rather than picking a verb per scope.
+                // Two separate sentences, not "\(heldDescription) goes out of reach": before
+                // anything is chosen that reads "0 items", and a count vs. "Everything except 3"
+                // take different verb forms anyway — naming it after a colon sidesteps agreement.
                 detail: anchor.hasSomethingToHold
                     ? "One click, and it locks your iPhone too. Out of reach: \(anchor.heldDescription)."
                     : "One click, and it locks your iPhone too. What you chose goes out of reach.",

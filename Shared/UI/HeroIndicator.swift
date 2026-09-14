@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// Tiny hourglasses in status colours, one per hero page. Tapping one turns to that page.
-/// Shared, because the Mac's home shows the same strip under its hero as the phone does.
+/// One hourglass per hero page; tap to jump. Shared between Mac and phone home screens.
 struct HeroIndicator: View {
     let pages: [Target]
     let glasses: [UUID: HourglassState]
@@ -25,18 +24,15 @@ struct HeroIndicator: View {
     }
 }
 
-/// Lays the indicator's glasses out in the width it is offered rather than the width they
-/// would like: 11 pt glasses in 19 pt tap slots, 9 pt apart, centred. When the slots no
-/// longer fit, the gaps close first, then the slots shrink together, so the strip is never
-/// wider than the screen. (A plain `HStack` of fixed-size glasses reports its full width
-/// whatever it is offered, and a vertical `ScrollView` then grows to match and clips both
-/// edges of every row below.)
+/// Custom layout: a plain `HStack` reports its full width regardless of what's offered, so a
+/// `ScrollView` grows to match and clips rows below. This shrinks slots (gaps first, then
+/// glasses) to fit instead.
 struct IndicatorStrip: Layout {
-    /// A slot at full size: the 11 × 15 glass with a 4 pt tap margin around it.
+    /// 11 × 15 glass plus 4pt tap margin.
     static let slot = CGSize(width: 19, height: 23)
     static let gap: CGFloat = 9
-    /// Each glass is drawn at its slot's size and scaled down to 11 × 15 inside it, so the
-    /// tap margin shrinks with the slot instead of eating the glass.
+    /// Scales the drawn glass down to 11 × 15 so the tap margin shrinks with the slot rather
+    /// than eating the glass.
     static let glassScale: CGFloat = 15 / slot.height
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {

@@ -1,13 +1,10 @@
 import SwiftUI
 
-/// What one hourglass shows. Direction C from design/HOURGLASS.md, chosen 2026-09-07: the
-/// top bulb is the window, exact, and drains with the countdown; the colour of the mound
-/// carries the budget, which the Screen Time API only reports at the 5-minute warning and at
-/// exhaustion. The same value drives the hero, the 12 pt row chips, the widget and the Live
-/// Activity.
+/// Direction C (design/HOURGLASS.md, 2026-09-07): top bulb = exact window countdown; mound
+/// colour = budget, which Screen Time only reports at the 5-min warning and exhaustion.
 struct HourglassState: Equatable {
-    /// `ink` is the glass on a light ground rather than the app's dark room: the Mac's menu
-    /// bar follows the desktop picture, and cream caps on a white bar are not there at all.
+    /// `ink`: glass on a light ground — the Mac menu bar follows the desktop picture, where
+    /// cream caps would vanish.
     enum Glass: Equatable { case cream, amber, dim, grey, pending, ink }
     enum Tone: Equatable { case sand, amber, ember, grey }
     enum Pulse: Equatable {
@@ -40,10 +37,9 @@ struct HourglassState: Equatable {
     var dropsGrain = false
     var showsAnchor = false
 
-    /// True when something moves from frame to frame.
     var isAnimated: Bool { isRunning || pulse != .none || dropsGrain }
 
-    /// Inside a window: the top bulb holds what is left of it. `warned` is the 5-minute budget warning.
+    /// Top bulb holds what's left of the window; `warned` is the 5-minute budget warning.
     static func open(level: Double, warned: Bool) -> HourglassState {
         HourglassState(
             sandLevel: level, moundLevel: 1 - level, isRunning: true,
@@ -103,8 +99,8 @@ extension HourglassState.Glass {
         }
     }
 
-    /// The 1 pt edge: bright top left, faint middle, bright bottom right. Stops first, so the
-    /// Core Graphics still (`HourglassStill`) draws the same edge from the same numbers.
+    /// 1pt edge gradient; stops shared with the Core Graphics still (`HourglassStill`) so both
+    /// render the same edge.
     var strokeStops: [Gradient.Stop] {
         let (color, top, middle, bottom): (Color, Double, Double, Double) = switch self {
         case .cream: (.white, 0.6, 0.14, 0.45)
@@ -144,8 +140,7 @@ extension HourglassState.Glass {
 }
 
 extension HourglassState.Tone {
-    /// Top to bottom over the whole glass, so the top sand is light and the mound is deep.
-    /// Stops first, for the same reason as `Glass.strokeStops`.
+    /// Top-to-bottom stops shared with the CG still, same reason as `Glass.strokeStops`.
     var stops: [Gradient.Stop] {
         switch self {
         case .sand:
@@ -194,11 +189,9 @@ extension HourglassState {
     }
 }
 
-/// The glass hourglass from the mockups, drawn as vectors in a 120 × 160 space and coloured
-/// by `state`. `phase` is a running clock in seconds that moves the stream, the glow pulse and
-/// the falling grain; hold it constant for a still picture (widgets, the Live Activity), which
-/// still shows a full stream since every grain is a function of the phase.
-/// Under 40 pt tall it switches to a bolder chip drawing for rows and the page indicator.
+/// Vector hourglass in a 120×160 space. `phase` drives the stream/pulse/grain; holding it
+/// constant (widgets, Live Activity) still renders a full stream since each grain is a pure
+/// function of phase. Under 40pt tall it switches to a bolder chip drawing.
 struct HourglassView: View {
     var state: HourglassState
     var phase: TimeInterval = 0
@@ -216,7 +209,7 @@ struct HourglassView: View {
             let landing = peak - 0.5
             let capHeight: Double = mini ? 10 : 8
             let streaming = state.isRunning || state.isFrozen
-            /// Grains, not a column: the full drawing with motion, or the frozen glass, which is one frame of it.
+            // Grains only when running/frozen, not mini, and motion is on.
             let grainy = streaming && !mini && motion
             let streamPhase = state.isFrozen ? HourglassView.frozenPhase : phase
             let unit = { (point: CGPoint) in
@@ -245,7 +238,7 @@ struct HourglassView: View {
                     let edge = HourglassGeometry.topEdge(level: state.sandLevel)
                     TopSandShape(level: state.sandLevel)
                         .fill(state.sand.gradient)
-                    // The funnel: a shadow in the bowl where the sand slides down to the neck.
+                    // Funnel shadow where sand slides to the neck.
                     TopSandShape(level: state.sandLevel)
                         .fill(RadialGradient(
                             colors: [.black.opacity(mini ? 0.2 : 0.34), .clear],
@@ -281,7 +274,7 @@ struct HourglassView: View {
                 if state.moundLevel > 0.002 {
                     MoundShape(level: state.moundLevel)
                         .fill(state.mound.gradient)
-                    // Fresh sand at the tip, where the stream lands, is lighter than the settled slopes.
+                    // Fresh sand at the tip is lighter than settled slopes.
                     MoundShape(level: state.moundLevel)
                         .fill(RadialGradient(
                             colors: [Ember.sandLight.opacity(mini ? 0.18 : 0.28), .clear],
@@ -300,9 +293,8 @@ struct HourglassView: View {
                     HourglassPartShape(part: .highlight)
                         .stroke(Color.white.opacity(0.55), style: StrokeStyle(lineWidth: 2 * scale, lineCap: .round))
                     if state.showsAnchor {
-                        // A rim of the ground colour first, so the ember reads against the
-                        // sand it sits on and the glass it crosses; the fill covers the
-                        // stroke's inner half, leaving a dark edge of a unit and a half.
+                        // Ground-colour rim first so the ember reads against sand/glass; fill
+                        // covers the stroke's inner half, leaving a thin dark edge.
                         HourglassPartShape(part: .anchor)
                             .stroke(Ember.ground.opacity(0.9), style: StrokeStyle(lineWidth: 3 * scale, lineJoin: .round))
                         HourglassPartShape(part: .anchor)
@@ -342,8 +334,8 @@ struct HourglassView: View {
     }
 }
 
-/// The hourglass in motion: stream, pulse and grain driven by a frame clock that pauses when
-/// nothing moves. Reduce Motion keeps the level changes and drops the rest.
+/// Frame-clock-driven hourglass that pauses when nothing moves; Reduce Motion keeps level
+/// changes and drops the rest.
 struct LivingHourglass: View {
     var state: HourglassState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -400,16 +392,14 @@ enum HourglassPart {
             p.move(to: CGPoint(x: 31, y: 20))
             p.addCurve(to: CGPoint(x: 45, y: 50), control1: CGPoint(x: 31, y: 34), control2: CGPoint(x: 37, y: 42))
         case .anchor:
-            // Across the neck, wider than the waist, centred on the orifice: the mark for a
-            // glass that has stopped, sitting where the sand would have to pass. It stood on
-            // the base until 2026-09-08, ember on ember-lit sand, and was lost there.
+            // Across the neck, not the base (pre-2026-09-08) — ember on ember-lit sand there
+            // was invisible.
             p = AnchorMark.fit(in: CGRect(x: 48, y: 66, width: 24, height: 28))
         }
         return p
     }
 }
 
-/// Scales a fixed part from the 120 × 160 space to fit the given rect, centred.
 struct HourglassPartShape: Shape {
     var part: HourglassPart
 
@@ -418,8 +408,7 @@ struct HourglassPartShape: Shape {
     }
 }
 
-/// The sand in the top bulb, from 0 (empty) to 1 (one charge), resting against the walls with
-/// a funnel down to the neck. Animatable.
+/// Top-bulb sand, 0 (empty) to 1 (one charge); animatable.
 struct TopSandShape: Shape {
     var level: Double
 
@@ -433,8 +422,7 @@ struct TopSandShape: Shape {
     }
 }
 
-/// The pile in the bottom bulb, from 0 (nothing) to 1 (one charge): a cone that spreads to the
-/// walls as it grows. Animatable.
+/// Bottom pile, 0 to 1 charge: a cone that spreads to the walls as it grows; animatable.
 struct MoundShape: Shape {
     var level: Double
 
@@ -448,9 +436,8 @@ struct MoundShape: Shape {
     }
 }
 
-/// The column of the stream, from the neck to the top of the pile, a little narrower at the
-/// bottom where the grains have spread apart. Solid under Reduce Motion and in the chips; a
-/// faint haze behind the grains otherwise.
+/// Stream column, neck to pile top, narrower at bottom where grains spread. Solid under
+/// Reduce Motion/chips; a faint haze behind grains otherwise.
 struct StreamShape: Shape {
     var landing: Double
     var topWidth: Double
@@ -516,7 +503,6 @@ extension HourglassGeometry {
         return path.applying(CGAffineTransform(translationX: dx, y: dy).scaledBy(x: scale, y: scale))
     }
 
-    /// A closed path through the polygon's points.
     static func polygon(_ points: [CGPoint]) -> Path {
         var p = Path()
         guard let first = points.first else { return p }

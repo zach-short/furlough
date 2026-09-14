@@ -1,9 +1,5 @@
 import SwiftUI
 
-/// The link between this Mac and the person's other devices: joining it, who is on it, what
-/// crosses, and leaving it. The phone's `DevicesScreen`, from the end that holds a lock it
-/// cannot open. Hosted by the Anchor half's Devices row and by Settings, each under its own
-/// back link.
 struct MacDevicesScreen: View {
     @Environment(MacModel.self) private var model
     @State private var name = DeviceLink.isEnrolled ? DeviceLink.name : (Host.current().localizedName ?? "Mac")
@@ -177,9 +173,6 @@ struct MacDevicesScreen: View {
 
 }
 
-/// The same screen behind Settings' one Devices row, in place with a Back link, the way the
-/// diagnostics and the log are: this is a sheet, and a sheet that grew a navigation stack for
-/// one push would be carrying a bar it has no use for.
 struct MacDevicesSettingsView: View {
     @Environment(MacModel.self) private var model
     let onBack: () -> Void
@@ -219,8 +212,6 @@ struct MacDevicesSettingsView: View {
     }
 }
 
-/// The traffic in the sidebar: what this Mac is asking whether to send, and what the others
-/// added and it is asking whether to take. Nothing when there is nothing to ask.
 struct MacLinkTraffic: View {
     @Environment(MacModel.self) private var model
     let half: Half

@@ -1,16 +1,8 @@
 import Foundation
 
-/// The two halves of a pending card: what is enforced now, and what the queued change
-/// replaces it with.
-///
-/// A card used to name only where the change lands ("New rule: 8:00 PM–midnight ·
-/// 60 min/day"), which is the half you already know, because you just wrote it. What is
-/// worth reading while there is still time to cancel is what it costs, and that only shows
-/// against what you have today.
-///
-/// The baseline is the target's *saved* rule, and that is exactly right: `assign` on both
-/// platforms replaces any rule already queued for a target, so at most one change per target
-/// is ever in flight and the saved rule is what stays in force until it lands.
+/// The two halves of a pending card: what is enforced now, and what the queued change replaces
+/// it with. The baseline is the target's *saved* rule — correct because `assign` on both
+/// platforms replaces any rule already queued, so at most one change per target is ever in flight.
 enum PendingText {
     struct Delta: Equatable, Sendable {
         /// What is enforced until the change lands.
@@ -47,9 +39,7 @@ enum PendingText {
                 becomes: tier(level, in: config)
             )
         case .unlink(_, let kind):
-            // The rule does not change, so the pair is what the two halves say. A half with no
-            // name of its own — a picked website is an opaque token — is "the other half", which
-            // is all that can honestly be said about it.
+            // A picked website's token has no name of its own, so it's just "the other half".
             let half = kind.hostName ?? "the other half"
             return Delta(
                 now: "\(TimeFormat.rule(target?.rule, calendar: calendar)), \(half) too",
@@ -63,8 +53,8 @@ enum PendingText {
         }
     }
 
-    /// The line at the top of a card for a change that is about no one target: the delay, or
-    /// the anchor's schedule. Nil for a change a target's name heads.
+    /// The card's header for a change about no single target (the delay, the anchor's
+    /// schedule); nil for a change a target's name heads.
     static func subject(of kind: PendingKind) -> String? {
         switch kind {
         case .setDelay: "Loosening delay"
@@ -73,8 +63,7 @@ enum PendingText {
         }
     }
 
-    /// A tier and what it buys. The name alone does not say how long the next loosening
-    /// waits, which is the only reason the tier is worth changing.
+    /// A tier and the wait it buys — the name alone doesn't say how long a loosening waits.
     private static func tier(_ utility: Utility, in config: Config) -> String {
         "\(utility.label) · waits \(TimeFormat.delay(hours: config.delayHours(for: utility)))"
     }

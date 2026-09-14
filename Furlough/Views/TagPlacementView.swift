@@ -1,27 +1,15 @@
 import SwiftUI
 
-/// Where to leave the tag, shown once, straight after the first one pairs.
-///
-/// The whole mechanism leans on the tag being somewhere else. Pairing teaches how to read one
-/// and says nothing about where it then lives, and a key on the same keyring as the phone is
-/// not a lock at all — it is a button with an extra step. So this is the one screen that says
-/// so, at the only moment a person is holding the tag and has not yet put it down.
-///
-/// Guidance, not a feature: no checkboxes, nothing tracked, nothing written to `Config`. The
-/// only state anywhere is the app-side flag that keeps it to a first pairing
-/// (`AppModel.hasSeenTagPlacement`), beside the other "what has been shown" flags.
+/// Guidance only, shown once after first pairing: no checkboxes, nothing written to `Config`.
+/// State is just `AppModel.hasSeenTagPlacement`.
 struct TagPlacementView: View {
-    /// The name the tag was just given, when there is one, so the screen speaks about the key
-    /// in hand rather than about tags in general. Nil where it is read later, from the Tags
-    /// screen, about no tag in particular.
+    /// Nil when reached later from the Tags screen, about no tag in particular.
     var tagName: String?
 
     @Environment(\.dismiss) private var dismiss
-    /// The sheet hugs its content, seeded near the real height so it does not resize on open.
+    /// Seeded near the real height so the sheet doesn't resize on open.
     @State private var contentHeight: CGFloat = 560
 
-    /// Four places, each a different kind of distance: a walk, a commute, another person, a
-    /// journey. Concrete on purpose — "somewhere inconvenient" is advice nobody acts on.
     private static let places: [(symbol: String, title: String, detail: String)] = [
         (
             "archivebox",
@@ -86,9 +74,6 @@ struct TagPlacementView: View {
         .presentationDragIndicator(.visible)
     }
 
-    /// Why the place matters, in one sentence, which is the site's own reason for a tag over a
-    /// code: a code can be photographed and a tag cannot, so the key is one object in one
-    /// place — and which place that is decides whether the Anchor is a lock or a formality.
     private var lead: String {
         let paired = tagName.map { "\($0) is paired." } ?? "Your tag is paired."
         return "\(paired) A code could be photographed and kept in your camera roll; a tag cannot be copied that way, "
@@ -96,7 +81,6 @@ struct TagPlacementView: View {
     }
 }
 
-/// One place: its mark, what it is, and what kind of distance it buys.
 private struct PlaceRow: View {
     let symbol: String
     let title: String

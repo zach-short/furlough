@@ -1,16 +1,12 @@
 import AppKit
 import SwiftUI
 
-/// The floating card shown when Furlough quits a blocked app: what was blocked and when it
-/// opens next. Non-activating, above everything, gone after a few seconds or a click.
 @MainActor
 final class ShieldPanel {
     private var panel: NSPanel?
     private var hideTask: Task<Void, Never>?
 
-    /// `grace` is the seconds left before the app is force-quit, when there are enough of them
-    /// to be worth showing. It is a duration rather than a date because the card is drawn by
-    /// the system against the device's clock, while Furlough runs on its own.
+    /// `grace` is a duration, not a date: the card renders against the system clock, Furlough its own.
     func show(
         name: String, title: String, subtitle: String, icon: NSImage?,
         glass: HourglassState = .doneForToday, grace: TimeInterval? = nil
@@ -34,8 +30,7 @@ final class ShieldPanel {
             panel.animator().alphaValue = 1
         }
         hideTask?.cancel()
-        // A card with a countdown stays until the countdown is spent, so the last thing on
-        // screen before the app goes is how long is left.
+        // +1s so the countdown visibly reaches zero before the panel hides.
         let seconds = grace.map { $0 + 1 } ?? 7
         hideTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(seconds))
@@ -74,21 +69,17 @@ final class ShieldPanel {
     }
 }
 
-/// The Mac shield: the iOS block screen's copy on an Ember Glass card.
 struct ShieldCard: View {
     let name: String
     let title: String
     let subtitle: String
     let icon: NSImage?
-    /// The app's own hourglass in this target's status, as the phone's shield now draws in its
-    /// icon slot. Here it can be the living one: the card is a view, not a still handed to iOS.
+    /// Live SwiftUI view here, unlike the static image iOS's shield gets.
     var glass: HourglassState = .doneForToday
-    /// Seconds of grace left before the app is force-quit, when it is worth counting down.
     var grace: TimeInterval?
     let onDismiss: () -> Void
 
-    /// Below this the countdown would be gone before it was read; a freshly launched app is
-    /// asked and forced almost at once, and says nothing.
+    /// Below this, the countdown would vanish before it could be read.
     private static let worthShowing: TimeInterval = 5
 
     var body: some View {
@@ -97,8 +88,6 @@ struct ShieldCard: View {
                 .frame(width: 40, height: 53)
                 .compositingGroup()
                 .shadow(color: (glass.glow ?? .clear).opacity(0.4), radius: 12)
-                // The app's icon, small, at the foot of the glass: the card arrives over
-                // whatever you were doing, so it still has to say which app went.
                 .overlay(alignment: .bottomTrailing) {
                     if let icon {
                         Image(nsImage: icon)
@@ -119,8 +108,6 @@ struct ShieldCard: View {
                     .foregroundStyle(Ember.muted)
                     .fixedSize(horizontal: false, vertical: true)
                 if let grace, grace >= Self.worthShowing {
-                    // Drawn by the system against its own clock, so the deadline is taken from
-                    // the device's now; the panel only ever shows a duration Furlough handed it.
                     Text("Quitting in \(Date.now.addingTimeInterval(grace), style: .timer) — save your work")
                         .emberBody(12)
                         .foregroundStyle(Ember.amber)

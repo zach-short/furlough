@@ -1,8 +1,6 @@
-// The living hourglass, ported from Shared/UI/HourglassGeometry.swift and Hourglass.swift:
-// the same 120 × 160 space, the same sand, drawn on a canvas. A level is a share of one
-// charge by area, the top surface is a funnel, the pile is a cone at the angle of repose, and
-// the stream is grains falling under gravity. Everything is a function of the phase, so a
-// still phase draws a full stream.
+// Ported from Shared/UI/HourglassGeometry.swift and Hourglass.swift: same 120x160 space,
+// sand levels by area-share, funnel top, cone pile at repose angle. Draw state is a pure
+// function of phase, so a still phase still renders a full stream.
 
 export const C = {
   ground: '#0F0D0B', ember: '#E5563D', amber: '#F59E4A', cream: '#F5EFE6', muted: '#B8AFA3',
@@ -14,9 +12,7 @@ export type Tone = 'sand' | 'amber' | 'ember' | 'grey';
 export type Pulse = 'none' | 'slow' | 'fast' | 'breathe';
 
 export interface HourglassState {
-  /** How full the top bulb is, 0…1. */
   sandLevel: number;
-  /** How tall the pile is, 0…1. */
   moundLevel: number;
   isRunning: boolean;
   /** The stream stopped dead: the Anchor. */
@@ -38,13 +34,12 @@ const still: HourglassState = {
 };
 
 export const States = {
-  /** Inside a window: the top bulb holds what is left of it. `warned` is the 5-minute budget warning. */
+  /** `warned`: the 5-minute budget warning. */
   open: (level: number, warned = false): HourglassState => ({
     ...still, sandLevel: level, moundLevel: 1 - level, isRunning: true,
     glass: warned ? 'amber' : 'cream', mound: warned ? 'amber' : 'sand',
     glow: warned ? C.amber : C.moss, pulse: warned ? 'fast' : 'slow',
   }),
-  /** Opens later today: every grain waits in the top. */
   comingSoon: (minutes: number): HourglassState => ({
     ...still, sandLevel: 1, glow: C.amber, glowStrength: 0.55, pulse: 'breathe', dropsGrain: minutes < 10,
   }),
@@ -377,9 +372,8 @@ function grainPath(ctx: CanvasRenderingContext2D, g: Grain) {
 }
 
 /**
- * The Anchor's mark, across the neck where the sand would have to pass. Ported from
- * Shared/UI/AnchorMark.swift and the `.anchor` part of Shared/UI/Hourglass.swift: it stood on
- * the base until 2026-09-08, ember on ember-lit sand, and was lost there.
+ * The Anchor's mark, drawn at the neck. Ported from Shared/UI/AnchorMark.swift; moved here
+ * from the base on 2026-09-08.
  */
 function drawAnchor(ctx: CanvasRenderingContext2D) {
   // Drawn in an 80 × 100 space whose ink spans x 2…78 and y 1…87.5, fitted into (48, 66, 24, 28).
@@ -401,8 +395,8 @@ function drawAnchor(ctx: CanvasRenderingContext2D) {
   };
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  // Swift strokes the one unioned outline at 3, half of it outside the ink; canvas has no
-  // union, so the same rim comes of drawing each part 1.5 wider under the ember on top.
+  // Canvas has no path union; fake it by stroking each part 1.5x wider underneath, in ground
+  // color, before drawing the ember on top.
   ctx.strokeStyle = rgba(C.ground, 0.9);
   ctx.fillStyle = rgba(C.ground, 0.9);
   skeleton(); ctx.lineWidth = ANCHOR_WEIGHT + 3; ctx.stroke();
@@ -496,7 +490,6 @@ export function drawHourglass(ctx: CanvasRenderingContext2D, state: HourglassSta
         for (const g of gs) if (g.alpha > lo && g.alpha <= hi) { grainPath(ctx, g); any = true; }
         if (any) { ctx.fillStyle = rgba(C.sandLight, op); ctx.fill(); }
       }
-      // Dust where the stream lands.
       const flicker = 0.8 + 0.2 * Math.sin(streamPhase * 13.1) * Math.sin(streamPhase * 7.3);
       ctx.save();
       ctx.translate(60, landing + 0.5);
@@ -580,11 +573,7 @@ export function fitCanvas(canvas: HTMLCanvasElement): { w: number; h: number; ct
   return { w, h, ctx };
 }
 
-/**
- * A glass that draws itself: the first frame lands at once, still states redraw only when
- * something changes, and moving ones run on a frame clock that pauses while the canvas is
- * off screen. `set` swaps the state at any time.
- */
+/** Redraws only on change unless animated; pauses its frame clock while off screen. */
 export class LivingHourglass {
   state: HourglassState;
   private canvas: HTMLCanvasElement;
@@ -638,7 +627,6 @@ export class LivingHourglass {
   };
 }
 
-/** Mounts every `<canvas data-hourglass="…">` on the page. */
 export function mountHourglasses(root: ParentNode = document): LivingHourglass[] {
   return Array.from(root.querySelectorAll<HTMLCanvasElement>('canvas[data-hourglass]')).map((canvas) => {
     const glass = new LivingHourglass(canvas, stateNamed(canvas.dataset.hourglass || 'open'), { still: canvas.hasAttribute('data-still') });

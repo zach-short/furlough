@@ -1,26 +1,22 @@
 import Foundation
 
-/// What the Mac's web filter enforces. Pure, and the system extension in `FurloughMacFilter` is
-/// a thin shell around it, so everything the filter decides is tested from here.
+/// What the Mac's web filter enforces. Pure; the system extension in `FurloughMacFilter` is a
+/// thin shell around it.
 ///
-/// The filter is the second half of website blocking on the Mac. The first, `Browsers`, reads
-/// the tabs of Safari and the Chromium browsers and sends a blocked one to the shield page. It
-/// cannot see Firefox, a site saved to the Dock as an app, or an app that loads a blocked host
-/// outside a browser. The filter sees every connection the Mac opens and drops the ones to a
-/// blocked host, so those holes close — with a failed connection rather than a shield page, and
-/// the floating card to say why.
+/// The second half of website blocking on the Mac: `Browsers` reads Safari/Chromium tabs but
+/// can't see Firefox, a Dock-saved site, or a non-browser app hitting a blocked host directly.
+/// This filter sees every connection and drops those instead, closing those holes.
 struct FilterRules: Equatable, Sendable {
-    /// Hosts blocked right now, exactly as `Decision.blockedHosts` names them: a host and every
-    /// subdomain of it, matched with `Hosts.matches`.
+    /// Exactly as `Decision.blockedHosts` names them: a host and every subdomain, matched with
+    /// `Hosts.matches`.
     var hosts: [String]
-    /// When these rules stop being trusted, on the device's clock: the next moment `Policy` says
-    /// a status could change. Past it the filter blocks nothing until fresh rules arrive. That is
-    /// what keeps a dropped connection derived from `Policy.decide` rather than from a list the
-    /// app left behind — with Furlough force-quit, a site stays blocked only until its next
-    /// window edge, and the watchdog has it back long before that.
+    /// When these rules expire, on the device's clock — past it the filter blocks nothing until
+    /// fresh rules arrive. Keeps a dropped connection tied to `Policy.decide` rather than to a
+    /// stale list: if Furlough is force-quit, a site stays blocked only until its next window
+    /// edge, well before the watchdog is due.
     var until: Date
-    /// Bumped by the app on every push, so the extension can tell a new list from the old one
-    /// without comparing every host.
+    /// Bumped on every push, so the extension can tell a new list from the old without
+    /// comparing every host.
     var version: Int
 
     static let empty = FilterRules(hosts: [], until: .distantPast, version: 0)
@@ -37,21 +33,17 @@ struct FilterRules: Equatable, Sendable {
         self.version = version
     }
 
-    /// Whether the rules still stand at `now`.
     func isCurrent(at now: Date) -> Bool { now < until }
 
-    /// The hosts to block at `now`: none once the rules have lapsed.
     func activeHosts(at now: Date) -> [String] { isCurrent(at: now) ? hosts : [] }
 
-    /// The dictionary that carries the rules to the extension, as
-    /// `NEFilterProviderConfiguration.vendorConfiguration`. Strings, a date and a number, because
-    /// every value in it has to be one the system can archive.
+    /// `NEFilterProviderConfiguration.vendorConfiguration` — strings, a date, a number, because
+    /// every value must be one the system can archive.
     var vendorConfiguration: [String: Any] {
         [Key.hosts: hosts, Key.until: until, Key.version: version]
     }
 
-    /// The rules as they come back out of that dictionary. Nil for a dictionary that is not one
-    /// of ours, which the extension reads as "block nothing".
+    /// Nil for a dictionary that isn't one of ours, which the extension reads as "block nothing".
     init?(vendorConfiguration: [String: Any]?) {
         guard let dictionary = vendorConfiguration,
               let hosts = dictionary[Key.hosts] as? [String],
@@ -65,17 +57,15 @@ struct FilterRules: Equatable, Sendable {
 enum FlowRules {
     /// A connection as the extension sees it the moment it opens.
     struct Endpoint: Equatable, Sendable {
-        /// The name the app connected by, when the system knows it. macOS knows it only for apps
-        /// that connect by name — Safari, Firefox, anything on URLSession. A browser that resolves
-        /// the name itself and connects to the address, as the Chromium family does, shows up
-        /// nameless, and so does anything connecting to a bare address.
+        /// macOS only knows this for apps that connect by name (Safari, URLSession); browsers
+        /// that resolve the name themselves and connect to the address, like Chromium, show up
+        /// nameless.
         var hostname: String?
         var port: Int
         var isUDP: Bool
 
-        /// A name the system hands over is lowercased, and an address literal is no name at all:
-        /// nothing in a rule can match `142.250.72.14`, and treating it as a name would skip the
-        /// look at the first bytes that would have found the real one.
+        /// An address literal is treated as no name — nothing in a rule matches `142.250.72.14`,
+        /// and treating it as one would skip the byte inspection that finds the real name.
         init(hostname: String?, port: Int, isUDP: Bool) {
             let name = hostname?.lowercased() ?? ""
             self.hostname = name.isEmpty || Self.isAddress(name) ? nil : name
@@ -91,28 +81,25 @@ enum FlowRules {
     /// What to do with a connection before any bytes have crossed it.
     enum NewFlow: Equatable, Sendable {
         case allow
-        /// Not decidable yet: the first outbound bytes carry the name the client is asking for.
+        /// Not decidable yet — the first outbound bytes carry the name being asked for.
         case inspect
         case drop(host: String, rule: String)
-        /// A nameless connection over UDP 443. That is QUIC, whose first bytes cannot be read the
-        /// way TLS's can, so while anything is blocked it is refused and the browser falls back
-        /// to TCP, where the name can be read. The fallback is the browsers' own and invisible.
+        /// QUIC (nameless, UDP 443): its bytes can't be read like TLS's, so while anything is
+        /// blocked it's refused outright and the browser silently falls back to TCP.
         case dropQUIC
     }
 
     /// What to do with a connection after looking at some of its outbound bytes.
     enum Inspection: Equatable, Sendable {
         case allow
-        /// The name has not arrived yet: look at more.
         case more
         case drop(host: String, rule: String)
     }
 
-    /// How many outbound bytes to ask for at a time. A TLS ClientHello is a kilobyte or two, more
-    /// with post-quantum key shares, and an HTTP request line and headers are less.
+    /// A TLS ClientHello is a kilobyte or two (more with post-quantum key shares).
     static let peekBytes = 8 * 1024
-    /// Past this much with no name found, the connection is let through: whatever it is, it is
-    /// not carrying a name the filter can read.
+    /// Past this with no name found, let the connection through — it isn't carrying a
+    /// readable name.
     static let maxInspectedBytes = 16 * 1024
 
     static func newFlow(_ endpoint: Endpoint, rules: FilterRules, now: Date) -> NewFlow {
@@ -129,7 +116,7 @@ enum FlowRules {
         }
     }
 
-    /// `bytes` is everything sent so far, from the first byte.
+    /// `bytes` is everything sent so far from the first byte.
     static func inspect(_ bytes: Data, port: Int, rules: FilterRules, now: Date) -> Inspection {
         let hosts = rules.activeHosts(at: now)
         guard !hosts.isEmpty else { return .allow }
@@ -151,18 +138,15 @@ enum FlowRules {
         return hosts.first { Hosts.matches(host, rule: $0) }
     }
 
-    /// What reading a name out of the first bytes found.
     enum Parse: Equatable, Sendable {
         case found(String)
-        /// The bytes are complete and there is no name in them, or they are not what was expected
-        /// on this port at all. Either way there is nothing to wait for.
+        /// Complete with no name, or not the expected shape for this port — nothing to wait for.
         case absent
-        /// More bytes would settle it.
         case incomplete
     }
 
-    /// The name a TLS client asks for, from the ClientHello that opens every HTTPS connection.
-    /// Encrypted Client Hello hides it, and then there is nothing here to read.
+    /// The name a TLS client asks for, from the ClientHello. Encrypted Client Hello hides it,
+    /// and then there is nothing here to read.
     enum TLS {
         private static let handshakeRecord: UInt8 = 0x16
         private static let clientHello: UInt8 = 0x01
@@ -171,9 +155,8 @@ enum FlowRules {
 
         static func serverName(in data: Data) -> Parse {
             let bytes = [UInt8](data)
-            // The ClientHello is one handshake message, usually in one record and occasionally
-            // split across two. The records are unwrapped first, so the parse below never has to
-            // know where a record boundary fell.
+            // Unwrap records first (a ClientHello can span two) so the parse below never has
+            // to know where a record boundary fell.
             var handshake: [UInt8] = []
             var index = 0
             var length: Int?
@@ -194,7 +177,7 @@ enum FlowRules {
             }
             guard let length else { return .absent }
             var reader = Reader(handshake, from: 4, to: 4 + length)
-            // Version, random, then three length-prefixed fields before the extensions.
+            // Version + random, then three length-prefixed fields before the extensions.
             guard reader.skip(2 + 32),
                   let sessionLength = reader.byte(), reader.skip(Int(sessionLength)),
                   let cipherLength = reader.uint16(), reader.skip(cipherLength),
@@ -206,7 +189,7 @@ enum FlowRules {
                 let dataEnd = reader.index + extensionLength
                 guard dataEnd <= extensionsEnd else { return .absent }
                 if type == serverNameExtension {
-                    // A list of names, of which there is only ever one: a host name.
+                    // A list of names, but there is only ever one: the host name.
                     guard reader.skip(2), let nameType = reader.byte(), nameType == hostNameType,
                           let nameLength = reader.uint16(), let name = reader.string(nameLength),
                           !name.isEmpty else { return .absent }
@@ -227,8 +210,7 @@ enum FlowRules {
         static func host(in data: Data) -> Parse {
             guard let text = String(bytes: data, encoding: .isoLatin1) else { return .absent }
             guard let lineEnd = text.range(of: "\r\n") else {
-                // No whole line yet. Worth waiting for only if what is here could still turn
-                // into a request line.
+                // No whole line yet; wait only if this could still turn into a request line.
                 let couldBeMethod = methods.contains { method in
                     (method + " ").hasPrefix(text) || text.hasPrefix(method + " ")
                 }
@@ -237,16 +219,15 @@ enum FlowRules {
             let requestLine = text[..<lineEnd.lowerBound].split(separator: " ", omittingEmptySubsequences: false)
             guard requestLine.count == 3, methods.contains(String(requestLine[0])),
                   requestLine[2].hasPrefix("HTTP/1.") else { return .absent }
-            // The blank line that ends the headers can be the request line's own line break
-            // doubled, which is a request with no headers at all.
+            // The header-ending blank line can double up with the request line's own break,
+            // for a request with no headers at all.
             guard let end = text.range(of: headerEnd, range: lineEnd.lowerBound..<text.endIndex) else { return .incomplete }
             let headers = text[lineEnd.upperBound..<max(lineEnd.upperBound, end.lowerBound)]
             for line in headers.components(separatedBy: "\r\n") {
                 guard let colon = line.firstIndex(of: ":"),
                       line[..<colon].trimmingCharacters(in: .whitespaces).lowercased() == "host" else { continue }
                 var value = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces).lowercased()
-                // A port is not part of the name. An IPv6 literal keeps its brackets and its
-                // colons, and matches no rule anyway.
+                // Strip a port; an IPv6 literal keeps its brackets/colons and matches no rule anyway.
                 if !value.hasPrefix("["), let portColon = value.lastIndex(of: ":") {
                     value = String(value[..<portColon])
                 }
@@ -256,7 +237,7 @@ enum FlowRules {
         }
     }
 
-    /// Walks bytes with bounds checks, so a malformed hello ends in `.absent` rather than a trap.
+    /// Bounds-checked, so a malformed hello ends in `.absent` rather than a trap.
     private struct Reader {
         let bytes: [UInt8]
         var index: Int

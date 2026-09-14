@@ -8,9 +8,8 @@ struct StatusSpeechTests {
     /// Tuesday 8 September 2026 at 12:30, the same moment the summary tests use.
     let now = at(8, 12, 30)
 
-    /// Through `plainSpaces`: the times in these sentences come out of ICU with a narrow
-    /// no-break space before AM/PM, which is right everywhere it is shown and cannot be
-    /// written in a literal below.
+    // ICU puts a narrow no-break space before AM/PM (correct on screen, unwriteable in a
+    // literal), so results go through `plainSpaces`.
     func said(_ state: SharedState) -> String {
         plainSpaces(
             StatusSpeech.sentence(

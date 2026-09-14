@@ -78,8 +78,7 @@ struct AnchorWarningTests {
         #expect(config.anchorWarning == nil)
     }
 
-    /// Changed 2026-09-08: anchoring is instant and only the tag lifts it, so it warns one tier
-    /// wider than blocking does. Idle used to be silent here and now speaks; hazard still does not.
+    // Anchoring is instant and only the tag lifts it, so it warns one tier wider than blocking.
     @Test("Idle speaks before an anchor, though it says nothing before a rule")
     func idleWarnsBeforeAnchoring() {
         let config = config([("TikTok", .hazard), ("Reddit", .idle)], anchoring: ["TikTok", "Reddit"])
@@ -248,8 +247,7 @@ struct AppUtilityTests {
 
     @Test("Every bundle identifier in the table is already lowercase")
     func bundleIDsAreLowercase() {
-        // `byBundleID` lowercases what it is handed, then compares against the table as
-        // written — a capital letter in the table is an entry that can never match.
+        // `byBundleID` lowercases input then compares as written: a capital letter here can never match.
         for key in AppUtility.bundleIDs.keys {
             #expect(key == key.lowercased(), "\(key) is not lowercase")
         }
@@ -274,18 +272,16 @@ struct AppUtilityTests {
 
     @Test("name(forBundleID:) answers instantly for anything with a confirmed proper name")
     func nameResolvesWithoutWaitingOnTheShield() {
-        // BeReal has no website, so `Companions` cannot name it, and its tier (`.hazard`) is
-        // shared by a dozen other apps with no detail — the old reverse lookup was ambiguous
-        // and returned nil. `properNameByBundleID` closes exactly that gap.
+        // BeReal has no website (so `Companions` can't name it) and shares its hazard tier with
+        // a dozen others with no detail; the old reverse lookup returned nil for it.
+        // `properNameByBundleID` closes that gap.
         #expect(AppUtility.name(forBundleID: "com.bereal.bereal") == "BeReal")
         #expect(AppUtility.name(forBundleID: "COM.BEREAL.BEREAL") == "BeReal")
         #expect(AppUtility.name(forBundleID: "com.robinhood.release.Robinhood") == "Robinhood")
         #expect(AppUtility.name(forBundleID: "com.amazon.Lassen") == "Kindle")
-        // An essential still resolves the old way, through its unique detail sentence, with
-        // no entry needed in `properNameByBundleID`.
+        // Essentials still resolve the old way, via their unique detail sentence.
         #expect(AppUtility.name(forBundleID: "com.apple.MobileSMS") == "Messages")
-        // A tier genuinely shared by several apps with no confirmed name for any of them is
-        // still nil, not a guess — Apple's own Mail and Xcode are both bare `.useful`.
+        // A tier shared by several apps with no confirmed name for any is nil, not a guess.
         #expect(AppUtility.name(forBundleID: "com.apple.mail") == nil)
         #expect(AppUtility.name(forBundleID: "com.nobody.at.all") == nil)
     }
@@ -301,8 +297,7 @@ struct AppUtilityTests {
 
     @Test("Spot checks on the newly added tiers")
     func newEntriesLandInTheRightTier() {
-        // Streaming video passes the time like Netflix already does; streaming music, like
-        // Spotify, is useful rather than idle.
+        // Streaming video is idle like Netflix; streaming music is useful, not idle.
         #expect(AppUtility.byBundleID("com.hulu.plus")?.utility == .idle)
         #expect(AppUtility.byBundleID("com.disney.disneyplus")?.utility == .idle)
         #expect(AppUtility.byBundleID("com.google.ios.youtubemusic")?.utility == .useful)
@@ -314,8 +309,7 @@ struct AppUtilityTests {
         // A general-purpose AI assistant is a work tool; a companion chatbot is not.
         #expect(AppUtility.byBundleID("com.openai.chat")?.utility == .useful)
         #expect(AppUtility.byBundleID("ai.character.app")?.utility == .hazard)
-        // Temu and Shein are built around the same gamified, notification-driven loop as a
-        // feed; eBay and Etsy are ordinary marketplaces.
+        // Temu's gamified loop is hazard; eBay/Etsy are ordinary marketplaces.
         #expect(AppUtility.byHost("temu.com")?.utility == .hazard)
         #expect(AppUtility.byHost("ebay.com")?.utility == .useful)
         // Casual games pass the time without the feed's infinite scroll.
@@ -352,8 +346,7 @@ struct UtilityTextTests {
         #expect(UtilityText.anchoring(names: ["TikTok"], utility: .hazard, detail: nil) == nil)
     }
 
-    /// The bug this pins was on Zach's Anchor screen 2026-09-08: "This app and This app is worth
-    /// having around". Two faults in one sentence; this is the verb.
+    // Pins a bug: "This app and This app is worth having around" — wrong verb number.
     @Test("The anchor warning agrees in number at every tier that speaks")
     func anchorWarningAgreesInNumber() {
         func text(_ names: [String], _ utility: Utility) -> String {
@@ -373,8 +366,7 @@ struct UtilityTextTests {
         #expect(text(["Reddit", "YouTube"], .idle).contains("Reddit and YouTube go the moment you anchor."))
     }
 
-    /// A detail is written about one app, so it cannot stand as the sentence for several. With
-    /// one name it is still preferred over the generic line, which is the whole reason it exists.
+    // A detail is written about one app, so it can't stand as the sentence for several.
     @Test("A one-app detail is dropped once the anchor holds more than one")
     func detailIsForOneNameOnly() {
         let detail = "Messages is where the codes texted to you land."

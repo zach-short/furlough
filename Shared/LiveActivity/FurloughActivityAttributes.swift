@@ -10,9 +10,8 @@ struct FurloughActivityAttributes: ActivityAttributes {
         var warned = false
         /// Today's budget for the featured target, in minutes; nil where there is no real limit.
         var budgetMinutes: Int?
-        /// The moment the budget runs out, known only once the warning has fired — see
-        /// `RuntimeState.warnedAt`. While it is nil the minutes left are genuinely unknown to
-        /// Furlough, and the activity says the allowance instead of pretending to count it.
+        /// Known only once the warning fires (`RuntimeState.warnedAt`); while nil, minutes left
+        /// are genuinely unknown, so the activity states the allowance instead of counting it down.
         var budgetDeadline: Date?
 
         init(

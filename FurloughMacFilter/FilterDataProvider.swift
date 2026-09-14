@@ -4,20 +4,12 @@ import NetworkExtension
 import os
 import Security
 
-/// The web filter: the shell around `FlowRules` that macOS calls with every connection.
-///
-/// It runs as root, outside any user session, and starts at boot before anyone logs in, so it
-/// keeps nothing of its own. The rules arrive in the filter configuration the app saves
-/// (`FilterRules.vendorConfiguration`), and they carry their own horizon: past `until` this
-/// blocks nothing, so a list the app left behind cannot outlive the moment `Policy` said it
-/// could change. What it drops it reports back to the app over XPC, for the floating card.
-/// `@unchecked Sendable` because macOS calls it from several queues and everything it mutates
-/// is behind `state`'s lock; the observation and the reporter are set up once in `startFilter`.
+/// Runs as root at boot, before login, so it keeps no state of its own; rules come from the
+/// saved filter configuration and expire at their own `until`. `@unchecked Sendable`: macOS
+/// calls in from multiple queues, guarded by `state`'s lock.
 final class FilterDataProvider: NEFilterDataProvider, @unchecked Sendable {
     private let logger = Logger(subsystem: FilterXPC.extensionID, category: "filter")
-    /// The rules as last read, and the bytes seen so far of each connection still being looked
-    /// at. Behind a lock because verdicts, configuration changes and XPC arrive on different
-    /// queues.
+    /// Guarded by a lock: verdicts, config changes, and XPC arrive on different queues.
     private let state = OSAllocatedUnfairLock(initialState: State())
     private let reporter = FilterReporter()
     private var configurationWatch: NSKeyValueObservation?
@@ -25,7 +17,7 @@ final class FilterDataProvider: NEFilterDataProvider, @unchecked Sendable {
     private struct State: Sendable {
         var rules = FilterRules.empty
         var buffers: [UUID: Data] = [:]
-        /// When each host was last reported, so a page that opens twenty connections is one card.
+        /// Last report time per host, so 20 connections from one page become one card.
         var reported: [String: Date] = [:]
     }
 
@@ -33,8 +25,7 @@ final class FilterDataProvider: NEFilterDataProvider, @unchecked Sendable {
 
     override func startFilter(completionHandler: @escaping (Error?) -> Void) {
         readRules()
-        // The app pushes new rules by saving the configuration again; the property updates in
-        // place and this hears it. `readRules` is cheap and idempotent, so hearing it twice is fine.
+        // Rules arrive by the app re-saving the configuration; readRules is cheap and idempotent.
         configurationWatch = observe(\.filterConfiguration) { [weak self] _, _ in self?.readRules() }
         reporter.start()
         logger.info("filter started")
@@ -49,8 +40,7 @@ final class FilterDataProvider: NEFilterDataProvider, @unchecked Sendable {
         completionHandler()
     }
 
-    /// Takes the rules out of the configuration. A version the extension already has is skipped
-    /// rather than compared host by host.
+    /// Skips reprocessing when the version is unchanged, rather than diffing host by host.
     private func readRules() {
         let rules = FilterRules(vendorConfiguration: filterConfiguration.vendorConfiguration) ?? .empty
         let changed = state.withLock { state in
@@ -88,8 +78,8 @@ final class FilterDataProvider: NEFilterDataProvider, @unchecked Sendable {
         let port = Int(Self.port(of: socket))
         let (bytes, rules) = state.withLock { state -> (Data, FilterRules) in
             var buffer = state.buffers[id] ?? Data()
-            // The bytes may arrive as everything from the start of the connection or as only
-            // what is new since the last look; `offset` says which, and both land as one run.
+            // `offset` says whether these bytes are the whole connection so far or just what's
+            // new; both land as one buffer.
             let alreadyHave = buffer.count - offset
             if alreadyHave >= 0, alreadyHave < readBytes.count {
                 buffer.append(readBytes[readBytes.startIndex.advanced(by: alreadyHave)...])
@@ -131,8 +121,8 @@ final class FilterDataProvider: NEFilterDataProvider, @unchecked Sendable {
 
     // MARK: Reading a flow
 
-    /// The name comes from `remoteHostname` when macOS has one, else from the endpoint when the
-    /// app connected by name; an address endpoint is nameless, which `Endpoint` also enforces.
+    /// Falls back to the endpoint's name when macOS has no `remoteHostname`; an address
+    /// endpoint has none, which `Endpoint` also enforces.
     private static func endpoint(of flow: NEFilterSocketFlow) -> FlowRules.Endpoint {
         var hostname = flow.remoteHostname
         if hostname == nil, case .hostPort(let host, _) = flow.remoteFlowEndpoint, case .name(let name, _) = host {
@@ -161,8 +151,7 @@ final class FilterDataProvider: NEFilterDataProvider, @unchecked Sendable {
         reporter.blocked(host: host, in: app)
     }
 
-    /// Who opened the connection, from the audit token macOS attaches to every flow: the signing
-    /// identifier, which for an app is its bundle identifier.
+    /// The signing identifier (an app's bundle identifier) from the audit token macOS attaches to every flow.
     private static func app(of flow: NEFilterSocketFlow) -> String {
         guard let token = flow.sourceAppAuditToken else { return "" }
         var code: SecCode?
@@ -177,12 +166,10 @@ final class FilterDataProvider: NEFilterDataProvider, @unchecked Sendable {
     }
 }
 
-/// The extension's end of the XPC link to the app. The extension listens; the app connects,
-/// exports a `FilterListening`, and is told about each dropped connection until it goes away.
+/// The extension's XPC listener; the app connects and is told about each drop until it disconnects.
 final class FilterReporter: NSObject, NSXPCListenerDelegate, FilterControl, @unchecked Sendable {
     private var listener: NSXPCListener?
-    /// Guards the connection list: connections come and go on XPC's queues, and reports arrive
-    /// on the filter's.
+    /// Guards the connection list: connections come and go on XPC's queues, reports on the filter's.
     private let queue = DispatchQueue(label: "\(FilterXPC.extensionID).reporter")
     private var connections: [NSXPCConnection] = []
 
@@ -202,8 +189,7 @@ final class FilterReporter: NSObject, NSXPCListenerDelegate, FilterControl, @unc
         }
     }
 
-    /// Nothing here is worth guarding: a connection can only ask to be told about dropped
-    /// hosts, and only Furlough is listening for that.
+    /// No auth check needed: a connection can only ask to hear about drops, and only Furlough listens.
     func listener(_ listener: NSXPCListener, shouldAcceptNewConnection connection: NSXPCConnection) -> Bool {
         connection.exportedInterface = NSXPCInterface(with: FilterControl.self)
         connection.exportedObject = self

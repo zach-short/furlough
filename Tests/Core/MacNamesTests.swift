@@ -1,9 +1,8 @@
 import Foundation
 import Testing
 
-/// The one-time move of a Mac target's own name out of `nickname` and into `systemName`. It
-/// runs over state Zach already has, so what it must not do matters as much as what it does:
-/// a name he typed is his, and an app that is no longer installed is not guessed at.
+/// The one-time move of a Mac target's own name from `nickname` into `systemName`, run over
+/// existing state: a typed name must survive, and an uninstalled app is never guessed at.
 @MainActor
 struct MacNamesTests {
     /// The names the Mac would look up, and the ones it cannot find.
@@ -22,7 +21,6 @@ struct MacNamesTests {
         #expect(MacNames.adopt(&config, name: lookup))
         #expect(config.targets[0].systemName == "Safari")
         #expect(config.targets[0].nickname.isEmpty)
-        // The point of the whole exercise: the row still says Safari.
         #expect(config.targets[0].displayName == "Safari")
     }
 
@@ -66,8 +64,6 @@ struct MacNamesTests {
         #expect(config == after)
     }
 
-    /// A target added since the fix already has its name in the right field, and a nickname
-    /// on top of it is untouched.
     @Test func aTargetAddedSinceTheFixIsSkipped() {
         var config = config([
             Target(kind: .macApp(bundleID: "com.apple.Chess"), nickname: "Time sink", systemName: "Chess")
@@ -77,8 +73,7 @@ struct MacNamesTests {
         #expect(config.targets[0].nickname == "Time sink")
     }
 
-    /// Clearing the field is the thing this all exists for: the name comes back to the app's
-    /// own rather than to its bundle identifier.
+    // Clearing the field is what this all exists for: falls back to the app's own name, not the bundle ID.
     @Test func clearingANicknameFallsBackToTheAppsOwnName() {
         var target = Target(kind: .macApp(bundleID: "com.apple.Safari"), nickname: "Safari")
         var config = config([target])

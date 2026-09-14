@@ -13,9 +13,8 @@ struct FurloughMacWidgetsBundle: WidgetBundle {
     }
 }
 
-/// The bundled faces, registered for this process. On the Mac a widget extension does not
-/// pick up `ATSApplicationFontsPath` the way the app does, so the fonts are registered by
-/// hand from the Fonts folder that ships with the extension.
+/// Mac widget extensions don't pick up `ATSApplicationFontsPath` like the app does, so fonts
+/// are registered by hand from the bundled Fonts folder.
 enum WidgetFonts {
     static func register() {
         guard let folder = Bundle.main.url(forResource: "Fonts", withExtension: nil),

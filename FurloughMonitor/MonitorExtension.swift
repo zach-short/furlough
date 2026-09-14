@@ -4,10 +4,9 @@ import ManagedSettings
 import UserNotifications
 import WidgetKit
 
-/// Woken by iOS at window edges, at midnight, when a budget threshold is reached, and — since
-/// 2026-09-09 — at the anchor's drop and lift times. Every callback re-derives the shields
-/// from persisted state, so a missed or duplicated callback can never leave the shields out
-/// of sync.
+/// Woken by iOS at window edges, midnight, budget thresholds, and anchor drop/lift times.
+/// Every callback re-derives shields from persisted state, so a missed or duplicated callback
+/// can't desync them.
 final class MonitorExtension: DeviceActivityMonitor {
     override func intervalDidStart(for activity: DeviceActivityName) {
         super.intervalDidStart(for: activity)
@@ -19,14 +18,12 @@ final class MonitorExtension: DeviceActivityMonitor {
         announceOpening(activity)
     }
 
-    /// "Window opened" for whatever this span just unblocked. `reconcile` above has already
-    /// lifted the shields; this only says so, which is the difference between a window opening
-    /// and Zach noticing it opened. A window activity also fires on days none of its targets
-    /// use it, and then nothing is `.open` against this end and nothing is posted.
+    /// Announces what `reconcile` already opened — the difference between a window opening and
+    /// Zach noticing. A window activity may fire on days none of its targets use it, posting
+    /// nothing.
     ///
-    /// A night is stored as an evening and the morning after it, so midnight is a join and not
-    /// an opening: the morning half is skipped for anything that was already open through it,
-    /// and the evening half matches a target whose window runs on past midnight.
+    /// A night is stored as evening + morning-after, so midnight is a join, not an opening: the
+    /// morning half is skipped for anything already open through it.
     private func announceOpening(_ activity: DeviceActivityName) {
         guard let window = ActivityNaming.parseWindow(activity.rawValue) else { return }
         let state = SharedStore.load()
@@ -45,8 +42,8 @@ final class MonitorExtension: DeviceActivityMonitor {
         guard !opened.isEmpty else { return }
         let names = opened.map(\.name).joined(separator: ", ")
         let ends = Set(opened.map(\.until))
-        // One closing time when they share one, which is every case but a night opening beside
-        // an evening that stops at midnight.
+        // One closing time when they share it — every case but a night opening beside an
+        // evening ending at midnight.
         let end = ends.count == 1 ? ends.first ?? window.endMinute : nil
         Notifier.post(
             id: "opened-\(activity.rawValue)",
@@ -66,10 +63,9 @@ final class MonitorExtension: DeviceActivityMonitor {
 
     // MARK: The anchor's clock
 
-    /// What an anchor activity's callback means, or nil when this callback is the other end of
-    /// its interval. DeviceActivity wants a quarter of an hour, so the minute a drop or a lift
-    /// is set for is one end of a fifteen-minute activity and `ActivityNaming` says which; the
-    /// other end is only a wake, answered with the reconcile every wake gets.
+    /// What an anchor callback means, or nil if it's just the wake half of the interval —
+    /// DeviceActivity requires a 15-minute minimum, so a drop/lift minute is one end of a
+    /// 15-min activity (`ActivityNaming` says which).
     private enum AnchorEvent {
         case drop(minute: Int)
         case lift
@@ -93,11 +89,9 @@ final class MonitorExtension: DeviceActivityMonitor {
         }
     }
 
-    /// The anchor drops itself: the schedule at this minute on today's weekday, if there is
-    /// one. `Policy.scheduledDrop` decides and is idempotent — a duplicated callback, or one on
-    /// a day the schedule is off, changes nothing — and every path ends in the reconciler. This
-    /// and `liftIfDue` are the monitor's two writes to `Config.anchor`, and the only ones
-    /// outside the app and the Drop Anchor intent.
+    /// Applies today's scheduled drop, if any. `Policy.scheduledDrop` is idempotent — a
+    /// duplicate or off-day callback changes nothing. This and `liftIfDue` are the monitor's
+    /// only writes to `Config.anchor` outside the app and the Drop Anchor intent.
     private func scheduledDrop(minute: Int, activity: String) {
         SharedStore.log(activity)
         let now = SharedStore.load().now
@@ -118,8 +112,8 @@ final class MonitorExtension: DeviceActivityMonitor {
         SharedStore.announceChange()
     }
 
-    /// A timed anchor's time has come. `Policy` has read it as released since the moment it
-    /// passed; this clears the flag, lifts the shields and says so.
+    /// A timed anchor's time has come; `Policy` already reads it as released, this just clears
+    /// the flag and lifts the shields.
     private func liftIfDue(activity: String) {
         SharedStore.log(activity)
         let now = SharedStore.load().now
@@ -148,11 +142,9 @@ final class MonitorExtension: DeviceActivityMonitor {
         SharedStore.mutate { state in
             Policy.applyDuePending(&state, now: now)
             guard let target = state.config.target(id: parsed.targetID), let rule = target.rule else { return }
-            // Today's budget, not the rule's: every distinct budget in the week is registered,
-            // so on a 30-minute Monday the 2-hour weekend event is live too. A threshold below
-            // today's is another day's and is ignored — which is the same guard that already
-            // threw out a stale event left over from an edit, now extended to the six other
-            // budgets this rule holds.
+            // Every distinct weekly budget is registered, so a Monday callback can be another
+            // day's threshold — same guard that filtered stale edits, extended to cover all
+            // weekday budgets.
             let weekday = Policy.weekday(now)
             let budget = rule.effectiveBudget(on: weekday)
             guard rule.isEverAllowed(on: weekday), parsed.minutes >= budget else {
@@ -186,16 +178,15 @@ final class MonitorExtension: DeviceActivityMonitor {
         SharedStore.mutate { state in
             Policy.applyDuePending(&state, now: now)
             guard let target = state.config.target(id: parsed.targetID), let rule = target.rule else { return }
-            // Exactly today's, so only the day's own budget warns: a Monday must not get its
-            // "5 minutes left" 25 minutes early because the weekend's larger event is loaded.
+            // Must match today's budget exactly, so a Monday doesn't get its warning early
+            // from a loaded weekend threshold.
             let weekday = Policy.weekday(now)
             guard rule.isEverAllowed(on: weekday), parsed.minutes == rule.effectiveBudget(on: weekday) else { return }
             let day = Policy.dayKey(now)
             guard !state.runtime.wasWarned(target.id, dayKey: day),
                   !state.runtime.isExhausted(target.id, dayKey: day) else { return }
             state.runtime.warned[target.id.uuidString] = day
-            // Furlough's own time, the same `now` every guard above was judged on, so the
-            // deadline the Live Activity counts to cannot be moved by touching the clock.
+            // Furlough's own `now`, so the Live Activity deadline can't be moved by touching the clock.
             state.runtime.warnedAt[target.id.uuidString] = now
             Record.markWarned(target.id, in: &state, now: now)
             warnedName = target.displayName
@@ -216,9 +207,8 @@ final class MonitorExtension: DeviceActivityMonitor {
         let state = SharedStore.load()
         let now = state.now
         let config = Policy.effectiveConfig(state, now: now)
-        // A rule without windows never closes; midnight only resets its budget. Neither does
-        // the evening half of a night, whose `until` is a time on the next morning and so
-        // never matches the midnight this activity ends at.
+        // A windowless rule never closes (midnight only resets its budget); neither does a
+        // night's evening half, whose `until` is next morning.
         let closing = config.targets.filter { target in
             if case .open(let until) = Policy.status(of: target, config: config, runtime: state.runtime, now: now) {
                 return until == window.endMinute && !(target.rule?.isAllDay ?? false)
@@ -234,20 +224,15 @@ final class MonitorExtension: DeviceActivityMonitor {
         )
     }
 
-    /// Re-derives the shields, then brings the Lock Screen with them. `canStart: false` because
-    /// an extension may not ask for a Live Activity — only end the one whose window just closed
-    /// and update the one whose window just opened, which iOS started on the schedule the app
-    /// asked for while it was in front.
+    /// Re-derives shields and syncs the Lock Screen. `canStart: false`: an extension can't
+    /// start a Live Activity, only end/update one iOS already started while the app was in front.
     private func reconcile(_ reason: String) {
         SharedStore.log(reason)
         ShieldReconciler.reconcile(reason: reason)
         let state = SharedStore.load()
         LiveActivityManager.sync(state: state, canStart: false)
-        // Re-planned here as well as in the app, because this is what is awake when the app is
-        // not: the day activity's own callbacks come round every midnight, so a week nobody
-        // opens Furlough still ends with a digest whose numbers are yesterday's rather than
-        // last Wednesday's. `sync` is idempotent and only ever touches Furlough's own
-        // scheduled notifications.
+        // Re-planned here too since this runs when the app doesn't; keeps the weekly digest
+        // from going stale if Furlough isn't opened all week. `sync` is idempotent.
         let clock = state.clock()
         PendingNotifications.sync(
             state: state, now: clock.now, drift: clock.drift,

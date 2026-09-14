@@ -1,11 +1,7 @@
 import SwiftUI
 
-/// The Mac's half of an import: read the file, look at what it would do, then do it.
-///
-/// A Mac file is a whole setup — a Mac target is a bundle identifier or a host, and this Mac
-/// can look both up for itself — so there is nothing to ask before the review. The phone's
-/// import has a step in front of this one, because a Screen Time token means nothing off the
-/// device that issued it; see `ImportSetupView`.
+/// Screen Time tokens don't transfer across devices, so unlike the phone's import
+/// (`ImportSetupView`) there's no setup step before the review here.
 struct MacImportReview: View {
     let plan: ImportPlan
     let onBack: () -> Void

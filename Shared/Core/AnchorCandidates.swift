@@ -1,17 +1,10 @@
 import Foundation
 
-/// The Anchor's first offer. Its list starts empty, and the things a person most wants held
-/// are usually the ones Furlough already blocks — so before Apple's picker, which lists every
-/// app on the phone, the Anchor screen offers what has a rule, to take in one tap. Both halves
-/// live here rather than in the view because they are the rules engine's business: what
-/// "already blocked" means, and what taking a target into the anchor adds.
+/// Before Apple's app picker, the Anchor screen offers targets Furlough already blocks, to
+/// take in one tap.
 extension Config {
-    /// The targets Furlough blocks that the anchor does not hold yet, in the list's order.
-    ///
-    /// A target counts once it has a rule: one added and never given windows is not blocked,
-    /// and is not offered. A target is left out once every door it covers is in the anchor,
-    /// and offered while any is missing — an app whose site was linked on later still has a
-    /// door the anchor does not hold.
+    /// Targets Furlough blocks (have a rule) that the anchor doesn't fully hold yet — a
+    /// target with only some of its doors (e.g. a linked site) still qualifies.
     var anchorCandidates: [Target] {
         targets.filter { target in
             target.rule != nil && !target.kinds.allSatisfy(anchor.contains)
@@ -20,10 +13,8 @@ extension Config {
 }
 
 extension AnchorProfile {
-    /// Takes in every door of `targets` the anchor does not hold yet, after what it holds, in
-    /// the order given. A linked target brings both halves: two doors into one habit should
-    /// not need two picks to close. Returns whether anything was added. Nothing here checks
-    /// the lock, because `AppModel.addToAnchor` refuses before it gets this far.
+    /// Adds every door of `targets` (a linked target brings both halves). Caller
+    /// (`AppModel.addToAnchor`) is responsible for checking the lock first.
     @discardableResult
     mutating func add(_ targets: [Target]) -> Bool {
         var added = false
@@ -34,11 +25,7 @@ extension AnchorProfile {
         return added
     }
 
-    /// Takes every door of `targets` back off the list, in place. The other way round from
-    /// `add`, and the same rule about halves: a linked target goes on as one thing, so it comes
-    /// off as one thing rather than leaving the site behind when the app is let go. Returns
-    /// whether anything was removed. Nothing here checks the lock either —
-    /// `AppModel.removeFromAnchor` refuses before it gets this far.
+    /// Mirror of `add`: a linked target comes off as one thing too. Caller checks the lock.
     @discardableResult
     mutating func remove(_ targets: [Target]) -> Bool {
         let going = Set(targets.flatMap(\.kinds))
@@ -47,29 +34,16 @@ extension AnchorProfile {
         return true
     }
 
-    /// Whether every door of `target` is on the list. What the rule editor's Anchor row reads:
-    /// a target the anchor holds by the app but not by the site it is also at is not yet held,
-    /// and turning the row on is what closes the second door. The mirror of `anchorCandidates`,
-    /// which offers exactly the targets this is false for.
+    /// True only once every door of `target` is held (mirror of `anchorCandidates`).
     func lists(_ target: Target) -> Bool { target.kinds.allSatisfy(contains) }
 
-    /// Whether dropping the anchor would take `target` away by any of its doors. Read through
-    /// `holds`, so it is right under both scopes: on the list under the chosen one, off the
-    /// list under everything-except. What the small anchor on a rules row says.
     func willHold(_ target: Target) -> Bool { target.kinds.contains { holds($0) } }
 }
 
 extension Config {
-    /// What the allowlist starts as when the anchor's scope becomes the whole phone: every
-    /// door of every target Zach tiered Essential, in the list's order. Those are the apps
-    /// whose loss he has already said would hurt — Messages, the authenticator, the way home —
-    /// so the anchor that takes everything else starts by keeping them.
-    ///
-    /// Only a chosen tier counts. `utility` answers useful for a target nobody has tiered, and
-    /// the table's guess is a chip the editor offers, never an answer, so neither can put an
-    /// app on the list by itself. What the seed does not see, `anchorWarning` still names:
-    /// an essential target taken off the list warns before the anchor drops, exactly as
-    /// anchoring it singly does.
+    /// Seeds the whole-phone anchor's allowlist with every door of targets tiered Essential.
+    /// Only an explicitly chosen tier counts — `utility`'s guess is a suggestion, not a tier,
+    /// and must not silently add an app to the list.
     var essentialKinds: [TargetKind] {
         targets.filter { $0.utilityLevel == .essential }.flatMap(\.kinds)
     }

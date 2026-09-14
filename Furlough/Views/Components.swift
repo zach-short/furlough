@@ -1,11 +1,8 @@
 import FamilyControls
 import SwiftUI
 
-/// Renders the system icon and name for an opaque Screen Time token.
-///
-/// A typed host has no token and no system artwork, so it draws itself: its own text and a
-/// globe. `TokenName` and `TokenTile` branch on it before they get here, because the sizing
-/// each of them does is calibrated to Apple's view and means nothing for ours.
+/// Renders the system icon and name for an opaque Screen Time token. A typed host has no
+/// token or artwork, so it draws its own text and a globe instead.
 struct TokenLabel: View {
     let kind: TargetKind
 
@@ -19,17 +16,15 @@ struct TokenLabel: View {
     }
 }
 
-/// The app's real name. Apple renders the text and ignores fonts, weights and colours; it only
-/// follows Dynamic Type, so `size` is how rows (xSmall, about 14 pt), the editor header
-/// (xLarge, about 19 pt) and the hero (xxxLarge, about 23 pt) pick their size.
+/// Apple renders the token's text and ignores fonts/weights/colors, following only Dynamic
+/// Type — `size` maps to that: xSmall (rows), xLarge (editor header), xxxLarge (hero).
 struct TokenName: View {
     let kind: TargetKind
     var size: DynamicTypeSize = .xSmall
 
     var body: some View {
         if case .host(let host) = kind {
-            // Ours to draw, so it is drawn at the size Apple's view would have come out at,
-            // in the system font it uses. A row holding both kinds has to look like one list.
+            // Drawn at the size/font Apple's view would use, so a row mixing both kinds matches.
             Text(host)
                 .font(.system(size: Self.points(for: size), weight: .semibold))
                 .lineLimit(1)
@@ -43,8 +38,7 @@ struct TokenName: View {
         }
     }
 
-    /// What `Label(token)` measures at each of the three sizes this is asked for, from the
-    /// sizing lab run on the device on 2026-09-07.
+    /// What `Label(token)` measures at each size, from an on-device measurement.
     static func points(for size: DynamicTypeSize) -> CGFloat {
         switch size {
         case .xSmall: 14
@@ -55,23 +49,17 @@ struct TokenName: View {
     }
 }
 
-/// The real app icon, scaled to fill `size`. The system view is always 32 pt, but how much of
-/// it the artwork actually covers depends on the kind of token, so the tile measures the view
-/// and scales past whatever padding that kind is known to have. No frame of our own: the
-/// artwork brings its rounded square.
+/// The real app icon, scaled to fill `size`. Apple's system view is always 32pt but the artwork
+/// inside it covers a varying fraction, so this measures the view and scales past that padding.
 struct TokenTile: View {
     let kind: TargetKind
     var size: CGFloat = 34
     @State private var natural = CGSize.zero
-    /// A typed site has no artwork of its own, and this is the glyph the + button already uses
-    /// for Website, so the two say the same thing.
+    /// Matches the glyph the + button uses for Website.
     static let hostSymbol = "globe"
 
     var body: some View {
         if case .host = kind {
-            // Our own tile, sized in proportion so it sits right at 26 in an import row and at
-            // 48 in the editor header. The scaling below is measured against Apple's artwork
-            // and would blow a symbol up to fill the frame edge to edge.
             Image(systemName: Self.hostSymbol)
                 .font(.system(size: size * 0.48, weight: .semibold))
                 .foregroundStyle(Ember.amber)
@@ -95,27 +83,17 @@ struct TokenTile: View {
         }
     }
 
-    /// How much of Apple's 32 pt icon view the artwork of `kind` really covers.
-    ///
-    /// An app icon is a squircle sitting inside padding and fills 0.655 of the view — measured
-    /// on the device in the sizing lab of 2026-09-07 — so its tile scales past that padding to
-    /// bring the squircle itself up to `size`. Nothing else has been measured, and everything
-    /// else Apple draws for a token is a glyph on a filled rounded rect running edge to edge,
-    /// so the rest are left alone. Scaling a view that is already full past padding it does not
-    /// have is what made a category come out half again too big, overflowing its frame and
-    /// lapping its neighbours in the Anchor grid. Only scale past padding you have measured.
+    /// How much of Apple's 32pt icon view the artwork of `kind` covers: an app icon is a
+    /// squircle filling 0.655 of the view (measured on-device); everything else runs edge to
+    /// edge already. Scaling an edge-to-edge glyph as if it had this padding overflowed its
+    /// frame in the Anchor grid — only scale past padding you've actually measured.
     private static func artworkFraction(of kind: TargetKind) -> CGFloat {
         if case .application = kind { return 0.655 }
         return 1
     }
 }
 
-/// The anchor, small enough to sit inside a line of a rules row: this one is on the anchor's
-/// list too.
-///
-/// A mark rather than a row, and rather than a section of its own. The two halves are one app,
-/// so a target that is in both should say so where it already is — the moment either half grows
-/// a second list of the other's contents, they are two apps again with a copy between them.
+/// Marks a rules row as also being on the anchor's list.
 struct HeldMark: View {
     var size: CGFloat = 9
 
@@ -127,9 +105,8 @@ struct HeldMark: View {
     }
 }
 
-/// The mirror of `HeldMark`, in the corner of a tile in the anchor's grid: this app has hours
-/// in the other half. Apple's artwork fills its tile edge to edge, so the badge sits on the
-/// corner in a disc of the page's own colour rather than trying to share the square.
+/// The mirror of `HeldMark`, in the anchor grid: this app also has a rule. Sits on the corner
+/// since Apple's artwork fills the tile edge to edge.
 struct RuledBadge: View {
     var size: CGFloat = 15
 
@@ -148,7 +125,6 @@ struct RuledBadge: View {
 struct StatusChip: View {
     let status: TargetStatus
     let glass: HourglassState
-    /// The rule has no windows, so there is no closing time to show.
     var allDay = false
 
     var body: some View {
@@ -194,15 +170,13 @@ enum RowCopy {
         if target.kind.isCategory { return "Everything in it" }
         guard let rule = target.rule else { return "Not enforced yet" }
         guard rule.isEverAllowed else { return "Blocked all day" }
-        // Today's budget beside today's hours: the row is a statement about right now.
         let budget = TimeFormat.budget(rule.budget(on: Policy.weekday(now)))
         if case .exhausted = status { return "Used up today · \(budget)" }
         if rule.isSameEveryDay, rule.isSameBudgetEveryDay {
             return "\(TimeFormat.schedule(rule)) · \(budget)"
         }
         let today = rule.windows(on: Policy.weekday(now)).map { TimeFormat.window($0) }
-        // A day worth nothing has no hours and no figure worth printing: "Not today · 0 min"
-        // offers a budget that is not on offer.
+        // Avoid pairing "Not today" with a budget figure that isn't on offer.
         guard !today.isEmpty else { return "Not today" }
         return "Today \(today.joined(separator: ", ")) · \(budget)"
     }
@@ -221,9 +195,8 @@ struct ProminentButton: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
-                // Small, and boxed no taller than the label: a spinner at the button's own
-                // large control size is 32 pt and would grow the button as it starts working,
-                // so Continue and Waiting for iOS would stand at different heights.
+                // Boxed to the label's height: the default large-control spinner is 32pt and
+                // would grow the button when it starts working.
                 if isBusy {
                     ProgressView()
                         .controlSize(.small)

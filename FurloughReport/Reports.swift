@@ -2,12 +2,11 @@ import DeviceActivity
 import ExtensionKit
 import SwiftUI
 
-// The context these scenes answer to, `.rank(n)`, lives in Shared/Usage: the app names one
-// when it hosts a DeviceActivityReport, and the scene here with the same context draws it.
+// `.rank(n)` context lives in Shared/Usage: the app names it when hosting a
+// DeviceActivityReport; the scene here with the same context draws it.
 
-/// What a rank slot draws: the recommendation at that position with the entry behind it (for
-/// its token, so the card can show the real icon), or nothing, and enough about the rest to
-/// say why nothing.
+/// The recommendation at this position plus its entry (for the icon token), or nothing plus
+/// enough to say why.
 struct RankSlot: Sendable {
     var position: Int
     var item: Recommendation?
@@ -17,14 +16,10 @@ struct RankSlot: Sendable {
     var days: Int
 }
 
-/// One card of the ranking. Five of these exist (`UsageAnalysis.rankLimit`), each its own
-/// report, so the app can give every card a fixed height and show them one at a time: a report
-/// cannot tell its host how tall it wants to be, and mounting five at once is what made the
-/// old page stutter.
+/// One of 5 fixed-height cards (`UsageAnalysis.rankLimit`) — a report can't tell its host how
+/// tall it wants to be, and mounting all 5 at once caused the old page to stutter.
 ///
-/// `nonisolated`: `AppExtensionScene` is a main-actor protocol, so a scene would otherwise be
-/// inferred onto the main actor, and the extension's `body`, which is not, could not build it.
-/// Off the main actor is also where the walk over a fortnight of segments belongs.
+/// `nonisolated` because `AppExtensionScene` is main-actor but the extension's `body` isn't.
 nonisolated struct RankReport: DeviceActivityReportScene {
     let position: Int
     let content: (RankSlot) -> RankView

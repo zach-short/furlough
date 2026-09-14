@@ -1,8 +1,8 @@
 import Foundation
 import Testing
 
-/// The first week and the undo window: the two things that let a beginner make a mistake
-/// without paying a day for it, and the reasons neither is a way out.
+/// The first week and the undo window let a beginner make a mistake without paying a day for
+/// it — and neither is a way out.
 @Suite struct ForgivenessTests {
 
     // MARK: The first week
@@ -15,8 +15,7 @@ import Testing
         #expect(config.trialEndsAt == at(15))
     }
 
-    /// Screen Time access off and on again is the documented way out of Furlough. It must not
-    /// also be the way to a fresh week, so the record outlives the week it records.
+    // Toggling Screen Time access is the documented way out; it must not also grant a fresh week.
     @Test func trialIsNeverGrantedTwice() {
         var config = makeConfig([])
         Forgiveness.startTrial(&config, now: at(8))
@@ -49,8 +48,7 @@ import Testing
         Forgiveness.startTrial(&config, now: at(8))
         #expect(config.delayHours(for: config.targets[0]) == 1)
         #expect(config.delayHours(for: config.targets[1]) == 1)
-        // What it will cost once the week is over is still answerable, because the editor says
-        // it while the week runs: the cliff at the end must not be a surprise.
+        // What it costs after the week ends is answerable while the week still runs.
         #expect(config.fullDelayHours(for: config.targets[1]) == 96)
 
         Forgiveness.expire(&config, now: at(15))
@@ -98,8 +96,7 @@ import Testing
         #expect(state.config.targets[0].undo == nil)
     }
 
-    /// A target's first rule replaces nothing, so undoing it puts the target back to having
-    /// none — which is where it stood before it was touched, and enforces nothing.
+    // A first rule replaces nothing, so undoing it means having none again.
     @Test func revertingAFirstRuleLeavesTheTargetUnconfigured() {
         let id = UUID()
         var target = makeTarget("Messenger", rule: nil, id: id)
@@ -122,8 +119,7 @@ import Testing
         #expect(state.config.targets[0].rule?.dailyBudgetMinutes == 5)
     }
 
-    /// Anything queued for this target was queued against the rule being taken back, so it is
-    /// now waiting to loosen something that no longer exists. Other targets are not its business.
+    // Reverting drops this target's now-meaningless queued change but leaves others alone.
     @Test func revertingDropsThisTargetsQueuedRuleOnly() {
         let mine = UUID(), other = UUID()
         var target = makeTarget("YouTube", rule: Rule(), id: mine)
@@ -144,8 +140,7 @@ import Testing
         #expect(state.pending.contains { $0.kind == .removeTarget(targetID: mine) })
     }
 
-    /// The property the whole design rests on: undo restores the rule that was in force, so a
-    /// chain of edits walks back exactly one step and never reaches "unrestricted".
+    // Undo restores what was previously in force: one step back, never all the way to unrestricted.
     @Test func undoIsOneStepBackAndNeverReachesUnrestricted() {
         let id = UUID()
         let first = Rule(windows: [window(540, 1020)], dailyBudgetMinutes: 60)
@@ -160,7 +155,6 @@ import Testing
 
         #expect(Forgiveness.revert(targetID: id, in: &state, now: at(8, 9, 25)))
         #expect(state.config.targets[0].rule?.isEquivalent(to: first) == true)
-        // And there is nothing left to walk back to.
         #expect(!Forgiveness.revert(targetID: id, in: &state, now: at(8, 9, 26)))
     }
 
@@ -187,8 +181,7 @@ import Testing
         #expect(!state.config.isInTrial)
     }
 
-    /// The widget draws future timelines through `effectiveConfig`, so the week has to be over
-    /// in the parts of them that fall after it ends.
+    // The widget draws future timelines through `effectiveConfig`, which must show the week over.
     @Test func effectiveConfigSeesTheWeekEnd() {
         var state = makeState([makeTarget("TikTok", rule: Rule())])
         state.config.targets[0].utilityLevel = .hazard
@@ -201,8 +194,7 @@ import Testing
 
     // MARK: What is already on the phone
 
-    /// State written before any of this existed decodes with no week and no undo, and a week is
-    /// granted at the moment access is given, which an upgrade is not.
+    // A week is granted at the moment access is given; an upgrade from old state is not that.
     @Test func stateWrittenBeforeTheTrialGetsNone() throws {
         let json = """
         {"targets":[],"loosenDelayHours":24,"schemaVersion":1}
@@ -214,8 +206,7 @@ import Testing
         #expect(config.delayHours(for: nil) == 24)
     }
 
-    /// A target with nothing to undo writes no key for it, so state from before the window
-    /// existed and state from after it are the same bytes.
+    // No key written means state from before this feature existed is the same bytes.
     @Test func aTargetWithNothingToUndoWritesNoKeyForIt() throws {
         let target = makeTarget("YouTube", rule: Rule())
         let json = String(data: try JSONEncoder().encode(target), encoding: .utf8) ?? ""

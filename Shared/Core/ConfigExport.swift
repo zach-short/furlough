@@ -1,30 +1,22 @@
 import Foundation
 
-/// A setup as a file: what Furlough hands to another Mac, or to the same person's next phone.
+/// A portable setup file — deliberately not the stored state. `SharedState` carries
+/// device-local runtime bookkeeping and, on the phone, Screen Time tokens that are opaque and
+/// device-scoped; this carries only what someone actually decided (managed things, names,
+/// tiers, rules). A Mac file can fully identify its targets by bundle ID/host; a phone file can
+/// only carry names, since a token can't be resolved back on import (see
+/// `ExportedTarget.identifier`).
 ///
-/// Deliberately not the stored state. `SharedState` is written for the device holding it —
-/// half of it is runtime bookkeeping that means nothing anywhere else, and on the phone a
-/// target *is* a Screen Time token, an opaque blob Apple scopes to one device and one install
-/// of one app. What travels is the part someone actually decided: which things are managed,
-/// what they are called, how much each is worth, and when it is allowed.
-///
-/// So a Mac file is a whole setup — a Mac target is a bundle identifier or a host, and the
-/// other Mac can look those up for itself — while a phone file carries every rule but can only
-/// say what the apps they belonged to were called. That is a fact about Screen Time rather
-/// than a gap here; see `ExportedTarget.identifier`.
-///
-/// The Anchor is left out on purpose. Its list is tokens and its key is a physical tag, so
-/// none of it would survive the trip, and a file that looked like it carried the Anchor would
-/// be worse than one that plainly does not.
+/// The Anchor is deliberately excluded — its list is tokens and its key is a physical tag, so
+/// none of it would survive the trip.
 struct ConfigExport: Codable, Equatable {
-    /// This file's own shape. It changes on its own schedule: `Config.schemaVersion` describes
-    /// the store, which is nobody's business but Furlough's, and the two must not be confused.
+    /// Independent of `Config.schemaVersion`, which describes the store instead — don't confuse
+    /// the two.
     static let currentVersion = 1
 
     var version = ConfigExport.currentVersion
     var platform: Platform
     var exportedAt: Date
-    /// The build that wrote the file, for reading a bug report six months from now.
     var appVersion: String?
     var loosenDelayHours: Int
     var targets: [ExportedTarget]
@@ -33,8 +25,6 @@ struct ConfigExport: Codable, Equatable {
         case iOS = "ios"
         case mac
 
-        /// What this build is. Stamped on every export so that an import can tell a phone
-        /// file from a Mac one and say so, rather than failing on an unknown target kind.
         static var current: Platform {
             #if os(iOS)
             .iOS
@@ -46,8 +36,6 @@ struct ConfigExport: Codable, Equatable {
 }
 
 extension ConfigExport {
-    /// The setup as it stands. Reads the store rather than a view's copy of it, the way
-    /// everything else that touches state does.
     static func current(_ state: SharedState = SharedStore.load()) -> ConfigExport {
         ConfigExport(
             platform: .current,
@@ -58,8 +46,8 @@ extension ConfigExport {
         )
     }
 
-    /// Pretty-printed, keys in order, slashes left alone: this is a file someone may well open
-    /// and read, and a stable key order makes two of them worth diffing.
+    /// Pretty-printed with sorted keys: this is a file someone may open by hand, and stable
+    /// ordering makes two exports diffable.
     func json() throws -> Data {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -73,7 +61,7 @@ extension ConfigExport {
         return try decoder.decode(ConfigExport.self, from: data)
     }
 
-    /// "Furlough Setup 2026-09-08". No extension: the save panel adds it from the content type.
+    /// e.g. "Furlough Setup 2026-09-08" — no extension; the save panel adds it.
     var suggestedFilename: String {
         let day = exportedAt.formatted(.iso8601.year().month().day().dateSeparator(.dash))
         return "Furlough Setup \(day)"
@@ -84,9 +72,9 @@ extension ConfigExport {
 struct ExportedTarget: Codable, Equatable {
     enum Kind: String, Codable { case app, website, category }
 
-    /// The tier as a word. `Utility` is stored as a number, which is right for a blob the
-    /// engine reads and wrong for a file a person might open. Exhaustive on purpose: adding
-    /// a tier should stop the compiler here rather than silently shift what the numbers mean.
+    /// `Utility` is stored as a number internally; this spells it out for a human-readable
+    /// file. Exhaustive switches below so adding a tier fails to compile here instead of
+    /// silently shifting what the numbers mean.
     enum Tier: String, Codable {
         case essential, useful, idle, hazard
 
@@ -110,30 +98,17 @@ struct ExportedTarget: Codable, Equatable {
     }
 
     var kind: Kind
-    /// What another device can look this up by: a bundle identifier for a Mac app
-    /// ("com.google.Chrome"), a host for a website ("youtube.com"). Nil for anything the phone
-    /// knows only as a Screen Time token — that token is meaningless off the device that
-    /// issued it and cannot be turned back into a bundle identifier, so an import on a phone
-    /// has to ask which app this was, with `name` to ask about.
+    /// Nil for a Screen Time token (device-scoped, meaningless elsewhere) — import on a phone
+    /// must ask which app this was, using `name`.
     var identifier: String?
-    /// The name the system gave it, where Furlough has been told one. On the phone that is
-    /// what the shield learned; on the Mac, what the bundle says.
     var name: String?
-    /// Zach's own word for it, when he gave one.
     var nickname: String?
-    /// Absent when the tier was never chosen, so that "he said useful" and "nobody said"
-    /// stay apart in the file exactly as `Target.utilityLevel` keeps them apart in the store.
+    /// Absent (not defaulted) when never explicitly chosen, matching `Target.utilityLevel`.
     var utility: Tier?
-    /// Absent for a target added but never given a rule. Nothing is enforced for those, and
-    /// the file should say so rather than invent an open rule for them.
+    /// Absent for a target added but never given a rule.
     var rule: Rule?
-    /// The other doors into this same thing, as hosts: "youtube.com" beside the YouTube app.
-    ///
-    /// Only hosts, for the same reason `identifier` is nil for a token: a Screen Time token means
-    /// nothing off the device that issued it, so a website half that came from Apple's picker
-    /// cannot travel and is simply absent. A site typed by name travels exactly as it does when
-    /// it is a row of its own, which is what lets a linked pair survive the trip to another
-    /// device and back.
+    /// Hosts only — a linked app-picker website token can't travel either, so only a
+    /// typed-by-name site survives the round trip.
     var alsoBlocks: [String]?
 }
 
@@ -150,8 +125,7 @@ extension ExportedTarget {
         case .category:
             kind = .category
             identifier = nil
-        // A typed host is a string another device can look up, so unlike a token it exports
-        // with an identifier — which is what lets a phone setup land on a Mac and back.
+        // A typed host, unlike a token, is a string another device can look up.
         case .host(let host):
             kind = .website
             identifier = host
@@ -168,8 +142,7 @@ extension ExportedTarget {
         nickname = target.nickname.isEmpty ? nil : target.nickname
         utility = target.utilityLevel.map(Tier.init)
         rule = target.rule
-        // The face is written above; these are the halves beside it, and only the ones a name can
-        // carry. A linked token is dropped rather than guessed at.
+        // Only host-named linked doors travel; a linked token is dropped rather than guessed.
         let linked = (target.also ?? []).compactMap(\.hostName)
         alsoBlocks = linked.isEmpty ? nil : linked
     }

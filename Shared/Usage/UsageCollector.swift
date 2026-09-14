@@ -2,55 +2,46 @@ import DeviceActivity
 import ManagedSettings
 import SwiftUI
 
-/// The reports the app hosts and the extension draws. The app names one when it makes a
-/// `DeviceActivityReport`; the scene in FurloughReport with the same context answers it.
-/// A report cannot tell the app how tall its content is, so each one is shaped to fit a
+/// The app names a `DeviceActivityReport` context; the matching scene in FurloughReport answers
+/// it. A report can't tell the app how tall its content is, so each context is shaped to fit a
 /// height the app already knows.
 extension DeviceActivityReport.Context {
-    /// The `position`-th heaviest app or site on the phone, 1 the heaviest, with the rule it
-    /// would take: one card, one report. The slot after the last worthwhile one says so; slots
-    /// past that draw nothing. `UsageAnalysis.rankLimit` says how many there are. The app shows
-    /// one at a time, so at most one or two of these remote views ever exist together.
+    /// The `position`-th heaviest app or site, 1 = heaviest, one card per report. Slots past the
+    /// last worthwhile one draw nothing; `UsageAnalysis.rankLimit` caps how many exist.
     static func rank(_ position: Int) -> Self { Self("rank-\(position)") }
 }
 
-/// One app or website as Screen Time reported it, folded onto the week. The token rides along
-/// so the app, where iOS lets it read the numbers itself, can write a rule without a picker;
-/// the report extension has no use for it. A token is an immutable value Apple has not marked
-/// Sendable, hence the unchecked.
+/// One app or website as Screen Time reported it, folded onto the week. The token rides along so
+/// the app (where iOS lets it read the numbers itself) can write a rule without a picker; the
+/// report extension has no use for it. Token is an immutable value Apple hasn't marked Sendable,
+/// hence the unchecked.
 struct UsageEntry: Hashable, @unchecked Sendable {
-    /// The bundle identifier, "web:" and the domain, or a stand-in for a token with no name.
+    /// The bundle identifier, "web:" + domain, or a stand-in for a token with no name.
     var key: String
     var name: String
     var histogram: UsageHistogram
     var applicationToken: ApplicationToken?
     var webDomainToken: WebDomainToken?
 
-    /// The shape `UsageAnalysis.rank` reads.
     var ranked: (key: String, name: String, histogram: UsageHistogram) { (key, name, histogram) }
 
-    /// The target this entry is, when Screen Time handed a token over with the numbers: what a
-    /// rule is written on, and what draws the real icon. Nil for something it counted but
-    /// named no token for; `UsageReader.kind(forKey:)` goes looking for those.
+    /// Nil when Screen Time counted this but handed over no token; `UsageReader.kind(forKey:)`
+    /// goes looking for those separately.
     var targetKind: TargetKind? {
         if let applicationToken { return .application(applicationToken) }
         if let webDomainToken { return .webDomain(webDomainToken) }
         return nil
     }
 
-    /// What to call this where there is no token to draw Apple's own name from. With data
-    /// access `localizedDisplayName` is nil and `name` is what the tables call the bundle
-    /// identifier (`Brand.name`), or the identifier itself when they do not know it — which is
-    /// not a name anybody should be shown: a site names itself, an app does not.
+    /// With data access, `name` may just be the bundle identifier — not fit to show, since a
+    /// site names itself but an app doesn't.
     var plainName: String {
         if let domain = UsageAnalysis.domain(inKey: key) { return domain }
         return name == key ? "This app" : name
     }
 
-    /// Whether there is anything to call this on screen: a token, which draws Apple's own name,
-    /// or a name the tables knew. A bare bundle identifier is neither, and a card is not drawn on
-    /// one — `UsageView` holds it back while Screen Time is still being asked for the token, and
-    /// drops it once Screen Time has stopped answering.
+    /// A bare bundle identifier is neither tokened nor named; `UsageView` holds such a card back
+    /// while still waiting on Screen Time for the token, and drops it once Screen Time stops answering.
     var isNamed: Bool { targetKind != nil || name != key }
 }
 
@@ -70,18 +61,10 @@ struct UsageSummary: Sendable {
         entries.first { $0.key == recommendation.key }
     }
 
-    /// The same fortnight with the halves of each linked target added together.
-    ///
-    /// Screen Time hands out an app and a website as two entries, because on the phone they are
-    /// two things. Linked, they are one row on one rule and one shared budget, so ranking them
-    /// apart would put YouTube on the page twice and suggest a budget for each half of one that is
-    /// already shared. `UsageAnalysis.folding` decides which entries belong together and which of
-    /// them carries the pair; the carrier keeps its own key and token, so the card still draws
-    /// Apple's icon and name for the app and `entry(for:)` still finds it.
-    ///
-    /// `UsageHistogram.merge` adds minutes and pickups and leaves `daysObserved` alone, which is
-    /// what makes the merged average right: both halves were observed over the very same days, so
-    /// the sum is divided by those days once rather than twice.
+    /// The same fortnight with the halves of each linked target (see `UsageAnalysis.folding`)
+    /// added together — the carrier keeps its own key and token, so its card still draws
+    /// correctly. `UsageHistogram.merge` leaves `daysObserved` alone since both halves were
+    /// observed over the same days.
     func folded(in config: Config) -> UsageSummary {
         let folding = UsageAnalysis.folding(
             entries.map { ($0.key, $0.targetKind, $0.histogram.totalMinutes) },
@@ -101,11 +84,9 @@ struct UsageSummary: Sendable {
 }
 
 enum UsageCollector {
-    /// Walk `data` — every person, every device, every segment — and fold each app's and
-    /// website's minutes onto the week by the hour each segment starts in. Ask for hourly
-    /// segments; a daily one lands whole on midnight. The days observed are read off the data,
-    /// first segment to last, because a report scene is never told what stretch the app asked
-    /// for. The same walk serves the report's results and the app's own fetch.
+    /// Ask for hourly segments — a daily one lands whole on midnight. Days observed are read off
+    /// the data itself (first segment to last), since a report scene is never told what date
+    /// range the app asked for.
     static func collect<Data: AsyncSequence>(
         _ data: Data,
         calendar: Calendar = .current
@@ -126,9 +107,7 @@ enum UsageCollector {
                     for await activity in category.applications {
                         let app = activity.application
                         guard let key = app.bundleIdentifier ?? app.token.map({ "app:\($0.hashValue)" }) else { continue }
-                        // Apple's name where the report extension gets one; with data access it
-                        // does not, and the tables know most of what is worth a card. The
-                        // identifier itself is the last resort, and `plainName` reads it as none.
+                        // Apple's name, then the tables, then the bare identifier as last resort.
                         var entry = entries[key] ?? UsageEntry(
                             key: key,
                             name: app.localizedDisplayName

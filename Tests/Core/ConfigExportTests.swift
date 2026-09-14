@@ -1,11 +1,9 @@
 import Foundation
 import Testing
 
-/// The file Furlough hands out. Two things are being held to: a Mac setup survives the round
-/// trip whole, and nothing that should not leave the device leaves with it.
+/// Held to two things: a setup survives the round trip whole, and nothing device-local leaks out.
 @Suite("Exporting a setup")
 struct ConfigExportTests {
-    /// A Mac config with one app, one website, and one target nobody has ruled on yet.
     func sample() -> SharedState {
         var state = SharedState()
         state.config.loosenDelayHours = 48

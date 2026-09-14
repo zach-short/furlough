@@ -1,24 +1,14 @@
 import SwiftUI
 
-/// What an import would do, laid out before it does it.
-///
-/// One view for both platforms, for the same reason `PendingDeltaView` is one: an import is
-/// the largest single change Furlough can make to itself, half of it may be invisible for a
-/// day, and the phone and the Mac must not tell that story in two different vocabularies.
-/// It is also the vocabulary the pending cards already use — Now/Becomes, and a date in the
-/// Pending colour — because a queued import change *is* a pending change, and reading the
-/// review should teach nothing that has to be unlearned on the Pending screen.
-///
-/// Self-contained on purpose: this file is compiled into the widgets along with the rest of
-/// `Shared/UI`, where the two apps' cards and section labels do not exist.
+/// One view for both platforms — vocabulary matches `PendingDeltaView`'s pending cards
+/// (Now/Becomes, Pending colour) since a queued import change is a pending change.
+/// Self-contained: compiled into widgets too, where each app's own components don't exist.
 struct ImportReviewList: View {
     let plan: ImportPlan
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Where the file came from, before what it would do. A setup file is worth keeping
-            // and worth sending, so the one from March and the one from last night look alike
-            // in a Downloads folder and do not look alike at all once applied.
+            // Provenance disambiguates files that look identical in Downloads.
             if let provenance {
                 Text(provenance)
                     .emberBody(11.5)
@@ -33,9 +23,9 @@ struct ImportReviewList: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.bottom, 4)
 
-            // Refused rather than warned about. An import iOS will not register is worse than
-            // one that does not happen: the rules land, registration throws, and nothing is
-            // watching them. The buttons on both platforms read `plan.canApply`.
+            // Hard refusal, not a warning: an import iOS won't register is worse than one that
+            // never happens (rules land, registration throws, nothing enforces them). Buttons
+            // on both platforms gate on `plan.canApply`.
             if let limitReason = plan.limitReason {
                 Text(limitReason)
                     .emberBody(12)
@@ -65,8 +55,7 @@ struct ImportReviewList: View {
         }
     }
 
-    /// "This file was saved 8 Sep 2026 at 4:12 PM, by Furlough 1.0." The build is dropped when
-    /// the file does not name one — a file old enough to predate `appVersion` still opens.
+    /// Drops the build name when the file predates `appVersion`, so old exports still open.
     private var provenance: String? {
         guard let exportedAt = plan.exportedAt else { return nil }
         let when = exportedAt.formatted(date: .abbreviated, time: .shortened)
@@ -118,8 +107,7 @@ struct ImportReviewList: View {
                 Text(item.name)
                     .emberDisplaySmall(13.5)
                     .foregroundStyle(Ember.cream)
-                // A row's name is the app; what part of it this line is about is the label.
-                // A target being added and the delay are already named by the row itself.
+                // Row name is the app; label only shown when it adds info beyond that.
                 if item.subject.isWorthNaming {
                     Text(item.subject.label)
                         .emberBody(11)

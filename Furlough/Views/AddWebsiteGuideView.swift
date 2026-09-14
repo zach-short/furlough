@@ -1,19 +1,13 @@
 import SwiftUI
 
-/// The long way to a website: the one that gets a daily limit and Furlough's own shield.
-///
-/// Reached from `AddSiteSheet` rather than straight from the + button since 2026-09-08, when
-/// typing became what Website means. Only a site iOS minted itself can be counted, and iOS
-/// mints one only in here — under the apps in every category, three levels down, where nobody
-/// finds it by accident. This says where to look before the picker opens; the picker's own
-/// footer says it again once you are in there.
+/// Only a site chosen through Apple's picker can be counted; a typed site only gets hours.
+/// The picker buries Websites under a category's app list, three levels deep.
 struct AddWebsiteGuideView: View {
-    /// Hand over to Apple's picker. The sheet dismisses itself; the caller opens the picker
-    /// once this one is fully gone.
+    /// Caller opens Apple's picker once this sheet has fully dismissed.
     let onContinue: () -> Void
 
     @Environment(\.dismiss) private var dismiss
-    /// The sheet hugs its content. Seeded near the real height so it does not resize on open.
+    /// Seeded near actual content height so the sheet doesn't resize on open.
     @State private var contentHeight: CGFloat = 470
 
     private static let steps: [(title: String, detail: String)] = [
@@ -74,7 +68,6 @@ struct AddWebsiteGuideView: View {
     }
 }
 
-/// One numbered step: an amber numeral, the move to make and what to look for.
 private struct StepRow: View {
     let number: Int
     let title: String

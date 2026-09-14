@@ -1,24 +1,14 @@
 import FamilyControls
 import SwiftUI
 
-/// What a card offers to do about an app: the half the intro was told to start on, or the
-/// question when it was told both.
-///
-/// The page is the same page either way — where a fortnight went, heaviest app first — because
-/// that is worth reading whichever half you came for. What changes is the third question a card
-/// answers. Rules propose hours and a budget; the Anchor has neither to propose, so its card
-/// asks the only question the Anchor has: hold it, or don't. Somebody who asked for both is
-/// shown the schedule and then asked where it should land, because they are the one person on
-/// this screen for whom that is a real choice.
+/// Which half a usage suggestion card offers to act on.
 enum UsageOffer {
     case rules
     case anchor
     case both
 }
 
-/// Where one card's answer would land, under `UsageOffer.both`. The default is both, which is
-/// what was asked for; the segment is there because "both" is a sensible default and a poor
-/// rule, and an app can deserve hours without deserving the tag.
+/// Where one card's answer would land, under `UsageOffer.both`.
 enum UsageDestination: String, CaseIterable, Identifiable {
     case rules, anchor, both
 
@@ -36,53 +26,40 @@ enum UsageDestination: String, CaseIterable, Identifiable {
     var holds: Bool { self != .rules }
 }
 
-/// Where one card stands in this run of the flow. Nothing here is written down: skipping is for
-/// this run, and the next time the flow is opened every app is offered again. Zach's call,
-/// 2026-09-08 — a skip is "not now", and there is no un-skip screen to build.
+/// Where one card stands in this run of the flow. Skips are never persisted — every time the
+/// flow reopens, every app is offered again (Zach's call, 2026-09-08).
 enum UsageCardState: Equatable {
     case offered
-    /// Something was done. See `Applied`.
     case applied(Applied)
     case skipped
     case failed(String)
 
-    /// What a card did when Apply was pressed, which is no longer one thing: a rule, a place on
-    /// the anchor's list, or both at once.
+    /// What a card did when Apply was pressed: a rule, a place on the anchor's list, or both.
     struct Applied: Equatable {
         /// The rules row the rule was written on, or nil when nothing but the anchor happened.
         var targetID: UUID?
         /// The doors the anchor took in, and what Undo takes back off it.
         var heldKinds: [TargetKind] = []
-        /// True when the flow added the app to Rules itself, which is the only case it may take
-        /// the rule straight back; see `AppModel.undoFreshTarget`. Says nothing about the
-        /// anchor's list, which has no delay and is always takeable back.
+        /// True only when this flow created the rule fresh — the only case Undo may remove it
+        /// again; see `AppModel.undoFreshTarget`. The anchor's list has no delay and is always
+        /// undoable regardless.
         var fresh = false
         /// What `AppModel.ApplyOutcome` said, plus the anchor's half where there was one.
         var message: String
-        /// The rule loosened what was there and so has to sit out the delay — the one thing the
-        /// collapsed line says for itself rather than keep behind a tap: it names a time.
+        /// True when the rule loosened and must sit out the delay; the collapsed line names the
+        /// time directly instead of hiding it behind a tap.
         var waiting = false
-        /// The card was answered before Screen Time had handed a token over, so nothing has
-        /// been written yet and the work is on its way in behind it. The one case where an
-        /// answered card is not yet a done one; see `UsageView.land`.
-        ///
-        /// The card is folded and marked all the same, because the alternative — the button
-        /// spinning until Screen Time feels like answering — is a screen that says nothing for
-        /// ten seconds about something that will take one. What it does not do is claim the
-        /// work is finished: the mark is amber and the line says what is still owed.
+        /// True when Screen Time hasn't handed over the token yet, so the write is still in
+        /// flight. The card still folds and marks itself, but amber, with the line saying what's
+        /// still owed rather than claiming it's done; see `UsageView.land`.
         var pending = false
 
         var holds: Bool { !heldKinds.isEmpty }
 
-        /// Whether Undo can put everything back. A rule written on a row that was already there
-        /// is a loosening like any other and belongs in the editor, where the delay is
-        /// explained; everything this flow made itself comes straight back off. Nothing to take
-        /// back while the work is still on its way in.
+        /// Only a freshly-created rule or an anchor-only change can be undone here; a loosened
+        /// pre-existing rule belongs in the editor instead. Nothing to undo while still pending.
         var canUndo: Bool { !pending && (fresh || targetID == nil) }
 
-        /// What was done, in the one line the folded card carries. Still being done outranks
-        /// everything, then a waiting rule, which names its time; otherwise the rule as a
-        /// sentence, the anchor as a sentence, or both.
         func line(for item: Recommendation) -> String {
             if pending { return "Screen Time has not handed this app over yet. Furlough is still asking — you can keep going." }
             if waiting { return message }
@@ -93,23 +70,14 @@ enum UsageCardState: Equatable {
     }
 }
 
-/// One app, answering three questions in order — what it is and how much of the day it takes,
-/// where that time falls, and what Furlough would do about it — and then offering the two
-/// buttons. The app draws this itself where iOS 26.4 lets it read the numbers; where it cannot,
-/// `UsageReportCard` in the report extension draws the same anatomy and the buttons become a
-/// hand-off to the picker.
-///
-/// The first two questions are the same for everybody. The third is the half the intro was told
-/// to start on (`UsageOffer`): a schedule for Rules, one sentence for the Anchor, and for
-/// somebody who asked for both, the schedule followed by the question of where it lands.
+/// Mirrors `UsageReportCard` in the report extension, used where iOS can't read Screen Time
+/// numbers directly — keep the two in sync.
 struct UsageSuggestionCard: View {
     let item: Recommendation
     let entry: UsageEntry
     let days: Int
     let state: UsageCardState
-    /// Which half this card is offering, and — under `.both` — where the offer lands. The
-    /// binding is the page's, so the answer carries from one card to the next: choosing once is
-    /// choosing for the run unless the next app deserves something else.
+    /// Binding lives on the page, so a chosen destination carries across cards for the run.
     var offer: UsageOffer = .rules
     @Binding var destination: UsageDestination
     let apply: () -> Void
@@ -117,7 +85,6 @@ struct UsageSuggestionCard: View {
     let undo: () -> Void
     let collapse: () -> Void
 
-    /// What Apply would do, given the offer and — under `.both` — the segment.
     private var landing: UsageDestination {
         switch offer {
         case .rules: .rules
@@ -147,9 +114,6 @@ struct UsageSuggestionCard: View {
 
     // MARK: What Furlough would do
 
-    /// The third question, answered in the shape the offer has. Rules draw a schedule; the
-    /// Anchor has none to draw and says the one thing it does instead; both draw the schedule
-    /// and then ask where it goes.
     @ViewBuilder
     private var verdict: some View {
         switch offer {
@@ -167,9 +131,8 @@ struct UsageSuggestionCard: View {
             VStack(alignment: .leading, spacing: 10) {
                 Eyebrow(text: "What Furlough would do", color: Ember.amber)
                 RuleDrawing(item: item)
-                    // Dimmed rather than hidden when the answer is the Anchor alone: the
-                    // schedule is still the proposal on the table, and taking it off the card
-                    // the moment somebody leans the other way makes the comparison impossible.
+                    // Dimmed, not hidden — keeps the schedule visible for comparison even when
+                    // leaning toward the Anchor instead.
                     .opacity(landing.writesRule ? 1 : 0.35)
                     .animation(.easeInOut(duration: 0.2), value: landing.writesRule)
             }
@@ -205,9 +168,8 @@ struct UsageSuggestionCard: View {
         }
     }
 
-    /// Apple's own name for the app, drawn by Apple, once there is a token to draw it from.
-    /// Until then the tables' name (`Brand.name`, via `plainName`): with data access
-    /// `localizedDisplayName` is nil, and a bundle identifier must never reach the screen.
+    /// Apple's token name once available; otherwise `Brand`'s plain name — `localizedDisplayName`
+    /// is nil with data access, and a bundle identifier must never reach the screen.
     @ViewBuilder
     private var name: some View {
         if let kind = entry.targetKind {
@@ -221,7 +183,6 @@ struct UsageSuggestionCard: View {
         }
     }
 
-    /// Pickups only when there are enough of them to say something.
     private var subtitle: String {
         let pickups = Int(item.pickupsPerDay.rounded())
         guard pickups >= 1 else { return "Last \(days) days" }
@@ -230,14 +191,8 @@ struct UsageSuggestionCard: View {
 
     // MARK: What happens next
 
-    /// "Apply" writes something with hours in it; the Anchor's button only ever puts a name on
-    /// a list, and says so in the words the rest of the app calls that list by. Not "Hold it",
-    /// which read as the thing happening on the spot — nothing goes out of reach until the
-    /// anchor is dropped, and a button promising otherwise is the card's only dishonest word.
-    ///
-    /// No busy title, because there is no busy: Apply writes what it can the moment it is
-    /// pressed. What is not in hand yet is said on the folded card, where it can be read
-    /// without holding the page up — see `UsageCardState.Applied.pending`.
+    /// Not "Hold it" — nothing goes out of reach until the anchor is actually dropped, so that
+    /// wording would be misleading.
     private var applyTitle: String {
         landing == .anchor ? "Add to the Anchor's list" : "Apply"
     }
@@ -288,9 +243,7 @@ struct UsageSuggestionCard: View {
     }
 }
 
-/// What the Anchor would do about this app, where Rules would draw a schedule. There is no
-/// picture to draw, because there is nothing gradual about it: the Anchor has no hours and no
-/// budget, so its whole proposal is one line and the mark beside it.
+/// No schedule to draw — the Anchor has no hours or budget, just hold-or-not.
 struct AnchorHolding: View {
     var body: some View {
         HStack(alignment: .top, spacing: 11) {
@@ -310,16 +263,11 @@ struct AnchorHolding: View {
     }
 }
 
-/// The question a card asks somebody who came for both halves: Rules, the Anchor, or both, and
-/// one line saying what that means for this app. The segment is the ask and the line is the
-/// answer read back — between them they are the whole of "in a clear, simple and concise
-/// manner", which is what was asked for and all that was asked for.
+/// Lets a `.both` card choose where its answer lands, with the effect spelled out below it.
 struct UsageDestinationPicker: View {
     @Binding var destination: UsageDestination
 
-    /// What Apply would do, in one sentence. Written against the drawing above rather than
-    /// repeating it: the schedule has just been read, and saying it a second time under the
-    /// segment is how three short answers turn into a wall.
+    /// Kept short — repeating the schedule here would pad three answers into a wall of text.
     private var effect: String {
         switch destination {
         case .rules: "The hours above, and nothing on the Anchor's list."
@@ -366,10 +314,8 @@ struct UsageDestinationPicker: View {
     }
 }
 
-/// An applied card, collapsed to its verdict: the app, what the rule now does, and the three
-/// things left to do about it — take it back, open the rule, or put the whole card back. Applying
-/// folds the card straight away, because a card that has been decided has stopped being a
-/// question and the ones still waiting to be read should not be pushed down the page by it.
+/// Applying folds the card immediately so cards still waiting to be read aren't pushed down the
+/// page by it.
 struct UsageAppliedLine: View {
     let item: Recommendation
     let entry: UsageEntry
@@ -391,12 +337,10 @@ struct UsageAppliedLine: View {
                     Text(entry.plainName).emberBody(13).foregroundStyle(Ember.cream).lineLimit(1)
                 }
                 Spacer(minLength: 8)
-                // The anchor's own mark where the anchor took it in, so a folded list says
-                // which half each line landed on without being read.
+                // Shows which half this landed on without reopening the card.
                 if done.holds { AnchorGlyph(isAnchored: false, size: 20) }
                 UsageAppliedMark(pending: done.pending, size: 12)
             }
-            // What was done, said in one line, so folding does not hide what was agreed to.
             Text(done.line(for: item))
                 .emberBody(11.5)
                 .foregroundStyle(Ember.muted)
@@ -419,22 +363,14 @@ struct UsageAppliedLine: View {
     }
 }
 
-/// A skipped card, folded the way an applied one is: the app, what the suggestion would have
-/// done, and the way back to the card — the whole line, or the word. Dimmer than the applied
-/// line throughout, because nothing was decided here.
-///
-/// Opening it opens the question again, so the card comes back offered rather than marked:
-/// nothing about a skip is stored, and this run of the flow is the whole of its life.
+/// Reopening returns the card to `.offered` — skip state is never stored.
 struct UsageSkippedLine: View {
     let item: Recommendation
     let entry: UsageEntry
-    /// Which half was on offer, so the line says what was actually passed on: a schedule where
-    /// one was proposed, and the Anchor's one sentence where none was.
     var offer: UsageOffer = .rules
     let reopen: () -> Void
 
-    /// What was on the table. Under `.both` the schedule, because that is what the card drew
-    /// and the destination was never answered.
+    /// Under `.both`, shows the schedule since the destination was never chosen.
     private var passedOn: String {
         offer == .anchor ? "Not on the Anchor's list." : item.consequence()
     }
@@ -455,7 +391,6 @@ struct UsageSkippedLine: View {
                 Spacer(minLength: 8)
                 Eyebrow(text: "Skipped", color: Ember.faint)
             }
-            // What was on offer, so what was passed on is still on the page.
             Text(passedOn)
                 .emberBody(11.5)
                 .foregroundStyle(Ember.faint)
@@ -474,9 +409,7 @@ struct UsageSkippedLine: View {
     }
 }
 
-/// Whether an answered card is done or still on its way: a moss tick, or an amber hourglass
-/// turning. One view for both places a card says so — open and folded — so the two cannot drift
-/// into disagreeing about what "Applied" looks like.
+/// Shared by folded and open cards so "Applied" can't drift between the two.
 struct UsageAppliedMark: View {
     /// See `UsageCardState.Applied.pending`.
     let pending: Bool
@@ -499,13 +432,8 @@ struct UsageAppliedMark: View {
     }
 }
 
-/// The apps this run could not finish, after the fact.
-///
-/// The flow applies on the spot and checks afterwards, because the check is a question to
-/// Screen Time and Screen Time answers when it feels like it. Nearly always it passes and this
-/// is never drawn; when it does not, what could not be managed is named here — not left as a
-/// number, because the whole point is knowing which one — put back as a question on the page,
-/// and offered again.
+/// Screen Time confirms writes asynchronously; this names the apps whose write didn't land
+/// (rather than a bare count) and lets them be retried.
 struct UsageTroubleToast: View {
     let names: [String]
     let retry: () -> Void
@@ -550,8 +478,6 @@ struct UsageTroubleToast: View {
     }
 }
 
-/// Takes the rule straight back off an app this run added. Ember, because it undoes rather
-/// than does; the same words whether the card is folded or open.
 struct UsageUndoButton: View {
     let action: () -> Void
 
@@ -563,7 +489,6 @@ struct UsageUndoButton: View {
     }
 }
 
-/// The way from an applied card into the rule it wrote.
 struct UsageEditRuleLink: View {
     let targetID: UUID
 
@@ -579,7 +504,6 @@ struct UsageEditRuleLink: View {
     }
 }
 
-/// Expand and Collapse: the quietest thing on the card, because it changes nothing but the view.
 struct UsageFoldButton: View {
     let title: String
     let symbol: String
@@ -598,12 +522,8 @@ struct UsageFoldButton: View {
     }
 }
 
-/// The tile for something Screen Time has handed no token for yet, so there is no artwork to
-/// draw: the first letter of the name on the colour the app is known by (`Brand`), in the shape
-/// and proportions `TokenTile` gives a typed host, so the real icon can take its place without
-/// the row moving. An app the tables know but have no colour for gets its letter in amber on the
-/// plain ground; a site they do not know keeps the globe. An app they do not know is not drawn at
-/// all (`UsageEntry.isNamed`), so the dashed square is a fallback that should never be seen.
+/// Sized like `TokenTile` so a real icon can later replace it without shifting the row. The
+/// dashed-square fallback should never actually render — see `UsageEntry.isNamed`.
 struct MonogramTile: View {
     let entry: UsageEntry
     var size: CGFloat = 34

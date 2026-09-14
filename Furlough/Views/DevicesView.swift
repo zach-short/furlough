@@ -1,12 +1,7 @@
 import SwiftUI
 
-/// The link between this iPhone and the person's other devices: joining it, who is on it,
-/// what crosses, and leaving it. Reached from the Anchor page's Devices row and from Settings,
-/// which host the same content under their own titles.
-///
-/// Off the link, the screen is the four things to know, a name, and one button. On it, the
-/// screen is the roster and the three settings. The two states share nothing but the lead,
-/// because a person reads each once: the guide before joining, the roster ever after.
+/// Shared between the Anchor page's Devices row and Settings, which host it under their own
+/// titles. Shows the join flow when not enrolled, otherwise the roster and settings.
 struct DevicesScreen: View {
     @Environment(AppModel.self) private var model
     @State private var name = DeviceLink.name
@@ -55,8 +50,6 @@ struct DevicesScreen: View {
         }
     }
 
-    /// What the link says of itself. Not shown while iCloud is unreachable: the lead above says
-    /// that case in full.
     private var linkCard: some View {
         let status = model.link
         return VStack(alignment: .leading, spacing: 0) {
@@ -91,7 +84,6 @@ struct DevicesScreen: View {
         .emberCard()
     }
 
-    /// Everyone on the link, this iPhone first.
     @ViewBuilder
     private var rosterCard: some View {
         SectionLabel(text: "On the link")
@@ -116,7 +108,6 @@ struct DevicesScreen: View {
             .padding(.top, 8)
     }
 
-    /// The three questions about what crosses, each Always, Ask or Never.
     @ViewBuilder
     private var settingsCard: some View {
         SectionLabel(text: "What crosses")
@@ -157,7 +148,6 @@ struct DevicesScreen: View {
             .padding(.top, 8)
     }
 
-    /// Name it, and join.
     @ViewBuilder
     private var joinCard: some View {
         SectionLabel(text: "This iPhone")
@@ -205,8 +195,6 @@ struct DevicesScreen: View {
 
 }
 
-/// The traffic on one half of Home: what this iPhone is asking whether to send, and what the
-/// others added and it is asking whether to take. Nothing when there is nothing to ask.
 struct LinkTraffic: View {
     @Environment(AppModel.self) private var model
     let half: Half

@@ -1,26 +1,20 @@
 import Foundation
 import Testing
 
-/// Websites by name, which the phone gained on 2026-09-08 and the Mac has always had.
+/// Websites by name (the phone gained this 2026-09-08; the Mac always had it). The phone blocks
+/// one via `WebContentSettings.blockedByFilter`'s `.specific` case, which takes a plain host and
+/// needs no token — so what it costs is a daily budget rather than a DeviceActivity count.
 ///
-/// The phone blocks one through `WebContentSettings.blockedByFilter`, whose `.specific` case
-/// takes plain host strings and needs no token — verified on the device that day: example.com
-/// showed iOS's own "Website Not Allowed" page while amazon.com loaded, and Screen Time's
-/// system-wide content filter was untouched. What it costs is a daily budget, because
-/// DeviceActivity counts only tokens.
-///
-/// This bundle builds for macOS, so it reads the Mac's `TargetKind` and the Mac's `Decision`.
-/// The rule engine underneath is one piece of code and `.host` means the same thing on both,
-/// so what is proved here holds for the phone; what cannot be reached from here is the iOS
-/// `Decision.filteredHosts` and `ShieldReconciler.apply`, which is why `webFilterHosts` is a
-/// property of `Decision` rather than a line inside the reconciler.
+/// Builds for macOS, reading the Mac's `TargetKind`/`Decision`; the shared rule engine makes
+/// this hold for the phone too. Unreachable from here: iOS's `Decision.filteredHosts` and
+/// `ShieldReconciler.apply` — why `webFilterHosts` lives on `Decision` rather than the reconciler.
 @Suite("Websites by name")
 struct HostTargetTests {
 
     // MARK: A rule with hours and no budget
 
-    /// A whole day of budget is what a typed host is saved with: 0 would mean blocked all day,
-    /// and anything smaller would be a limit nothing on the phone could enforce.
+    // A whole day of budget, since 0 would mean blocked all day and anything else an
+    // unenforceable limit.
     let noLimit = Furlough.minutesPerDay
 
     @Test("a whole day of budget is not a limit")
@@ -57,7 +51,6 @@ struct HostTargetTests {
         let text = plainSpaces(TimeFormat.rule(rule, calendar: cal))
         #expect(!text.contains("/day"))
         #expect(text.contains("8:00 PM"))
-        // A real limit still says so.
         let limited = Rule(windows: [window(1200, 1320)], dailyBudgetMinutes: 30)
         #expect(plainSpaces(TimeFormat.rule(limited, calendar: cal)).contains("30 min/day"))
     }
@@ -131,7 +124,6 @@ struct HostTargetTests {
         let target = Target(kind: .host("youtube.com"))
         #expect(target.defaultName == "youtube.com")
         #expect(target.displayName == "youtube.com")
-        // A nickname still wins.
         var nicknamed = target
         nicknamed.nickname = "The time sink"
         #expect(nicknamed.displayName == "The time sink")

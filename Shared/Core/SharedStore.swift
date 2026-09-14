@@ -20,10 +20,9 @@ enum SharedStore {
     #else
     static var isAppGroupAvailable: Bool { UserDefaults(suiteName: Furlough.macAppGroupID) != nil }
 
-    /// The Mac app and its widget share the App Group container. Before the widget existed the
-    /// app kept everything in its own defaults, so the first launch that finds the group empty
-    /// while the old store has state copies the old store across, once. The old keys are left
-    /// where they were. `UserDefaults` is thread-safe but not marked Sendable, hence the unsafe.
+    /// One-time migration: if the App Group is empty but the old (pre-widget) standalone
+    /// defaults has state, copies it across. `UserDefaults` is thread-safe but not Sendable,
+    /// hence the unsafe.
     nonisolated(unsafe) static let defaults: UserDefaults = {
         guard let group = UserDefaults(suiteName: Furlough.macAppGroupID) else { return .standard }
         let old = UserDefaults.standard
@@ -54,17 +53,15 @@ enum SharedStore {
         }
     }
 
-    /// The names Screen Time has told us, by target id. iOS says an app's name in one place
-    /// only — the shield, as it blocks it — and the shield must not write the state, so it
-    /// writes here instead and every `load` folds these into the targets. Everything that has
-    /// to render a name as text rather than as `Label(token)` reads them: the widget, the
-    /// notifications, the Live Activity.
+    /// Names Screen Time has told us, by target id. iOS only reveals an app's name via the
+    /// shield, which must not write the state directly — so it writes here instead, and `load`
+    /// folds these into the targets on every read.
     static func learnedNames() -> [String: String] {
         defaults.dictionary(forKey: namesKey) as? [String: String] ?? [:]
     }
 
-    /// Writes down what iOS called a target. Returns true when this is news, so the caller can
-    /// reload the surfaces that were showing "This app".
+    /// Writes down what iOS called a target; returns true when it's news, so callers can reload
+    /// surfaces still showing "This app".
     @discardableResult
     static func learnName(_ name: String, for id: UUID) -> Bool {
         var names = learnedNames()
@@ -75,19 +72,10 @@ enum SharedStore {
     }
 
     #if os(iOS)
-    /// What the anchor holds that no rule covers, by the name iOS gave it, against the kind it
-    /// is. The anchor's own half of `learnedNames`, and it exists for the same reason: a Screen
-    /// Time token says nothing about what it is, so a thing on the anchor's list and in no rule
-    /// has no name to send to the other devices until something teaches it one.
-    ///
-    /// Keyed by name rather than by kind, because a token cannot be a defaults key and its
-    /// encoded bytes are no promise; the kind is the value, so the walk can check that what was
-    /// named is still on the list and drop it when it is not. The Mac needs none of this — a
-    /// bundle identifier and a host both name themselves.
-    ///
-    /// Two things write it: the shield, the first time it covers something the anchor holds
-    /// (`ShieldExtension`), and Screen Time's own tables where data access exists
-    /// (`AppModel.nameAnchoredKinds`). Never the state, which the shield must not touch.
+    /// The anchor's half of `learnedNames`: what it holds outside any rule, by learned name.
+    /// Keyed by name rather than kind (a token can't be a defaults key reliably), with the kind
+    /// as the value so a stale entry can be dropped when it's no longer on the list. Written by
+    /// the shield and by Screen Time's tables where data access exists; never by the state.
     static func anchorNames() -> [TargetKind: String] {
         guard let stored = defaults.dictionary(forKey: anchorNamesKey) as? [String: Data] else { return [:] }
         var names: [TargetKind: String] = [:]
@@ -109,9 +97,8 @@ enum SharedStore {
         return true
     }
 
-    /// Forgets every name for a kind the anchor no longer holds. Called on the settle that
-    /// reads them, so the map stays the length of the list rather than of everything ever
-    /// anchored.
+    /// Forgets names for kinds no longer held, so the map stays the size of the list, not of
+    /// everything ever anchored.
     static func pruneAnchorNames(keeping kinds: [TargetKind]) {
         guard let stored = defaults.dictionary(forKey: anchorNamesKey) as? [String: Data] else { return }
         let held = Set(kinds)
@@ -123,11 +110,9 @@ enum SharedStore {
     }
     #endif
 
-    /// What Screen Time last said is installed on this phone, keyed the way a usage entry is.
-    /// The usage page opens on this so Apple's icons are there in the same instant as the cards;
-    /// see `TokenCache` for why it is kept and why it is replaced whole. Nil before the first
-    /// answer, and after a reset. Unreadable bytes are treated as no cache: the cost is one slow
-    /// visit, and the next answer overwrites them.
+    /// What Screen Time last said is installed, so the usage page has icons ready immediately.
+    /// Nil before the first answer or after a reset; unreadable bytes are treated as no cache
+    /// (costs one slow visit, then gets overwritten).
     static func tokenCache() -> TokenCache? {
         guard let data = defaults.data(forKey: tokensKey) else { return nil }
         do {
@@ -138,9 +123,8 @@ enum SharedStore {
         }
     }
 
-    /// Writes down an answer from Screen Time. The whole map, not the ranked few: it is also
-    /// what `UsageReader.identities` reads to name a target that has no name yet, and that asks
-    /// about targets no usage card ever mentioned.
+    /// Writes down an answer from Screen Time — the whole map, since `UsageReader.identities`
+    /// also uses it to name targets no usage card mentioned.
     static func save(_ cache: TokenCache) {
         do {
             let data = try encoder.encode(cache)
@@ -195,11 +179,9 @@ enum SharedStore {
     static func logEntries() -> [String] { defaults.stringArray(forKey: logKey) ?? [] }
     static func clearLog() { defaults.removeObject(forKey: logKey) }
 
-    /// The Darwin notification posted after a write another process may be showing: a drop
-    /// from Control Center, the monitor's schedule firing. The app listens
-    /// (`AppModel.changedElsewhere`) so its screen does not say Free over an anchored phone
-    /// until the next activation. It carries nothing; the listener reloads and looks. Every
-    /// process hears it, the poster included, and the listener finds nothing new in that case.
+    /// Darwin notification posted after a write another process may need to react to (a Control
+    /// Center drop, a schedule firing). Carries nothing — the listener just reloads and looks.
+    /// Every process hears it, including the poster.
     static let changeNotification = "com.zachshort.furlough.changed"
 
     static func announceChange() {

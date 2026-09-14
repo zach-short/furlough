@@ -1,41 +1,28 @@
 import SwiftUI
 
-/// The Anchor: apps locked behind a physical tag. One of Home's two pages, beside Rules, rather
-/// than a screen pushed off a card in the middle of the other half — that card is gone, and the
-/// segment in the toolbar is how you get here.
-///
-/// `isCurrent` is whether this is the page in front. A page-style `TabView` builds the page next
-/// to the one you are looking at, and this one can arm an NFC reader on sight: without the flag,
-/// opening Home on Rules would put Apple's scan sheet in front of someone who never asked for it.
-/// Whether it does is itself a setting — off until turned on in Tags, see `AppModel.autoArmsReader`
-/// — so `isCurrent` alone no longer decides it.
+/// The Anchor: apps locked behind a physical tag. One of Home's two pages, beside Rules.
 struct AnchorPage: View {
-    /// Whether this is the half on screen. See above.
+    /// Whether this is the page in front. A page-style `TabView` builds the adjacent page too,
+    /// and this one can arm an NFC reader on sight, so only the current page should do so.
+    /// Also gated by `AppModel.autoArmsReader`, a separate setting.
     let isCurrent: Bool
-    /// Asks Home's add flow for this page's list — the already-blocked offer, then Apple's
-    /// picker. The same call the + button over this page makes, because it is the same act.
     let onChooseApps: () -> Void
     /// Opens a rule editor on the stack this page is in: the grid's way into the other half.
     let onOpenRule: (UUID) -> Void
 
     @Environment(AppModel.self) private var model
     @State private var message: String?
-    /// The name typed into the pairing alert, for a tag the reader found and did not know.
     @State private var draftName = ""
-    /// A drop made from here lifts by itself at `liftMinute`. Off, the tag is the only way
-    /// back, as ever. Not stored: it is how the next drop is made, not a setting.
+    /// Whether the next drop lifts itself at `liftMinute`, rather than only by the tag.
+    /// Not persisted — this only shapes the next drop.
     @State private var liftsBySelf = false
     @State private var liftMinute = 18 * 60
     @State private var pickingLift = false
-    /// A reader is armed and Apple's sheet is up. Only ever seen after the fact, since that
-    /// sheet covers this screen while it is true, but it keeps a second one from being armed
-    /// under the first.
+    /// True while Apple's scan sheet is up, to keep a second reader from being armed under it.
     @State private var listening = false
-    /// A paired tag was held up with the anchor off, so the tag would lock rather than unlock.
-    /// Held here until it is confirmed: a tag that can also anchor is a tag you can shut
-    /// yourself out with by walking past the drawer it lives in.
+    /// A paired tag was held up with the anchor off (which would lock it, not unlock). Held
+    /// until confirmed, since that's a way to lock yourself out.
     @State private var droppingWithTag: PairedTag?
-    /// An unpaired tag was held up, waiting on the offer to keep it.
     @State private var pairingScanned: Data?
 
     @Environment(\.scenePhase) private var scenePhase
@@ -43,7 +30,6 @@ struct AnchorPage: View {
     private var anchor: AnchorProfile { model.state.config.anchor }
     private var anchorCaution: (text: String, isSevere: Bool)? { model.anchorCaution }
 
-    /// The three steps this half is set up in. See `HalfGuide`.
     private var guide: HalfGuide {
         HalfGuide.anchor(config: model.state.config, finished: model.finishedGuides.contains(.anchor))
     }
@@ -52,31 +38,18 @@ struct AnchorPage: View {
         withPresentations(
             ScrollView {
                 Group {
-                    // Before it is set up this page is the checklist and nothing else. Eleven blocks
-                    // with the two that matter sixth and ninth is what it used to be, and it is the
-                    // thing this guide exists to replace rather than to sit on top of.
                     if guide.isRunning { guidePane } else { setUpPane }
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
                 .padding(.bottom, 48)
             }
-            // No wall of its own. Home draws one behind the pager, and both halves stand on
-            // it: Rules already does. A second wall here would be laid over the first at a
-            // different size, so the two would put their glows in two places and the edge
-            // between them would read as a crease under the toolbar.
+            // No wall or title of its own: Home draws the wall behind the pager, and the
+            // toolbar segment already names this page.
             //
-            // No title of its own: Home's segment names this page, and a second "Anchor" in the
-            // same bar would be the app saying it twice.
-            //
-            // Armed on sight, so that holding a tag up is the whole of it. Only when this is the
-            // page in front, and only when the scan has something to do: someone who came here to
-            // choose apps has no tag in hand, and a system sheet in the face every time this page
-            // arrives would be the price of a convenience they are not using yet. The guide's first
-            // step and the reader row both arm it by hand regardless — this only governs whether
-            // arriving does it too, off until asked for in Tags. See `AppModel.autoArmsReader`.
-            //
-            // Keyed on `isCurrent` so a swipe onto this page arms it, the way arriving used to.
+            // Keyed on `isCurrent` so a swipe onto this page arms the reader too, gated by
+            // `AppModel.autoArmsReader` (off by default) so it doesn't surprise someone who
+            // just came here to choose apps.
             .task(id: isCurrent) {
                 guard isCurrent, model.autoArmsReader, anchor.isAnchored || anchor.canAnchor else { return }
                 await listen()
@@ -87,18 +60,14 @@ struct AnchorPage: View {
                 if !current { model.stopReadingTags() }
             }
             .onDisappear { model.stopReadingTags() }
-            // Backgrounding only. A system sheet over the app can take the scene to `.inactive`,
-            // and Apple's scan sheet is one — tearing down there would cancel the reader the
-            // moment it was armed. iOS ends the session on its own when the app truly leaves.
+            // Backgrounding only: Apple's own scan sheet also takes the scene to `.inactive`,
+            // which would cancel the reader the moment it's armed if handled there too.
             .onChange(of: scenePhase) { _, phase in
                 if phase == .background { model.stopReadingTags() }
             }
         )
     }
 
-    /// Pair a tag, choose what it holds, drop it. The severe banner outranks even this: a tag
-    /// that cannot release a locked Mac is the one failure Furlough has no other way out of,
-    /// and it bears on the third step.
     private var guidePane: some View {
         VStack(alignment: .leading, spacing: 0) {
             if !model.cloudAvailable {
@@ -130,27 +99,16 @@ struct AnchorPage: View {
         case 1:
             GuideButton(title: "Choose apps", systemImage: "plus") { chooseApps() }
         case 2:
-            // The real one, so the first drop goes through exactly what every later drop does,
-            // caution dialog and all.
+            // The real button, so the first drop goes through the same path (caution dialog
+            // included) as every later one.
             AnchorToggleButton()
         default:
             EmptyView()
         }
     }
 
-    /// One action, one list, four rows.
-    ///
-    /// It used to be eleven blocks and four footnotes, with the two a person actually taps
-    /// sixth and ninth. What is left is the drop at the top, what it holds under that, and one
-    /// card of rows for everything that is a setting rather than an act — each opening on the
-    /// screen where its own footnote is the first sentence.
-    ///
-    /// No banners. The one about the anchor holding something worth keeping lives on the
-    /// button, which already stops to ask before it drops; the one about iCloud is the Your Mac
-    /// row's status, where the thing it is about is.
     private var setUpPane: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // What the link is asking about on this half, when it is asking anything.
             LinkTraffic(half: .anchor)
                 .padding(.bottom, 6)
             stateCard
@@ -163,10 +121,8 @@ struct AnchorPage: View {
         }
     }
 
-    /// Every sheet, alert and dialog this page can raise, gathered here because the body is
-    /// at the type-checker's limit without them, and because both panes raise the same ones:
-    /// pairing a tag from the guide's first step ends in the naming alert exactly as the tag
-    /// row does.
+    /// Gathered here since `body` is at the type-checker's limit without them, and both panes
+    /// raise the same ones (e.g. pairing from the guide ends in the same naming alert).
     private func withPresentations(_ content: some View) -> some View {
         content
             .sheet(isPresented: $pickingLift) {
@@ -192,9 +148,8 @@ struct AnchorPage: View {
             } message: {
                 Text(tagDropMessage)
             }
-            // The offer and the name in one, rather than a dialog handing off to an alert — the
-            // second of two presentations asked for in the same breath is the one SwiftUI drops.
-            // Naming is the confirmation anyway: what you call it is where you will leave it.
+            // Combined into one alert: SwiftUI drops the second of two presentations requested
+            // in the same breath, so this can't hand off from a dialog to a separate alert.
             .alert(
                 anchor.isPaired ? "Pair this as another key?" : "Pair this tag?",
                 isPresented: Binding(get: { pairingScanned != nil }, set: { if !$0 { pairingScanned = nil } })
@@ -222,14 +177,6 @@ struct AnchorPage: View {
         }
     }
 
-    /// Everything about the drop itself, in one card: where the anchor stands, the button that
-    /// changes it, whether the next drop lifts by itself, and what a tag held up right now would
-    /// do. Three rows that are all the same act, rather than three cards down the page.
-    ///
-    /// The mark is here rather than in a header of its own. The page used to open on an anchor
-    /// glyph beside the word "Anchor", which is what the segment in the toolbar already says;
-    /// what the glyph is actually good for is saying at a glance whether the anchor is down, and
-    /// that is this card's whole job.
     private var stateCard: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
@@ -250,8 +197,6 @@ struct AnchorPage: View {
                 CardDivider()
                 timedRow
             }
-            // Last, because it is the one row that is not a control: it says what the phone is
-            // already listening for, and tapping it only starts listening again.
             if TagScanner.isAvailable {
                 CardDivider()
                 readerRow
@@ -260,9 +205,6 @@ struct AnchorPage: View {
         .emberCard()
     }
 
-    /// Schedule, Tags, Scope and Your Mac: the four things about the anchor that are settings
-    /// rather than acts. Each was a card and a footnote on this page; each is a row and a screen
-    /// now, and the footnote is the first sentence you read when the screen opens.
     private var settingsCard: some View {
         VStack(spacing: 0) {
             settingsRow(title: "Schedule", detail: scheduleSummary) { AnchorScheduleScreen() }
@@ -271,14 +213,10 @@ struct AnchorPage: View {
             CardDivider()
             settingsRow(title: "Scope", detail: scopeSummary) { AnchorScopeScreen() }
             CardDivider()
-            // The dot, and the iCloud warning folded into the words beside it. It used to be a
-            // severe banner at the top of the page; it belongs on the one row it is about, which
-            // is also the only row that can be wrong without anybody having done anything.
             settingsRow(title: "Devices", detail: macSummary, dot: macDot) { AnchorMacScreen() }
         }
         .emberCard()
-        // Asked when the page opens, so the row is about now rather than about whenever the app
-        // last happened to hear something.
+        // Checked on open so the row reflects the current state, not a stale cached one.
         .task { model.checkLink() }
     }
 
@@ -363,9 +301,8 @@ struct AnchorPage: View {
         return "\(held) · ready"
     }
 
-    /// The moment a drop made now would lift by itself: the chosen time later today, or
-    /// tomorrow when it is already past or too close — the monitor cannot be woken for less
-    /// than a quarter of an hour. Nil when the tag is the only way back.
+    /// Nil when the tag is the only way back. Rolls to tomorrow if today's time is already
+    /// past or within `Furlough.minimumWindowMinutes` (the monitor's minimum wake window).
     private var timedUntil: Date? {
         guard liftsBySelf else { return nil }
         let now = model.clock.now
@@ -376,9 +313,6 @@ struct AnchorPage: View {
         return Policy.date(atMinute: liftMinute, of: tomorrow)
     }
 
-    /// Whether the next drop lifts by itself. Off, the tag is the only way back, as ever. A row
-    /// inside the state card rather than a card of its own: it is a term of the drop the button
-    /// above it makes, and reads as one only while it is beside that button.
     private var timedRow: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 12) {
@@ -409,8 +343,7 @@ struct AnchorPage: View {
         return "Anchor lifts \(day) at \(TimeFormat.clock(until)), or sooner with the tag."
     }
 
-    /// The page's live gesture: one reader, armed, whose outcome the tag decides. Tapping it
-    /// arms it again — after the cancel, or after the minute Core NFC gives a session runs out.
+    /// Tapping re-arms the reader, needed after a cancel or after Core NFC's session times out.
     private var readerRow: some View {
         Button {
             Task { await listen() }
@@ -440,8 +373,6 @@ struct AnchorPage: View {
         .disabled(listening)
     }
 
-    /// Whether a tag held up right now would do the thing this screen is for, rather than be
-    /// turned into a key. Only the colour of the glyph turns on it.
     private var readerIsUseful: Bool { anchor.isAnchored || anchor.canAnchor }
 
     private var readerTitle: String {
@@ -466,9 +397,6 @@ struct AnchorPage: View {
         return "A paired tag anchors, and asks first. A tag Furlough does not know is offered as another key."
     }
 
-    /// What a tag-drop would take away, and how it comes back. The caution the Anchor button
-    /// shows, where there is one, plus the lift the timed card is set to — the two halves of
-    /// what someone is agreeing to when the tag becomes the lock as well as the key.
     private var tagDropMessage: String {
         let lift = timedUntil.map { "It lifts at \(TimeFormat.clock($0)), or sooner with a tag." }
             ?? "Nothing but a tag lifts it."
@@ -476,9 +404,7 @@ struct AnchorPage: View {
         return "\(anchor.heldDescription) goes behind the tag. \(lift)"
     }
 
-    /// Arms one reader and acts on what it reads. Never in a loop: Core NFC stops listening
-    /// after about a minute, and a sheet that came back on its own would be a sheet nobody
-    /// asked for — the card is there to ask again.
+    /// Never re-arms in a loop: Core NFC's session stops on its own after about a minute.
     private func listen() async {
         guard TagScanner.isAvailable, !listening else { return }
         listening = true
@@ -486,13 +412,10 @@ struct AnchorPage: View {
         switch await model.readTag(prompt: readerPrompt) {
         case .read(let reading): act(on: reading)
         case .failed(let why): message = why
-        // Cancelled, or the minute run out. An answer, not a fault.
         case .quiet: break
         }
     }
 
-    /// What Apple's sheet says while it waits. Written from the state the reader was armed in,
-    /// which is the state the person holding the tag is looking at.
     private var readerPrompt: String {
         if anchor.isAnchored { return "Hold your iPhone to a paired tag to weigh anchor." }
         if !anchor.isPaired { return "Hold your iPhone to the tag you want to pair." }
@@ -515,8 +438,6 @@ struct AnchorPage: View {
         }
     }
 
-    /// The drop a tag asked for, on the terms the screen is showing: the timed card's lift if
-    /// it is on, the tag alone if it is not — the same drop its own Anchor button makes.
     private func dropWithTag() {
         switch model.anchor(until: timedUntil) {
         case .failed(let reason): message = reason
@@ -524,9 +445,8 @@ struct AnchorPage: View {
         }
     }
 
-    /// Keeps a tag that was held up and not recognised, under the name typed in the same
-    /// breath. An empty name is left as the placeholder the model assigned — `renameTag`
-    /// ignores it — so a tag is never nameless, only unhelpfully named.
+    /// An empty typed name is ignored by `renameTag`, which keeps the model's placeholder —
+    /// a tag is never nameless, only unhelpfully named.
     private func keep(_ scanned: Data) {
         switch model.pair(identifier: scanned) {
         case .paired(let tag): model.renameTag(id: tag.id, to: draftName)
@@ -535,9 +455,6 @@ struct AnchorPage: View {
         }
     }
 
-    /// What the anchor holds, as a grid of icons, and the one way to change it. The list itself
-    /// is the page's second card; everything about *how* the list is read — the scope it is a
-    /// list under — is a row in the third.
     private var appsCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             if anchor.kinds.isEmpty {
@@ -550,8 +467,6 @@ struct AnchorPage: View {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 6), spacing: 10) {
                     ForEach(Array(anchor.kinds.enumerated()), id: \.offset) { _, kind in
                         TokenTile(kind: kind, size: 44)
-                            // The mirror of the anchor on a rules row: this one has hours in
-                            // the other half. Overlaid rather than listed, for the same reason.
                             .overlay(alignment: .bottomTrailing) {
                                 if model.state.config.target(kind: kind)?.rule != nil {
                                     RuledBadge().offset(x: 4, y: 4)
@@ -596,16 +511,8 @@ struct AnchorPage: View {
         }
     }
 
-    /// The way in to what the anchor holds, from the card and from the guide's second step.
-    /// Home's add flow owns the sheet and the picker now — the same pipeline the + button uses,
-    /// so this page's own row and the button above it cannot drift apart.
     private func chooseApps() { onChooseApps() }
 
-    /// The other half, from a tile: hours for something the anchor already holds.
-    ///
-    /// A long press rather than a row, for the same reason the rules row wears a mark rather
-    /// than a section: the grid is the anchor's list, and a way into the rules half must not
-    /// turn it into a list of rules as well.
     @ViewBuilder
     private func gridMenu(for kind: TargetKind) -> some View {
         if let target = model.state.config.target(kind: kind) {
@@ -620,11 +527,8 @@ struct AnchorPage: View {
     }
 }
 
-/// The Anchor's first offer, before Apple's picker: the apps and sites Furlough already blocks,
-/// every one checked to start, with All / None and a row each to change that. Adding takes in
-/// what is checked; "Choose from all apps instead" goes on to the picker. Shown while the
-/// anchor holds nothing and something has a rule, so a list that starts empty starts with what
-/// matters rather than with the whole phone.
+/// The Anchor's first offer, before Apple's picker: apps and sites already blocked, all checked
+/// to start. Shown when the anchor holds nothing but something already has a rule.
 struct AnchorFromRulesSheet: View {
     let candidates: [Target]
     let onAdd: ([UUID]) -> Void
@@ -775,9 +679,8 @@ struct AnchorFromRulesSheet: View {
     }
 }
 
-/// Edits the anchor's drop times as one draft with one Save, the way a rule is edited,
-/// because the whole set is classified at once: more drops or longer holds land now, fewer
-/// or shorter ones queue behind the delay. The banner above Save says which before it happens.
+/// Edits the anchor's drop times as one draft with one Save; the whole set is classified at
+/// once, so a looser change queues behind the delay while a tightening lands now.
 struct AnchorScheduleSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -891,14 +794,9 @@ struct AnchorScheduleSheet: View {
         }
     }
 
-    /// A row's binding, found by id rather than by position.
-    ///
-    /// `ForEach($drafts)` hands each row a binding that subscripts `drafts` at the index it had
-    /// when the row was made, and removing a row leaves the binding it handed that row pointing
-    /// past the end. The row is still in the tree while its own removal is dispatched, and its
-    /// `Toggle` reads `liftsBySelf` — and so `schedule` — on the way out, which trapped on the
-    /// out-of-range subscript: tapping the minus on the last drop time crashed the app. A lookup
-    /// by id cannot go out of range, and an edit arriving for a row that is gone is dropped.
+    /// By id, not index: `ForEach($drafts)`'s positional binding goes out of range when a row
+    /// removes itself while still momentarily in the tree, which crashed on the last row's
+    /// remove button. An edit for a row that's gone is silently dropped instead.
     private func binding(for draft: AnchorSchedule) -> Binding<AnchorSchedule> {
         Binding(
             get: { drafts.first { $0.id == draft.id } ?? draft },

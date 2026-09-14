@@ -1,38 +1,18 @@
 import Foundation
 
-/// How many DeviceActivity activities the rules would need, and whether iOS will take them.
+/// Checks the DeviceActivity activity ceiling (20) before Save, since `Monitoring.register`
+/// only refuses *after* the rule is already saved and in force. iOS-only; the Mac enforces
+/// from its own timer loop and never consults this.
 ///
-/// iOS monitors at most 20 activities at once. Furlough spends one on the daily budget tracker
-/// and one on each distinct window span — whatever days that span applies on — so 19 spans is
-/// the ceiling. `Monitoring.register` already refuses past it, but it runs *after* the rule is
-/// saved: the editor accepted the rule, registration threw, and the reason turned up in Settings
-/// with the rule already in force and nothing monitored. This is the same count run before Save,
-/// so the editor can say no while the rule is still a draft.
-///
-/// This is an iOS constraint only. The Mac has no DeviceActivity — `Monitoring.swift` is in the
-/// iOS app target and the Mac enforces from its own timer loop — so nothing there is limited by
-/// it and the Mac's editor does not consult this. It lives in `Shared/Core` beside the rest of
-/// the engine and is harmlessly unused on the Mac, the way `Hosts` is on the phone.
-///
-/// The projection has to match `AppModel.assign` rather than just swapping the rule in. A
-/// tightening replaces the target's rule; a loosening is queued *alongside* it, and
-/// `Monitoring.register` registers pending rules too, so a loosening can need the spans of the
-/// old rule and the new one at the same time. Counting only the new rule would let exactly the
-/// edit that overflows through.
+/// Projections must match `AppModel.assign`'s tightening-lands/loosening-queues rule: a
+/// loosening is registered alongside the old rule, so both count until it lands.
 enum ActivityLimit {
-    /// One of the 20 is always the daily budget tracker.
-    ///
-    /// Per-weekday budgets do not press on this ceiling. A budget is a `DeviceActivityEvent`
-    /// carried *by* the day activity, not an activity of its own, so a rule that asks for seven
-    /// different budgets still costs the one activity every rule costs — only the event count
-    /// inside it grows. The 20 is spent on the day tracker plus one per distinct window span,
-    /// and that is why this counts spans and nothing else.
+    /// Per-weekday budgets don't add activities — they're `DeviceActivityEvent`s carried by
+    /// the one day activity, so only window spans count toward the ceiling.
     static var maxSpans: Int { Furlough.maxActivities - 1 }
 
-    /// Every distinct span the state would ask iOS to monitor. Mirrors what
-    /// `Monitoring.register` collects: saved rules plus queued ones, spans stripped of their
-    /// days so the same hours on different days count once, and nothing at all from a rule that
-    /// never allows anything.
+    /// Mirrors `Monitoring.register`: saved rules plus queued ones, spans stripped of days so
+    /// equal hours on different days count once.
     static func spans(in state: SharedState) -> Set<TimeWindow> {
         var spans = Set<TimeWindow>()
         func include(_ rule: Rule) {
@@ -50,9 +30,8 @@ enum ActivityLimit {
         return spans
     }
 
-    /// The minutes the anchor's activities sit at: every schedule's drop minute and every lift
-    /// minute, saved schedules and queued ones together, the way `spans` takes saved rules and
-    /// queued ones — a queued schedule change can carry a minute of its own before it lands.
+    /// Saved schedules plus queued ones, like `spans` — a queued schedule can carry a minute
+    /// of its own before it lands.
     static func anchorMinutes(in state: SharedState) -> (drops: Set<Int>, lifts: Set<Int>) {
         var schedules = state.config.anchor.schedules
         for change in state.pending {
@@ -61,29 +40,25 @@ enum ActivityLimit {
         return (Set(schedules.map(\.minuteOfDay)), Set(schedules.compactMap(\.liftMinuteOfDay)))
     }
 
-    /// How many activities the anchor's clock needs: one per distinct drop minute, one per
-    /// distinct lift minute, and one for a timed anchor's own `until` while it holds.
+    /// One per distinct drop minute, one per distinct lift minute, plus one for a timed
+    /// anchor's own `until` while it holds.
     static func anchorActivities(in state: SharedState) -> Int {
         let minutes = anchorMinutes(in: state)
         let timed = state.config.anchor.isAnchored && state.config.anchor.until != nil ? 1 : 0
         return minutes.drops.count + minutes.lifts.count + timed
     }
 
-    /// Everything besides the day activity: the window spans and the anchor's times. This is
-    /// the number the ceiling is judged against.
     static func activities(in state: SharedState) -> Int {
         spans(in: state).count + anchorActivities(in: state)
     }
 
-    /// Named when the count includes the anchor's times, so the sentence is not a lie.
+    /// Only worded in when the anchor actually adds to the count.
     private static func anchorClause(_ state: SharedState) -> String {
         anchorActivities(in: state) > 0 ? " and the Anchor's drop and lift times" : ""
     }
 
-    /// Nil when the anchor's drop times fit alongside the windows. Otherwise why not, for the
-    /// banner above the schedule's Save. Counted with the current schedules still in place,
-    /// the way a queued rule counts beside the saved one: a loosening leaves both live until
-    /// it lands, and a tightening that adds a minute needs it from the moment it is saved.
+    /// Nil when the anchor's drop times fit. Counted with the current schedules still in
+    /// place, like a queued rule counts beside the saved one.
     static func reason(schedules: [AnchorSchedule], in state: SharedState) -> String? {
         var copy = state
         copy.pending.append(PendingChange(kind: .setAnchorSchedules(schedules), effectiveAt: .distantFuture))
@@ -92,14 +67,12 @@ enum ActivityLimit {
         return "That would need \(needed) windows and anchor times across everything Furlough manages, and iOS allows \(maxSpans). Drop a time, or give it a minute another drop or lift already uses."
     }
 
-    /// The state as saving `rule` for each of `targetIDs` would leave it, following the same
-    /// tightening-lands / loosening-queues rule the model uses. Nothing is persisted.
+    /// Follows `AppModel.assign`'s tightening-lands/loosening-queues rule. Nothing persisted.
     static func projecting(_ rule: Rule, appliedTo targetIDs: [UUID], in state: SharedState) -> SharedState {
         var copy = state
         for id in targetIDs {
             guard let index = copy.config.targets.firstIndex(where: { $0.id == id }) else { continue }
             let target = copy.config.targets[index]
-            // An unchanged rule is left alone, exactly as `assign` leaves it.
             guard !(target.rule?.isEquivalent(to: rule) ?? false) else { continue }
             copy.pending.removeAll { change in
                 if case .setRule(let targetID, _) = change.kind { return targetID == id }
@@ -116,7 +89,7 @@ enum ActivityLimit {
         return copy
     }
 
-    /// Nil when the rule fits once saved. Otherwise why it does not, for the banner above Save.
+    /// Nil when the rule fits once saved; otherwise the banner text for above Save.
     static func reason(applying rule: Rule, to targetIDs: [UUID], in state: SharedState) -> String? {
         let projected = projecting(rule, appliedTo: targetIDs, in: state)
         let needed = activities(in: projected)
@@ -124,29 +97,16 @@ enum ActivityLimit {
         return "That would need \(needed) different windows across everything Furlough manages\(anchorClause(projected)), and iOS allows \(maxSpans). Merge or drop a window, or give this app hours another app already uses."
     }
 
-    /// The state as applying a whole import would leave it.
-    ///
-    /// Projected by running the real `ConfigImport.apply` against a copy rather than by a second
-    /// reading of what an import does: an import arrives as twenty edits at once, each of which
-    /// may land or queue, and a projection that guessed differently from the thing it is
-    /// predicting would be worth less than no projection at all. `plannedAt` stands in for the
-    /// clock — nothing is persisted and a span count does not depend on when anything lands, so
-    /// this stays a pure function of the plan and the state.
+    /// Projects by running the real `ConfigImport.apply` on a copy, rather than reimplementing
+    /// import logic, so the projection can't diverge from the real apply.
     static func projecting(_ plan: ImportPlan, in state: SharedState) -> SharedState {
         var copy = state
         ConfigImport.apply(plan, to: &copy, now: plan.plannedAt)
         return copy
     }
 
-    /// Nil when the import fits once applied. Otherwise why it does not, for the review.
-    ///
-    /// Counted before the button rather than at registration, and for a worse reason than the
-    /// editor's. `Monitoring.register` runs *after* `applyImport` has saved, and `enforce`
-    /// catches what it throws and saves anyway — so an oversized import lands whole, registration
-    /// fails, nothing at all is monitored, and the only sign of it is a row in Settings. The
-    /// queued half counts too: `spans` gathers pending rules exactly as registration does, so
-    /// the loosenings in a file press against the ceiling from the moment Apply is pressed,
-    /// a day before any of them are in force.
+    /// Checked before Apply, since an oversized import would otherwise save whole and silently
+    /// fail to register. Queued rules count too, matching how `spans` gathers pending rules.
     static func reason(applying plan: ImportPlan, in state: SharedState) -> String? {
         let projected = projecting(plan, in: state)
         let needed = activities(in: projected)

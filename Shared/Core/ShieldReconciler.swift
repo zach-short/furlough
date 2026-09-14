@@ -8,23 +8,20 @@ enum ShieldReconciler {
     }
 
     @discardableResult
-    /// `now` is Furlough's own time; it defaults to reading it, so no caller can hand the
-    /// shields a device clock that was moved forward.
+    /// `now` is Furlough's own time; defaults to reading it, so no caller can hand the shields
+    /// a moved-forward device clock.
     static func reconcile(now: Date? = nil, reason: String) -> Decision {
         var state = SharedStore.load()
         let now = now ?? state.now
         if Policy.applyDuePending(&state, now: now) {
             SharedStore.log("applied due pending changes during reconcile")
         }
-        // Folded here the way due pending changes are: `Policy` has read the anchor as
-        // released since its time passed, and this makes the stored flag agree in whichever
-        // process reconciles first — the monitor's wake at `until` being the one that makes
-        // sure some process does.
+        // Makes the stored `isAnchored` flag agree with what `Policy` already reads as released;
+        // the monitor's wake at `until` guarantees some process runs this.
         if Policy.liftExpiredAnchor(&state.config, now: now) {
             SharedStore.log("a timed anchor's time had passed; lifted it during reconcile")
         }
-        // What the Mac wrote, if anything: every wake in every process is a chance to hear of
-        // a drop made elsewhere, and the merge is pure and idempotent.
+        // Pulls what another device wrote, if anything; pure and idempotent.
         if let note = AnchorSync.pull(into: &state.config, now: now) {
             SharedStore.log("iCloud anchor: \(note)")
         }
@@ -47,19 +44,13 @@ enum ShieldReconciler {
     static func apply(_ decision: Decision) {
         let store = store
         store.shield.applications = decision.shieldedApps.isEmpty ? nil : decision.shieldedApps
-        // The category policies and the filter are worked out on the decision, where the sets
-        // they are built from live and where the three cases each has can be read together:
-        // nothing, the blocked categories with the open apps excepted, or — with the anchor
-        // over the whole phone — `.all(except:)` the allowlist.
+        // Category policy and filter live on `Decision`, next to the sets they're built from.
         store.shield.applicationCategories = decision.appCategoryPolicy
         store.shield.webDomains = decision.shieldedWeb.isEmpty ? nil : decision.shieldedWeb
         store.shield.webDomainCategories = decision.webCategoryPolicy
-        // Typed hosts, which have no token to shield. `.specific` names exactly these and
-        // touches nothing else: verified on the phone 2026-09-08 with a throwaway store —
-        // example.com showed iOS's own "Website Not Allowed" page while amazon.com loaded, and
-        // Screen Time's system-wide content filter stayed as it was. `.auto` is the case that
-        // would have switched Apple's adult filter on for the whole phone; it is not used.
-        // `.all(except:)` is, while the anchor holds everything: see `Decision.webFilter`.
+        // Typed hosts have no token to shield, so this uses the filter instead. `.specific`
+        // blocks exactly these; `.auto` is deliberately avoided since it would also switch on
+        // Apple's adult content filter for the whole phone. Verified on the phone 2026-09-08.
         store.webContent.blockedByFilter = decision.webFilter
         // Deny deleting apps only while something is shielded, so the flag can never outlive a block.
         store.application.denyAppRemoval = decision.isAnythingShielded ? true : nil

@@ -1,5 +1,5 @@
-// Flattens AnchorMark.outline into polygons and emits an OpenSCAD module, so the
-// engraving in the puck is the app's own mark rather than a redraw of it.
+// Flattens AnchorMark.outline into an OpenSCAD module, so the engraving matches the app's
+// mark exactly rather than a redraw of it.
 import Foundation
 import CoreGraphics
 import SwiftUI

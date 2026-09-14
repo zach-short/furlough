@@ -1,10 +1,8 @@
 import SwiftUI
 
-/// The first moment of a launch for someone who has already set Furlough up. After a cold
-/// start FamilyControls says "not determined" until it has asked the system, which used to
-/// flash onboarding before Home. Instead the root holds this screen for `Launch.hold` and then
-/// dissolves it into the app. It draws no wall of its own: the root's wall stays put
-/// underneath, so the dissolve moves only the hourglass and the name.
+// Covers the window where FamilyControls reports "not determined" after a cold start, which
+// used to flash onboarding before Home. Draws no wall of its own — the root's wall stays put
+// underneath so the dissolve only moves the hourglass and name.
 struct LaunchView: View {
     @State private var appeared = false
 
@@ -24,7 +22,6 @@ struct LaunchView: View {
     }
 }
 
-/// The launch screen's timing, in one place.
 enum Launch {
     /// The wall, the hourglass and the name fade up from the flat launch colour.
     static let rise: TimeInterval = 0.45
@@ -37,7 +34,7 @@ enum Launch {
 }
 
 extension HourglassState {
-    /// Sand running under a quiet amber glow: nothing about any target, just the app waking up.
+    // Not tied to any target — just an idle animation while the app wakes up.
     static let launching = HourglassState(
         sandLevel: 0.62, moundLevel: 0.38, isRunning: true, glow: Ember.amber, glowStrength: 0.6, pulse: .slow
     )

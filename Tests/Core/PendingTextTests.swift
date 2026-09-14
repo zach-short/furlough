@@ -1,10 +1,7 @@
 import Foundation
 import Testing
 
-/// A pending card names both sides of the change, because the side you wrote is the side you
-/// already know. These pin the pairing, not the formatting: `TimeFormatTests` owns the wording
-/// of a rule, and what matters here is that "now" is what is still enforced and "becomes" is
-/// what replaces it.
+/// These pin the now/becomes pairing, not the wording — `TimeFormatTests` owns a rule's phrasing.
 @Suite("Pending card copy")
 struct PendingTextTests {
     private let evening = Rule(windows: [window(20 * 60, 22 * 60)], dailyBudgetMinutes: 30)
@@ -49,8 +46,7 @@ struct PendingTextTests {
         #expect(PendingText.delta(for: change, in: config, calendar: cal).now == "Not configured yet")
     }
 
-    /// A target can be gone by the time the card is drawn (removed on another device, or a
-    /// stale change). The card must still render rather than trap.
+    // A target can be gone by the time the card draws (removed elsewhere, a stale change); it must not trap.
     @Test("An unknown target still produces both halves")
     func unknownTargetIsSafe() {
         let config = makeConfig([])
@@ -69,8 +65,7 @@ struct PendingTextTests {
         #expect(delta.becomes == "12 hours")
     }
 
-    /// The tier's name alone does not say what changing it buys, and buying a shorter wait is
-    /// the entire point of the change, so both halves carry the wait.
+    // The tier's name alone doesn't say what changing it buys, so both halves carry the wait.
     @Test("A tier change names the wait on each side")
     func utilityShowsTheWait() {
         var target = makeTarget("Messages", rule: evening)
@@ -82,8 +77,8 @@ struct PendingTextTests {
         #expect(delta.becomes == "Essential · waits 6 hours")
     }
 
-    /// `utilityLevel` is nil until someone picks a tier, and `Target.utility` answers `.unset`
-    /// (= useful) for that. The card has to show the tier actually in force, not a blank.
+    // `utilityLevel` is nil until picked; `Target.utility` answers `.unset` (= useful) for that,
+    // and the card must show the tier actually in force, not a blank.
     @Test("A target that was never tiered shows the tier it is treated as")
     func untieredTargetShowsUnset() {
         let target = makeTarget("Messages", rule: evening)
@@ -93,8 +88,7 @@ struct PendingTextTests {
         #expect(PendingText.delta(for: change, in: config, calendar: cal).now == "\(Utility.unset.label) · waits 1 day")
     }
 
-    /// The floor in `Config.delayHours(for:)` is what the copy has to agree with: a short base
-    /// and an essential target must not read as no wait at all.
+    // Must agree with the floor in `Config.delayHours(for:)`: never reads as no wait at all.
     @Test("The wait shown never drops below the floor")
     func waitRespectsTheFloor() {
         let target = makeTarget("Messages", rule: evening)

@@ -3,9 +3,7 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(AppModel.self) private var model
-    /// The launch screen has had its time. Only ever set when one was shown.
     @State private var revealed = false
-    /// The wall fades up under the launch screen; every screen draws its own wall over it.
     @State private var lit = false
 
     private var holdsLaunch: Bool { model.wasAuthorized && !revealed }
@@ -24,14 +22,10 @@ struct RootView: View {
                 OnboardingView()
                     .transition(.opacity)
             } else if model.showsUsageStep {
-                // The step between access and the first rule: a fortnight of use, app by app,
-                // with the rule each one would take. Skippable, and Settings opens the same
-                // screen again whenever it is wanted.
                 UsageView(role: .onboarding)
                     .transition(.opacity)
             } else {
-                // The half the intro was told to start on. Read once, here, so Home's own state
-                // owns it from then on and a swipe is not undone by the next rebuild.
+                // Read once: Home owns `half` from then on, so a swipe isn't undone by rebuild.
                 HomeView(start: model.startHalf)
                     .transition(.opacity)
             }
@@ -53,9 +47,7 @@ struct RootView: View {
         } message: {
             Text(model.lastError ?? "")
         }
-        // What an App Intent has to say, once it is back in an app that can say it. Its own
-        // alert rather than `lastError`: none of these is a thing going wrong, and the wrong
-        // tag least of all — that is the anchor working.
+        // Separate from `lastError`: this covers App Intent outcomes, not failures.
         .alert(
             "Furlough",
             isPresented: Binding(
@@ -67,10 +59,8 @@ struct RootView: View {
         } message: {
             Text(model.notice ?? "")
         }
-        // Where to leave the first tag, the moment it is paired. Raised from here rather than
-        // from either pairing screen because there are two of them — the Anchor page's armed
-        // reader and the Tags screen's Pair a tag — and one of those is a screen pushed onto
-        // Home's own stack, which a sheet presented from the root covers either way.
+        // Raised from the root (not from either pairing screen) since one of them is pushed
+        // onto Home's own nav stack, which a root-level sheet covers either way.
         .sheet(
             isPresented: Binding(
                 get: { model.placingTagID != nil },
@@ -81,8 +71,6 @@ struct RootView: View {
         }
     }
 
-    /// Keeps the launch screen up for its fixed time, and a little longer only if iOS has not
-    /// yet said whether Screen Time access still stands, then dissolves it into the app.
     private func holdLaunch() async {
         guard holdsLaunch else {
             lit = true

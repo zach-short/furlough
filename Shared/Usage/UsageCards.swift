@@ -1,23 +1,17 @@
 import SwiftUI
 
-/// The pictures a usage card is made of, drawn the same way wherever the numbers come from.
-/// The phone app has them in hand on iOS 26.4 (`UsageReader.hasDataAccess`) and draws these
-/// itself; everywhere else only the report extension ever sees a number, and it draws the very
-/// same shapes inside its sandbox. Nothing here reaches for Screen Time: give it a histogram
-/// and a `Recommendation` and it draws.
+/// The pictures a usage card is made of, drawn the same way wherever the numbers come from: the
+/// phone app draws these directly, the report extension draws the same shapes in its sandbox.
+/// Nothing here reaches for Screen Time itself — give it a histogram and a `Recommendation`.
 
-/// What the app and the report extension agree a hosted card measures. A report cannot tell
-/// its host how tall it wants to be, so the height is settled here instead of guessed twice:
-/// room for two rows of bars, two strips, and two lines of prose at each of the two places
-/// prose appears. Content is top-aligned, so a shorter card simply leaves space.
+/// A report can't tell its host how tall it wants to be, so the height is fixed here instead of
+/// guessed twice; content is top-aligned so a shorter card just leaves space.
 enum UsageReportFrame {
     static let height: CGFloat = 380
 }
 
-/// Where the time goes: an average day hour by hour, with the hours a rule would close lit in
-/// ember and banded behind, so the closure reads as one stretch and not as scattered bars.
-/// `tallest` is the minutes the full height stands for; two rows given the same one compare
-/// honestly, which is the whole point of showing weekdays beside weekends.
+/// `tallest` is the minutes the full height represents — shared across rows so weekdays and
+/// weekends compare honestly on one scale.
 struct HourBars: View {
     let hourly: [Double]
     let closed: Set<Int>
@@ -49,7 +43,6 @@ struct HourBars: View {
     }
 }
 
-/// Midnight, 6, noon, 6 under a set of bars, so the shape above has a clock to sit on.
 struct HourAxis: View {
     var body: some View {
         HStack(spacing: 0) {
@@ -63,15 +56,13 @@ struct HourAxis: View {
     }
 }
 
-/// The whole "where" picture: one row of bars, or weekdays above weekends when the suggestion
-/// tells them apart, both on one scale, with the clock beneath.
 struct UsageHours: View {
     let histogram: UsageHistogram
     let item: Recommendation?
 
     private var rows: [UsageRow] { UsageRow.rows(for: item) }
 
-    /// The busiest hour on any row drawn: the height every row is measured against.
+    /// The height every row is measured against.
     private var tallest: Double {
         rows.map { histogram.hourlyAverage(on: $0.days).max() ?? 0 }.max() ?? 0
     }
@@ -94,9 +85,8 @@ struct UsageHours: View {
     }
 }
 
-/// One day as a 24-hour strip: cream where the rule lets the app open, ember where it closes
-/// it. The rule as a picture, which is the only form of it anybody reads at a glance. Named
-/// for its hours, not its days: the rule editor's `DayStrip` is the row of seven day toggles.
+/// One day as a 24-hour strip: cream where open, ember where closed. Named for its hours, not
+/// its days — the rule editor's `DayStrip` is the row of seven day toggles.
 struct HourStrip: View {
     let closed: Set<Int>
     var height: CGFloat = 13

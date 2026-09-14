@@ -2,25 +2,11 @@ import FamilyControls
 import SwiftUI
 
 /// The first run: the promise, the question, the ask.
-///
-/// Three panes, and the middle one is the point. Furlough is two things — Rules, which are hours
-/// and budgets and a delay on anything that hands time back, and the Anchor, which is one tap and
-/// a physical tag as the only key. The intro used to name both and then hand everyone the same
-/// app, built around Rules, with the Anchor a card someone had to find. So the second pane asks
-/// which half you came for, and the answer is what the app opens on and which guide runs. The
-/// two panes that used to explain a half each are gone: every sentence on them now lands inside
-/// the guide step it describes, where it can be acted on rather than read and forgotten.
-///
-/// The ask is last and on its own, because both halves are enforced by Screen Time and because
-/// the gentler first week starts the moment access is granted, which is a thing to be told
-/// immediately before granting it rather than two screens earlier.
 struct OnboardingView: View {
     @Environment(AppModel.self) private var model
     @State private var requesting = false
     @State private var pane: Pane = .promise
-    /// The start pane's answer, held until Continue. The Anchor leads: it is the half nobody
-    /// was being offered, and a preselected first row asks the question without putting a dead
-    /// button under it.
+    /// Defaults to `.anchor` so the row is preselected without a dead Continue button.
     @State private var chosen: Half = .anchor
     @State private var wantsBoth = false
 
@@ -50,6 +36,8 @@ struct OnboardingView: View {
                 // two ways of moving cannot disagree. The mark rides inside each page, which is
                 // what makes a swipe carry the whole screen rather than slide the words out
                 // from under a mark that stayed put.
+                // Mark lives inside each page (not outside) so a swipe carries it along instead
+                // of sliding text under a fixed mark.
                 TabView(selection: $pane) {
                     ForEach(Pane.allCases, id: \.self) { pane in
                         ScrollView {
@@ -66,23 +54,18 @@ struct OnboardingView: View {
                         .tag(pane)
                     }
                 }
-                // The pager's own dots would sit over the button and count in the wrong style,
-                // so they are off and `PaneDots` below draws them beside Back.
+                // Built-in page dots would overlap the button; PaneDots draws them instead.
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 footer
                     .padding(.horizontal, 24)
                     .padding(.bottom, 12)
-                    // Only the footer animates on the pane changing; the pager runs its own
-                    // transition, and a second one over the top of it stutters.
+                    // Footer only — animating the pager too causes a stutter.
                     .animation(.snappy(duration: 0.28), value: pane)
             }
         }
-        // A phone that has already been through the panes and had access refused comes back to
-        // the ask rather than to page one. The intro is not the thing it is stuck on.
+        // Returning after a prior denial goes straight to the access pane, not page one.
         .onAppear { if model.authorization == .denied { pane = .access } }
-        // The answer is committed on the way forward off the start pane, which is the one place
-        // both ways of leaving it meet: Continue sets `pane` and so does a swipe. Going Back
-        // does not commit, so a finger on its way somewhere else changes nothing.
+        // Committed only when moving forward off .start (Continue or swipe) — going Back doesn't commit.
         .onChange(of: pane) { old, new in
             guard old == .start, new.rawValue > Pane.start.rawValue else { return }
             model.chooseStart(half: chosen, both: wantsBoth)
@@ -91,9 +74,6 @@ struct OnboardingView: View {
 
     // MARK: The mark
 
-    /// The glass on the panes about the whole app, and both marks together on the one that asks
-    /// you to choose between them — the picture of the question, in the order the rows are in.
-    /// Bare marks rather than the row tiles they wear elsewhere: glowing objects, no furniture.
     @ViewBuilder private func mark(for pane: Pane) -> some View {
         if pane == .start {
             HStack(spacing: 16) {
@@ -127,8 +107,6 @@ struct OnboardingView: View {
         }
     }
 
-    /// Both halves on one screen, named, with a row each. Whatever else is skipped, this is the
-    /// screen that has to leave behind the fact that there are two of them.
     private var promise: some View {
         VStack(alignment: .leading, spacing: 0) {
             Eyebrow(text: "Furlough", color: Ember.amber)
@@ -142,8 +120,7 @@ struct OnboardingView: View {
                 .foregroundStyle(Ember.muted)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 14)
-            // The Anchor first here and on the next pane, so the intro lists the two halves in
-            // one order throughout and the row you read first is the row you land on.
+            // Anchor listed first here and on the next pane so read-order matches the default selection.
             VStack(spacing: 0) {
                 HalfRow(
                     title: "The Anchor",
@@ -166,10 +143,7 @@ struct OnboardingView: View {
         }
     }
 
-    /// The question the app never asked. Two rows and a quieter third line; the answer sets the
-    /// page Furlough opens on and the guide that runs on it. Tapping a row only selects it —
-    /// Continue is what commits, and it is live from the moment the pane arrives, because a
-    /// disabled button under a question is the thing this pass is removing from Home.
+    /// Tapping a row only selects it — Continue is always enabled and is what actually commits.
     private var start: some View {
         VStack(alignment: .leading, spacing: 0) {
             Eyebrow(text: "Two halves", color: Ember.amber)
@@ -208,8 +182,6 @@ struct OnboardingView: View {
             }
             .emberCard()
             .padding(.top, 18)
-            // Quieter and outside the card, because it is not a third thing to be — it is the
-            // two above, in the order they are in.
             Button {
                 chosen = .anchor
                 wantsBoth = true
@@ -276,9 +248,8 @@ struct OnboardingView: View {
             PaneDots(count: Pane.allCases.count, index: pane.rawValue)
                 .overlay(alignment: .leading) {
                     if let previous = pane.previous {
-                        // withAnimation, because a page-style TabView slides for a gesture but
-                        // jumps for a plain assignment, and the two ways forward should look
-                        // like the same movement.
+                        // withAnimation needed — TabView jumps on a plain assignment but slides
+                        // for a gesture; this matches the two.
                         Button("Back") { withAnimation(.snappy(duration: 0.28)) { pane = previous } }
                             .emberBody(13, .semibold)
                             .foregroundStyle(Ember.muted)
@@ -313,7 +284,6 @@ struct OnboardingView: View {
     }
 }
 
-/// One half of the app on the promise pane: its mark, its name, and what it is in two lines.
 private struct HalfRow<Icon: View>: View {
     let title: String
     let detail: String
@@ -345,9 +315,8 @@ private struct HalfRow<Icon: View>: View {
     }
 }
 
-/// One half offered on the start pane: `HalfRow` with a tap and a chosen state. The mark keeps
-/// its own colour when the row is not chosen — an anchor greyed out is a different anchor — and
-/// the row says which it is with its border and its check.
+/// The icon keeps its own color even when unselected — dimming it would look like a different
+/// icon — so the border and checkmark carry the selected state instead.
 private struct StartRow<Icon: View>: View {
     let title: String
     let detail: String
@@ -399,7 +368,6 @@ private struct StartRow<Icon: View>: View {
     }
 }
 
-/// Where you are in the intro. Ember for the pane you are on.
 private struct PaneDots: View {
     let count: Int
     let index: Int

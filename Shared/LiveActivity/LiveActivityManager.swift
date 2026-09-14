@@ -1,25 +1,20 @@
 import ActivityKit
 import Foundation
 
-// ActivityKit has not adopted Sendable annotations. Activity is documented for use from any
-// task, and Furlough only ever touches it inside the detached task below.
+// ActivityKit predates Sendable; Furlough only ever touches Activity from the detached task below.
 extension Activity: @retroactive @unchecked Sendable {}
 
-/// Keeps the Lock Screen in step with the windows: one Live Activity for the window that is
-/// open, and one scheduled ahead for the window that opens next.
+/// Keeps the Lock Screen in step with the windows: one Live Activity for the open window, one
+/// scheduled ahead for the next.
 ///
-/// Until iOS 26 only the foreground app could start an activity, so one appeared only if
-/// Furlough happened to be open when a window began. `Activity.request(…, start:)` (iOS 26)
-/// takes a start date, so the next window is asked for while the app *is* in front and arrives
-/// on its own — on a locked phone, with Furlough closed. Requesting is still foreground-only;
-/// `canStart` is false in the monitor extension, which updates and ends but never asks for a
-/// new one.
-///
-/// ActivityKit objects are not Sendable, so all of the work happens off the main actor with
-/// only value data passed in.
+/// `Activity.request(…, start:)` (iOS 26) lets the next window be requested while the app is
+/// foreground and have it arrive later on its own, even on a locked/closed phone — before this,
+/// only a foreground app could start an activity at all. Requesting is still foreground-only:
+/// `canStart` is false in the monitor extension, which updates/ends existing activities but
+/// never starts new ones. All work here runs off the main actor since ActivityKit isn't Sendable.
 enum LiveActivityManager {
-    /// The system draws the activity's timer against its own clock, so the summary is computed
-    /// on Furlough's time and then moved onto the device's before ActivityKit sees it.
+    /// Computed on Furlough's clock, then shifted to the device's before ActivityKit (which
+    /// draws its timer against the device clock) ever sees it.
     nonisolated static func sync(state: SharedState, canStart: Bool = true) {
         let clock = state.clock()
         let summary = Policy.summary(state: state, now: clock.now).shifted(by: clock.drift)
@@ -49,8 +44,7 @@ enum LiveActivityManager {
                 note: "Open",
                 warned: summary.openWarned,
                 budgetMinutes: summary.openBudgetMinutes,
-                // Five minutes from the warning, and only from a warning that really fired:
-                // this is the one budget deadline Screen Time ever makes knowable.
+                // The one budget deadline Screen Time ever makes knowable: 5 min after a warning fires.
                 budgetDeadline: summary.openWarnedAt.map {
                     $0.addingTimeInterval(TimeInterval(Furlough.warningMinutes * 60))
                 }
@@ -64,9 +58,7 @@ enum LiveActivityManager {
                 names: summary.openNames
             ))
         }
-        // The next window, asked for now and shown then. `nextOpenUntil` is nil for a rule with
-        // no windows of its own, which is the same thing that keeps it out of `openNames`: an
-        // all-day budget has nothing to count down to.
+        // `nextOpenUntil` is nil for an all-day budget — nothing to count down to.
         if let start = summary.nextOpenAt, let end = summary.nextOpenUntil,
            !summary.nextOpenNames.isEmpty, start > now, end > start {
             let contentState = FurloughActivityAttributes.ContentState(
@@ -81,16 +73,14 @@ enum LiveActivityManager {
             ))
         }
 
-        // Anything that is not one of those two windows any more: a window that has closed, and
-        // a scheduled one that a tightening edit took away before it ever started.
+        // A closed window, or a scheduled one a tightening edit removed before it started.
         await end(existing.filter { activity in
             !wanted.contains { same($0.attributes, activity.attributes) }
         })
 
         for item in wanted {
             if let current = existing.first(where: { same(item.attributes, $0.attributes) }) {
-                // A scheduled activity keeps its identity when its start arrives, so this is
-                // also how the pending one becomes the open one.
+                // Also how a pending activity becomes the open one: identity survives its start.
                 await current.update(item.content)
                 continue
             }
@@ -115,17 +105,14 @@ enum LiveActivityManager {
         }
     }
 
-    /// Two activities are the same window when they cover the same minutes. Nothing else about
-    /// an activity is stable across a sync, and the attributes cannot be changed once it exists.
+    /// Compared by minutes covered — the only thing about an activity stable across a sync.
     private nonisolated static func same(
         _ a: FurloughActivityAttributes, _ b: FurloughActivityAttributes
     ) -> Bool {
         a.windowStart == b.windowStart && a.windowEnd == b.windowEnd
     }
 
-    /// What the Lock Screen says as a scheduled activity arrives. The same sentence the
-    /// monitor's "Window opened" notification uses, so the two read as one thing if the phone
-    /// shows both.
+    /// Matches the monitor's "Window opened" notification wording, so the two read as one thing.
     private nonisolated static func alert(names: [String], end: Date) -> AlertConfiguration {
         let list = names.joined(separator: ", ")
         let time = end.formatted(date: .omitted, time: .shortened)

@@ -1,8 +1,8 @@
 import Foundation
 import Testing
 
-/// The anchor across devices, added 2026-09-09: what one device does with the record the
-/// other wrote. Only `merge` and `macDrop` are here; the iCloud store itself is not touched.
+/// What one device does with the record the other wrote. Only `merge` and `macDrop` are here;
+/// the iCloud store itself is not touched.
 @Suite("Anchor sync: merging the other device's record")
 struct AnchorSyncMergeTests {
     let noon = at(8, 12, 0)
@@ -79,8 +79,7 @@ struct AnchorSyncMergeTests {
         #expect(early.profile.until == sixPM)
         #expect(early.profile.isHolding(at: at(8, 17, 59)))
         #expect(!early.profile.isHolding(at: sixPM))
-        // Furlough's time here is 7 PM — the wall clock may say anything, the caller passes the
-        // trusted one — so the drop is already over and nothing drops.
+        // The caller passes the trusted time (7 PM here), so the drop is already over.
         let late = AnchorSync.merge(local: local(anchored: false), remote: record(sequence: 4, anchored: true, until: sixPM), now: at(8, 19, 0))
         #expect(!late.profile.isAnchored)
         #expect(late.profile.sequence == 4)
@@ -150,9 +149,8 @@ struct AnchorSyncMacDropTests {
         #expect(AnchorSync.macDrop(&everything, now: noon, hasKey: true, cloudAvailable: true) == nil)
     }
 
-    /// The lock-with-no-key guard, in the case `phoneSeen` alone cannot see: the latch is set
-    /// once and never cleared, so a Mac signed out of iCloud after its first sync would other-
-    /// wise still take a drop that nothing on earth could lift.
+    // The latch is set once and never cleared, so a Mac signed out after its first sync can't
+    // take a drop that nothing could then lift.
     @Test("a Mac signed out of iCloud refuses to drop, however many phones it has heard from")
     func refusesWithoutCloud() {
         var config = makeConfig([])
@@ -160,16 +158,13 @@ struct AnchorSyncMacDropTests {
         #expect(AnchorSync.macDrop(&config, now: noon, hasKey: true, cloudAvailable: false) == .noCloud)
         #expect(!config.anchor.isAnchored)
         #expect(config.anchor.sequence == 0)
-        // Ahead of the phone: signed out, whether a phone has ever been heard from is moot,
-        // and the account is the thing to go and fix.
+        // Signed out outranks a never-seen phone: the account is what needs fixing.
         #expect(AnchorSync.macDrop(&config, now: noon, hasKey: false, cloudAvailable: false) == .noCloud)
-        // Behind the list, which is on this screen and fixable without leaving it.
         var empty = makeConfig([])
         #expect(AnchorSync.macDrop(&empty, now: noon, hasKey: true, cloudAvailable: false) == .noList)
     }
 
-    /// An anchor already down is not touched by the account going away. Only dropping is
-    /// refused; a hold and its release are the phone's business and survive on their own.
+    // Only dropping is refused; a hold already down and its release are the phone's business.
     @Test("losing iCloud does not lift an anchor already holding")
     func cutOffLeavesAHoldAlone() {
         var config = makeConfig([])
@@ -203,33 +198,26 @@ struct AnchorSyncMacDropTests {
     func messages() {
         #expect(Policy.DropRefusal.noList.message.contains("Choose"))
         #expect(Policy.DropRefusal.noPhone.message.contains("iPhone"))
-        // The instruction that actually clears the refusal. Pairing a tag publishes nothing,
-        // so the message must ask for the drop; this pins that it does not go back to asking
-        // only for the pairing.
+        // Pairing a tag publishes nothing, so the message must ask for the drop itself.
         #expect(Policy.DropRefusal.noPhone.message.contains("Drop anchor"))
         #expect(Policy.DropRefusal.noCloud.message.contains("iCloud"))
         #expect(Policy.DropRefusal.noCloud.message == AnchorSync.cutOffWarning)
     }
 
-    /// The cut-off warning is written as a `\`-continued literal, where a missing space runs two
-    /// words together and a kept one doubles up, and neither shows in a diff. It is also the
-    /// only string here that a person reads as a paragraph in a banner, so: one paragraph, one
-    /// space between words, and it names both the harm and the way out.
+    // Written as a `\`-continued literal, where a missing/doubled space wouldn't show in a diff.
     @Test("the cut-off warning reads as one clean paragraph and says what to do")
     func cutOffWarningReads() {
         let warning = AnchorSync.cutOffWarning
         #expect(!warning.contains("  "))
         #expect(!warning.contains("\n"))
         #expect(warning.hasSuffix("."))
-        // The harm, said on the device reading it. This bundle is built for macOS.
         #expect(warning.contains("this Mac"))
         #expect(warning.contains("System Settings"))
-        // Says iCloud cannot be reached, and stops there. An earlier version of this named a
-        // signed-out account as the cause, which the probe behind it cannot actually tell:
-        // `isAvailable` reports an unusable store, not an absent account.
+        // Stops at "cannot reach iCloud": the probe (`isAvailable`) can't actually tell a
+        // signed-out account from an unusable store, so it must not claim one.
         #expect(warning.contains("cannot reach iCloud"))
-        // Names iCloud Drive, because that is the switch: the key-value store rides on it, and
-        // a Mac with Drive off receives nothing while looking perfectly signed in.
+        // iCloud Drive is the real switch: the key-value store rides on it and stays dark with
+        // Drive off even while signed in.
         #expect(warning.contains("iCloud Drive"))
     }
 
@@ -247,9 +235,8 @@ struct AnchorSyncMacDropTests {
     }
 }
 
-/// The link status: what the Anchor screen says about whether the two devices are talking.
-/// Pure, so the awkward cases — nothing in iCloud, only this device's own writes — can be
-/// pinned without an account.
+/// What the Anchor screen says about whether the two devices are talking. Pure, so the awkward
+/// cases (nothing in iCloud, only this device's own writes) can be pinned without an account.
 @Suite("Anchor sync: the link status")
 struct AnchorLinkStatusTests {
     let noon = at(8, 12, 0)
@@ -282,8 +269,7 @@ struct AnchorLinkStatusTests {
         #expect(status.detail(now: noon).contains("Drop the anchor"))
     }
 
-    /// The case that sent Zach looking: this device has written and heard nothing back. Not
-    /// linked — hearing your own write proves only that you can write.
+    // Hearing your own write proves only that you can write, not that you're linked.
     @Test("only this device's own write is not proof of a link")
     func ownWriteOnly() {
         let status = AnchorSync.LinkStatus(
@@ -295,13 +281,9 @@ struct AnchorLinkStatusTests {
         #expect(status.detail(now: noon).contains("has not written since"))
     }
 
-    /// The state Zach's own Mac was in an hour after the one above: the phone had released with
-    /// its tag, this Mac had read that, and then this Mac dropped — overwriting the proof with
-    /// its own write. It used to fall straight back to `ownWriteOnly`'s amber and say there was
-    /// nothing to prove the phone was hearing it, three minutes after the phone had been heard.
-    ///
-    /// Worse on the phone, where every drop is a write of its own and the Mac may not write
-    /// again for days, so the Your Mac row sat at a caution indefinitely.
+    // Regression: a write of our own used to overwrite the proof and fall back to the
+    // "nothing proven" amber, even minutes after actually hearing back. Worst on the phone,
+    // where every drop is a write of its own, leaving the row stuck at caution indefinitely.
     @Test("having heard the other device once survives a write of our own")
     func ownWriteAfterHearing() {
         let status = AnchorSync.LinkStatus(
@@ -316,7 +298,7 @@ struct AnchorLinkStatusTests {
         #expect(!status.detail(now: noon).contains("nothing yet to prove"))
     }
 
-    /// The dot is the same colour on both ends, so the phone gets the same reprieve.
+    // Same colour on both ends: the phone gets the same reprieve.
     @Test("the phone's row stops sitting at a caution after its own drop")
     func phoneOwnDropStaysLinked() {
         let status = AnchorSync.LinkStatus(
@@ -327,9 +309,7 @@ struct AnchorLinkStatusTests {
         #expect(status.detail(now: noon).contains("Mac was last read here at"))
     }
 
-    /// iCloud going away outranks having heard something once: a link proven yesterday carries
-    /// nothing today if the store cannot be reached, and this is the one screen that must not
-    /// say otherwise.
+    // A link proven yesterday carries nothing today if the store can't be reached now.
     @Test("no iCloud is not linked, whatever was heard before")
     func cutOffOutranksHavingHeard() {
         let status = AnchorSync.LinkStatus(

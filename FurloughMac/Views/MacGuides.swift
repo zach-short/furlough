@@ -1,13 +1,7 @@
 import SwiftUI
 
-/// The checklist, on the Mac: three steps, the live one carrying the only button, the rest
-/// dimmed. `HalfGuide` in Shared/Core is the shape and the Mac's own three steps of each; this
-/// is the drawing.
-///
-/// A copy of the phone's `GuideCard` rather than one file both compile, for the reason
-/// `MacComponents.swift` gives about `SectionLabel` and the rest: those live in each app's own
-/// views, and Shared/UI is compiled into the iOS widget extension, which has none of them.
-/// Unify the two when the components move.
+/// Duplicated from the phone's GuideCard rather than shared: Shared/UI also compiles into the
+/// iOS widget extension, which lacks these view helpers.
 struct GuideCard<Action: View>: View {
     let guide: HalfGuide
     @ViewBuilder var action: Action
@@ -37,8 +31,6 @@ struct GuideCard<Action: View>: View {
     }
 }
 
-/// One row of the checklist: its number or its tick, its words, and — on the live one — the
-/// button and nothing else on the card.
 private struct GuideStepRow<Action: View>: View {
     let number: Int
     let step: HalfGuide.Step
@@ -65,8 +57,6 @@ private struct GuideStepRow<Action: View>: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 12)
-        // Done and not-yet look different from live in the same way: they are not what you are
-        // being asked to do. A tick is still legible at this opacity; a dim number is the point.
         .opacity(isLive ? 1 : 0.55)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Step \(number). \(step.title). \(step.isDone ? "Done" : (isLive ? "Now" : "Not yet"))")
@@ -92,8 +82,6 @@ private struct GuideStepRow<Action: View>: View {
     }
 }
 
-/// The one button a live step gets: ember and filled, sized to its words rather than to the
-/// card, so a checklist never looks like three things to press.
 struct GuideButton: View {
     let title: String
     var systemImage: String?

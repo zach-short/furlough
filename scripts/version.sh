@@ -9,17 +9,15 @@
 #   scripts/version.sh major           1.1.0 -> 2.0.0
 #   scripts/version.sh 1.4.2           straight to a number, for the rare case the words miss
 #
-# MARKETING_VERSION lives once, in project.yml's base settings, and every target's Info.plist
-# reads it through $(MARKETING_VERSION). What each of the three numbers means, and what forces
-# which, is README's Versioning section — this file enforces the mechanical half of it:
+# MARKETING_VERSION lives once, in project.yml's base settings; every target reads it through
+# $(MARKETING_VERSION). README's Versioning section says what the three numbers mean; this file
+# enforces the mechanical half:
 #
 #   * three components, always, so 1.1 and 1.1.0 can never both be written down;
-#   * the new number is greater than the old one, because App Store Connect will not take a
-#     version that is not and finding that out at upload time wastes an archive;
-#   * release-notes.json already has an entry for it, written before the bump rather than after.
-#     The last one is the point of the whole script. Notes written afterwards are written from
-#     the git log by whoever has forgotten what the changes were for, and `scripts/archive.sh`
-#     calls --check so a build cannot be cut without them.
+#   * the new number is greater than the old, since App Store Connect refuses one that isn't;
+#   * release-notes.json already has an entry, written before the bump — the point of the whole
+#     script, since notes written after are reconstructed from the git log by someone who's
+#     forgotten why. scripts/archive.sh calls --check so a build can't ship without them.
 #
 # It does not commit, tag, or push. Zach commits.
 
@@ -35,7 +33,6 @@ die() { printf 'version: %s\n' "$*" >&2; exit 1; }
 
 current() { grep -m1 '^    MARKETING_VERSION:' "$PROJECT" | awk '{print $2}' | tr -d '"'; }
 
-# Every version release-notes.json has an entry for, newest first, as the file has them.
 noted() {
   python3 - "$NOTES" <<'PY'
 import json, sys
@@ -45,11 +42,9 @@ with open(sys.argv[1]) as f:
 PY
 }
 
-# Three components, each a number. The one spelling the repo accepts.
 well_formed() { [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; }
 
-# Sort -V puts versions in order; a version is greater than another when it is not the one that
-# sorts first, and is not equal to it.
+# sort -V puts versions in order; greater when it's not the one that sorts first, and not equal.
 greater_than() { [[ "$1" != "$2" && "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -1)" == "$2" ]]; }
 
 check() {
@@ -100,7 +95,7 @@ set_version() {
   App Store Connect refuses a version that does not rise, and finding that out at upload time
   wastes an archive."
     check "$to" quiet
-    # The one line, matched on its own indentation so a target's $(MARKETING_VERSION) is safe.
+    # Matched on its own indentation so a target's $(MARKETING_VERSION) is safe.
     python3 - "$PROJECT" "$from" "$to" <<'PY'
 import sys
 path, old, new = sys.argv[1], sys.argv[2], sys.argv[3]

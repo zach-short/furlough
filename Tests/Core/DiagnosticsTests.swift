@@ -30,8 +30,7 @@ private func healthy(
     #expect(Diagnostics.summary(healthy(notifications: false)).line == "Notifications are off")
 }
 
-/// Off notifications are worth saying and not worth alarming about; the other three mean
-/// something is not being enforced.
+// Off notifications are worth saying but not alarming; the other three mean something unenforced.
 @Test func diagnosticsGradesNotificationsBelowTheRest() {
     #expect(Diagnostics.summary(healthy(notifications: false)).level == .warn)
     #expect(Diagnostics.summary(healthy(screenTime: false)).level == .bad)
@@ -39,14 +38,12 @@ private func healthy(
     #expect(Diagnostics.summary(healthy(registrationError: "denied")).level == .bad)
 }
 
-/// A phone that has never been asked about notifications hears nothing either, so the row says
-/// the same thing it says for a refusal.
+// Unasked reads the same as refused.
 @Test func diagnosticsTreatsUnaskedNotificationsAsOff() {
     #expect(Diagnostics.summary(healthy(notifications: nil)).line == "Notifications are off")
 }
 
-/// The line names the first thing wrong, not the last: fixing notifications on a phone with no
-/// Screen Time access would leave the row saying nothing new.
+// Names the first thing wrong, not the last.
 @Test func diagnosticsReportsTheCostliestFaultFirst() {
     let everything = healthy(
         screenTime: false,
@@ -95,8 +92,7 @@ private func healthyMac(
     #expect(Diagnostics.macSummary(healthyMac(filter: .notInstalled)).line == "The web filter is not installed")
 }
 
-/// The three that leave something unenforced are grave; the two that only cost knowing, or that
-/// were offered and declined, are not.
+// The three that leave something unenforced are grave; the rest are not.
 @Test func macDiagnosticsGradesTheFaultsApart() {
     #expect(Diagnostics.macSummary(healthyMac(filter: .broken)).level == .bad)
     #expect(Diagnostics.macSummary(healthyMac(refusedBrowser: "Chrome")).level == .bad)
@@ -106,8 +102,7 @@ private func healthyMac(
     #expect(Diagnostics.macSummary(healthyMac(filter: .notInstalled)).level == .warn)
 }
 
-/// The line names the first thing wrong, not the last: a filter that was switched off is the
-/// widest hole, and fixing the notifications under it would leave the row saying nothing new.
+// Names the first thing wrong, not the last: the switched-off filter is the widest hole.
 @Test func macDiagnosticsReportsTheCostliestFaultFirst() {
     let everything = healthyMac(filter: .broken, refusedBrowser: "Safari", appGroup: false, notifications: false)
     #expect(Diagnostics.macSummary(everything).line == "The web filter is switched off")
@@ -119,14 +114,11 @@ private func healthyMac(
     #expect(Diagnostics.macSummary(withBrowsers).line == "The App Group is missing")
 }
 
-/// Not installing it is a thing somebody was offered and declined, so it comes after the faults
-/// and after the permission — a Mac with no filter and no notifications should say the one that
-/// went wrong on its own.
+// Declined is not a fault, so it ranks after faults and after the permission.
 @Test func macDiagnosticsPutsAnUninstalledFilterLast() {
     #expect(Diagnostics.macSummary(healthyMac(filter: .notInstalled, notifications: false)).line == "Notifications are off")
 }
 
-/// A Mac that has never been asked about notifications hears nothing either.
 @Test func macDiagnosticsTreatsUnaskedNotificationsAsOff() {
     #expect(Diagnostics.macSummary(healthyMac(notifications: nil)).line == "Notifications are off")
 }

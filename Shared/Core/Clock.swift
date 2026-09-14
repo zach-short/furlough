@@ -7,54 +7,40 @@ struct ClockMark: Codable, Equatable {
     var uptime: TimeInterval
 }
 
-/// Furlough keeps its own time, because its whole loosening rule is "wait" and the device's
-/// clock is a setting. Every save records the two clocks together. Later, the mark plus the
-/// seconds the machine has counted since says what the time really is; while the device agrees
-/// with that, Furlough uses the device's clock, and when it does not, Furlough uses its own.
-/// So turning off "Set Automatically" and moving the date forward a day changes nothing at all:
-/// no window opens early, no budget resets, no queued loosening lands.
-///
-/// The hole that is left: a reboot starts the machine's count again from zero, so a reboot
-/// followed by a clock change looks like an ordinary first reading. It is documented in README,
-/// and it doubles as the way out for a device whose clock was genuinely wrong.
+/// Furlough distrusts the wall clock, since its whole loosening rule is "wait" and the device's
+/// clock is a user setting. Tracks drift via boot-relative uptime instead, so setting the date
+/// forward manually changes nothing. Known gap: a reboot resets the uptime counter to zero, so
+/// a reboot + clock change looks like a first reading — documented in README, and doubles as
+/// the escape hatch for a genuinely wrong clock.
 enum Clock {
-    /// Small corrections — an NTP step, a manual nudge of a few minutes — are not worth
-    /// leaving the device's clock over.
+    /// Small corrections (NTP step, manual nudge) aren't worth distrusting the clock over.
     static let tolerance: TimeInterval = 10 * 60
 
-    /// Seconds since boot, counting the time the machine spent asleep. `ProcessInfo`'s
-    /// `systemUptime` stops while a Mac sleeps, which would read a night with the lid shut as
-    /// an eight-hour jump forward; Darwin's `CLOCK_MONOTONIC` keeps counting through sleep and
-    /// still starts again from zero at boot, which is what makes a reboot detectable.
+    /// Uses `CLOCK_MONOTONIC` rather than `ProcessInfo.systemUptime`, since the latter stops
+    /// counting while a Mac sleeps (an overnight lid-close would read as an 8-hour jump).
     static var uptime: TimeInterval {
         TimeInterval(clock_gettime_nsec_np(CLOCK_MONOTONIC)) / 1_000_000_000
     }
 
     static var mark: ClockMark { ClockMark(wall: .now, uptime: uptime) }
 
-    /// What Furlough believes the time is, and how far the device's clock is from it.
     struct Reading: Equatable {
-        /// The time to judge everything against: windows, days, budgets, pending changes.
         var now: Date
-        /// How far the device's clock is ahead (positive) or behind (negative). Zero while the
-        /// two agree, which is every day of normal use.
+        /// How far the device's clock is ahead (+) or behind (-). Zero in normal use.
         var drift: TimeInterval
 
         var isTrusted: Bool { drift == 0 }
 
-        /// A Furlough time on the device's clock. Anything the system renders for itself — a
-        /// Live Activity's timer, a widget timeline entry — has to be given one of these.
+        /// System-rendered UI (Live Activity timers, widget timelines) needs Furlough time
+        /// converted back onto the device's own clock.
         func device(_ date: Date) -> Date { drift == 0 ? date : date.addingTimeInterval(drift) }
 
-        /// The Furlough time behind a device time.
         func honest(_ date: Date) -> Date { drift == 0 ? date : date.addingTimeInterval(-drift) }
     }
 
-    /// The device's clock is taken at its word when there is no mark to check it against (the
-    /// first reading), after a reboot (the machine's count started again, so the two are no
-    /// longer comparable), and while it agrees with the mark's projection to within the
-    /// tolerance. Otherwise Furlough runs on the projection, in either direction: a clock moved
-    /// back would hold everything up just as surely as one moved forward lets it go.
+    /// Trusts the device clock with no mark to check against, right after a reboot (uptime
+    /// reset makes the two incomparable), or within tolerance of the projection. Otherwise runs
+    /// on the projection either direction — a clock moved backward holds things up too.
     static func read(
         wall: Date = .now,
         uptime: TimeInterval = Clock.uptime,
@@ -67,9 +53,8 @@ enum Clock {
         return abs(drift) <= tolerance ? Reading(now: wall, drift: 0) : Reading(now: projected, drift: drift)
     }
 
-    /// The mark to store with this reading. A reading Furlough trusts replaces the mark; while
-    /// the device's clock is off, the old mark is kept, because it is the only thing left that
-    /// knows what the time really is.
+    /// Keeps the old mark while the device's clock is off — it's the only thing left that
+    /// knows the real time.
     static func stamp(
         _ mark: ClockMark?,
         wall: Date = .now,
@@ -94,7 +79,6 @@ enum Clock {
 }
 
 extension SharedState {
-    /// What Furlough makes of this machine's clock, against the mark the last save left behind.
     func clock(wall: Date = .now, uptime: TimeInterval = Clock.uptime) -> Clock.Reading {
         Clock.read(wall: wall, uptime: uptime, mark: runtime.clock)
     }

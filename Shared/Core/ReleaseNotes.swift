@@ -1,15 +1,8 @@
 import Foundation
 
-/// What changed in each version, and which version you are looking at.
-///
-/// The notes are data rather than code: `release-notes.json` at the root of the repo is the one
-/// copy, bundled into both apps and imported by the site's releases page. A second copy would
-/// drift the day someone edited one of them, and the thing that makes release notes worth
-/// reading is that they are true.
-///
-/// The rules for the numbers — when a change forces a minor rather than a patch, and what has to
-/// be in the file before `scripts/archive.sh` will cut a build — are the Versioning section of
-/// README.md. `Tests/Core/ReleaseNotesTests.swift` holds the file to them.
+/// What changed in each version. Notes are data, not code: `release-notes.json` at the repo
+/// root is the one copy, bundled into both apps and imported by the site — a second copy would
+/// drift. Versioning rules live in README.md; `ReleaseNotesTests` holds the file to them.
 enum ReleaseNotes {
     /// The resource, in the app bundle. Named without its extension the way `Bundle` wants it.
     private static let resource = "release-notes"
@@ -31,17 +24,16 @@ enum ReleaseNotes {
 
         var id: String { version }
 
-        /// The version as numbers, for ordering and for matching a build. `1.1` and `1.1.0` are
-        /// the same version — the first two releases were written without the patch component,
-        /// and a build of either has to find its own notes.
+        /// The version as numbers, for ordering/matching; `1.1` and `1.1.0` compare equal since
+        /// early releases omitted the patch.
         var number: Version { Version(version) }
 
-        /// The date as a date, or nil if the file says something that is not one. Only the
-        /// formatting uses this; ordering is by version, which cannot be ambiguous.
+        /// The date as a date, or nil if unparsable; only used for formatting — ordering is
+        /// always by version.
         var day: Date? { Self.formatter.date(from: date) }
 
-        /// The day as the rest of Furlough writes one: "11 September 2026", the format the
-        /// privacy policy's own date already uses. The file's own string if it is not a date.
+        /// The day formatted as the rest of Furlough writes one ("11 September 2026"); the raw
+        /// string if unparsable.
         var dayLabel: String {
             guard let day else { return date }
             return Self.display.string(from: day)
@@ -78,8 +70,7 @@ enum ReleaseNotes {
         var id: String { title }
     }
 
-    /// Where a version went. Nothing has reached the App Store yet, so every entry so far says
-    /// `testflight`; the site says as much beside them rather than implying a public release.
+    /// Where a version went. Nothing has reached the App Store yet, so every entry so far says `testflight`.
     enum Channel: String, Codable, Sendable {
         case appStore = "appstore"
         case testFlight = "testflight"
@@ -95,8 +86,7 @@ enum ReleaseNotes {
         }
     }
 
-    /// What a change is. Three, deliberately: a longer list turns into a taxonomy nobody agrees
-    /// on, and every one of these answers "should I care?" differently.
+    /// What a change is. Deliberately just three — a longer taxonomy nobody agrees on.
     enum Kind: String, Codable, Sendable, CaseIterable {
         /// Something that was not there before.
         case new
@@ -114,8 +104,8 @@ enum ReleaseNotes {
         }
     }
 
-    /// Which app a change happened in. The rules engine is shared, so most changes are `both`;
-    /// enforcement is not shared at all, so the ones that are not tend to be whole features.
+    /// Which app a change happened in; most are `both` since the rules engine is shared, but
+    /// enforcement isn't.
     enum Platform: String, Codable, Sendable {
         case both
         case iphone
@@ -133,8 +123,8 @@ enum ReleaseNotes {
         /// Whether a change marked this way is worth showing on `platform`.
         func shows(on platform: Platform) -> Bool { self == .both || self == platform }
 
-        /// What to put on a change that is not for everyone. Nil where it would be noise: on the
-        /// iPhone a change marked `iphone` is simply the news.
+        /// A badge for a change not for everyone; nil where it would be noise (e.g. an
+        /// iphone-only change on the iPhone).
         func badge(on platform: Platform) -> String? {
             guard self != .both, self != platform else { return nil }
             return self == .mac ? "Mac" : "iPhone"
@@ -143,18 +133,15 @@ enum ReleaseNotes {
 
     // MARK: - Reading the file
 
-    /// Every release, newest first, exactly as the file has them. Empty if the resource is
-    /// missing or will not decode, which is the right failure: a screen with nothing on it is
-    /// better than a crash in an app whose whole job is to still be running.
+    /// Every release, newest first. Empty if the resource is missing or fails to decode — a
+    /// blank screen beats a crash.
     static var all: [Release] { loaded }
 
-    /// Only the releases with something to say on this platform, each carrying only the changes
-    /// that apply here. A release whose every change was for the other device is left out
-    /// entirely rather than shown empty — 1.2.0 is exactly that on the Mac.
+    /// Only releases with something to say on `platform`; one whose every change was for the
+    /// other device is left out entirely (not shown empty).
     static func all(on platform: Platform = .current) -> [Release] { filter(loaded, to: platform) }
 
-    /// The filtering on its own, so it can be tested against the real file. `all(on:)` reads a
-    /// bundled resource, which a test bundle does not carry; this takes the releases it is given.
+    /// The filtering on its own, testable without a bundled resource (which a test bundle lacks).
     static func filter(_ releases: [Release], to platform: Platform) -> [Release] {
         releases.compactMap { release in
             let changes = release.changes.filter { $0.platform.shows(on: platform) }
@@ -170,18 +157,15 @@ enum ReleaseNotes {
         }
     }
 
-    /// The notes for the version this build is, or nil when the file has none for it — which a
-    /// Debug build off a branch mid-version legitimately is, and so is a version that changed
-    /// nothing on this device. `bundleRelease` tells those two apart.
+    /// The notes for this build's version, or nil if the file has none (a mid-version Debug
+    /// build, or a version that changed nothing here). `bundleRelease` tells those apart.
     static func current(on platform: Platform = .current) -> Release? {
         guard let version = bundleVersion else { return nil }
         return all(on: platform).first { $0.number == version }
     }
 
-    /// The entry for this build whatever platform it was for. The difference between this and
-    /// `current(on:)` is a version that shipped on both devices and changed something on only
-    /// one of them: dropping it from the list is right, but letting the screen imply this device
-    /// is on the version above it is not, so the page says which it is.
+    /// The entry for this build's version regardless of platform — unlike `current(on:)`,
+    /// doesn't drop a version that changed nothing here.
     static func bundleRelease() -> Release? {
         guard let version = bundleVersion else { return nil }
         return loaded.first { $0.number == version }
@@ -199,8 +183,8 @@ enum ReleaseNotes {
         return Version(string)
     }
 
-    /// Decode a file's bytes. Separate from `loaded` so the tests can hold the real
-    /// `release-notes.json` to the same decoder the apps use rather than a copy of it.
+    /// Decode a file's bytes; separated from `loaded` so tests can hold the real JSON to this
+    /// same decoder.
     static func decode(_ data: Data) throws -> [Release] {
         try JSONDecoder().decode(File.self, from: data).versions
     }
@@ -226,12 +210,9 @@ enum ReleaseNotes {
 
 // MARK: - Version
 
-/// A marketing version as three numbers, so `1.1` and `1.1.0` compare equal and `1.10.0` sorts
-/// above `1.9.0` — neither of which a string comparison gets right.
-///
-/// Anything the string does not supply is zero, and anything that is not a number is zero, so
-/// this never fails to parse. A version that cannot be read is 0.0.0, which sorts below every
-/// real one and matches none of them.
+/// A marketing version as three numbers, so `1.1` == `1.1.0` and `1.10.0` sorts above `1.9.0` —
+/// neither of which a string comparison gets right. Never fails to parse: missing/non-numeric
+/// components default to zero.
 struct Version: Comparable, Hashable, Sendable, CustomStringConvertible {
     let major: Int
     let minor: Int
@@ -250,8 +231,7 @@ struct Version: Comparable, Hashable, Sendable, CustomStringConvertible {
         patch = parts.count > 2 ? parts[2] : 0
     }
 
-    /// The canonical spelling: always three components, which is what README's Versioning
-    /// section asks every new version to be written as.
+    /// The canonical spelling: always three components, as README's Versioning section requires.
     var string: String { "\(major).\(minor).\(patch)" }
 
     var description: String { string }

@@ -1,13 +1,10 @@
 import Foundation
 import Testing
 
-/// `ConfigImport.preresolved`: the rows of a setup file the phone can answer for itself.
-///
-/// Everything else on a phone import has to be answered by hand, because a Screen Time token
-/// is scoped to one device and one install and the file carries no identifier for it. A
-/// website row is the exception since the phone gained `.host`: it carries a plain host, which
-/// is the same string on every device. This is what lets a Mac's setup arrive on a phone as
-/// real enforceable targets rather than as rows nobody can map.
+/// `ConfigImport.preresolved`: the rows of a setup file the phone can answer for itself. A
+/// Screen Time token is scoped to one device/install and carries no cross-device identifier, so
+/// only website rows (a plain host, same string everywhere) can be pre-resolved; everything
+/// else is answered by hand.
 @Suite("Pre-resolving a setup's websites")
 struct HostImportTests {
     let unanswered = "not said yet"

@@ -1,9 +1,8 @@
 import SwiftUI
 import WidgetKit
 
-/// The desktop widget: the phone's home-screen widget on the Mac. It reads the same store
-/// as the app through the App Group and shows what is open now, or what opens next, with the
-/// status hourglass in the corner. The app reloads it whenever the rules or the runtime change.
+/// Mirrors the phone's home-screen widget: reads the same store as the app through the App
+/// Group; the app reloads it when rules or runtime change.
 struct StatusEntry: TimelineEntry {
     let date: Date
     let summary: Policy.Summary
@@ -21,16 +20,14 @@ struct StatusProvider: TimelineProvider {
         completion(StatusEntry(date: .now, summary: Policy.summary(state: SharedStore.load(), now: .now)))
     }
 
-    /// One entry per status change over the next day and a half, plus one every three
-    /// minutes while a window or an all-day app is open so the hourglass keeps draining.
-    /// Entries are free; only reloads count against the widget budget.
+    /// One entry per status change over the next 36h, plus every 3 min while draining so the
+    /// hourglass animates. Entries are free; only reloads count against the widget budget.
     func getTimeline(in context: Context, completion: @escaping (Timeline<StatusEntry>) -> Void) {
         let state = SharedStore.load()
         let clock = state.clock()
         var entries: [StatusEntry] = []
-        // The cursor runs on Furlough's own time, because that is what decides the timeline;
-        // each entry is then dated on the device's clock, because that is what WidgetKit
-        // compares against, and its summary moved with it so the countdowns read right.
+        // Cursor runs on Furlough's own time (what decides transitions); entries are dated on
+        // the device clock (what WidgetKit compares against), with the summary shifted to match.
         var cursor = clock.now
         let horizon = cursor.addingTimeInterval(36 * 3600)
         while entries.count < 200, cursor < horizon {
@@ -48,8 +45,6 @@ struct StatusProvider: TimelineProvider {
 }
 
 
-/// Eyebrow, name in Display, countdown or next time in Geist Mono, a detail line, and the
-/// status hourglass in the bottom corner, on the wall.
 struct StatusWidgetView: View {
     let entry: StatusEntry
 

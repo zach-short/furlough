@@ -1,23 +1,14 @@
-// Stand-ins for the three ManagedSettings token types, for a target that must not link the
-// Screen Time frameworks.
+// Stand-ins for the three ManagedSettings token types, so the widget need not link Screen Time
+// frameworks at all.
 //
-// App Review's automated pass rejected build 202609090423 on 2026-09-09 under guideline 2.5.1:
-// "the app uses one or more Screen Time APIs but has not been submitted with the Family
-// Controls entitlement". Every bundle that links FamilyControls, ManagedSettings or
-// DeviceActivity must carry `com.apple.developer.family-controls`, and the widget was linking
-// ManagedSettings — not for any API call, only because `Models.swift` and `Policy.swift` import
-// it for `ApplicationToken`, `WebDomainToken` and `ActivityCategoryToken`, which sit inside
-// the state the widget decodes from the App Group. The widget carried no such entitlement, and
-// its App ID has no distribution grant; that one bundle failed the whole submission.
+// App Review rejected build 202609090423 (2026-09-09, guideline 2.5.1) because the widget
+// linked ManagedSettings — only for `ApplicationToken`/`WebDomainToken`/`ActivityCategoryToken`
+// used by decoded state — without the Family Controls entitlement the widget's App ID lacks.
 //
-// A widget has no business with the Screen Time API, so rather than entitle it, the
-// FurloughWidgets target builds with `NO_SCREEN_TIME` set (see project.yml), those two
-// imports fall away, and these three types take the tokens' names. They decode whatever JSON
-// the real token wrote and would encode it back unchanged, so the store round-trips; equality
-// is structural, which is all a `Set` of them needs. Nothing in the widget ever opens a token.
-//
-// Only ever compiled with the condition set: everywhere else the real types exist and these
-// must not.
+// The `NO_SCREEN_TIME` build flag (project.yml) drops those imports for FurloughWidgets and
+// substitutes these types, which decode/re-encode the same JSON unchanged (structural equality
+// is all a `Set` needs) without ever opening a token. Only ever compiled with that flag set —
+// elsewhere the real types must be used.
 #if os(iOS) && NO_SCREEN_TIME
 import Foundation
 
@@ -40,8 +31,8 @@ struct ActivityCategoryToken: Codable, Hashable, Sendable {
     func encode(to encoder: Encoder) throws { try raw.encode(to: encoder) }
 }
 
-/// Any JSON value, kept as it was found. The real tokens' wire format is Apple's to change,
-/// so this preserves a subtree of whatever shape rather than assuming one.
+/// Any JSON value, kept as found — preserves whatever shape Apple's token wire format has,
+/// without assuming one.
 indirect enum OpaqueJSON: Codable, Hashable, Sendable {
     case null
     case bool(Bool)

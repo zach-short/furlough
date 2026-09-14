@@ -1,21 +1,17 @@
 #if os(iOS)
 import Foundation
 
-/// Drops the anchor from whichever process asks: the app, the Drop Anchor intent running in
-/// the widget extension behind a Control Center button or a widget button, a Shortcut. One
-/// function, so every path ends in the same store write, the same reconcile and the same log
-/// line — the way the monitor extension already works, and the reason the widget extension
-/// carries the Family Controls entitlement since 2026-09-09. The decision itself is
-/// `Policy.drop`, which is pure and tested; this is the I/O around it.
+/// Single entry point for dropping the anchor from any process (app, widget-extension intent,
+/// Shortcut) so every path shares the same store write, reconcile, and log line. Wraps the
+/// pure, tested `Policy.drop` with the actual I/O.
 ///
-/// Release is not here and must not be: only a tag scan in the app lifts the anchor.
+/// Deliberately has no release/lift function: only a tag scan in the app may lift the anchor.
 enum AnchorDrop {
     enum Outcome: Equatable {
         case anchored(AnchorProfile)
         case refused(Policy.DropRefusal)
     }
 
-    /// Drops now, until `until` or the tag. `reason` is what the log says.
     @discardableResult
     static func drop(until: Date? = nil, reason: String) -> Outcome {
         var state = SharedStore.load()

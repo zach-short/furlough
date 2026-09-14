@@ -1,10 +1,7 @@
 import SwiftUI
 
-/// The old → new pair on a pending card. One control, so the phone and the Mac cannot drift.
-///
-/// The line you have today is drawn back in Faint and the one replacing it in Cream, so the
-/// card reads as a change at a glance without spending another amber on it — the effective
-/// date under it is already the Pending colour.
+/// Old→new pair for a pending card, shared so phone/Mac can't drift. Faint for "now", Cream
+/// for "becomes" — no extra amber needed since the date below is already Pending-coloured.
 struct PendingDeltaView: View {
     let delta: PendingText.Delta
 

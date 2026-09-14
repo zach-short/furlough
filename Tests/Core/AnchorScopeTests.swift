@@ -1,11 +1,8 @@
 import Foundation
 import Testing
 
-/// The anchor's second scope, added 2026-09-09: everything on the phone except an allowlist.
-/// Under `.chosen` the list is what goes; under `.everythingExcept` it is what stays, and the
-/// engine has to read it the right way round everywhere it looks. This bundle builds for
-/// macOS, so the decision it reads is the Mac's; the flag both decisions carry and the
-/// statuses are what the phone's reconciler builds its `.all(except:)` policies from.
+/// The second anchor scope: everything except an allowlist. Under `.chosen` the list is what
+/// goes; under `.everythingExcept` it is what stays — read the right way round everywhere.
 @Suite("Anchor scope")
 struct AnchorScopeTests {
     @Test("the scope starts as the chosen list")
@@ -181,8 +178,7 @@ struct AnchorScopeDecisionTests {
         var pair = Target(kind: .macApp(bundleID: "com.google.ios.youtube"), nickname: "YouTube", rule: openAllDay)
         pair.also = [.host("youtube.com")]
         var config = makeConfig([pair])
-        // The app is let through and the site is not: one door held is the whole of it held,
-        // exactly as it is under the chosen scope.
+        // One door held (the app) is the whole target held, as under the chosen scope.
         config.anchor = anchored(.everythingExcept, [pair.kind])
         #expect(config.isAnchored(pair, at: noon))
         let decision = decide(config)
@@ -289,9 +285,7 @@ struct AnchorScopeWarningTests {
     }
 }
 
-/// The condition the Mac's web filter offer waits on. Pure, and about the config rather than
-/// about which button was pressed, so the offer cannot drift from the thing that makes it worth
-/// making — see `MacModel.shouldOfferWebFilter`.
+/// The condition the Mac's web filter offer waits on — see `MacModel.shouldOfferWebFilter`.
 @Suite("A config that has a website in it anywhere")
 struct ConfigHasAnyHostTests {
     @Test("apps alone are not a reason to ask for a web filter")
@@ -317,8 +311,7 @@ struct ConfigHasAnyHostTests {
         #expect(config.hasAnyHost)
     }
 
-    /// A site the anchor holds is exactly as unenforceable in a browser Furlough has never met
-    /// as one held by a rule, so it earns the same offer.
+    // Held by the anchor is as unenforceable in an unmet browser as held by a rule.
     @Test("a site on the anchor's list counts even with no rule anywhere")
     func anchorHost() {
         var config = Config()

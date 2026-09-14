@@ -1,8 +1,7 @@
 import Foundation
 import Testing
 
-/// A day's record for the digest tests. Its own rather than the one in `RecordTests`, which is
-/// private to that file.
+// Own copy of `day()` from RecordTests, which is private to that file.
 private func digestDay(
     spent: Bool = false,
     shielded: Int = 0,
@@ -167,8 +166,7 @@ struct DigestScheduleTests {
         #expect(parts.hour == Furlough.digestHour)
         #expect(parts.minute == 0)
         #expect(parts.weekday == Furlough.digestWeekday)
-        // Seven days and an hour, less the second: nine o'clock local either side of the
-        // clocks going back, rather than 604,800 seconds later at eight.
+        // 9 o'clock local either side of the fall-back, not 604,800 seconds later at 8.
         #expect(next?.timeIntervalSince(from) == TimeInterval(7 * 86_400 + 3_600 - 1))
     }
 
@@ -227,8 +225,6 @@ struct DigestPlanTests {
 
     @Test("the week it reports is the one ending the night before it fires")
     func reportsTheWeekBeforeItFires() {
-        // Planned on Tuesday the 8th for Monday the 14th: the week Monday the 7th to Sunday
-        // the 13th, which is what the record already holds.
         #expect(plan(state(week), digest: true).first?.body.contains("Held shut: 7 hours") == true)
     }
 
@@ -253,8 +249,7 @@ struct DigestPlanTests {
 
     @Test("a fingerprint is the same in every process")
     func stableFingerprint() {
-        // The literal is the whole of the test: a hash seeded per launch would fail here on
-        // the second run, which is exactly the bug it exists to prevent.
+        // Hardcoded on purpose: a per-launch-seeded hash would fail on the second run.
         #expect(PendingNotifications.fingerprint("Last week") == "1kusyro3vpq8b")
     }
 

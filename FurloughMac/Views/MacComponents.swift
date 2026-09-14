@@ -1,11 +1,8 @@
 import AppKit
 import SwiftUI
 
-// The small Ember Glass controls, as in Furlough/Views/Components.swift on iOS. They are
-// duplicated here rather than moved so the phone's files stay untouched; unify them into
-// Shared/UI when both sides are quiet.
+// Mirrors Furlough/Views/Components.swift on iOS; duplicated intentionally, not yet unified into Shared/UI.
 
-/// The prominent ember glass button used for Save and Start.
 struct ProminentButton: View {
     let title: String
     var isBusy = false
@@ -27,7 +24,6 @@ struct ProminentButton: View {
     }
 }
 
-/// A text-only button in Ember, for Remove and other quiet actions.
 struct GhostButton: View {
     let title: String
     var color: Color = Ember.ember
@@ -66,8 +62,7 @@ struct Footnote: View {
             .emberBody(10.5)
             .foregroundStyle(Ember.faint)
             .multilineTextAlignment(alignment)
-            // Its ideal height is the wrapped height. Without this a footnote in a stack that
-            // is measuring itself gets one line and an ellipsis.
+            // Needed or a measuring stack collapses this to one line + ellipsis.
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: alignment == .center ? .center : .leading)
             .padding(.horizontal, 8)
@@ -80,13 +75,9 @@ struct CardDivider: View {
     }
 }
 
-/// A row inside a card that does something.
 struct CardAction: View {
     let title: String
     var symbol: String?
-    /// A line under the title, for a button whose effect is worth saying before it is pressed —
-    /// and, once it has been, worth saying it happened. The phone's `actionRow` has one for the
-    /// same reason: a row that answers for itself beats a row that raises an alert.
     var detail: String?
     var color: Color = Ember.ember
     let action: () -> Void
@@ -117,7 +108,6 @@ struct CardAction: View {
     }
 }
 
-/// The app's icon, or a globe for a website.
 struct KindTile: View {
     let kind: TargetKind
     var size: CGFloat = 34
@@ -148,11 +138,9 @@ struct KindTile: View {
     }
 }
 
-/// The 12 pt status hourglass and the next time on the right of a row.
 struct StatusChip: View {
     let status: TargetStatus
     let glass: HourglassState
-    /// The rule has no windows, so there is no closing time to show.
     var allDay = false
 
     var body: some View {
@@ -192,19 +180,15 @@ struct StatusChip: View {
 }
 
 enum RowCopy {
-    /// The rule line under a row's name. A rule that varies by day shows today's windows.
     static func detail(target: Target, status: TargetStatus, now: Date = .now) -> String {
         guard let rule = target.rule else { return "Not enforced yet" }
         guard rule.isEverAllowed else { return "Blocked all day" }
-        // Today's budget beside today's hours: the row is a statement about right now.
         let budget = TimeFormat.budget(rule.budget(on: Policy.weekday(now)))
         if case .exhausted = status { return "Used up today · \(budget)" }
         if rule.isSameEveryDay, rule.isSameBudgetEveryDay {
             return "\(TimeFormat.schedule(rule)) · \(budget)"
         }
         let today = rule.windows(on: Policy.weekday(now)).map { TimeFormat.window($0) }
-        // A day worth nothing has no hours and no figure worth printing: "Not today · 0 min"
-        // offers a budget that is not on offer.
         guard !today.isEmpty else { return "Not today" }
         return "Today \(today.joined(separator: ", ")) · \(budget)"
     }
@@ -214,7 +198,6 @@ enum RowCopy {
     }
 }
 
-/// A sheet chrome: title, Done, dark ground.
 struct SheetFrame<Content: View>: View {
     let title: String
     var width: CGFloat = 520
@@ -247,14 +230,8 @@ struct SheetFrame<Content: View>: View {
     }
 }
 
-/// The web filter's directions, one instruction at a time.
-///
-/// Two rounds of this were a paragraph and then a numbered list, and both failed the same way:
-/// there is one step that decides whether any of it works — Network Extensions lives under **By
-/// Category** and does not exist under By App — and a step like that is invisible in a list you
-/// skim. So the walkthrough shows a single instruction, a drawing of the control it means, the
-/// trap it carries if it has one, and a button that does the thing where a button can. Both
-/// onboarding and Settings > Web draw it from `WebFilter.Status.guidance`.
+/// Network Extensions lives under System Settings' By Category, not By App — easy to miss, so
+/// each step is shown one at a time rather than as a list.
 struct FilterDirections: View {
     let guidance: WebFilter.Guidance
     var size: CGFloat = 12.5
@@ -277,7 +254,6 @@ struct FilterDirections: View {
             if let current { stepCard(current) }
             if let caution = guidance.caution { warning(caution, size: size - 1) }
         }
-        // A status change is a different walkthrough, so it starts at its own first step.
         .onChange(of: guidance) { _, _ in index = 0 }
     }
 
@@ -303,7 +279,6 @@ struct FilterDirections: View {
         .emberCard()
     }
 
-    /// One dot per step, so the length of the walk is visible without reading it.
     private var pips: some View {
         HStack(spacing: 4) {
             ForEach(guidance.steps.indices, id: \.self) { position in
@@ -351,12 +326,7 @@ struct FilterDirections: View {
     }
 }
 
-/// A small drawing of the part of System Settings a step is about, in Furlough's own tokens.
-///
-/// Deliberately not screenshots. A screenshot of System Settings goes stale at every macOS
-/// redesign, carries a whole window of things that are not the point, and cannot emphasise the
-/// one control that matters. These show that control and little else, with the thing to click
-/// picked out in Ember.
+/// Hand-drawn, not screenshots — real System Settings screenshots go stale at every macOS redesign.
 struct StepFigure: View {
     let kind: WebFilter.Guidance.Figure
 
@@ -531,11 +501,6 @@ struct StepFigure: View {
     }
 }
 
-/// Rules · Anchor, at the top of the sidebar: the one control that says the app is two things and
-/// neither of them is the main one.
-///
-/// The phone puts this where its title is; a Mac window's toolbar has no such slot free, so it
-/// sits under the headline it belongs to, above the list it changes.
 struct MacHalfSegment: View {
     @Binding var half: Half
 

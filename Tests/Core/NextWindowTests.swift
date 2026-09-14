@@ -1,9 +1,8 @@
 import Foundation
 import Testing
 
-/// `Summary.nextOpenUntil`: when the window that opens next closes again. It exists so the app
-/// can ask ActivityKit for that window's Live Activity before it starts, which needs both ends
-/// of it while it is still in the future.
+/// `Summary.nextOpenUntil`: lets the app ask ActivityKit for a Live Activity before the window
+/// starts, which needs both ends of it while still in the future.
 @Suite("Policy.summary next window")
 struct NextWindowTests {
     /// Tuesday 8 September 2026 at 12:30.

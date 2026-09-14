@@ -1,6 +1,5 @@
-// The wall behind every page, from Shared/UI/Theme.swift: a warm dark ground, one ember glow
-// that laps the room in a hundred seconds, a faint amber glow top right, and a light grain.
-// Only the ember moves, and it moves on the compositor: one transform a frame, no repaint.
+// Ember glow ported from Shared/UI/Theme.swift; moved via transform only, so it animates on
+// the compositor with no repaint.
 
 export function startWall(wall: HTMLElement) {
   const ember = wall.querySelector<HTMLElement>('.wall-ember');
@@ -14,8 +13,7 @@ export function startWall(wall: HTMLElement) {
   const t0 = performance.now() / 1000 - 40;
   let last = 0;
 
-  /// Where the ember sits, as a fraction of the wall. The orbit is polar, so the ember always
-  /// clears the middle of the screen, where the content is.
+  // Polar orbit keeps the ember clear of the centered content.
   const center = (phase: number) => {
     const angle = (phase / 103) * 2 * Math.PI + 0.18 * Math.sin((phase / 32) * 2 * Math.PI);
     const reach = 0.86 + 0.2 * Math.sin((phase / 41) * 2 * Math.PI);

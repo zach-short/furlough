@@ -5,27 +5,20 @@
 #   BUILD=202609091529 scripts/beta-submit.sh
 #   BUILD=202609091529 WHATS_NEW="..." scripts/beta-submit.sh
 #
-# The TestFlight tab's "Submit for Review" through the API. This is a different queue from
-# scripts/store-submit.sh and scripts/store-resubmit.sh: Beta App Review reviews a build for
-# external testers, App Review reviews a version for the store. They do not touch each other,
-# and a build sitting in one is unaffected by anything that happens in the other. Submitting
-# here does NOT disturb a version already waiting in App Review — that was the whole reason
-# this script exists rather than swapping the build under the version.
+# The TestFlight tab's "Submit for Review" through the API. Beta App Review (this script) and
+# App Review (store-submit.sh/store-resubmit.sh) are separate queues that don't touch each
+# other — submitting here does not disturb a version already waiting in App Review.
 #
-# Two things gate an external submission and both are checked before anything is written:
-# the build must have processed to VALID, and its "What to Test" must be non-empty — Apple
-# refuses an external build without one, and the API's error for it does not say so plainly.
+# Gates checked before anything is written: the build must be VALID, and its "What to Test"
+# must be non-empty (Apple refuses an external build without one, with an unhelpful error).
 #
-# The submission itself is external-group membership. Adding a build to a group that is not
-# an internal group is what puts it in front of Beta App Review; the explicit
-# betaAppReviewSubmissions POST is tried first because it says what it did, and the group add
-# is the fallback that the web form uses underneath. Both are idempotent here: a build already
-# submitted is reported and left alone rather than resubmitted.
+# Submission is external-group membership: adding a build to a non-internal group is what puts
+# it in front of Beta App Review. The explicit betaAppReviewSubmissions POST is tried first
+# since it says what it did; group-add is the fallback the web form uses underneath. Both are
+# idempotent — an already-submitted build is reported and left alone.
 #
-# Written 2026-09-09, to get 202609091529 (the widget carrying its own family-controls
-# entitlement) in front of Beta App Review while 1.0/202609090936 held its place in App
-# Review. Same credentials as the other store scripts: ASC_KEY_ID and ASC_ISSUER_ID, with
-# the .p8 at ~/.appstoreconnect/private_keys/. No fastlane; the token is minted here.
+# Same credentials as the other store scripts: ASC_KEY_ID and ASC_ISSUER_ID, with the .p8 at
+# ~/.appstoreconnect/private_keys/. No fastlane; the token is minted here.
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -39,8 +32,8 @@ BUNDLE_ID="$(grep -m1 'PRODUCT_BUNDLE_IDENTIFIER:' project.yml | awk '{print $2}
 
 exec ruby - "$BUILD" "$ASC_KEY_ID" "$ASC_ISSUER_ID" "$KEY" "$BUNDLE_ID" "${WHATS_NEW:-}" <<'RUBY'
 # encoding: utf-8
-# Read from stdin rather than a file, so ruby assumes US-ASCII without this line and the
-# em-dashes in the messages below are a syntax error rather than text.
+# Needed because this runs from stdin: ruby otherwise assumes US-ASCII and the em-dashes below
+# are a syntax error.
 require 'openssl'; require 'base64'; require 'json'; require 'net/http'; require 'uri'
 build_number, key_id, issuer, key_path, bundle_id, whats_new = ARGV
 
@@ -99,8 +92,8 @@ if existing
 end
 
 # --- What to Test ---------------------------------------------------------------------
-# Apple refuses an external build whose "What to Test" is empty, and the error it gives for
-# it names neither the field nor the build. Fill it before submitting, never after.
+# Apple's error for an empty "What to Test" names neither the field nor the build — fill it
+# before submitting, never after.
 locs = request('GET', "/v1/betaBuildLocalizations?filter[build]=#{bid}")['data']
 loc = locs.find { |l| l.dig('attributes', 'locale') == 'en-US' } || locs.first
 current = loc && loc.dig('attributes', 'whatsNew')
@@ -128,8 +121,8 @@ status, parsed = attempt('POST', '/v1/betaAppReviewSubmissions',
 if (200..299).include?(status)
   puts "submitted: #{parsed.dig('data', 'attributes', 'betaReviewState')}"
 else
-  # The web form submits by putting the build in an external group; the explicit endpoint
-  # refuses in some account states. Say why before falling back, so a real failure is visible.
+  # The explicit endpoint refuses in some account states; fall back to the group-add the web
+  # form uses underneath.
   detail = (parsed['errors'] || []).map { |e| e['detail'] }.join('; ')
   puts "betaAppReviewSubmissions -> #{status} (#{detail})"
   puts "falling back to external-group membership, which is what the web form does"

@@ -57,7 +57,6 @@ enum EmberFont {
 }
 
 extension View {
-    /// Display face with the spec's -0.025 em tracking.
     func emberDisplay(_ size: CGFloat) -> some View {
         font(EmberFont.display(size)).tracking(-0.025 * size)
     }
@@ -67,17 +66,14 @@ extension View {
         font(EmberFont.displaySmall(size)).tracking(-0.01 * size)
     }
 
-    /// Geist Mono with tabular figures and -0.02 em tracking, in Cream.
     func emberNumerals(_ size: CGFloat) -> some View {
         font(EmberFont.numerals(size)).monospacedDigit().tracking(-0.02 * size).foregroundStyle(Ember.cream)
     }
 
-    /// Onest body text.
     func emberBody(_ size: CGFloat, _ weight: EmberFont.BodyWeight = .regular) -> some View {
         font(EmberFont.body(size, weight))
     }
 
-    /// The card behind rows and form fields: white 6 % fill, white 12 % 1 pt border, radius 20.
     func emberCard() -> some View {
         background(Ember.cardFill, in: RoundedRectangle(cornerRadius: Ember.cardRadius, style: .continuous))
             .overlay(
@@ -87,7 +83,7 @@ extension View {
     }
 }
 
-/// Uppercase Onest Bold label with wide tracking: section headers, "OPEN NOW · UNTIL 10:00 PM", "NEXT".
+/// Section headers, "OPEN NOW · UNTIL 10:00 PM", "NEXT".
 struct Eyebrow: View {
     var text: String
     var color: Color = Ember.faint
@@ -102,9 +98,8 @@ struct Eyebrow: View {
     }
 }
 
-/// The background behind every screen: a warm dark ground, one ember glow that laps the room,
-/// a faint amber glow top right, and a light grain to keep the gradients from banding. Reduce
-/// Motion parks the ember at its resting place, low on the left.
+/// Ember glow, faint amber glow, and noise grain over a dark ground. Reduce Motion parks the
+/// ember low-left.
 struct EmberWall: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -132,11 +127,8 @@ struct EmberWall: View {
         .ignoresSafeArea()
     }
 
-    /// Where the ember sits, as a fraction of the wall. It laps the room in a hundred seconds,
-    /// its reach breathing in and out and its pace wobbling, so the path is a long way from
-    /// repeating. Because the orbit is polar, `reach` sets a floor the ember never crosses: even
-    /// at its tightest it sits a fade radius clear of the middle, where the content is. Keep the
-    /// wobble below the period ratio (32/103) or the pace goes negative and the ember backs up.
+    /// Ember orbit: `reach` keeps it a fade radius clear of centre. Keep the wobble below the
+    /// period ratio (32/103) or the pace goes negative and it backs up.
     private func emberCenter(at phase: TimeInterval) -> CGPoint {
         guard !reduceMotion else { return CGPoint(x: 0.28, y: 1.04) }
         let angle = phase / 103 * 2 * .pi + 0.18 * sin(phase / 32 * 2 * .pi)
@@ -147,7 +139,6 @@ struct EmberWall: View {
         )
     }
 
-    /// An elliptical radial glow that fades to clear at `fade` of its radius.
     private func glow(color: Color, radiusX: CGFloat, radiusY: CGFloat, fade: CGFloat) -> some View {
         RadialGradient(
             stops: [.init(color: color, location: 0), .init(color: .clear, location: fade)],

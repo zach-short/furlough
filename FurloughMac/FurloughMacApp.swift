@@ -6,8 +6,7 @@ import UserNotifications
 struct FurloughMacApp: App {
     @NSApplicationDelegateAdaptor(MacAppDelegate.self) private var delegate
     @State private var model = MacModel.shared
-    /// Which page Help is on. Held here rather than inside Help, because the window that opens
-    /// Help is the one that decides whether it lands on the hub or on a page.
+    /// Held here, not inside Help: the window that opens Help decides which page it lands on.
     @State private var help = HelpRoute()
 
     var body: some Scene {
@@ -20,21 +19,15 @@ struct FurloughMacApp: App {
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentMinSize)
         .defaultSize(width: 980, height: 660)
-        // Deliberately not `.defaultLaunchBehavior(.suppressed)` for the menu bar case, which
-        // Help below can afford and this window cannot. A suppressed scene is never built, and
-        // then there is no window for AppKit to raise —
-        // reopening Furlough switched the activation policy and put nothing on screen, which
-        // on a Mac with no menu bar item is an app with no way in at all. So the window is
-        // always built and put away instead; `MacAppDelegate` hides it at launch.
+        // Not `.suppressed` like Help: a suppressed scene is never built, so reopening after a
+        // menu-bar-only launch would have no window to raise. Built always; `MacAppDelegate`
+        // hides it instead.
         .commands {
             CommandGroup(replacing: .newItem) {}
-            // The stock item opens a help book Furlough does not ship, so ⌘? did nothing at
-            // all. It opens the same window the question mark in the toolbar does.
+            // Replaces the stock Help item, which opened a help book Furlough doesn't ship.
             CommandGroup(replacing: .help) { HelpMenuItem(route: help) }
         }
 
-        // Help is a window rather than a sheet: it is long enough to want a scroll bar and a
-        // size of your own, and a sheet that size was taller than a small main window.
         Window("Furlough Help", id: HelpRoute.windowID) {
             HelpWindow()
                 .environment(model)
@@ -43,17 +36,15 @@ struct FurloughMacApp: App {
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentMinSize)
         .defaultSize(width: 560, height: 720)
-        // Opened on request and never on its own: a launch meant for the menu bar puts no
-        // window up, and a Help window left open at a force quit is not something to restore
-        // over whatever the Mac is doing when the watchdog starts Furlough again.
+        // Never opens on its own: a Help window left open at a force quit shouldn't reappear
+        // when the watchdog relaunches Furlough.
         .defaultLaunchBehavior(.suppressed)
         .restorationBehavior(.disabled)
     }
 }
 
-/// Starts enforcement, keeps notifications visible while Furlough is in front, and refuses
-/// to quit while something is blocked. Logging out, restarting and shutting down are always
-/// allowed; Force Quit always works too, and is the Mac's documented escape.
+/// Starts enforcement; refuses to quit while something is blocked (Force Quit is the
+/// documented escape).
 final class MacAppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     /// Built in `applicationDidFinishLaunching` rather than here: the delegate is not
     /// `@MainActor`, so a property initialiser cannot reach `MacModel.shared`.
@@ -61,19 +52,14 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationC
     private var restoreWatcher: NSObjectProtocol?
     private var closeWatcher: NSObjectProtocol?
 
-    /// The watchdog agent passes `--background`, so a reopen it caused can be told from a
-    /// person double-clicking Furlough. Nothing else passes it.
+    /// Nothing else passes `--background`; it's how a watchdog reopen is told from a user launch.
     static var isWatchdogLaunch: Bool { CommandLine.arguments.contains(Watchdog.backgroundFlag) }
 
-    /// Whether this launch should put a window on screen. Only a first run does: after that
-    /// Furlough goes straight to the menu bar, and the window is opened on request.
     @MainActor
     static var opensWindowAtLaunch: Bool { !isWatchdogLaunch && !MacModel.shared.isOnboarded }
 
-    /// The `Window` scene's window, for the menu bar's way back to it. Matched on the scene id
-    /// SwiftUI stamps on it, falling back to the one titled window that is neither the shield
-    /// nor Help — Help is a window of its own now, and raising it instead would put the app's
-    /// reading matter on screen in place of its rules.
+    /// Matched by SwiftUI's scene id, falling back to the one titled window that's neither the
+    /// shield nor Help.
     @MainActor
     static var mainWindow: NSWindow? {
         NSApp.windows.first { $0.identifier?.rawValue.contains("main") == true }
@@ -92,8 +78,8 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationC
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // First, before the window or a Dock icon can appear, so an onboarded Mac goes quietly
-        // to the menu bar rather than blinking a window on the way.
+        // Set before the window can appear, so onboarded Macs don't blink a window on the way
+        // to the menu bar.
         if !Self.opensWindowAtLaunch { NSApp.setActivationPolicy(.accessory) }
         UNUserNotificationCenter.current().delegate = self
         MacModel.shared.start()
@@ -104,11 +90,8 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationC
         watchForTheWindowClosing()
     }
 
-    /// Brings the window up, and makes Furlough a regular app for as long as it is there.
-    ///
-    /// The policy change is not cosmetic. An accessory app has no menu bar menus, and with them
-    /// goes the Edit menu — which is where ⌘C and ⌘V live, so the nickname and host fields would
-    /// quietly stop taking a paste. Regular while a window is up, accessory again once it closes.
+    /// Regular, not accessory, while the window is up: an accessory app has no Edit menu, so
+    /// ⌘V would silently stop working in text fields.
     @MainActor
     static func showWindow() {
         NSApp.setActivationPolicy(.regular)
@@ -116,17 +99,15 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationC
         if let window = mainWindow {
             window.makeKeyAndOrderFront(nil)
         } else {
-            // Suppressed at launch, so there is nothing to raise. Opening the bundle asks AppKit
-            // for the same reopen that double-clicking Furlough does, and that path builds it.
-            // It cannot loop: the reopen handler below never calls back into here.
+            // Nothing to raise (suppressed at launch); opening the bundle triggers the same
+            // reopen path as a double-click, which builds it — no loop back into here.
             NSWorkspace.shared.openApplication(
                 at: Bundle.main.bundleURL, configuration: NSWorkspace.OpenConfiguration()
             )
         }
     }
 
-    /// Opening Furlough again while it is running is the way back to the window that always
-    /// exists — no Dock icon and, on some Macs, no menu bar item, but this still works.
+    /// Works even with no Dock icon or menu bar item, since the window always exists, just hidden.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate()
@@ -134,18 +115,15 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationC
         return true
     }
 
-    /// Closing the window puts Furlough back in the menu bar. It does not stop enforcement:
-    /// without this, an app with no window left would terminate and the rules would go with it.
+    /// Without this, closing the last window would terminate the app and enforcement with it.
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
     private func watchForTheWindowClosing() {
         closeWatcher = NotificationCenter.default.addObserver(
             forName: NSWindow.willCloseNotification, object: nil, queue: .main
         ) { _ in
-            // Deferred, and asked as "is anything left" rather than "was that the main window":
-            // the closing window is still in `NSApp.windows` while it closes, and a Notification
-            // cannot cross into the main actor anyway. The shield is an NSPanel and does not
-            // count, so blocking something never drags the Dock icon back.
+            // Deferred: the closing window is still in `NSApp.windows` during `willClose`, so
+            // check what's left rather than which one closed. The shield (an NSPanel) doesn't count.
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
                     let stillShowing = NSApp.windows.contains { Self.isAppWindow($0) && $0.isVisible }
@@ -155,13 +133,8 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationC
         }
     }
 
-    /// Hides the window Furlough is not meant to show at this launch, keeping it built so
-    /// there is always something to raise later.
-    ///
-    /// Asked three times on purpose, because there are three moments it can appear: one SwiftUI
-    /// builds during launch, one AppKit restores from the state saved when Furlough was last
-    /// force quit — exactly the case the watchdog exists for — and one that lands a turn later.
-    /// None of the three is guaranteed to have happened by now.
+    /// Called three times: SwiftUI's own build, AppKit's window restoration (from a force
+    /// quit), and one that lands a turn later — none guaranteed to have happened yet.
     @MainActor
     private func putTheWindowAway() {
         Self.orderOutEveryWindow()
@@ -169,15 +142,13 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationC
         restoreWatcher = NotificationCenter.default.addObserver(
             forName: NSApplication.didFinishRestoringWindowsNotification, object: nil, queue: .main
         ) { _ in
-            // Captures nothing: the delegate is not Sendable, and the notification fires once
-            // per launch anyway, so there is nothing to tear down.
+            // No capture needed: fires once per launch, and the delegate isn't Sendable.
             MainActor.assumeIsolated { Self.orderOutEveryWindow() }
         }
     }
 
-    /// Every window, not just the main one: macOS restores whatever was open when Furlough was
-    /// last force quit, and a Help window left open is exactly the sort of thing a launch meant
-    /// for the menu bar should not put back on screen.
+    /// All windows, not just main: macOS restores whatever was open at the last force quit,
+    /// Help included.
     @MainActor
     private static func orderOutEveryWindow() {
         for window in NSApp.windows where isAppWindow(window) { window.orderOut(nil) }

@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Shown while the device's clock disagrees with Furlough's own. Nothing is broken and nothing
-/// is waiting on the banner: it is there so the times on screen make sense.
+/// Shown when the device clock disagrees with Furlough's own; informational only, nothing is
+/// broken or blocked on it.
 struct ClockBanner: View {
     let drift: TimeInterval
 

@@ -1,17 +1,13 @@
 import AppIntents
 import Foundation
 
-// `DropAnchorIntent` moved to `Shared/Intents/DropAnchorIntent.swift` on 2026-09-09, so the
-// widget extension can run it behind a Control Center control and a widget button. It drops
-// through `AnchorDrop` in `Shared/Core` and never reaches `AppModel`; the app hears of the
-// drop through `SharedStore.announceChange`.
+// `DropAnchorIntent` lives in `Shared/Intents/DropAnchorIntent.swift` so the widget extension
+// can run it behind a Control Center control and a widget button. It goes through `AnchorDrop`
+// in `Shared/Core` and never reaches `AppModel`; the app hears of the drop through
+// `SharedStore.announceChange`.
 
-/// Weighs anchor — which means opening Furlough and asking for the tag.
-///
-/// It cannot be done in the background and it is not meant to be. Core NFC only reads for an
-/// app that is in front, and the tag is the whole mechanism: the Anchor's friction is a thing
-/// you have to walk to, not a screen you have to find. So this saves the walk to the app and
-/// nothing else — the scan still has to succeed, with the paired tag, or the anchor holds.
+/// Opens Furlough and asks for the tag. Cannot run in the background: Core NFC only reads for
+/// a foreground app.
 struct WeighAnchorIntent: AppIntent {
     static let title: LocalizedStringResource = "Weigh Anchor"
     static let description = IntentDescription(
@@ -19,8 +15,6 @@ struct WeighAnchorIntent: AppIntent {
         categoryName: "Anchor",
         searchKeywords: ["anchor", "unlock", "unanchor", "tag", "nfc"]
     )
-    /// Has to be. The NFC sheet belongs to the foreground app; there is no reading a tag from
-    /// a background intent, and no unlocking without reading one.
     static let openAppWhenRun = true
 
     func perform() async throws -> some IntentResult {
@@ -29,13 +23,7 @@ struct WeighAnchorIntent: AppIntent {
     }
 }
 
-/// What Spotlight puts under Furlough's name, in the order it draws them.
-///
-/// Three, because the row beside the app icon holds three, and these are the three worth a
-/// slot: the two halves of the Anchor — kept apart because they behave differently, one
-/// instant and silent, one opening the app for the tag — and the question that needs no app
-/// at all. Everything else Furlough can do either loosens a rule, which is not allowed to
-/// happen in one tap, or wants the editor in front of you.
+/// The three shortcuts Spotlight shows under Furlough's name, in this order.
 struct FurloughShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
@@ -46,13 +34,10 @@ struct FurloughShortcuts: AppShortcutsProvider {
                 "Lock my apps with \(.applicationName)"
             ],
             shortTitle: "Drop Anchor",
-            // SF Symbols has no anchor, and this slot takes an SF Symbol name and nothing else:
-            // the system draws the row beside the app's name in Spotlight, out of our process,
-            // where the app's own `anchor` symbol (Shared/UI/Ember.xcassets, drawn by
-            // scripts/make-anchor-symbol.swift) cannot be reached. Naming it here drew an empty
-            // circle — seen in Spotlight on the phone, 2026-09-09. A lock is what the drop
-            // does, and it is the one honest symbol Apple ships for it. The custom anchor is
-            // still right in `DropAnchorControl`, which renders inside our own extension.
+            // This slot only accepts an SF Symbol name (rendered by the system out-of-process),
+            // so the app's custom `anchor` glyph (Shared/UI/Ember.xcassets) can't be used here —
+            // naming it drew an empty circle. `DropAnchorControl` still uses the custom glyph
+            // since it renders inside our own extension.
             systemImageName: "lock.fill"
         )
         AppShortcut(

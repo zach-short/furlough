@@ -1,14 +1,10 @@
 import SwiftUI
 
-/// The phone's hero page for one app, at the top of its rule: the living hourglass, an
-/// eyebrow, the name, the big countdown and a sub line. `now` ticks once a second in the
-/// editor, so the sand and the countdown share a clock. The Mac counts usage itself, so the
-/// sub line can say how much of the budget is gone, which the phone cannot.
+/// `now` is shared with the hourglass so both tick from the same clock.
 struct TargetHero: View {
     let target: Target
     let status: TargetStatus
     let runtime: RuntimeState
-    /// Seconds counted against the budget today.
     let usedSeconds: Int
     let now: Date
 
@@ -76,7 +72,6 @@ struct TargetHero: View {
         }
     }
 
-    /// What the target is underneath its name: the bundle identifier or the host.
     private var identity: String {
         switch target.kind {
         case .macApp(let bundleID): bundleID
@@ -121,8 +116,7 @@ struct TargetHero: View {
             }
             return Line(eyebrow: "Used up today", color: Ember.ember, big: .quiet("spent"), sub: "\(budget) a day")
         case .anchored:
-            // Since 2026-09-09 the Mac anchors too: dropped here, or on the phone and arrived
-            // through iCloud. Only the phone's tag releases it.
+            // Can be set here or synced from the phone via iCloud; only the phone's tag releases it.
             return Line(eyebrow: "Anchored", color: Ember.ember, big: .quiet("locked"), sub: "Your iPhone's tag releases it · \(RowCopy.detail(target: target, status: status, now: now))")
         case .blockedAllDay:
             return Line(eyebrow: "Always blocked", color: Ember.muted, big: .quiet("all day"), sub: "No budget · set one below")
@@ -135,9 +129,7 @@ struct TargetHero: View {
     }
 }
 
-/// The list order from the phone: Open now · Later today · Tomorrow · Later this week ·
-/// Always blocked · Needs a schedule. There is no Anchored section: a Mac has no NFC reader,
-/// so nothing is ever anchored here.
+/// No Anchored section — Mac has no NFC reader, so nothing anchors here.
 struct HomeGroups {
     struct Section: Identifiable {
         let title: String
@@ -148,7 +140,6 @@ struct HomeGroups {
     var open: [(target: Target, until: Date)] = []
     var laterToday: [(target: Target, at: Date)] = []
     var tomorrow: [(target: Target, at: Date?)] = []
-    /// Two or more days out: targets whose windows skip tomorrow.
     var laterThisWeek: [(target: Target, at: Date)] = []
     var alwaysBlocked: [Target] = []
     var unconfigured: [Target] = []
@@ -183,7 +174,6 @@ struct HomeGroups {
         laterThisWeek.sort { $0.at < $1.at }
     }
 
-    /// Every target in the list's order: one hero page each, as on the phone.
     var ordered: [Target] { sections.flatMap(\.targets) }
 
     var sections: [Section] {
@@ -199,21 +189,14 @@ struct HomeGroups {
 }
 
 
-/// The phone's hero header (H1 in design/HOURGLASS.md) as the Mac's front page: one page per
-/// managed app in the list's order, with a strip of tiny status hourglasses under it that is a
-/// status summary in itself. The Mac has no swipe, so the strip and a pair of chevrons turn the
-/// pages; clicking the page opens that app's rule, which is what tapping it does on the phone.
-/// It fills the detail pane while nothing is selected, so the living hourglass is the first
-/// thing the window shows rather than something you have to click to find.
 struct MacHeroPager: View {
     let targets: [Target]
     let statuses: [UUID: TargetStatus]
     let runtime: RuntimeState
     let now: Date
-    /// Seconds counted against the budget today, per target.
     let usedSeconds: (UUID) -> Int
     let onOpen: (UUID) -> Void
-    /// The page being shown; the second ticks rebuild this view, so it is state.
+    /// @State because the view rebuilds every second (the tick).
     @State private var featured: UUID?
 
     private var landing: UUID? {
@@ -267,7 +250,6 @@ struct MacHeroPager: View {
         }
     }
 
-    /// One page forward or back, wrapping, for the mouse and for ⌘← / ⌘→.
     @ViewBuilder
     private func turner(symbol: String, by step: Int) -> some View {
         Button {

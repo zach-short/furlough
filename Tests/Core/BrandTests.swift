@@ -1,8 +1,7 @@
 import Foundation
 import Testing
 
-/// What the usage page can call an app before Screen Time says: the tables' name for its bundle
-/// identifier, and the colour and letter its tile carries until the real icon lands. See `Brand`.
+/// The name/colour/letter a tile shows before Screen Time or the real icon is known. See `Brand`.
 @Suite("Brand")
 struct BrandTests {
     @Test("a bundle identifier the tables know is named without asking Screen Time")
@@ -30,9 +29,7 @@ struct BrandTests {
         #expect(Brand.color(forKey: "com.example.nobody") == nil)
     }
 
-    /// A colour is only ever drawn under a letter, and the letter comes from the name, so a
-    /// colour for an identifier the tables cannot name is dead weight — or a sign the name is
-    /// missing from `AppUtility.properNameByBundleID`.
+    // A colour with no name is dead weight, or a missing entry in `AppUtility.properNameByBundleID`.
     @Test("every colour in the table belongs to an identifier the tables can name")
     func everyColourHasAName() {
         for key in Brand.colors.keys.sorted() {

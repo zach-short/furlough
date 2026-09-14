@@ -1,18 +1,13 @@
 import SwiftUI
 
-/// The Anchor's own mark, drawn here because SF Symbols has none: 8,302 names in the system
-/// list and not one anchor, so the thing the feature is named for cannot be borrowed. What
-/// stood in for it was `cube.fill`, which said nothing.
-///
-/// The path is the anchor's skeleton — ring, shank, stock, arms — stroked into a closed
-/// outline and handed over as one filled shape, so a caller can `fill` it like a glyph and,
-/// where the drawing wants an edge, `stroke` the same outline a second time.
+/// Hand-drawn: SF Symbols has no anchor glyph (8,302 names, none of them this — `cube.fill`
+/// stood in before). The skeleton is stroked into one closed outline so callers can both
+/// `fill` and `stroke` it like a glyph.
 enum AnchorMark {
-    /// The space the coordinates below are written in. The mark does not fill it — `fit`
-    /// measures the ink rather than trusting the box.
+    /// Nominal coordinate space only — `fit` measures actual ink (`ink`), not this box.
     static let size = CGSize(width: 80, height: 100)
 
-    /// The bar the skeleton is drawn with, in that space: about a semibold glyph's weight.
+    /// Stroke width, ~a semibold glyph's weight.
     static let weight: Double = 7
 
     /// Ring, shank, stock, arms. A centre line, not yet a shape.
@@ -40,8 +35,7 @@ enum AnchorMark {
         return p.applying(CGAffineTransform(scaleX: -1, y: 1).translatedBy(x: -size.width, y: 0))
     }
 
-    /// The whole mark as one closed outline, ready to fill. Built once: a union is not cheap,
-    /// and the mark never changes.
+    /// Built once — Path union is expensive and this never changes.
     static let outline: Path = {
         let bar = skeleton.strokedPath(StrokeStyle(lineWidth: weight, lineCap: .round, lineJoin: .round))
         return bar.union(fluke(mirrored: false)).union(fluke(mirrored: true))
@@ -50,7 +44,6 @@ enum AnchorMark {
     /// What the ink actually covers, which is narrower and shorter than `size`.
     static let ink = outline.cgPath.boundingBoxOfPath
 
-    /// The mark scaled to fill `rect`, centred, keeping its proportions.
     static func fit(in rect: CGRect) -> Path {
         let scale = min(rect.width / ink.width, rect.height / ink.height)
         let x = rect.midX - ink.midX * scale
@@ -59,7 +52,6 @@ enum AnchorMark {
     }
 }
 
-/// The anchor, filled like a glyph.
 struct AnchorShape: Shape {
     func path(in rect: CGRect) -> Path { AnchorMark.fit(in: rect) }
 }

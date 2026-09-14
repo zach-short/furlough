@@ -101,7 +101,6 @@ def render(meshes, eye, target, size, ss=2, layer_lines=True, shadow=True, frame
     sx = cx + u * F
     sy = cy - v * F
 
-    # background gradient
     g = np.linspace(0, 1, H)[:, None]
     img = (np.array([0.945, 0.953, 0.960])[None, None, :] * (1 - g[..., None])
            + np.array([0.855, 0.870, 0.885])[None, None, :] * g[..., None])
@@ -177,8 +176,8 @@ def render(meshes, eye, target, size, ss=2, layer_lines=True, shadow=True, frame
         c = np.concatenate([np.zeros((a.shape[0], 1)), c], axis=1)
         return (c[:, k:] - c[:, :-k]) / k
 
-    # A debossed mark on a face: seen near head-on, a 0.5 mm recess reads as a step in
-    # shading rather than a step in silhouette, so darken the covered pixels.
+    # Seen near head-on, a 0.5mm recess reads as a shading step, not a silhouette step —
+    # fake it by darkening the covered pixels.
     if decal is not None:
         from PIL import ImageDraw
         polys_xy, z_plane, _depth = decal
@@ -240,10 +239,8 @@ else:
 
 
 # --- twist variant --------------------------------------------------------
-# The lugs and the bayonet channels are not solids of revolution, but they are
-# still lathe work: the profile just changes with the angle. One revolve that
-# takes a profile *function* draws both, and the walls at each feature's ends
-# fall out of the mesh for free.
+# Lugs and bayonet channels aren't solids of revolution, but a profile that varies with
+# angle is still lathe work — one revolve_fn draws both, feature-end walls included free.
 
 seat, foot_h = 0.2, 1.6
 bay_gap, lug_out, skirt_wall = 0.35, 1.2, 1.65

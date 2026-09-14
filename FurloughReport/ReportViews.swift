@@ -1,9 +1,7 @@
 import FamilyControls
 import SwiftUI
 
-/// One slot of the ranking, in a frame the app fixed: the whole card for that position, or, in
-/// the first empty slot, a line saying the list ended. Every text is allowed its lines and the
-/// whole thing sits at the top, so nothing is squeezed to fit or centred out of view.
+/// The card for this rank, or (in the first empty slot) a line saying the list ended.
 struct RankView: View {
     let slot: RankSlot
 
@@ -24,10 +22,8 @@ struct RankView: View {
     }
 }
 
-/// One app or site, answering the three questions in order: what it is and how much of the day
-/// it takes, where that time falls, and what Furlough would do about it. The same card the app
-/// draws for itself where iOS lets it read the numbers; here Screen Time draws it, and the
-/// person carries the rule into the editor by hand, because nothing leaves this sandbox.
+/// Same card the app draws for itself when it can read the numbers; here Screen Time draws it
+/// and the person carries the rule into the editor by hand, since nothing can leave this sandbox.
 struct UsageReportCard: View {
     let item: Recommendation
     let entry: UsageEntry
@@ -82,7 +78,6 @@ struct UsageReportCard: View {
         }
     }
 
-    /// Pickups only when there are enough of them to say something.
     private var subtitle: String {
         let pickups = Int(item.pickupsPerDay.rounded())
         guard pickups >= 1 else { return "Last \(days) days" }
@@ -90,18 +85,15 @@ struct UsageReportCard: View {
     }
 }
 
-/// The real icon, when Screen Time handed a token over with the numbers. Apple's `Label(token)`
-/// is always 32 pt with its artwork filling about two thirds of that, so the tile measures the
-/// view and scales past the padding. The same measured scaling `TokenTile` does in the app,
-/// written again because `Furlough/Views` is not among this extension's sources; if the two
-/// ever have to agree on more than a number, move `TokenTile` into `Shared/UI`.
+/// Apple's `Label(token)` is a fixed 32pt with artwork filling ~2/3 of that, so this measures
+/// and scales past the padding. Duplicates `TokenTile` from the app since `Furlough/Views`
+/// isn't in this extension's sources; move it to `Shared/UI` if the two need to agree on more.
 private struct ReportTile: View {
     let entry: UsageEntry
     var size: CGFloat = 34
     @State private var natural = CGSize.zero
-    /// An app icon fills 0.655 of Apple's 32 pt view and is scaled past that padding; anything
-    /// else Apple draws runs edge to edge and is left alone. `TokenTile.artworkFraction` says
-    /// the same thing in the app, where the measurement was made.
+    /// App icon fills 0.655 of Apple's 32pt view; everything else runs edge to edge. Measured
+    /// value mirrored from `TokenTile.artworkFraction` in the app.
     private var artworkFraction: CGFloat { entry.applicationToken != nil ? 0.655 : 1 }
 
     private var hasToken: Bool { entry.applicationToken != nil || entry.webDomainToken != nil }
@@ -139,8 +131,7 @@ private struct ReportTile: View {
 }
 
 extension View {
-    /// Furlough's card over its own ground, so the text reads whatever the host paints behind
-    /// the report.
+    /// Furlough's own ground behind the card, so text reads regardless of what the host paints.
     func reportCard() -> some View {
         background(Ember.ground.opacity(0.92), in: RoundedRectangle(cornerRadius: Ember.cardRadius, style: .continuous))
             .emberCard()

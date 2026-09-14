@@ -10,9 +10,7 @@ struct RuleEditorView: View {
     @State private var budget = Furlough.defaultBudgetMinutes
     /// On when the week is seven figures rather than one, mirroring `byDay` for the windows.
     @State private var budgetByDay = false
-    /// Seven budgets, Sunday first so the index is Calendar's weekday minus one. Only read
-    /// while `budgetByDay` is on; `budget` keeps the single figure so turning the toggle back
-    /// on restores what the rule said before it was split.
+    /// Sunday-first, index = Calendar's weekday minus one. Only read while `budgetByDay` is on.
     @State private var dayBudgets = [Int](repeating: Furlough.defaultBudgetMinutes, count: 7)
     @State private var loaded = false
     /// Whether each window shows its day strip. Off means every window applies every day.
@@ -22,32 +20,21 @@ struct RuleEditorView: View {
     /// Targets chosen in the apply sheet, applied once the sheet has gone so the alert can show.
     @State private var applyTo: [UUID]?
     @State private var showWeek = false
-    /// What the last save did, shown in the alert that closes the editor.
     @State private var saved: String?
     @State private var confirmRemove = false
-    /// The tier in the draft. Saved through `AppModel.setUtility`, which decides on its own
-    /// whether it lands now or queues.
+    /// Saved through `AppModel.setUtility`, which decides on its own whether it lands now or queues.
     @State private var tier = Utility.unset
-    /// Whether anyone has actually touched the tier chips this visit. An untouched picker reads
-    /// `.useful` because that is what `Utility.unset` is, so a rule suggestion may not read it as
-    /// an answer — see `answeredTier`.
+    /// `Utility.unset` reads as `.useful` in the picker, so this distinguishes an actual choice
+    /// from the untouched default — see `answeredTier`.
     @State private var tierTouched = false
     @State private var confirmBlockEssential = false
-    /// The first-rule card handed over: "Change it" was tapped, and the full editor is on
-    /// screen holding the rule the card was showing. One-way for this visit — the card was an
-    /// offer, and a person who has started editing has already answered it.
+    /// Set when "Change it" is tapped on the first-rule card, revealing the full editor.
+    /// One-way for this visit.
     @State private var changing = false
-    /// The suggestion currently sitting in the fields, so the offer inside the editor knows not
-    /// to offer what is already there. Set by `applySuggestion` however the fields were filled:
-    /// from the card's "Change it", or from the offer itself.
+    /// The suggestion currently in the fields, so the offer doesn't re-offer what's already there.
     @State private var appliedSuggestion: RuleSuggestion.Draft?
-    /// Set when the companion nudge is taken up: the flow below opens the guide or the picker.
     @State private var addRequest: AddRequest?
-    /// What linking, merging or unlinking a half just did, shown in an alert. The editor stays
-    /// open: the row is the same row, and there is nothing to go back to.
     @State private var linked: String?
-    /// The half whose unlink is being confirmed. Taking one off loosens the rules, so it is worth
-    /// asking, the same as removing the whole row.
     @State private var confirmUnlink: TargetKind?
     @FocusState private var nicknameFocused: Bool
 
@@ -56,10 +43,9 @@ struct RuleEditorView: View {
         let id = UUID()
         var window: TimeWindow
 
-        /// Rows on the same days that overlap or touch, joined into the earlier row. A night
-        /// is left out of it: its end is a time on the next morning, so it neither swallows a
-        /// later row nor is swallowed by an earlier one. A night that does overlap its
-        /// neighbours is caught by validation once it is split, and said so.
+        /// Rows on the same days that overlap or touch, joined into the earlier row. Night
+        /// windows are excluded since their end lands the next morning; an overlap there is
+        /// caught by validation instead.
         static func joined(_ rows: [DraftWindow]) -> [DraftWindow] {
             var result: [DraftWindow] = []
             for row in rows.sorted(by: { $0.window < $1.window }) {
@@ -75,7 +61,6 @@ struct RuleEditorView: View {
             return result
         }
 
-        /// Rows by group of days, then by time of day: the order the list always reads in.
         static func sorted(_ rows: [DraftWindow]) -> [DraftWindow] {
             let order = TimeWindow.grouped(rows.map(\.window))
             return rows.sorted { a, b in
@@ -83,30 +68,21 @@ struct RuleEditorView: View {
             }
         }
 
-        /// Joined, then sorted: what a committed edit leaves behind.
         static func tidy(_ rows: [DraftWindow]) -> [DraftWindow] { sorted(joined(rows)) }
     }
 
     private var target: Target? { model.state.config.target(id: targetID) }
-    /// The rows as Furlough stores them: a night becomes its evening and the morning after.
+    /// A night becomes its evening and the morning after, as Furlough stores it.
     private var windows: [TimeWindow] { drafts.flatMap { $0.window.split } }
     private var draft: Rule {
         Rule(windows: windows, dailyBudgetMinutes: savedBudget, budgetByWeekday: savedBudgetByWeekday).normalized
     }
-    /// A target nothing counts is saved with a whole day of budget — the value `Rule.unrestricted`
-    /// uses for "no limit" — whatever the slider last held. Forced here rather than in `load()` so
-    /// that no other path into the draft can give one a limit that nothing would enforce:
-    /// "Use windows from another app" copies a budget, and the week sheet writes windows back
-    /// through the same binding. A budget of 0 would mean blocked all day, so it cannot be that.
-    ///
-    /// `isCounted` rather than `kind.isHost` since linking: a typed site on its own is counted by
-    /// nothing, but the same site linked to an app shares that app's budget event, and the app's
-    /// minutes are real minutes. So a linked pair gets a real budget and a lone site still does not.
+    /// A target nothing counts (`isCounted == false`, not `kind.isHost` — a linked site shares
+    /// its app's real budget) is forced to `Rule.unrestricted`'s whole-day value here, so no
+    /// other path (copy, week sheet) can give it an unenforceable limit.
     private var savedBudget: Int { target?.isCounted == false ? Furlough.minutesPerDay : budget }
-    /// The seven figures, or nil when one covers the week. A target nothing counts never gets
-    /// one, for the reason above: seven copies of a budget nothing enforces are no more
-    /// enforceable than the one. `normalized` drops the array again when the seven agree, so
-    /// the toggle cannot leave behind a rule that only differs from its old self on paper.
+    /// Nil for an uncounted target, for the same reason as `savedBudget`. `normalized` drops
+    /// the array again when all seven agree.
     private var savedBudgetByWeekday: [Int]? {
         guard budgetByDay, target?.isCounted != false else { return nil }
         return dayBudgets
@@ -119,53 +95,39 @@ struct RuleEditorView: View {
             || target.utility != tier
     }
 
-    /// What Furlough would have guessed, offered only while Zach has not answered for himself.
     private var suggestion: Utility? {
         guard let target, !target.hasChosenUtility else { return nil }
         return AppUtility.suggestion(for: target)?.utility
     }
 
-    /// The rule Furlough would start this one on: the sibling of `suggestion` above, one
-    /// property over. That one answers what this thing is; this one answers what to do about it.
-    /// Offered only while the target has no rule of its own and none is queued — a suggestion is
-    /// for the cold start, never a second way to edit a rule someone is living under.
+    /// Offered only while the target has no rule and none is queued — a cold-start suggestion,
+    /// never a second way to edit a rule someone is already living under.
     private var ruleSuggestion: RuleSuggestion.Draft? {
         guard let target, pendingRule == nil else { return nil }
         return RuleSuggestion.suggestion(for: target, chosen: answeredTier)
     }
 
-    /// The suggestion the editor opens on instead of its own sections, or nil for the ordinary
-    /// full editor.
-    ///
-    /// The second step of the Rules guide is "give the first one a rule", and this is what that
-    /// step lands on: one card saying the rule Furlough would write, a Save, and a way to write
-    /// it yourself. Only ever on a target with no rule at all — an editor that opened on a card
-    /// over a rule someone is living under would be a second way to edit that rule, which is the
-    /// thing `RuleSuggestion` is not allowed to be.
+    /// The card the editor opens on instead of its own sections, or nil for the full editor.
+    /// Only for a target with no rule at all.
     private var firstRule: RuleSuggestion.Draft? {
         guard !changing, let target, !target.kind.isCategory else { return nil }
         return ruleSuggestion
     }
 
-    /// The tier the rule suggestion answers to, or nil while nobody has answered. "Useful" from
-    /// someone who has not touched the chips is the absence of an answer, not one, so the table's
-    /// own guess stands in until the picker is used or a tier is saved.
+    /// Nil until the tier chips are actually touched or a tier is saved — an untouched picker
+    /// reads `.useful`, which is not itself an answer.
     private var answeredTier: Utility? {
         guard let target else { return nil }
         return target.hasChosenUtility || tierTouched ? tier : nil
     }
 
-    /// The name the tables already know for this row, while it is going by an address or a
-    /// stand-in and the field is still empty.
     private var nicknameOffer: String? {
         guard let target, trimmedNickname.isEmpty else { return nil }
         return AppUtility.offeredNickname(for: target)
     }
 
-    /// What blocking this one costs, when it is worth saying. Nil for the tiers Furlough exists
-    /// to block, and nil for a draft that restricts nothing.
+    /// Nil for tiers Furlough doesn't block, and for a draft that restricts nothing.
     private var caution: String? {
-        // A draft that restricts nothing is not a block, so there is nothing to warn about.
         guard let target, !Rule.unrestricted.isEquivalent(to: draft) else { return nil }
         return UtilityText.blocking(
             name: target.displayName,
@@ -174,31 +136,25 @@ struct RuleEditorView: View {
         )
     }
 
-    /// What a night takes from the day after it, said under the windows while one is drafted.
     static let nightNote = """
         A window that runs past midnight opens the early hours of the next day too, and the \
         budget resets at midnight, so those hours get a fresh one.
         """
 
-    /// Whether there is anything to copy a rule *from*: another configured target, or Furlough's
-    /// own starting rule for this one. The second is what makes the sheet worth opening on the
-    /// first app anyone adds, when there is nothing else in the list yet.
     private var hasCopySources: Bool { !copyCandidates.isEmpty || ruleSuggestion != nil }
 
-    /// Other apps and sites with windows worth copying.
     private var copyCandidates: [Target] {
         model.state.config.targets.filter {
             $0.id != targetID && !$0.kind.isCategory && ($0.rule?.isEverAllowed ?? false)
         }
     }
 
-    /// Other apps and sites this draft can be given to, set up or not.
     private var applyCandidates: [Target] {
         model.state.config.targets.filter { $0.id != targetID && !$0.kind.isCategory }
     }
 
-    /// The draft as a week for the visual editor. Writing back merges identical spans across
-    /// days into one window and sets the Same every day toggle to match.
+    /// Writing back merges identical spans across days into one window and updates the
+    /// Same-every-day toggle to match.
     private var weekDraft: Binding<WeekDraft> {
         Binding(
             get: { WeekDraft(windows: windows) },
@@ -225,9 +181,8 @@ struct RuleEditorView: View {
         )
     }
 
-    /// Turning it on returns to the single figure the editor still holds, discarding the seven;
-    /// turning it off seeds all seven from that figure, so the first thing a person sees is the
-    /// week they already had, not seven defaults.
+    /// Turning it off seeds all seven days from the current single figure, so the toggle shows
+    /// the week already had rather than seven defaults.
     private var sameBudgetEveryDay: Binding<Bool> {
         Binding(
             get: { !budgetByDay },
@@ -246,9 +201,6 @@ struct RuleEditorView: View {
                 if let target {
                     header(target)
                     undoCard(target)
-                    // The first rule is one card and a Save; everything else waits behind
-                    // "Change it". Both branches keep the header above and the way out below,
-                    // so the screen is the same screen either way.
                     if let suggestion = firstRule {
                         firstRulePane(target, suggestion)
                     } else {
@@ -277,9 +229,8 @@ struct RuleEditorView: View {
             }
         }
         .onAppear(perform: load)
-        // "No budget" only means something while windows narrow the day. Take the last window
-        // away and the same rule would enforce nothing at all, which is a removal wearing a
-        // slider — so the budget comes back to the top of the ordinary range instead.
+        // "No budget" only makes sense while windows narrow the day; with no windows left it
+        // would enforce nothing, so fall back to the top of the ordinary range instead.
         .onChange(of: drafts.isEmpty) { _, isEmpty in
             guard isEmpty else { return }
             let ceiling = BudgetSlider.anchors.last ?? 240
@@ -342,10 +293,8 @@ struct RuleEditorView: View {
 
     // MARK: The editor, in sections
 
-    /// Everything under the header once there is a rule to edit — or once somebody has asked to
-    /// write one themselves. Lifted out of `body` with the pane beside it, for the reason the
-    /// sections below are lifted out of it: this body is one expression to the type checker and
-    /// it has been over its budget before.
+    /// Lifted out of `body`, like the sections below, since the type checker times out on it
+    /// as one expression.
     @ViewBuilder
     private func fullEditor(_ target: Target) -> some View {
         nudge(target)
@@ -366,12 +315,6 @@ struct RuleEditorView: View {
         }
     }
 
-    /// The rule Furlough would write, and two ways to answer it.
-    ///
-    /// A first rule is the one edit where the app has something to say before it is asked: it
-    /// knows what this app is, and the whole editor underneath is a lot of screen for a person
-    /// whose real answer is "yes, that". So Save takes the suggestion exactly as stated, and
-    /// "Change it" puts the same rule in the fields and gets out of the way.
     @ViewBuilder
     private func firstRulePane(_ target: Target, _ suggestion: RuleSuggestion.Draft) -> some View {
         SectionLabel(text: "The first rule")
@@ -397,11 +340,8 @@ struct RuleEditorView: View {
         Footnote(text: Self.firstRuleNote, alignment: .center)
     }
 
-    /// The fact that belongs to this moment rather than to an onboarding pane three screens
-    /// back: adding an app did nothing, and this is the button that starts it.
     private static let firstRuleNote = "Adding an app enforces nothing on its own. Saving its first rule is what starts it."
 
-    /// What is shown when the target this editor was opened on has been removed.
     private var removedPane: some View {
         VStack(spacing: 8) {
             Image(systemName: "checkmark.circle")
@@ -418,18 +358,12 @@ struct RuleEditorView: View {
         .padding(.top, 80)
     }
 
-    /// The whole of a rule: hours, budget, the other halves, the tier and Save.
-    ///
-    /// One expression per section rather than one for the screen. SwiftUI's result builder makes
-    /// a body a single expression, and this one grew past what the type checker will solve in
-    /// reasonable time — so the branches are functions now. Nothing about the layout changed.
     @ViewBuilder
     private func ruleSection(_ target: Target) -> some View {
         SectionLabel(text: "Allowed windows")
         windowsCard
-        // Not while the fields already hold it: after "Change it" the offer would be pointing at
-        // what is on screen. It comes back the moment it would say something different — moving
-        // the tier chips changes what Furlough would suggest, and that is worth offering again.
+        // Suppressed only while it matches what's already in the fields (e.g. right after
+        // "Change it"); reappears once moving the tier chips changes the suggestion.
         if let draft = ruleSuggestion, draft != appliedSuggestion {
             SuggestionOffer(text: RuleSuggestion.offer(draft, counted: target.isCounted)) {
                 applySuggestion(draft)
@@ -465,21 +399,14 @@ struct RuleEditorView: View {
             .padding(.top, 10)
     }
 
-    /// "You have one half of this." Nothing when both halves are in, when the table has never
-    /// heard of this one, or once it has been waved away.
     @ViewBuilder
     private func nudge(_ target: Target) -> some View {
         if let companion = model.companion(for: target) {
             CompanionNudge(companion: companion) {
                 switch companion {
-                // Sites need no picker: they are names, so they join this row on the spot rather
-                // than becoming rows of their own. The nudge then goes by itself, because the row
-                // now covers both halves.
                 case .sites(let hosts): linked = model.linkHosts(hosts, to: target.id).message
-                // Still the picker: only Apple can mint an app's token, and `FamilyActivityData` —
-                // the one API that could do it without her — is EU-only for anyone who installs
-                // from the App Store. So the trip is made as short as it can be instead: one
-                // question, and what comes back joins this row and becomes its face.
+                // Apple's `FamilyActivityData` could mint an app token directly but is EU-only
+                // for App Store installs, so this still goes through the picker.
                 case .app(let name):
                     addRequest = .companion(.application, of: target.id, titled: name)
                 }
@@ -488,9 +415,8 @@ struct RuleEditorView: View {
             }
             .padding(.bottom, 14)
         } else if model.awaitsName(target) {
-            // Told Always, and nothing to act on yet: a picked app has no name until Furlough has
-            // seen it, and the site follows the name. Said here so the row that seems to be
-            // missing its site is not read as the setting being ignored.
+            // A picked app has no name until Furlough has seen it, and the site name follows
+            // that — said here so the missing site doesn't read as the setting being ignored.
             Footnote(text: "The website this app is also at follows once Furlough has seen the app — right away with Screen Time data access, otherwise the first time the shield covers it.")
                 .padding(.bottom, 14)
         }
@@ -498,15 +424,6 @@ struct RuleEditorView: View {
 
     // MARK: The other halves
 
-    /// The budget, or the reason there is not one.
-    ///
-    /// Three cases, and the middle one is new. A target nothing counts has no budget at all and
-    /// says so. A target that is counted gets the slider. A linked pair gets the slider *and* one
-    /// line naming the half the budget cannot reach — the one honest gap in linking, said plainly
-    /// rather than left to be discovered.
-    ///
-    /// Lifted out of `body`, like `halves`, because the editor's body is at the limit of what the
-    /// type checker will take in one expression and these branches put it over.
     @ViewBuilder
     private func budgetSection(_ target: Target) -> some View {
         if !target.isCounted {
@@ -522,9 +439,6 @@ struct RuleEditorView: View {
         }
     }
 
-    /// The other doors into this thing: what the row already covers, and what it could. Lifted out
-    /// of `body` rather than written inline because the editor's body is at the limit of what the
-    /// type checker will take in one expression, and two more branches put it over.
     @ViewBuilder
     private func halves(_ target: Target) -> some View {
         if target.isLinked {
@@ -539,31 +453,20 @@ struct RuleEditorView: View {
         }
     }
 
-    /// The one row that could be folded into this one, or nil. One at a time: merging is a
-    /// judgement about two specific rows, and offering three at once would be a list to work
-    /// through rather than a question to answer.
+    /// One at a time: offering more than one merge candidate would be a list to work through
+    /// rather than a question to answer.
     private func mergeCandidate(_ target: Target) -> Target? { model.mergeable(with: target).first }
 
     // MARK: The other half
 
-    /// The Anchor, as one row on the rule that is already open: hold this too, or stop holding
-    /// it.
-    ///
-    /// A row rather than a trip to the other page, because the halves are one app and the
-    /// moment somebody is deciding what an app is allowed is the moment they know whether it
-    /// belongs behind the tag. It calls the same path the Already blocked sheet calls, so there
-    /// is one way in and one way out, and it acts at once rather than on Save: the anchor's list
-    /// is not a rule, nothing about it waits out a delay, and Save is for hours.
+    /// Acts at once rather than on Save: the anchor's list is not a rule and waits out no delay.
     @ViewBuilder
     private func anchorSection(_ target: Target) -> some View {
         let anchor = model.state.config.anchor
         SectionLabel(text: "The Anchor")
         HStack(spacing: 12) {
             if anchor.anchorsEverything {
-                // Under everything-except the list is what stays open, so there is nothing to
-                // add here: this is held unless somebody put it on that list. Said, not offered
-                // — the list itself is the Anchor page's, and a control here would be editing
-                // the other scope's list by its opposite.
+                // Stated, not editable here: the "except" list belongs to the Anchor page.
                 Text(anchor.willHold(target) ? "Held while anchored" : "Stays open while anchored")
                     .emberBody(13)
                     .foregroundStyle(Ember.cream)
@@ -589,9 +492,7 @@ struct RuleEditorView: View {
             .padding(.top, 8)
     }
 
-    /// On when every door of this target is on the anchor's list, so a row whose site was
-    /// linked on after it was anchored reads as off until the second door is closed too —
-    /// which is exactly what turning it on then does.
+    /// On only once every linked half is on the anchor's list; toggling on adds them all.
     private func heldBinding(_ target: Target) -> Binding<Bool> {
         Binding(
             get: { model.state.config.anchor.lists(target) },
@@ -617,8 +518,6 @@ struct RuleEditorView: View {
         return "The anchor holds only what it has been given. This changes nothing until it is dropped."
     }
 
-    /// Every half beside the face, each with a way off. Taking one off is a loosening, so it goes
-    /// through the delay — the footnote says so before the button is touched, not after.
     @ViewBuilder
     private func alsoCard(_ target: Target) -> some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -657,7 +556,6 @@ struct RuleEditorView: View {
             .padding(.top, 8)
     }
 
-    /// Halves already queued to come off, so the row says so rather than offering Unlink twice.
     private func queuedUnlink(_ target: Target) -> [TargetKind] {
         model.state.pending.compactMap { change in
             if case .unlink(let id, let kind) = change.kind, id == target.id { return kind }
@@ -834,14 +732,12 @@ struct RuleEditorView: View {
         .emberCard()
     }
 
-    /// What the figure above the slider is measured against. "No budget" needs saying what it
-    /// does *not* lift — the windows still close — or it reads as no rule at all.
+    /// "No budget" still needs saying the windows keep closing, or it reads as no rule at all.
     private var budgetNote: String {
         if budget >= BudgetSlider.noBudget { return "the windows still close" }
         return drafts.isEmpty ? "for the whole day" : "across all windows"
     }
 
-    /// One day's slider, bound into `dayBudgets` by Calendar's weekday number.
     private func dayBudget(_ weekday: Int) -> Binding<Int> {
         Binding(
             get: { dayBudgets.indices.contains(weekday - 1) ? dayBudgets[weekday - 1] : budget },
@@ -849,8 +745,7 @@ struct RuleEditorView: View {
         )
     }
 
-    /// Why the draft will not fit inside iOS's 20 monitored activities once saved, or nil.
-    /// Checked here rather than at registration, which only finds out after the rule is saved.
+    /// Checked here (not at registration) so iOS's 20-activity limit is caught before Save.
     private var limitReason: String? {
         ActivityLimit.reason(applying: draft, to: [targetID], in: model.state)
     }
@@ -864,9 +759,6 @@ struct RuleEditorView: View {
         return .loosening(model.clock.now.addingTimeInterval(model.state.config.delay(for: target)))
     }
 
-    /// The edit on this target that has not set yet, if there is one. Its own function, and a
-    /// `@ViewBuilder` one, for the reason the sections below are: this body is a single
-    /// expression to the type checker and it has been over its budget before.
     @ViewBuilder
     private func undoCard(_ target: Target) -> some View {
         if let undo = model.undo(for: targetID) {
@@ -876,8 +768,6 @@ struct RuleEditorView: View {
                 deviceExpiry: model.clock.device(undo.expiresAt)
             ) {
                 model.undoRule(for: targetID)
-                // The draft on screen is the rule that was just taken back, so it is reloaded
-                // rather than left showing the edit that no longer exists.
                 loaded = false
                 load()
             }
@@ -885,9 +775,8 @@ struct RuleEditorView: View {
         }
     }
 
-    /// What the draft would do today and what taking it back would cost, or nil when there is
-    /// nothing worth saying — a loosening (the banner above already answers for those), a rule
-    /// that will not save, or no change at all.
+    /// Nil when there's nothing worth saying: a loosening (the banner already covers those),
+    /// an invalid draft, or no change at all.
     private func consequence(for target: Target?) -> Consequence.Preview? {
         guard hasChanges, draft.validationError == nil, limitReason == nil else { return nil }
         return Consequence.preview(rule: draft, for: target, config: model.state.config, now: model.clock.now)
@@ -901,9 +790,8 @@ struct RuleEditorView: View {
 
     // MARK: Actions
 
-    /// The chips, with a note that they were touched. `UtilityPicker` writes the tier straight
-    /// through; what it cannot say is whether the value it wrote is an answer or the default the
-    /// picker opened on, and the rule suggestion needs to know which.
+    /// Tracks `tierTouched` alongside the value, since `UtilityPicker` can't itself say whether
+    /// what it wrote is a real answer or just its default.
     private var tierBinding: Binding<Utility> {
         Binding(
             get: { tier },
@@ -914,9 +802,6 @@ struct RuleEditorView: View {
         )
     }
 
-    /// The rule edit on this target that has not set yet, if there is one. Read by `load`, which
-    /// shows it rather than the rule it will replace, and by `ruleSuggestion`, which stays quiet
-    /// while one is waiting.
     private var pendingRule: Rule? {
         model.state.pending.compactMap { change -> Rule? in
             if case .setRule(let id, let rule) = change.kind, id == targetID { return rule }
@@ -936,23 +821,16 @@ struct RuleEditorView: View {
         byDay = !rule.isSameEveryDay
     }
 
-    /// The week's figures into the seven sliders, and the toggle to match. Seeded even when the
-    /// rule has one budget, so switching the toggle off shows that budget on all seven days
-    /// rather than the default.
+    /// Seeded even for a single-budget rule, so switching the toggle off shows that budget on
+    /// all seven days rather than the default.
     private func seedBudgets(_ rule: Rule) {
         budgetByDay = !rule.isSameBudgetEveryDay
         dayBudgets = (1...7).map { rule.budget(on: $0) }
     }
 
-    /// Takes Furlough's own suggestion into the fields: the budget onto the slider, the window
-    /// into the list. A draft like any other — everything stays editable and nothing is written
-    /// until Save.
-    ///
-    /// The window is added to the rows rather than put in their place, so a tap can never throw
-    /// away hours somebody typed; `tidy` joins it into a row it overlaps, which on the usual
-    /// cold start is no row at all and lands as the one it suggests. The budget does replace
-    /// what the slider held, because a slider that has never been moved is holding a default
-    /// rather than an answer.
+    /// The window is appended (via `tidy`) rather than replacing existing rows, so a tap can
+    /// never discard hours already typed; the budget does overwrite, since an untouched slider
+    /// holds a default rather than an answer.
     private func applySuggestion(_ draft: RuleSuggestion.Draft) {
         appliedSuggestion = draft
         withAnimation(.snappy) {
@@ -966,19 +844,13 @@ struct RuleEditorView: View {
         }
     }
 
-    /// The card's Save: exactly what it said, through the same door every other save goes
-    /// through. The suggestion goes into the fields first rather than being written straight
-    /// out, so what is saved is the draft the editor holds — the one thing that can be true of
-    /// both buttons on this pane — and so the editor is showing that rule if the save comes
-    /// back with something to say.
+    /// Applies the suggestion to the fields first, then saves through the normal path, so the
+    /// editor is showing the saved rule if Save has something to say.
     private func saveFirstRule(_ suggestion: RuleSuggestion.Draft) {
         applySuggestion(suggestion)
         attemptSave()
     }
 
-    /// "Change it": the same rule, in the fields, with the editor around it. The suggestion is
-    /// applied rather than discarded because *it* is what is being changed — an editor that
-    /// opened on empty fields would have thrown away the thing the card was about.
     private func beginChanging(_ suggestion: RuleSuggestion.Draft) {
         applySuggestion(suggestion)
         withAnimation(.snappy) { changing = true }
@@ -994,27 +866,20 @@ struct RuleEditorView: View {
         }
     }
 
-    /// The first window is the one Furlough would have suggested for this target, or an evening
-    /// when it has nothing to say about it. Each one after that goes on the same days as the last
-    /// row, where those days have room: after the latest window, or from the first free hour
-    /// once the evening is taken, so "later on weekends" starts as the early-morning window
-    /// it has to be. The list keeps its order; the new row is not joined until its times are
-    /// set. Nothing is added when those days are full.
+    /// Defaults to an evening window; picks the next free slot on the last row's days, or
+    /// Furlough's suggested window for the first row on an unset target. Adds nothing when
+    /// those days are full.
     private func addWindow() {
         var window = TimeWindow(startMinute: 20 * 60, endMinute: 22 * 60)
         if let last = drafts.last {
             guard let free = TimeWindow.nextFree(after: windows, on: last.window.days) else { return }
             window = free
         } else if let suggested = ruleSuggestion?.window {
-            // The first row on a target with no rule yet: the hours Furlough would have
-            // suggested are a better guess than a fixed evening, and it is the same one tap.
             window = suggested
         }
         withAnimation(.snappy) { drafts = DraftWindow.sorted(drafts + [DraftWindow(window: window)]) }
     }
 
-    /// A tier already queued for this target is what the editor should show, the same way a
-    /// queued rule is: otherwise the chips would say one thing and the pending list another.
     private var pendingTier: Utility? {
         model.state.pending.compactMap { change -> Utility? in
             if case .setUtility(let id, let level) = change.kind, id == targetID { return level }
@@ -1022,8 +887,6 @@ struct RuleEditorView: View {
         }.first
     }
 
-    /// Blocking something essential is the one edit here that cannot be undone in a hurry, so
-    /// it is the one that asks twice.
     private func attemptSave() {
         if caution != nil, tier == .essential {
             nicknameFocused = false
@@ -1035,8 +898,8 @@ struct RuleEditorView: View {
 
     private func save() {
         nicknameFocused = false
-        // The tier first: a tightening of it lands now and so lengthens the wait the rule
-        // itself is about to be given, while a loosening of it queues and changes nothing yet.
+        // Tier saved first: a tightening applies immediately and extends the rule's own delay;
+        // a loosening queues and changes nothing yet.
         let tierResult = model.setUtility(tier, for: targetID)
         let ruleResult = model.propose(rule: draft, nickname: nickname, for: targetID)
         saved = [tierResult, ruleResult]
@@ -1046,18 +909,14 @@ struct RuleEditorView: View {
         if saved?.isEmpty ?? true { saved = ProposalResult.unchanged.message }
     }
 
-    /// Saves the draft here and gives it to `ids` as well, in one go.
     private func applyToOthers(_ ids: [UUID]) {
         nicknameFocused = false
         saved = model.apply(rule: draft, nickname: nickname, for: targetID, andTo: ids).message
     }
 }
 
-/// One allowed window: two glass time chips, an arrow, the duration, a quiet remove button,
-/// and, when the rule varies by day, a strip of day toggles beneath. `onCommit` fires when
-/// a time picker closes, so the owner can join rows that now touch. An end earlier than the
-/// start is a night: the chip marks it "+1", the duration counts through midnight, and the
-/// row is stored as the evening and the morning after.
+/// `onCommit` fires when a time picker closes, so the owner can join rows that now touch. An
+/// end earlier than the start is a night: stored as the evening and the morning after.
 struct WindowRow: View {
     @Binding var window: TimeWindow
     var showsDays = false
@@ -1125,10 +984,9 @@ struct WindowRow: View {
     }
 }
 
-/// Seven round day toggles in the calendar's order, amber when on, with the days named beside them.
 struct DayStrip: View {
     @Binding var days: Weekdays
-    /// Shown in cream and not toggleable: the day whose hours are being applied elsewhere.
+    /// Shown in cream and not toggleable.
     var locked: Weekdays = []
     /// Replaces "No days" when an empty pick is fine rather than an error.
     var placeholder: String?
@@ -1166,14 +1024,10 @@ struct DayStrip: View {
     }
 }
 
-/// Picks another app or site whose windows, days and budget replace the draft.
-///
-/// Since 2026-09-09 the first row can be Furlough's own starting rule for the target being
-/// edited, when it has one. That is the whole point of it: the second hazard app someone adds
-/// used to have exactly one thing to copy from, and the first had nothing at all.
+/// Picks another app or site whose windows, days and budget replace the draft. The first row
+/// can be Furlough's own starting rule for the target being edited, when it has one.
 struct CopyRuleSheet: View {
     let candidates: [Target]
-    /// Furlough's suggestion for the target being edited, when there is one.
     var suggestion: Rule?
     let onPick: (Rule) -> Void
     @Environment(\.dismiss) private var dismiss
@@ -1248,8 +1102,6 @@ struct CopyRuleSheet: View {
         .presentationBackground(Ember.ground)
     }
 
-    /// Furlough's own rule, wearing a sparkle where the other rows wear an app's icon. Same row,
-    /// same tap, and it says what it would set in the same words the list uses for a real rule.
     private func suggestionRow(_ rule: Rule) -> some View {
         Button {
             onPick(rule)
@@ -1284,16 +1136,12 @@ struct CopyRuleSheet: View {
     }
 }
 
-/// Picks the other apps and sites that get this rule, any number at once. Each row shows what
-/// it has now; the line above the button says what applying will do, since each one is judged
-/// on its own: tighter lands now, looser waits out the delay.
+/// Picks the other apps and sites that get this rule, any number at once. Each is judged on
+/// its own: tighter lands now, looser waits out the delay.
 struct ApplyRuleSheet: View {
     let candidates: [Target]
     let rule: Rule
     let delayHours: Int
-    /// Why saving to this set of targets would not fit inside iOS's activity limit, or nil.
-    /// Each target keeps its own rule while a loosening waits, so a wide apply can overflow
-    /// even when the rule is small.
     var limitReason: ([UUID]) -> String? = { _ in nil }
     let onApply: ([UUID]) -> Void
     @Environment(\.dismiss) private var dismiss
@@ -1577,12 +1425,8 @@ struct EffectBanner: View {
     }
 }
 
-/// The two things that can happen to a half, as presentations of their own.
-///
-/// A `ViewModifier` rather than two more links on the editor's chain. SwiftUI solves a modifier
-/// chain as one expression, and the editor's was already long enough that adding a dialog and an
-/// alert to it put the type checker past its time limit — with the error landing somewhere else
-/// in the body entirely. Its own type gets its own budget.
+/// A `ViewModifier` rather than more links on the editor's own chain, whose modifier chain (one
+/// expression to the type checker) was already at its time limit.
 private struct HalfChangeAlerts: ViewModifier {
     @Binding var unlinking: TargetKind?
     @Binding var done: String?
@@ -1606,8 +1450,8 @@ private struct HalfChangeAlerts: ViewModifier {
             } message: { kind in
                 Text("\(kind.hostName ?? "The other half") stops being blocked and \(name) carries on alone. That loosens your rules, so it takes \(delay).")
             }
-            // Separate from the editor's "Saved" alert, which dismisses the screen: linking,
-            // merging and unlinking all leave the same row on screen, so there is nowhere to go.
+            // Separate from the editor's "Saved" alert (which dismisses the screen): this leaves
+            // the same row on screen since there's nowhere else to go.
             .alert(
                 "Done",
                 isPresented: Binding(get: { done != nil }, set: { if !$0 { done = nil } }),
@@ -1620,12 +1464,8 @@ private struct HalfChangeAlerts: ViewModifier {
     }
 }
 
-/// "These two are the same thing — make them one row?"
-///
-/// The retroactive case, and the only one that needs asking. A pair added since linking existed
-/// is already one row; a pair added before it is two, and nothing but an offer like this will
-/// ever join them. Merging is a tightening — two budgets become one shared budget and the
-/// tighter schedule wins — so there is no delay to warn about, only a row that goes away.
+/// Offers to merge a pair added before linking existed (and so left as two rows) into one.
+/// A tightening — two budgets become one shared, tighter one — so no delay applies.
 struct MergeOffer: View {
     let name: String
     let into: String
@@ -1663,11 +1503,7 @@ struct MergeOffer: View {
     }
 }
 
-/// The way back out of an edit that has not set yet.
-///
-/// It is not an unblock and must never read as one: it puts the rule back exactly as it was a
-/// quarter of an hour ago, so the only person it can help is the one who did not mean it. The
-/// countdown is the honest part — this closes, and it says when.
+/// Reverts an edit that hasn't taken effect yet, exactly to its prior state — not an unblock.
 struct UndoCard: View {
     let name: String
     /// True when the edit was this target's first rule, so undoing leaves it enforcing nothing.
@@ -1682,12 +1518,9 @@ struct UndoCard: View {
             HStack(spacing: 8) {
                 Eyebrow(text: "Not set yet", color: Ember.pending, size: 10.5)
                 Spacer()
-                // Ticked here rather than handed to `Text(timerInterval:)`, which the system
-                // renders for itself, so the tick is on the device's clock — hence
-                // `deviceExpiry`. `TimeFormat.countdown` is the same Geist Mono countdown the
-                // hero and the rows use, spelt out rather than reached through `emberNumerals`
-                // because that helper bakes in Cream and would win over a colour set after it.
-                // The palette's amber is for pending, and a window closing is exactly that.
+                // Ticked manually (not `Text(timerInterval:)`) so it renders on `deviceExpiry`'s
+                // clock. Font spelt out rather than via `emberNumerals`, which bakes in a color
+                // that would override the one set below.
                 TimelineView(.periodic(from: .now, by: 1)) { context in
                     Text(TimeFormat.countdown(from: context.date, to: deviceExpiry))
                         .font(EmberFont.numerals(12))
@@ -1711,8 +1544,7 @@ struct UndoCard: View {
     }
 }
 
-/// What the rule on screen would do, said before it is saved rather than found out at ten past
-/// nine. Two sentences: today, and the cost of changing your mind.
+/// What the rule on screen would do, shown before it's saved: today, and the cost of undoing.
 struct ConsequenceCard: View {
     let preview: Consequence.Preview
 

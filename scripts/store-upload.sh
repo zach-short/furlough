@@ -5,11 +5,10 @@
 #   scripts/store-upload.sh          upload build/store-shots/*.jpg as the 6.9-inch iPhone set
 #
 # The third of the store scripts: store-shots.sh renders the frames, this one uploads them,
-# and archive.sh/status.sh handle the build. It touches nothing but the screenshots of the
-# version that is being prepared: no metadata, no binary, no submission. Whatever screenshots
-# that version already has are replaced, so the set on Apple's side always matches the
-# folder here. The 1320x2868 frames land as iPhone 6.9-inch, which Apple accepts in place of
-# the 6.5-inch set; deliver reads the device from the pixel size.
+# archive.sh/status.sh handle the build. Touches only the screenshots of the version being
+# prepared — replaces whatever is already there, so Apple's side always matches this folder.
+# The 1320x2868 frames land as iPhone 6.9-inch (Apple accepts it in place of 6.5-inch); deliver
+# reads the device from the pixel size.
 #
 # Same credentials as status.sh: export ASC_KEY_ID and ASC_ISSUER_ID, with the .p8 at
 # ~/.appstoreconnect/private_keys/AuthKey_<KEY_ID>.p8, and fastlane installed.
@@ -32,7 +31,7 @@ BUNDLE_ID="$(grep -m1 'PRODUCT_BUNDLE_IDENTIFIER:' project.yml | awk '{print $2}
 [[ -n "$BUNDLE_ID" ]] || { echo "Could not read PRODUCT_BUNDLE_IDENTIFIER from project.yml" >&2; exit 1; }
 
 # deliver wants one folder per language under the screenshots path, and a Fastfile beside the
-# working directory. Both are staged in a temp dir so the repo carries neither.
+# working directory — both staged in a temp dir so the repo carries neither.
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 mkdir -p "$WORK/fastlane" "$WORK/screenshots/en-US"

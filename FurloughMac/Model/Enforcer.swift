@@ -3,13 +3,8 @@ import CoreGraphics
 import Foundation
 import UserNotifications
 
-/// Enforces the rules on the Mac, where there is no Screen Time API to do it. Once a second
-/// it re-derives everything from persisted state: a blocked app that is running is asked to
-/// quit and force-quit when its grace runs out (`QuitGrace`), every window of every running
-/// browser showing a blocked site is sent to the shield page, the same list of blocked hosts
-/// goes to the web filter (`WebFilter`) so a connection to one fails everywhere the browsers
-/// cannot be read, and time spent in an open app or site counts against its daily budget. The
-/// 5-minute warning and "Time's up" arrive as notifications, as on the phone.
+/// Enforces rules on the Mac, where there is no Screen Time API; re-derives everything from
+/// persisted state once a second.
 @MainActor
 final class Enforcer {
     static let shared = Enforcer()
@@ -18,31 +13,22 @@ final class Enforcer {
     let browsers = Browsers()
     let webFilter = WebFilter()
     var onChange: (() -> Void)?
-    /// The day just turned over on this Mac's own clock. There is no midnight DeviceActivity
-    /// callback here the way there is on the phone, so this — the usage ledger's own
-    /// day-boundary check, which already runs once a day whether or not anyone opens Furlough —
-    /// is what stands in for it. It is what keeps a planned weekly digest
-    /// (`PendingNotifications.weeklyDigests`) from firing with a streak counted through days
-    /// that had not happened yet when it was last planned: see `MacModel.start()`.
+    /// No midnight DeviceActivity callback on Mac; the ledger's day-boundary check stands in
+    /// for it. See `MacModel.start()`.
     var onDayRollover: ((SharedState) -> Void)?
 
     private var timer: Timer?
     private var observers: [any NSObjectProtocol] = []
     private var ledger = UsageLedger.load()
     private var lastTick = Date.now
-    /// Apps asked to quit, and how long each has left before it is forced.
     private var grace = QuitGrace()
-    /// When each target's shield was last shown, so a relaunch loop does not flash it.
+    /// Debounces repeated shield flashes from a relaunch loop.
     private var lastShield: [UUID: Date] = [:]
-    /// Window ends already warned about today, per target.
     private var windowWarned: [UUID: Int] = [:]
-    /// Whether the device's clock disagreed at the last tick, so the log gets one line per
-    /// crossing rather than one a second.
+    /// Logs once per clock-trust crossing, not every tick.
     private var clockOff = false
-    /// How far the device's clock is from Furlough's at the last tick. The web filter runs on
-    /// the device's clock, so every date handed to it is moved by this.
+    /// The web filter runs on the device's clock; dates handed to it are shifted by this.
     private var drift: TimeInterval = 0
-    /// Furlough's own time as of the last tick, for the parts of the UI that ask outside one.
     private(set) var now = Date.now
     private let shield = ShieldPanel()
     private static let idleAfter: TimeInterval = 120
@@ -57,8 +43,7 @@ final class Enforcer {
                 MainActor.assumeIsolated { self?.tick(reason: "app event") }
             })
         }
-        // Moving the date forward is the obvious way to try to buy time, so react at once
-        // rather than on the next tick; Policy holds the loosening changes either way.
+        // React to clock changes immediately (a way to try to buy time); Policy still gates loosening.
         observers.append(NotificationCenter.default.addObserver(
             forName: NSNotification.Name.NSSystemClockDidChange, object: nil, queue: .main
         ) { [weak self] _ in
@@ -72,7 +57,6 @@ final class Enforcer {
         self.timer = timer
     }
 
-    /// Logs and applies everything. Call it after any edit.
     @discardableResult
     func reconcile(now requested: Date? = nil, reason: String) -> Decision {
         var state = SharedStore.load()
@@ -90,8 +74,7 @@ final class Enforcer {
         return decision
     }
 
-    /// Furlough's own time, logging the first tick on each side of the line so the log shows
-    /// both when the device's clock went wrong and when it came back.
+    /// Logs only at each clock-trust transition, not every tick.
     @discardableResult
     private func readClock(_ state: SharedState) -> Date {
         let clock = state.clock()
@@ -115,7 +98,6 @@ final class Enforcer {
     }
 
     #if DEBUG || TESTING_TOOLS
-    /// Forgets today's counted usage and warnings, for Settings > Testing > Reset everything.
     func resetUsage() {
         ledger = UsageLedger(dayKey: Policy.dayKey(now))
         ledger.save()
@@ -146,13 +128,10 @@ final class Enforcer {
         }
     }
 
-    /// Counts usage, marks warnings and exhaustion, then quits and redirects. Returns the
-    /// decision it enforced.
     @discardableResult
     private func apply(_ state: inout SharedState, now: Date, elapsed: TimeInterval) -> Decision {
         let dayKey = Policy.dayKey(now)
-        // The Mac is awake every second, so this counts a minute at a time; the phone counts
-        // the same minutes in bigger pieces at its reconciles. See `Record.accumulate`.
+        // Mac counts a second at a time; the phone batches at its reconciles. See `Record.accumulate`.
         Record.accumulate(&state, now: now)
         if ledger.dayKey != dayKey {
             ledger = UsageLedger(dayKey: dayKey)
@@ -184,10 +163,7 @@ final class Enforcer {
                       seconds >= Double((budget - Furlough.warningMinutes) * 60),
                       !state.runtime.wasWarned(used.id, dayKey: dayKey) {
                 state.runtime.warned[used.id.uuidString] = dayKey
-                // Written wherever `warned` is, so the two never disagree about whether the
-                // moment is known. The Mac has nothing that counts it down yet — the phone's
-                // Live Activity does — but a half-set pair is the kind of thing that is only
-                // found much later, by whatever reads it next.
+                // Keep in sync with `warned`; a half-set pair goes unnoticed until much later.
                 state.runtime.warnedAt[used.id.uuidString] = now
                 Record.markWarned(used.id, in: &state, now: now)
                 SharedStore.log("5 minutes of budget left: \(used.displayName)")
@@ -199,10 +175,8 @@ final class Enforcer {
             }
         }
 
-        // A window closing soon. A rule without windows has no closing time, only a budget, and
-        // neither has the evening half of a night: its `until` is a time on the next morning,
-        // which no minute of today is five minutes short of, so the warning waits for the
-        // morning half and the hour the night really ends.
+        // Overnight rules: `until` falls on the next morning, so this warning only fires
+        // for the morning half.
         let minute = Policy.minuteOfDay(now)
         for target in state.config.targets where target.rule?.isAllDay == false {
             guard case .open(let until) = decision.statuses[target.id], until - minute == Furlough.warningMinutes,
@@ -217,9 +191,8 @@ final class Enforcer {
 
         enforceApps(decision: decision, config: state.config, runtime: state.runtime, now: now)
         enforceBrowser(decision: decision, config: state.config, runtime: state.runtime, now: now)
-        // The web filter gets the same list, on the device's clock, together with the moment
-        // Policy next allows a status to change: past that the extension blocks nothing on its
-        // own, so a list left behind by a force quit cannot outlive the window it was true for.
+        // `until` is the next policy transition; past it the extension blocks nothing, so a
+        // list left behind by a force quit can't outlive its window.
         webFilter.sync(
             hosts: decision.blockedHosts,
             until: Policy.nextTransition(config: state.config, after: now).addingTimeInterval(drift)
@@ -228,10 +201,8 @@ final class Enforcer {
         return decision
     }
 
-    /// The web filter dropped a connection to `host` from `app`. A browser the tab reader covers
-    /// is already on its way to the shield page and gets no card; everything else — Firefox, a
-    /// site saved to the Dock, an app loading a blocked site — gets the floating card, which is
-    /// the only explanation it will see.
+    /// Browsers the tab reader covers already redirect to the shield page; only other apps
+    /// (Firefox, a Dock-saved site, etc.) get this floating card.
     private func noteFiltered(host: String, app: String) {
         let state = SharedStore.load()
         let appName = AppInfo.name(for: app) ?? (app.isEmpty ? "an app" : app)
@@ -258,8 +229,7 @@ final class Enforcer {
         for app in running {
             guard let bundleID = app.bundleIdentifier, bundleID != Bundle.main.bundleIdentifier,
                   decision.blocks(app: bundleID) else { continue }
-            // Over everything, only what a person could have opened: an app with a Dock
-            // presence, and never one the Mac cannot do without. A listed app is a listed app.
+            // Skip background/non-Dock apps unless explicitly listed.
             if !decision.blockedApps.contains(bundleID),
                app.activationPolicy != .regular || AppCatalog.excluded.contains(bundleID) {
                 continue
@@ -292,12 +262,9 @@ final class Enforcer {
         }
     }
 
-    /// Sends every window showing a blocked site to the shield page, in every running browser —
-    /// not only the browser in front, and not only its front window. A blocked site left playing
-    /// behind the window you are looking at is still a blocked site.
+    /// Sweeps every window of every running browser, not just the front one.
     private func enforceBrowser(decision: Decision, config: Config, runtime: RuntimeState, now: Date) {
-        // `hasHost` rather than `kind.isHost`: an imported setup can carry a website as the
-        // linked half of an app's row, and that site still needs the browser swept for it.
+        // `hasHost`, not `kind.isHost`: a website linked to an app's row still needs sweeping.
         guard config.targets.contains(where: \.hasHost) || decision.shieldsEverything else { return }
         for browser in browsers.snapshots() {
             for tab in browser.tabs {
@@ -311,8 +278,7 @@ final class Enforcer {
                     text = ShieldText.text(name: target.displayName, status: status, rule: target.rule)
                     glass = HourglassState.of(target, status: status ?? .blockedAllDay, runtime: runtime, now: now)
                 } else {
-                    // Not a site Furlough knows: only the anchor over everything blocks it, and
-                    // then it wears the anchored shield under its own name.
+                    // Unknown site: only an all-blocking anchor covers it.
                     guard decision.blocks(host: host) else { continue }
                     text = ShieldText.text(name: host, status: .anchored, rule: nil)
                     glass = .anchored
@@ -326,7 +292,6 @@ final class Enforcer {
         }
     }
 
-    /// No keyboard or mouse for two minutes: nothing is being used, whatever is in front.
     private static func isIdle() -> Bool {
         let types: [CGEventType] = [.keyDown, .mouseMoved, .leftMouseDown, .rightMouseDown, .scrollWheel, .flagsChanged]
         let idle = types.map { CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: $0) }.min() ?? 0
@@ -334,14 +299,13 @@ final class Enforcer {
     }
 }
 
-/// What is in front of the user right now.
 enum Front {
     case app(bundleID: String)
     case browser(bundleID: String, kind: Browsers.Kind, url: URL?)
     case nothing
 
-    /// The address bar is only read when some website has a rule, so an app-only setup never
-    /// asks macOS for browser access.
+    /// Reads the address bar only when a host rule exists, so app-only setups never trigger
+    /// the Automation permission prompt.
     @MainActor
     static func current(browsers: Browsers, readsAddress: Bool) -> Front {
         guard let app = NSWorkspace.shared.frontmostApplication, let bundleID = app.bundleIdentifier else { return .nothing }
@@ -352,7 +316,6 @@ enum Front {
         return .app(bundleID: bundleID)
     }
 
-    /// The target being used: the front app, or the site in the front browser.
     func target(in config: Config) -> Target? {
         switch self {
         case .app(let bundleID): config.target(bundleID: bundleID)
@@ -362,8 +325,7 @@ enum Front {
     }
 }
 
-/// Seconds of use per target for one day. Kept out of `RuntimeState` so the shared model
-/// stays as it is on the phone, where iOS does the counting.
+/// Kept out of `RuntimeState` so the shared model matches iOS, where iOS does the counting.
 struct UsageLedger: Codable {
     var dayKey: String
     var seconds: [UUID: Double] = [:]
@@ -385,7 +347,6 @@ struct UsageLedger: Codable {
     }
 }
 
-/// Names and icons for Mac apps, looked up by bundle identifier and cached.
 @MainActor
 enum AppInfo {
     private static var cache: [String: (name: String, icon: NSImage)?] = [:]
@@ -410,9 +371,7 @@ enum AppInfo {
     }
 }
 
-/// The page a blocked tab is sent to, bundled with the app. It draws Furlough's own hourglass
-/// in the status the site is in, as the phone's shield does since it started rendering the real
-/// drawing into its icon slot; `k` names the status and `d` asks for the lone grain.
+/// `k` (status) and `d` (lone grain) are query params read by Shield.html's hourglass drawing.
 enum ShieldPage {
     static func url(title: String, subtitle: String, glass: HourglassState = .doneForToday) -> URL {
         guard let file = Bundle.main.url(forResource: "Shield", withExtension: "html"),
@@ -428,8 +387,7 @@ enum ShieldPage {
         return components.url ?? file
     }
 
-    /// Which of the page's five glasses to draw. A blocked site is never inside its window, so
-    /// there is no draining state here; anything unrecognised falls back to a settled glass.
+    /// No draining state here: a blocked site is never inside its window.
     static func key(for glass: HourglassState) -> String {
         if glass == .usedUp { return "spent" }
         if glass == .alwaysBlocked { return "blocked" }

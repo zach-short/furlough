@@ -1,12 +1,10 @@
 import Foundation
 import Testing
 
-/// What the Anchor offers first: the targets Furlough already blocks, before Apple's picker.
-/// The phone shows the offer; which targets are in it, and what taking one in adds, is the
-/// engine's, so it is pinned here.
+/// Which targets the Anchor offers first (already-blocked ones, before Apple's picker) and what
+/// taking one in adds — the engine's job, pinned here.
 @Suite("Anchor candidates")
 struct AnchorCandidatesTests {
-    /// YouTube the app, with youtube.com linked onto it.
     func youtube() -> Target {
         var target = Target(kind: .macApp(bundleID: "com.google.Chrome"), nickname: "YouTube", rule: .unrestricted)
         target.also = [.host("youtube.com")]
@@ -86,8 +84,7 @@ struct AnchorCandidatesTests {
         #expect(anchor.kinds == [tiktok.kind])
     }
 
-    /// The rule editor's Anchor row: a target the anchor holds by one door and not the other
-    /// reads as off, and turning it on is what closes the second one.
+    // A target held by only one of its doors reads as off; turning it on closes the other.
     @Test("A target is listed only once every door is on the list")
     func listedMeansEveryDoor() {
         let pair = youtube()
@@ -98,8 +95,7 @@ struct AnchorCandidatesTests {
         #expect(anchor.lists(pair))
     }
 
-    /// The small anchor on a rules row, which has to be right under both scopes: the list is
-    /// what is held under one and what is spared under the other.
+    // The list means "held" under .chosen and "spared" under .everythingExcept.
     @Test("What a drop would hold is read the right way round under either scope")
     func willHoldFollowsTheScope() {
         let tiktok = makeTarget("TikTok", rule: .alwaysBlocked)
@@ -113,8 +109,7 @@ struct AnchorCandidatesTests {
         #expect(anchor.willHold(messages))
     }
 
-    /// A linked target is held when either door is: the halves are one thing, and one of them
-    /// shut is the whole of it shut.
+    // A linked target's halves are one thing: either door shut is the whole of it shut.
     @Test("One held door holds the whole target")
     func oneDoorHoldsTheTarget() {
         let pair = youtube()

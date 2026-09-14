@@ -1,51 +1,21 @@
 import Foundation
 
-/// The other half of `ConfigExport`: a setup file coming back in.
-///
-/// An import is a *proposal*, never a restore, and that is the whole of the design. Furlough's
-/// value is the asymmetry in `Policy`: a tightening applies at once, a loosening waits out the
-/// delay. Restoring a file wholesale would be a hole straight through it — export, open the
-/// JSON in any text editor, change a 30-minute budget to 1440, import, and the delay is gone
-/// in half a minute. So every rule and every tier in a file goes through the very same gate
-/// the rule editor goes through, and the file is only ever a source of proposed values.
-///
-/// What that leaves is narrow on purpose. A file may set targets and the base delay, and
-/// nothing else:
-///
-/// - The Anchor is not in the file, and would not be honoured if it were. Its only key is a
-///   physical tag, so a file that could clear it would be exactly the bypass Furlough is built
-///   not to have.
-/// - `pending` is not read. A queue is delay already served; handing yourself one that is
-///   due is the same hole by a quieter door.
-/// - `runtime` is not read. `exhausted` and `warned` are today's spent budget, so importing
-///   them would un-spend the day, and `clock` is how Furlough notices a wall clock moved
-///   forward.
-///
-/// A file with those keys in it is not an error — extra keys are ignored, quietly rather than
-/// fatally, which is also what lets a file from an older Furlough still open. `ConfigExport`
-/// has never carried them, so the only way to see them is a hand-edited file, and the answer
-/// to a hand-edited file is to read the parts that are allowed to travel and ignore the rest.
-///
-/// Nothing here does I/O or touches the store. `plan` decides, `apply` performs, and the two
-/// are separate so that the whole of an import can be shown to the person before any of it
-/// happens — see `ImportPlan`.
+/// A setup file coming back in. An import is a proposal, never a restore — every rule and tier
+/// goes through the same gate the editor does, so a hand-edited file can't shortcut the delay.
+/// The Anchor, `pending`, and `runtime` are never read: importing them would bypass the delay or
+/// un-spend the day. Unknown keys are ignored quietly, which also lets an older file still open.
+/// `plan` decides, `apply` performs, so a whole import can be reviewed before anything happens.
 enum ConfigImport {
-    /// Ceilings on what will even be looked at. None of these are shapes Furlough writes; they
-    /// are here because `decode` has to be pointed at whatever arrives, and a hand-written file
-    /// should be refused in a sentence rather than spend a minute in `validationError`'s
-    /// pairwise window comparison.
+    /// Ceilings for refusing a hand-written file quickly, not shapes Furlough itself writes.
     static let maxFileBytes = 1_000_000
     static let maxTargets = 500
     static let maxWindowsPerRule = 128
-    /// Longer than any bundle identifier or host, and short enough that a megabyte of them
-    /// cannot be smuggled in as one.
+    /// Longer than any real identifier; short enough to block padding a file with one giant string.
     static let maxIdentifierLength = 253
-    /// The top of the Settings stepper. A delay outside its range was typed into the file by
-    /// hand, so the file is read for everything else and asked about this.
+    /// Matches the Settings stepper's top; anything outside it was typed by hand.
     static let maxLoosenDelayHours = 168
 
     enum Refusal: Error, Equatable {
-        /// The file could not be opened at all — permission withdrawn, or it moved.
         case couldNotOpen(String)
         case tooBig(bytes: Int)
         case tooMany(targets: Int)
@@ -55,8 +25,7 @@ enum ConfigImport {
         /// A phone file on a Mac, or a Mac file on a phone.
         case wrongPlatform(ConfigExport.Platform)
 
-        /// Refusals are read by whoever just chose the file, so each says what the file is and
-        /// what to do instead, rather than naming the key that failed.
+        /// Says what the file is and what to do, not which key failed.
         var message: String {
             switch self {
             case .couldNotOpen(let why):
@@ -77,19 +46,16 @@ enum ConfigImport {
         }
     }
 
-    /// Reads a file, or refuses it whole.
-    ///
-    /// The platform is checked here rather than left to fail at decode: `TargetKind`'s cases
-    /// differ between the two builds, so a mismatched file would otherwise come back as some
-    /// unreadable key error instead of the one sentence that explains it.
+    /// Platform is checked before decode so a mismatch gives one clear sentence instead of a
+    /// decode error (`TargetKind`'s cases differ between the two builds).
     static func read(_ data: Data) throws(Refusal) -> ConfigExport {
         guard data.count <= maxFileBytes else { throw .tooBig(bytes: data.count) }
         let export: ConfigExport
         do {
             export = try ConfigExport.decode(data)
         } catch {
-            // A file from a newer Furlough may not decode at all. Say which version wrote it,
-            // which is the useful half, rather than naming a key that means nothing to anyone.
+            // May not decode at all if written by a newer Furlough; report the version instead
+            // of a meaningless key.
             if let version = peekVersion(data), version > ConfigExport.currentVersion {
                 throw .fromTheFuture(version: version)
             }
@@ -103,11 +69,8 @@ enum ConfigImport {
         return export
     }
 
-    /// Reads a file the person chose.
-    ///
-    /// `.fileImporter` hands back a URL rather than a document, and on iOS that URL is
-    /// security-scoped: it has to be opened and closed around the read or the read comes back
-    /// empty. The Mac does not need it, and does it anyway rather than keep two paths.
+    /// On iOS, `.fileImporter`'s URL is security-scoped and must be opened/closed around the
+    /// read or it comes back empty. The Mac doesn't need this but does it anyway to keep one path.
     static func read(contentsOf url: URL) throws(Refusal) -> ConfigExport {
         let opened = url.startAccessingSecurityScopedResource()
         defer { if opened { url.stopAccessingSecurityScopedResource() } }
@@ -120,27 +83,21 @@ enum ConfigImport {
         return try read(data)
     }
 
-    /// The `version` alone, from a file the full decode could not read.
+    /// Best-effort version read for a file that fails full decode.
     private static func peekVersion(_ data: Data) -> Int? {
         struct Peek: Decodable { var version: Int? }
         return (try? JSONDecoder().decode(Peek.self, from: data))?.version
     }
 
-    /// Why an imported rule cannot be used, or nil.
-    ///
-    /// `Rule.validationError` is the check the rule editor runs, so a rule Furlough could not
-    /// have written is refused for the reason the editor would have given. The window count and
-    /// the budget range are checked on top of it: the editor's own controls cannot leave either,
-    /// so nothing needs to say so there, but a file is typed by hand.
+    /// Why an imported rule is invalid, or nil. Reuses `Rule.validationError` (what the editor
+    /// enforces) plus window-count/budget-range checks the editor's own controls can't violate
+    /// but a hand-typed file can.
     static func problem(with rule: Rule) -> String? {
         if rule.windows.count > maxWindowsPerRule {
             return "It has \(rule.windows.count) windows. Furlough writes at most \(maxWindowsPerRule)."
         }
         if let error = rule.validationError { return error }
-        // Every day of the week, so a per-day budget is checked figure by figure. A file that
-        // is seven entries long has already been read as seven by the decoder; one that is not
-        // decoded as no per-day budget at all, and `budget(on:)` answers the daily figure for
-        // all seven, which is exactly the range this checked before per-day budgets existed.
+        // budget(on:) falls back to one daily figure if per-day budgets weren't set.
         guard (1...7).allSatisfy({ (0...Furlough.minutesPerDay).contains(rule.budget(on: $0)) }) else {
             return "A daily budget has to be between 0 and \(Furlough.minutesPerDay) minutes."
         }
@@ -148,21 +105,14 @@ enum ConfigImport {
     }
 }
 
-/// What the file's targets turned out to be on this device.
-///
-/// The Mac works this out for itself — a Mac target is a bundle identifier or a host, both of
-/// which another Mac can look up — and `ConfigImport.matches(for:config:)` does it. The phone
-/// cannot: a Screen Time token is scoped to one device and one install and cannot be turned
-/// back into an app, so the file carries no identifier and the person is walked through the
-/// picker to say which app each row was. Either way the answer arrives here.
+/// What a file's target resolves to on this device. The Mac matches itself
+/// (`ConfigImport.matches(for:config:)`); the phone can't (Screen Time tokens are per-device)
+/// and walks the person through a picker instead.
 enum ImportResolution: Equatable {
-    /// Something Furlough already manages on this device.
     case existing(UUID)
-    /// Nothing here is it yet, so it is added. The kind is the caller's to build: it is the
-    /// only side that knows what a target is made of on this platform.
+    /// Caller builds the kind, since only it knows the platform's target shape.
     case create(TargetKind)
-    /// Left out, with a sentence saying why — a category on a Mac, a website the file writes
-    /// in a way Furlough cannot read, an app the person chose not to pick.
+    /// Left out, with why — e.g. a Mac category, an unreadable website, a declined picker row.
     case skipped(String)
 }
 
@@ -170,7 +120,7 @@ struct ImportMatch: Equatable {
     var exported: ExportedTarget
     var resolution: ImportResolution
 
-    /// What to call this row: what he named it if he named it, else what the system called it.
+    /// Nickname, then system name, then identifier — whichever exists first.
     var name: String {
         if let nickname = exported.nickname, !nickname.isEmpty { return nickname }
         if let name = exported.name, !name.isEmpty { return name }
@@ -183,11 +133,8 @@ struct ImportMatch: Equatable {
     }
 }
 
-/// Everything an import would do, decided but not yet done.
-///
-/// An import is the largest single change Furlough can make to itself, and half of it may be
-/// invisible for a day — so it is shown before it happens, in the same words the pending cards
-/// use, and only then applied. `items` is what to show; `edits` is what to do.
+/// Everything an import would do, decided but not done — reviewed before it's applied since
+/// half of it may be invisible for a day. `items` is what to show; `edits` is what to do.
 struct ImportPlan: Equatable {
     /// Which part of a row a line is about.
     enum Subject: Equatable {
@@ -210,9 +157,8 @@ struct ImportPlan: Equatable {
             }
         }
 
-        /// Whether the label says anything the row's name has not already said. A target and
-        /// the delay each carry their own name; a rule, a tier and a nickname are one part of
-        /// a row that can have three, so those say which part they are.
+        /// Whether the label adds info beyond the row's own name — true for rule/tier/name/half,
+        /// which can share a row with other parts.
         var isWorthNaming: Bool { self == .rule || self == .tier || self == .name || self == .half }
     }
 
@@ -229,57 +175,44 @@ struct ImportPlan: Equatable {
         var name: String
         var subject: Subject
         var outcome: Outcome
-        /// What is enforced now and what replaces it, exactly as a pending card says it.
         var delta: PendingText.Delta? = nil
     }
 
-    /// One decided change, in the form the store can take. Deliberately not a copy of the
-    /// whole state: an import is reviewed before it is applied, and in between the enforcer
-    /// may have spent a budget or landed a queued change. Writing back a state captured
-    /// before that would un-spend the day, which is the thing an import must never do.
+    /// One decided change. Not a state snapshot — between review and apply the enforcer may
+    /// have spent budget or landed a queued change, and overwriting that would un-spend the day.
     enum Edit: Equatable {
-        /// A target the file has and this device does not, added bare. What it should be
-        /// called and what tier it is in come with it — neither enforces anything — but its
-        /// rule goes through the gate like any other, which is why the first rule on a fresh
-        /// install lands at once without needing a path of its own.
+        /// Name and tier come with it (neither enforces); its rule still goes through the
+        /// normal gate.
         case addTarget(Target)
-        /// The name he gave it. Cosmetic, so it is not gated.
+        /// Cosmetic, so it is not gated.
         case setNickname(targetID: UUID, String)
-        /// Websites the file blocks as part of an existing row. More is blocked than a moment
-        /// ago, so this is a tightening and lands at once, like the first rule on a fresh target.
-        /// Only hosts: a token cannot travel, so a linked website that was picked is simply not
-        /// in the file — see `ExportedTarget.alsoBlocks`.
+        /// A tightening (more blocked than before), lands at once. Hosts only — a picked
+        /// website's token can't travel, see `ExportedTarget.alsoBlocks`.
         case link(targetID: UUID, hosts: [String])
         case applyNow(PendingKind)
         case queue(PendingChange)
     }
 
-    /// When the plan was worked out. `apply` counts a queued change's wait from here, so that
-    /// leaving the review open does not serve any of it.
+    /// When the plan was made; `apply` counts queued waits from here so an open review doesn't
+    /// serve time.
     var plannedAt: Date
     var items: [Item] = []
     var edits: [Edit] = []
-    /// Targets this device manages that the file says nothing about. Left alone — an import is
-    /// additive, and dropping them would be a loosening — but named, because "my old setup is
-    /// back" and "my old setup is back and this is also still here" are different facts.
+    /// Targets the file says nothing about. Left alone (dropping would be a loosening) but
+    /// named for the confirmation.
     var untouched: [String] = []
-    /// When the file was written, and by which build. Carried onto the plan rather than read
-    /// off the export by the review, so that the one view both platforms share needs only the
-    /// plan. This is the largest single change Furlough can make to itself, and whether the
-    /// file is from yesterday or from March is the first thing worth knowing about it.
+    /// When/by which build the file was written. Carried on the plan so the shared review view
+    /// needs only the plan.
     var exportedAt: Date? = nil
     var appVersion: String? = nil
-    /// Why this import cannot be registered, or nil. Set by the phone's model, because the
-    /// ceiling is iOS's: `Monitoring.register` refuses past 19 distinct window spans, and it
-    /// runs *after* the import is saved — so an oversized file would land, registration would
-    /// throw, and nothing at all would be monitored. Counted here while it is still a proposal.
-    /// Always nil on the Mac, which has no DeviceActivity; see `ActivityLimit`.
+    /// Why this import can't be registered. Checked here because `Monitoring.register` (iOS,
+    /// 19-span ceiling) runs *after* save — catching it late would leave the import applied but
+    /// unmonitored. Always nil on the Mac.
     var limitReason: String? = nil
 
     var isEmpty: Bool { edits.isEmpty }
-    /// Whether the button should do anything. Empty is nothing to do; over the ceiling is worse
-    /// than nothing to do, because an import that cannot be registered leaves the rules in force
-    /// and no monitor watching them.
+    /// Over the ceiling is worse than empty: it would leave rules in force with no monitor
+    /// watching them.
     var canApply: Bool { !isEmpty && limitReason == nil }
     var added: [Item] { items.filter { $0.subject == .target && $0.outcome == .now } }
     var immediate: [Item] { items.filter { $0.outcome == .now && $0.subject != .target } }
@@ -291,8 +224,6 @@ struct ImportPlan: Equatable {
         items.compactMap { if case .queued(let date) = $0.outcome { return date }; return nil }.max()
     }
 
-    /// The sentence at the top of the review. The shape of the whole thing — how much is new,
-    /// how much lands now, how much waits — before any of the detail under it.
     var headline: String {
         guard !isEmpty else { return "There is nothing in this file that is not already set up here." }
         var parts: [String] = []
@@ -311,16 +242,9 @@ struct ImportPlan: Equatable {
         return sentence.prefix(1).uppercased() + sentence.dropFirst() + "."
     }
 
-    /// The same shape in the past tense, for the alert after the button.
-    ///
-    /// Every other mutation in the app ends in a sentence saying what it did — `ProposalResult`
-    /// is that sentence for one edit, and this is it for a whole file. It matters more here than
-    /// anywhere else: half of an import is invisible until it lands, so a screen that simply
-    /// closed would leave the queued half looking like nothing happened, and pressing the button
-    /// again is the natural response to that.
-    ///
-    /// `headline` cannot be reused. It is written for a review — what this *would* do — and the
-    /// two must not drift, which is why they are next to each other.
+    /// Past-tense version of `headline`, for the post-apply alert — needed because half an
+    /// import is invisible until it lands, and a silent close invites a second press. Kept
+    /// separate from `headline` (a review, not a result) so the two can't drift apart unnoticed.
     var confirmation: String {
         guard !isEmpty else { return "There was nothing in that file that was not already set up here, so nothing changed." }
         var parts: [String] = []
@@ -337,8 +261,7 @@ struct ImportPlan: Equatable {
         }
         let sentence = UtilityText.list(parts)
         var said = sentence.prefix(1).uppercased() + sentence.dropFirst() + "."
-        // When it lands, not just that it waits. Without the date the only way to find out is
-        // the Pending screen, and the sentence would be telling someone to go and look.
+        // Include the date — otherwise the only way to find out is the Pending screen.
         if let last = lastEffectiveAt {
             let when = last.formatted(date: .abbreviated, time: .shortened)
             said += queued.count == 1 ? " It takes effect \(when)." : " The last of them takes effect \(when)."
@@ -348,23 +271,9 @@ struct ImportPlan: Equatable {
 }
 
 extension ConfigImport {
-    /// What this file would do here, decided against the state as it stands.
-    ///
-    /// Every change is judged the way the editor judges the same change by hand, in the order
-    /// the editors would have been used, so that an import can never be a shorter road than
-    /// the screens are:
-    ///
-    /// 1. The base delay. Raising it lands now and lengthens every wait worked out below it;
-    ///    lowering it waits out the slowest target, because the base multiplies out to all of
-    ///    them. This is `AppModel.setDelay(hours:)`, not a second opinion on it.
-    /// 2. Each target's tier, before its rule. A tier that moves toward hazard lands now and
-    ///    makes that target's own delay longer, so the rule underneath it waits the longer
-    ///    time — which is what saving the two by hand does, and is the stricter of the two
-    ///    readings. A tier that moves toward essential shortens the wait, so it queues, and
-    ///    the rule under it is judged against the tier the target still has today.
-    /// 3. Each target's rule, through `Policy.classify(newRule:against:)`.
-    ///
-    /// `now` is Furlough's own time — `state.now` — and never the device's.
+    /// Judges the file's changes in the same order and by the same rules the editors would use
+    /// by hand: base delay, then each target's tier, then its rule (against the tier as it now
+    /// stands). `now` is Furlough's own clock, never the device's.
     static func plan(
         _ export: ConfigExport,
         matches: [ImportMatch],
@@ -374,8 +283,7 @@ extension ConfigImport {
         var plan = ImportPlan(plannedAt: now)
         plan.exportedAt = export.exportedAt
         plan.appVersion = export.appVersion
-        // The config as the import would leave it, for classifying what comes after against
-        // what came before. Only ever a scratch copy: nothing here is saved.
+        // Scratch copy for classifying later changes in this import against earlier ones; never saved.
         var working = state.config
 
         planDelay(export, in: &working, plan: &plan, now: now)
@@ -447,7 +355,7 @@ extension ConfigImport {
         return plan
     }
 
-    /// The base delay, the way the Settings stepper does it.
+    /// The base delay, judged the way the Settings stepper does it.
     private static func planDelay(
         _ export: ConfigExport,
         in working: inout Config,
@@ -455,9 +363,7 @@ extension ConfigImport {
         now: Date
     ) {
         let hours = export.loosenDelayHours
-        // Refused rather than clamped: a number the stepper cannot reach was typed into the
-        // file by hand, and quietly rounding it to something Furlough likes would be reading
-        // a file that does not exist.
+        // Refused, not clamped — silently rounding would mean reading a file that doesn't exist.
         guard (Furlough.minimumLoosenDelayHours...maxLoosenDelayHours).contains(hours) else {
             plan.items.append(.init(
                 name: "Loosening delay",
@@ -481,9 +387,9 @@ extension ConfigImport {
         }
     }
 
-    /// One row of the file against the target it turned out to be: name, then tier, then rule.
-    /// `isNew` says the target was added a moment ago by the caller, whose line already says
-    /// what it will be — so nothing here repeats it except a rule that had to be dropped.
+    /// One row of the file, judged name then tier then rule. `isNew` means the caller's own
+    /// line already said what this target will be, so nothing here repeats it except a dropped
+    /// rule.
     private static func planTarget(
         _ match: ImportMatch,
         id: UUID,
@@ -495,10 +401,8 @@ extension ConfigImport {
     ) {
         let name = match.name
 
-        // A nickname changes nothing about what is allowed, so it is not gated — the rule
-        // editor saves one alongside a rule without asking either. Only ever set, never
-        // cleared: an import is additive, and a file that simply has no nickname for a target
-        // is not a request to forget the one this device has.
+        // Not gated (cosmetic). Only ever set, never cleared — a missing nickname isn't a
+        // request to forget one.
         if let nickname = match.exported.nickname?.trimmingCharacters(in: .whitespacesAndNewlines),
            !nickname.isEmpty,
            let index = working.targets.firstIndex(where: { $0.id == id }),
@@ -516,9 +420,7 @@ extension ConfigImport {
             }
         }
 
-        // Websites the file blocks as part of this row. A tightening — more is blocked than a
-        // moment ago — so it lands at once, and one that is already covered, or already a row of
-        // its own here, is left alone rather than blocked twice.
+        // A tightening, lands at once. Anything already covered or already its own row is skipped.
         if let index = working.targets.firstIndex(where: { $0.id == id }) {
             let wanted = (match.exported.alsoBlocks ?? [])
                 .compactMap(Hosts.normalize)
@@ -528,8 +430,7 @@ extension ConfigImport {
                     working.targets[index].also = (working.targets[index].also ?? []) + [.host(host)]
                 }
                 plan.edits.append(.link(targetID: id, hosts: wanted))
-                // No line for a target being added in this same import: its halves are part of
-                // what "added" means, and two rows for one arrival reads as two arrivals.
+                // No separate line when the target is new — its halves are already part of "added".
                 if !isNew {
                     plan.items.append(.init(
                         name: name,
@@ -564,9 +465,8 @@ extension ConfigImport {
 
         guard let rule = match.exported.rule else { return }
         if let problem = problem(with: rule) {
-            // Named and dropped rather than repaired. A rule Furlough would not have written
-            // is one somebody typed, and guessing what they meant is the one thing a
-            // commitment device must not do with a hand-edited file.
+            // Dropped, not repaired — guessing at a hand-typed rule is what a commitment
+            // device must never do.
             plan.items.append(.init(name: name, subject: .rule, outcome: .skipped(problem)))
             return
         }
@@ -587,15 +487,9 @@ extension ConfigImport {
         }
     }
 
-    /// Performs a plan against the state as it stands right now.
-    ///
-    /// Applied as a set of changes rather than as a saved copy of the config, and deliberately:
-    /// between working the plan out and pressing the button, the enforcer may have spent a
-    /// budget, landed a queued change or learned a name, and writing back a config captured
-    /// before that would quietly undo it.
-    ///
-    /// Anything queued has its wait counted from `plan.plannedAt`, so reading the review for an
-    /// hour does not serve an hour of the delay.
+    /// Applies edits (not a config snapshot) against live state — a snapshot would silently
+    /// undo whatever the enforcer did while the review was open. Queued waits count from
+    /// `plan.plannedAt`, not now.
     static func apply(_ plan: ImportPlan, to state: inout SharedState, now: Date) {
         let read = max(0, now.timeIntervalSince(plan.plannedAt))
         for edit in plan.edits {
@@ -608,8 +502,7 @@ extension ConfigImport {
                 state.config.targets[index].nickname = nickname
             case .link(let id, let hosts):
                 guard let index = state.config.targets.firstIndex(where: { $0.id == id }) else { continue }
-                // Re-checked against the state as it stands, not as it stood when the plan was
-                // worked out: a site added by hand in between must not now be blocked twice.
+                // Re-checked against live state so a site added by hand meanwhile isn't blocked twice.
                 for host in hosts where state.config.target(host: host) == nil {
                     state.config.targets[index].also = (state.config.targets[index].also ?? []) + [.host(host)]
                 }
@@ -617,18 +510,10 @@ extension ConfigImport {
                 state.pending.removeAll { supersedes(kind, $0.kind) }
                 Policy.apply(PendingChange(kind: kind, effectiveAt: now), to: &state.config)
             case .queue(let change):
-                // The very same change, already waiting, is left exactly where it is.
-                //
-                // This is the one place import diverges from `assign`, and deliberately. Saving
-                // the same pending edit twice by hand restarts its clock, which is right: it was
-                // typed twice, and a hand edit is not something anyone does by accident. A file
-                // is applied as a whole and is easy to press twice — a second look at the review,
-                // a double tap, a Mac and a phone both restored from the same file — and every
-                // press would push every loosening in it further out than the last. Superseding
-                // it with an identical copy is not a decision, so it does not restart anything.
-                //
-                // Anything that differs in the least — one window moved, one minute of budget —
-                // is a different decision and supersedes the old one on the new clock, below.
+                // Diverges from `assign` deliberately: an identical pending change already
+                // queued is left alone rather than restarted, because a file (unlike a hand
+                // edit) is easy to apply twice and each press would push the loosening further
+                // out. Anything that differs at all still supersedes and restarts, below.
                 guard !state.pending.contains(where: { $0.kind == change.kind }) else { continue }
                 state.pending.removeAll { supersedes(change.kind, $0.kind) }
                 var change = change
@@ -638,12 +523,8 @@ extension ConfigImport {
         }
     }
 
-    /// Whether making the first change replaces a second one already waiting.
-    ///
-    /// The rule editor, the tier picker and the delay stepper each drop what was queued for
-    /// the thing they are changing rather than stacking a second change on it, so that at most
-    /// one change per target is ever in flight — which is the assumption `PendingText` reads
-    /// the saved rule under. An import is not allowed to be the one edit that stacks.
+    /// Whether one change should drop another already queued for the same thing — keeps to the
+    /// app-wide invariant of at most one pending change per target, which `PendingText` assumes.
     private static func supersedes(_ made: PendingKind, _ queued: PendingKind) -> Bool {
         switch (made, queued) {
         case (.setRule(let a, _), .setRule(let b, _)): a == b
@@ -656,28 +537,16 @@ extension ConfigImport {
 }
 
 extension ConfigImport {
-    /// What the phone can work out for itself, before anybody is asked.
+    /// What the phone can resolve on its own, before asking. Most rows can't (a Screen Time
+    /// token is per-device, per-install, so `ImportSetupView` walks the picker) — except a
+    /// `.website` row, which is a plain host string this phone can look up exactly like a Mac
+    /// (since 2026-09-08). Everything else comes back `.skipped(unresolved)`, matching the
+    /// "not answered yet" state on that screen.
     ///
-    /// Most of a phone import cannot be: a Screen Time token is scoped to one device and one
-    /// install, so the file writes no identifier for it and `ImportSetupView` walks the person
-    /// through the picker row by row. A website row is the exception since 2026-09-08. The
-    /// phone has `.host` targets now, and a `.website` row carrying an identifier is a plain
-    /// string this phone can look up exactly as a Mac would — so those rows need no picker
-    /// step at all, which is what lets a Mac's websites arrive here as real enforceable
-    /// targets rather than as rows nobody can answer.
+    /// Grows `config` as it reads so "youtube.com" and "m.youtube.com" in the same file resolve
+    /// to one target.
     ///
-    /// Everything else comes back `.skipped(unresolved)`, which is what an unanswered row says
-    /// until the person answers it: "not yet" and "leave it out" are the same state on that
-    /// screen until Import is pressed.
-    ///
-    /// Read against a config that grows as the file is read, the way the Mac's does, so a file
-    /// listing both "youtube.com" and "m.youtube.com" lands on one target rather than two: the
-    /// second is a subdomain of the first, and `Config.target(host:)` is the thing that knows it.
-    ///
-    /// Only `ImportSetupView` calls this, so it is the phone's — but it is not behind an
-    /// `#if os(iOS)`, because everything it touches exists on both platforms and the test
-    /// bundle is a macOS one. Behind the guard it would be the one part of this feature no
-    /// test could reach. Harmlessly unused on the Mac, the way `Hosts` used to be on the phone.
+    /// Not `#if os(iOS)`-gated: nothing here is iOS-only, and the test bundle is macOS.
     static func preresolved(for export: ConfigExport, config: Config, unresolved: String) -> [ImportResolution] {
         var growing = config
         var invented = Set<UUID>()
@@ -693,8 +562,7 @@ extension ConfigImport {
                 return .skipped("\"\(identifier)\" is not a website Furlough can read.")
             }
             if let existing = growing.target(host: host) {
-                // Matched something this file asked for a moment ago rather than anything on
-                // this phone, which makes it the same row twice.
+                // Matched an earlier row in this same file, not anything already on the phone — a duplicate.
                 if invented.contains(existing.id) { return .skipped("The file lists it more than once.") }
                 return .existing(existing.id)
             }
@@ -708,15 +576,9 @@ extension ConfigImport {
 
 #if !os(iOS)
 extension ConfigImport {
-    /// How a Mac file lines up with what this Mac already manages.
-    ///
-    /// A Mac target is a bundle identifier or a host — both plain strings another Mac can look
-    /// up — so unlike the phone, the Mac needs nobody's help to work this out. Websites match
-    /// through `Config.target(host:)`, which matches parent domains too, so a file listing
-    /// "m.youtube.com" lands on the "youtube.com" already here rather than beside it.
-    /// Read against a config that grows as the file is read, so a file listing both
-    /// "youtube.com" and "m.youtube.com" resolves to one target and not two: the second is a
-    /// subdomain of the first, and `Config.target(host:)` is the thing that knows it.
+    /// How a Mac file lines up with what's already here. A Mac target (bundle id or host) is a
+    /// plain string this Mac can look up itself. Grows `config` as it reads so "youtube.com" and
+    /// "m.youtube.com" in the same file resolve to one target rather than two.
     static func matches(for export: ConfigExport, config: Config) -> [ImportMatch] {
         var growing = config
         var invented = Set<UUID>()
@@ -727,8 +589,7 @@ extension ConfigImport {
                 let stub = Target(kind: kind)
                 growing.targets.append(stub)
                 invented.insert(stub.id)
-            // Matched something this file asked for a moment ago rather than anything on
-            // this Mac, which makes it the same row twice.
+            // Matched an earlier row in this file, not anything already here — a duplicate.
             case .existing(let id) where invented.contains(id):
                 resolution = .skipped("The file lists it more than once.")
             case .existing, .skipped:

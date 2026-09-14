@@ -1,30 +1,15 @@
 import Foundation
 
-/// The rule Furlough would start something on, before anybody has told it anything.
-///
-/// `AppUtility` answers what a target *is*: a tier, and the cost of blocking it, from facts that
-/// can be checked — a bundle identifier either is Instagram's or it is not. This file answers
-/// what to *do* about it, and none of that is checkable the same way. "TikTok gets 30 minutes,
-/// not 20" is a judgement, agreed with Zach on 2026-09-09; the tier beside it is a fact. They
-/// are separate files for exactly that reason: a figure here can be retuned any afternoon
-/// without anyone having to re-verify a table of identifiers.
-///
-/// The pattern is `AppUtility`'s, one property over. Everything is offered and never applied:
-/// the editor shows it only while a target has no rule of its own, one tap takes it into the
-/// fields, one ignores it, and nothing is written until Save. `Policy.decide` never reads it,
-/// and nothing here can loosen or tighten anything by itself.
-///
-/// The warm half of this already exists. `UsageAnalysis` builds a whole `Rule` out of what a
-/// person actually did — the hours their use piles into, and half of the minutes they spent —
-/// but it needs `FamilyActivityData`, which most installs never get. This is the cold half: the
-/// same shape of answer for the first app anyone adds, from the tier alone. The numbers below
-/// were chosen to sit alongside that engine's, not to argue with it.
+/// The rule Furlough would start something on, before anybody has told it anything. Separate
+/// from `AppUtility` (which is fact — a bundle identifier's tier) because these numbers are
+/// judgement calls that can be retuned without re-verifying identifiers. Offered, never applied:
+/// the editor shows it only while a target has no rule, and nothing writes until Save —
+/// `Policy.decide` never reads this. The cold-start counterpart to `UsageAnalysis`, which builds
+/// a rule from actual usage data where that's available.
 enum RuleSuggestion {
-    /// A starting rule: a daily budget, and the one window where the tier calls for one.
-    ///
-    /// A fragment rather than a `Rule` because that is what the editor takes — the budget goes
-    /// to the slider and the window becomes a row, both still editable before Save. `rule` is
-    /// for the places that want to *show* it whole.
+    /// A starting rule: a daily budget, and the one window where the tier calls for one. A
+    /// fragment rather than a `Rule` since the editor takes budget and window separately
+    /// (still editable before Save); `rule` is for places that want to show it whole.
     struct Draft: Equatable, Sendable {
         var budgetMinutes: Int
         /// The one allowed window, or nil for a rule that is open all day up to its budget.
@@ -38,48 +23,33 @@ enum RuleSuggestion {
 
     // MARK: The numbers, agreed with Zach on 2026-09-09
 
-    /// An hour a day, and no claim about when. Idle is what passes the time, not what a person
-    /// is fighting, so the suggestion limits it and stays out of the question of which hours are
-    /// the wrong ones — that answer is different for everybody and the week sheet is where it
-    /// belongs. A tick on the budget slider, so what lands under the thumb reads as a decision.
+    /// An hour a day, no window — idle apps are limited on time, not hours, since "wrong hours"
+    /// differs per person.
     static let idleBudgetMinutes = 60
 
-    /// Half an hour a day. `UsageAnalysis.budgetKeep` keeps half of what was actually spent, and
-    /// half of a typical hazard app's day is about this, so the cold answer and the warm one
-    /// land in the same place rather than contradicting each other on the same screen.
+    /// Half an hour a day, chosen to roughly agree with what `UsageAnalysis.budgetKeep` derives
+    /// from real usage.
     static let hazardBudgetMinutes = 30
 
-    /// 9:00 AM to 10:00 PM, every day: the first and the last hours of the day are not the feed.
-    /// 10 PM is already what this codebase calls late (`UsageAnalysis.lateHours`), and the
-    /// morning end is the other half of the same idea.
-    ///
-    /// One window on every day, deliberately, and not a per-weekday shape: it is a starting
-    /// draft, and the week sheet is the tool for the rest. It also costs almost nothing to
-    /// spread — DeviceActivity dedupes spans, so every hazard target that takes this shares the
-    /// one `window:540-1320` activity rather than spending one each against the ceiling of 19.
+    /// 9 AM–10 PM (10 PM matches `UsageAnalysis.lateHours`). One window every day, deliberately,
+    /// not per-weekday — it's a starting draft. Also cheap: DeviceActivity dedupes identical
+    /// spans, so every hazard target sharing this counts as one activity against the ceiling of 19.
     static let hazardWindow = TimeWindow(startMinute: 9 * 60, endMinute: 22 * 60)
 
-    /// Two hours for a film or two episodes. An hour-a-day budget on long-form video runs out
-    /// somewhere in the second act, and Furlough's answer to "I am halfway through" is to wait
-    /// until tomorrow — which is a rule nobody keeps, so it is the rule that gets deleted.
+    /// Two hours for a film or two episodes — an hour-a-day budget stops mid-story, which is
+    /// the rule that gets deleted.
     static let longFormBudgetMinutes = 120
 
     // MARK: The suggestion
 
-    /// The rule Furlough would start `target` on, or nil when it has nothing worth saying.
-    ///
-    /// Nil whenever the target already has a rule of its own. A suggestion is for the cold
-    /// start; one that could land on top of a rule someone is living under would be a second way
-    /// to edit that rule, and this file is not allowed to be that.
-    ///
-    /// `chosen` is the tier showing in the editor, and only when somebody actually answered:
-    /// an untouched picker reads `.useful`, which is the absence of an answer rather than one,
-    /// so the table's own guess is what stands in until then.
+    /// The rule Furlough would start `target` on, or nil when it has nothing worth saying —
+    /// always nil once the target has a rule, since this must never be a second way to edit it.
+    /// `chosen` is the tier the editor shows; an untouched picker reads `.useful` (no answer),
+    /// so the table's guess stands in until then.
     static func suggestion(for target: Target, chosen: Utility? = nil) -> Draft? {
         guard target.rule == nil, let tier = tier(for: target, chosen: chosen) else { return nil }
         guard let draft = exception(for: target, at: tier) ?? draft(for: tier) else { return nil }
-        // Nothing counts a typed site's minutes, so a budget on one is a number that would never
-        // be enforced. Its hours are, which is why the window still stands on its own.
+        // A typed site's minutes are never counted, so a budget on one would never be enforced.
         guard target.isCounted || draft.window != nil else { return nil }
         return draft
     }
@@ -89,13 +59,9 @@ enum RuleSuggestion {
         chosen ?? AppUtility.suggestion(for: target)?.utility
     }
 
-    /// What a tier alone suggests, before any per-app exception.
-    ///
-    /// The two quiet tiers say nothing on purpose. Blocking an essential is the risk Furlough
-    /// interrupts a person about, so recommending a budget for one would be the app arguing with
-    /// its own caution banner. And a work tool has no healthy amount: the only generous figure
-    /// that could stand for `.useful` is looser than the 30 minutes the slider already sits at,
-    /// so taking it would be a suggestion that loosens the screen it is offered on.
+    /// What a tier alone suggests, before any per-app exception. `.essential`/`.useful` say
+    /// nothing on purpose: blocking an essential is already the risk Furlough warns about, and
+    /// a work tool has no healthy budget to suggest.
     static func draft(for utility: Utility) -> Draft? {
         switch utility {
         case .essential, .useful: nil
@@ -104,10 +70,8 @@ enum RuleSuggestion {
         }
     }
 
-    /// The offer in one line: what taking it would put in the fields.
-    ///
-    /// `counted` is `Target.isCounted`: a typed site has no budget to fill, so the line says only
-    /// what it can actually do rather than promising minutes nothing will ever count.
+    /// The offer in one line: what taking it would put in the fields. `counted` is
+    /// `Target.isCounted` — a typed site gets no budget line, since nothing would enforce it.
     static func offer(_ draft: Draft, counted: Bool = true, calendar: Calendar = .current) -> String {
         let budget = counted ? "\(TimeFormat.budget(draft.budgetMinutes)) a day" : nil
         let hours = draft.window.map { TimeFormat.span($0, calendar: calendar) }
@@ -115,41 +79,26 @@ enum RuleSuggestion {
         return "Furlough would start it at \(parts.joined(separator: ", "))"
     }
 
-    /// The same suggestion as the rule itself, for the card the editor opens on when a target
-    /// has no rule yet.
-    ///
-    /// `offer` is a nudge inside an editor somebody is already reading: it says what tapping
-    /// would put in the fields. This is read before there is an editor at all, so it states the
-    /// rule rather than the act of taking it — hours first, because that is what a person
-    /// pictures, then the budget those hours are spent out of.
+    /// The same suggestion stated as a rule (not a nudge to tap), for the card shown before an
+    /// editor exists at all — hours first, then the budget.
     static func statement(_ draft: Draft, counted: Bool = true, calendar: Calendar = .current) -> String {
         let budget = "\(TimeFormat.budget(draft.budgetMinutes)) a day"
         guard let window = draft.window else { return "Open at any hour, \(budget)." }
         let hours = "Open \(TimeFormat.span(window, calendar: calendar))"
-        // Nothing counts a typed site's minutes, so on one of those the hours are the whole rule
-        // and a figure here would be a promise the phone cannot keep.
+        // A typed site's minutes are never counted, so the hours are the whole rule.
         return counted ? "\(hours), \(budget)." : "\(hours)."
     }
 
-    /// Why those numbers, in the word the editor's own chips use for it.
-    ///
-    /// Conditional on purpose: nothing has been written, and the tier is Furlough's reading of
-    /// what this thing is rather than an answer anyone gave. The picker under the editor is
-    /// where it is argued with.
+    /// Why those numbers, phrased conditionally since the tier is Furlough's guess, not a saved answer.
     static func because(_ tier: Utility) -> String {
         "Furlough would call this \(tier.label)."
     }
 
     // MARK: Exceptions
 
-    /// One app's refinement of its tier's default, and the tier it was written against.
-    ///
-    /// The tier is carried rather than assumed because an exception is an argument about an app
-    /// *at* a tier: "an hour cuts a film in half" is a thing to say about Netflix while Netflix
-    /// is idle, and says nothing about what to do if it is ever tiered somewhere else. Carrying
-    /// it also makes drift loud — `RuleSuggestionTests` checks every entry here still agrees
-    /// with `AppUtility`, so retiering an app in that table fails a test here instead of quietly
-    /// switching this off.
+    /// One app's refinement of its tier's default, with the tier it was written against carried
+    /// along — an exception is an argument about an app *at* a tier, and carrying the tier lets
+    /// `RuleSuggestionTests` catch drift if `AppUtility` retiers the app later.
     struct Exception: Equatable, Sendable {
         var utility: Utility
         var draft: Draft
@@ -161,9 +110,8 @@ enum RuleSuggestion {
         draft: Draft(budgetMinutes: longFormBudgetMinutes)
     )
 
-    /// A hazard that is also how people are reached. It keeps the budget and loses the window:
-    /// closing it from 10 PM to 9 AM would be shutting the door someone is knocked on, which is
-    /// the harm `.essential` exists to warn about, arriving through the back of a suggestion.
+    /// A hazard that's also how people are reached: keeps the budget, drops the window (closing
+    /// overnight would shut off a way to be reached).
     static let reachable = Exception(
         utility: .hazard,
         draft: Draft(budgetMinutes: hazardBudgetMinutes)
@@ -175,8 +123,8 @@ enum RuleSuggestion {
         return found.draft
     }
 
-    /// Keyed off whatever identity the target has, in `AppUtility.suggestion(for:)`'s order and
-    /// through `AppUtility`'s own matchers, so an exception is found exactly where a tier is.
+    /// Keyed the same way `AppUtility.suggestion(for:)` looks up a tier, so an exception is
+    /// found wherever a tier is.
     private static func lookup(_ target: Target) -> Exception? {
         switch target.kind {
         #if os(iOS)

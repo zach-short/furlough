@@ -1,15 +1,11 @@
 import CoreGraphics
 import Foundation
 
-/// The inside of the glass in the mockup's 120 × 160 space, and how sand sits in it. Pure
-/// geometry with no SwiftUI, so the shapes in Hourglass.swift stay thin and a script can check
-/// the numbers.
+/// Pure geometry (no SwiftUI) for the glass interior, so Hourglass.swift's shapes stay thin
+/// and a script can check the numbers.
 ///
-/// The sand fills the bulb it is in: the top charge rests against the walls and drains through
-/// a funnel into the neck, and the pile below is a cone at the angle of repose that spreads to
-/// the walls as it grows. A level is a share of one charge by area, not a height, so the top
-/// surface drops slowly while the bulb is wide and quickly as it narrows, and what leaves the
-/// top is what arrives below.
+/// A level is a share of one charge by area (not height) — the top drains slowly while wide,
+/// fast as it narrows; what leaves the top arrives below.
 enum HourglassGeometry {
     static let centerX: Double = 60
     /// The top cap covers the glass down to here.
@@ -88,9 +84,8 @@ enum HourglassGeometry {
 
     // MARK: Top sand
 
-    /// Half the top sand's width at `y`: the wall in the bulb, and through the neck a pour that
-    /// narrows from the neck's width to the orifice, so the charge runs into the stream rather
-    /// than stopping on a line above it.
+    /// Top sand's half-width at `y`: wall width in the bulb, narrowing to the orifice through
+    /// the neck so sand feeds the stream instead of stopping short.
     static func topSandHalfWidth(at y: Double) -> Double {
         guard y > neckTop else { return halfWidth(at: y) }
         let s = min(1, (y - neckTop) / (topSandBottom - neckTop))
@@ -105,11 +100,10 @@ enum HourglassGeometry {
         let depth = funnelDepth(edge: edge, half: half)
         let step = 0.5
         var points: [CGPoint] = [CGPoint(x: centerX - orificeHalfWidth, y: topSandBottom)]
-        // Left side, bottom to top.
         for y in stride(from: topSandBottom - step, to: edge, by: -step) {
             points.append(CGPoint(x: centerX - topSandHalfWidth(at: y), y: y))
         }
-        // The funnel, left to right, kept inside the sand's sides where they narrow under it.
+        // Funnel, left to right, clamped inside the sand's sides.
         let samples = 32
         for k in 0...samples {
             let u = Double(k) / Double(samples) * 2 - 1
@@ -117,7 +111,6 @@ enum HourglassGeometry {
             let side = topSandHalfWidth(at: y)
             points.append(CGPoint(x: min(max(centerX + u * half, centerX - side), centerX + side), y: y))
         }
-        // Right side, top to bottom, ending at the orifice.
         for y in stride(from: edge + step, to: topSandBottom, by: step) {
             points.append(CGPoint(x: centerX + topSandHalfWidth(at: y), y: y))
         }
@@ -125,7 +118,6 @@ enum HourglassGeometry {
         return points
     }
 
-    /// The bottom of the funnel for a wall edge.
     static func funnelBottom(edge: Double) -> CGPoint {
         CGPoint(x: centerX, y: edge + funnelDepth(edge: edge, half: topSandHalfWidth(at: edge)))
     }
@@ -167,7 +159,7 @@ enum HourglassGeometry {
             let y = pileSurface(x: x, peak: peak)
             right.append(CGPoint(x: min(x, centerX + halfWidth(at: y)), y: y))
         }
-        // Down the wall from where the cone met it, then along the floor.
+        // Down the wall then along the floor.
         if let last = right.last, last.y < floor {
             for y in stride(from: last.y + 1, to: floor, by: 1) {
                 right.append(CGPoint(x: centerX + halfWidth(at: y), y: y))
@@ -226,10 +218,8 @@ struct SandGrain: Equatable {
     var alpha: Double = 1
 }
 
-/// The stream: grains leave the neck at a steady rate, fall under gravity in a slightly
-/// wandering column that spreads as it drops, and scatter where they land. Everything is a
-/// function of `phase`, so any still phase shows a full stream and the same phase always
-/// draws the same frame; the frozen glass is the stream at one phase.
+/// Everything here is a pure function of `phase` — the same phase always draws the same
+/// frame, so the frozen glass is just one held phase.
 enum HourglassStream {
     /// Grains a second.
     static let rate: Double = 34
@@ -245,14 +235,13 @@ enum HourglassStream {
     /// The share of grains that throw chips when they land.
     static let splashChance: Double = 0.4
 
-    /// Seconds a grain takes from `top` to `landing`.
     static func fallTime(top: Double, landing: Double) -> Double {
         let drop = max(0, landing - top)
         return (-exitSpeed + (exitSpeed * exitSpeed + 2 * gravity * drop).squareRoot()) / gravity
     }
 
-    /// Every grain in the air and every chip on the pile at `phase`, in the 120-space.
-    /// `surface` gives the pile's surface at an x, so chips roll on it instead of through it.
+    /// All grains/chips at `phase`; `surface` keeps chips rolling on the pile instead of
+    /// through it.
     static func grains(phase: Double, top: Double, landing: Double, surface: (Double) -> Double) -> [SandGrain] {
         let flight = fallTime(top: top, landing: landing)
         guard flight > 0.01 else { return [] }

@@ -1,25 +1,16 @@
 import SwiftUI
 
-/// Every version and what it changed, as both apps draw it.
-///
-/// The text is not here: `release-notes.json` at the root of the repo is the one copy, bundled
-/// into both apps and imported by the site, so a release cannot be described one way in the app
-/// and another way on furloughapp.com. This is the shape it takes on screen, and it is one
-/// shape rather than two because there is nothing about a list of changes that should read
-/// differently on a Mac.
-///
-/// Self-contained the way `LinkCards` is — Ember and the theme helpers only, no `SectionLabel`,
-/// `Footnote` or `CardDivider` — because Shared/UI is compiled into extensions that carry none
-/// of each app's own components. The version heading repeats `SectionLabel`'s own padding so it
-/// still sits where every other section heading in the app sits.
+/// Text lives in `release-notes.json` (bundled into both apps and the site) — one shape, not
+/// two, since a list of changes shouldn't read differently on a Mac. Self-contained like
+/// `LinkCards` for the same widget-extension reason; the version heading repeats
+/// `SectionLabel`'s padding so it still lines up with other section headings.
 struct ReleaseList: View {
     /// Only what applies to this device, which `ReleaseNotes.all(on:)` has already filtered.
     var releases: [ReleaseNotes.Release] = ReleaseNotes.all()
     /// Which one is the build in hand, so it can say so. Nil on a build the file does not cover.
     var current: Version? = ReleaseNotes.bundleVersion
-    /// The device the list was filtered for, which decides which changes wear a badge. Passed
-    /// rather than read from the platform this binary is, so that the two cannot disagree — a
-    /// list filtered for the phone must not badge its own rows "iPhone".
+    /// Passed rather than read from the running platform, so the filter and the badges can't
+    /// disagree.
     var platform: ReleaseNotes.Platform = .current
 
     var body: some View {
@@ -35,7 +26,6 @@ struct ReleaseList: View {
     }
 }
 
-/// One version: what it was for, then every change in it.
 private struct ReleaseCard: View {
     let release: ReleaseNotes.Release
     let isCurrent: Bool
@@ -44,15 +34,13 @@ private struct ReleaseCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 6) {
-                // Both labels on one line above the headline rather than around it: the
-                // headline is the only thing on the card allowed to wrap, and a badge beside a
-                // two-line headline squeezes it into three.
+                // Labels above the headline, not beside it — a badge next to a two-line
+                // headline would squeeze it to three.
                 HStack(spacing: 8) {
                     Eyebrow(text: release.channel.label, color: Ember.faint, size: 9)
                     Spacer(minLength: 4)
-                    // Worth carrying on the card rather than only in the list: someone reading a
-                    // version number back off a bug report wants to know which of these they
-                    // are actually running.
+                    // Repeated here (not just the list) so a bug report's version number is
+                    // easy to confirm.
                     if isCurrent {
                         Eyebrow(text: "This build", color: Ember.amber, size: 9)
                     }
@@ -80,9 +68,8 @@ private struct ReleaseCard: View {
     }
 }
 
-/// One change: what kind it is, then the thing, then what it means. The kind is a word and not
-/// a colour alone — the colour is the only thing separating New from Fixed, and the difference
-/// between those two is worth reading without one.
+/// Kind is a word, not colour alone — colour is the only difference between New/Fixed
+/// otherwise.
 private struct ChangeRow: View {
     let change: ReleaseNotes.Change
     let platform: ReleaseNotes.Platform
@@ -91,8 +78,8 @@ private struct ChangeRow: View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 6) {
                 Eyebrow(text: change.kind.label, color: colour, size: 9)
-                // Nothing at all on a change that is for this device, which is nearly all of
-                // them: a badge on every row is a badge that says nothing.
+                // Omitted for changes on this device (nearly all) — a badge on every row says
+                // nothing.
                 if let badge = change.platform.badge(on: platform) {
                     Eyebrow(text: badge, color: Ember.faint, size: 9)
                 }

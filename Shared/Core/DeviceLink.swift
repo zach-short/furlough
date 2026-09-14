@@ -1,11 +1,8 @@
 import Foundation
 
 /// How much a device does on its own when something could cross to, or from, another one.
-///
-/// Three answers and never a fourth: *always* acts without asking, *ask* offers and waits, and
-/// *never* stays quiet. Each of the link's settings is one of these, so a person learns the
-/// scale once. None of them is a loosening when changed — turning one down blocks nothing that
-/// was blocked a moment ago, it only stops adding — so none waits out a delay.
+/// Turning one down never blocks anything already blocked, only stops adding — so none of
+/// these waits out a delay.
 enum LinkChoice: String, Codable, CaseIterable, Sendable {
     case always
     case ask
@@ -21,12 +18,10 @@ enum LinkChoice: String, Codable, CaseIterable, Sendable {
 }
 
 /// The three settings about what crosses between devices, kept per device in `Config`. Each
-/// device answers for itself: one Mac can take everything the phone adds while another asks
-/// first, and the phone can send without either of them having any say in how it is received.
+/// device answers for itself.
 ///
-/// `companionSite` is not really about the link — it is about the website an app is also at,
-/// on this device alone — but it is the same kind of question, and the default Zach asked for
-/// (2026-09-10) is the reason it is here: adding an app blocks its site unless told otherwise.
+/// `companionSite` isn't really about the link — it's whether adding an app also blocks the
+/// website it's also at, on this device alone — but it lives here as the same kind of question.
 struct LinkPreferences: Codable, Equatable, Sendable {
     /// Whether adding an app also blocks the website it is also at, as one row.
     var companionSite: LinkChoice = .always
@@ -36,24 +31,19 @@ struct LinkPreferences: Codable, Equatable, Sendable {
     var acceptAdditions: LinkChoice = .ask
 }
 
-/// What one device says about itself to the others: its name, what it is, and whether it holds
-/// a key. Each device writes only its own entry to iCloud, under its own key, so the roster is
-/// never one blob two devices fight over — it is the set of entries, and a device that leaves
-/// deletes its own.
+/// What one device says about itself to the others. Each device writes only its own entry to
+/// iCloud under its own key, so the roster is never one blob two devices fight over.
 struct LinkedDevice: Codable, Equatable, Identifiable, Sendable {
     /// `AnchorSync.deviceID`: the same string the anchor record is signed with.
     var id: String
-    /// What the person called it. iOS stopped telling third-party apps the device's name in
-    /// iOS 16, so on a phone this is typed in the guide; the Mac offers `Host.localizedName`.
+    /// iOS stopped telling third-party apps the device name in iOS 16, so on a phone this is
+    /// typed in the guide; the Mac offers `Host.localizedName`.
     var name: String
     var platform: AnchorRecord.Platform
-    /// When it joined. A revocation older than this is spent: the device came back afterwards.
+    /// A revocation older than this is spent: the device came back afterwards.
     var enrolledAt: Date
-    /// When it last wrote anything here. Refreshed by every enrollment and every addition, so a
-    /// device gone quiet for a month reads as one.
     var lastSeen: Date
-    /// Whether a tag can be read on it, which is the only thing that releases an anchor. An
-    /// iPhone; never an iPad or a Mac, neither of which has a reader.
+    /// Whether a tag can be read on it — only an iPhone; never an iPad or Mac.
     var canRelease: Bool
 
     /// The platform's name where a device has not been given one.
@@ -67,20 +57,15 @@ struct LinkedDevice: Codable, Equatable, Identifiable, Sendable {
 }
 
 /// One device taking another off the link, written under the revoked device's id so that
-/// device finds it on its next read and un-enrolls itself. Any linked device may write one.
+/// device finds it on its next read and un-enrolls itself.
 struct Revocation: Codable, Equatable, Sendable {
     var by: String
     var at: Date
 }
 
 /// The link between a person's devices: who is on it, and the rules for joining and leaving.
-///
-/// It used to be implicit. Any device signed into the same Apple Account read the one anchor
-/// record, so two installs were linked the moment they existed, with nothing to switch on and
-/// nothing that said so. Zach's call (2026-09-10) is that a person opts each device in, is told
-/// in steps what the link carries, and can take any device off it — which is what this is.
-/// Nothing crosses to or from a device that is not enrolled: `AnchorSync.pull` refuses the
-/// anchor, and `SharedAdditions` refuses what was added.
+/// A person opts each device in and can take any off it; nothing crosses to or from a device
+/// that isn't enrolled (`AnchorSync.pull` refuses the anchor, `SharedAdditions` refuses additions).
 ///
 /// The roster is pure and read from whatever store hands it the entries, so joining, leaving and
 /// the refusal to leave under an anchor are all testable without an iCloud account.
@@ -93,8 +78,8 @@ enum DeviceLink {
         var devices: [LinkedDevice] = []
         var revoked: [String: Revocation] = [:]
 
-        /// The devices on the link: written, and not revoked since they enrolled. A revocation
-        /// older than the enrollment is spent — the device was taken off and came back.
+        /// Written, and not revoked since enrolling. A revocation older than the enrollment is
+        /// spent — the device was taken off and came back.
         var linked: [LinkedDevice] {
             devices.filter { device in
                 guard let revocation = revoked[device.id] else { return true }
@@ -110,8 +95,8 @@ enum DeviceLink {
         /// Everyone on the link but `id`.
         func others(than id: String) -> [LinkedDevice] { linked.filter { $0.id != id } }
 
-        /// Whether some device other than `id` can release an anchor. The Mac's drop reads
-        /// this: a Mac with no key-holder on the link would be a lock with no key.
+        /// The Mac's drop reads this — a Mac with no key-holder on the link would be a lock
+        /// with no key.
         func hasKey(besides id: String) -> Bool { others(than: id).contains(where: \.canRelease) }
 
         /// What to call the other devices, for a sentence: "your iPhone", "your Mac and iPad",
@@ -131,9 +116,8 @@ enum DeviceLink {
 
     /// Why a device cannot come off the link right now.
     enum LeaveRefusal: Equatable, Sendable {
-        /// An anchor is holding somewhere on the link. Taking a device off while it holds
-        /// would either leave that device locked with no key or release it, and both are the
-        /// one thing the Anchor exists to make impossible.
+        /// Taking a device off while an anchor holds would either leave it locked with no key
+        /// or release it — both are what the Anchor exists to make impossible.
         case anchored
 
         var message: String {
@@ -144,10 +128,8 @@ enum DeviceLink {
         }
     }
 
-    /// Whether a device may leave. Pure: the caller says whether an anchor holds anywhere —
-    /// here, by its own profile, or on the link, by the shared record — and that is the whole
-    /// question. Leaving is otherwise instant, because with no anchor down the link holds
-    /// nothing that leaving would let go of.
+    /// Leaving is otherwise instant: with no anchor down, the link holds nothing that leaving
+    /// would let go of.
     static func leaveRefusal(anchorHoldsHere: Bool, anchorHoldsOnLink: Bool) -> LeaveRefusal? {
         anchorHoldsHere || anchorHoldsOnLink ? .anchored : nil
     }
@@ -162,18 +144,14 @@ enum DeviceLink {
     // MARK: Joining
 
     /// Whether an install that predates the roster is put on the link without being asked.
-    ///
-    /// Zach's call: the two devices he has linked today keep working after the update. What
-    /// proves a device was linked is that it has heard the other one — `lastHeard` on either
-    /// platform, or the Mac's older `phoneSeen` latch — and a device that has only ever heard
-    /// itself, or nothing, starts off the link and is shown the guide like anyone new.
+    /// Proven by having heard the other device — `lastHeard`, or the Mac's older `phoneSeen`
+    /// latch — so an install that never has starts off the link like anyone new.
     static func grandfathers(lastHeard: Date?, phoneSeen: Bool) -> Bool {
         lastHeard != nil || phoneSeen
     }
 
-    /// The entry a device writes when it joins, or refreshes when it writes anything else.
-    /// `enrolledAt` is kept from the existing entry so a refresh does not spend a revocation
-    /// that has not been read yet.
+    /// `enrolledAt` is kept from the existing entry so a refresh doesn't spend a revocation
+    /// that hasn't been read yet.
     static func entry(
         id: String,
         name: String,
@@ -195,9 +173,8 @@ enum DeviceLink {
 
     // MARK: The guide
 
-    /// The steps a person is walked through before a device joins, on both platforms. Prose
-    /// rather than a `HalfGuide`: none of these is a thing to do, they are four things to know,
-    /// and the one action — Link this device — comes after all of them.
+    /// The steps a person is walked through before a device joins. Prose rather than a
+    /// `HalfGuide`: these are things to know, not do — the one action comes after all of them.
     struct Step: Identifiable, Equatable, Sendable {
         var title: String
         var detail: String
@@ -242,17 +219,16 @@ extension DeviceLink {
     private static let sequenceKey = "furlough.link.sequence"
     private static let declinedKey = "furlough.link.declined"
 
-    /// Whether this device is on the link. Read by every process — the reconciler decides
-    /// whether to take the anchor by it — so it lives in the App Group beside `deviceID`.
+    /// Read by every process (the reconciler decides whether to take the anchor by it), so it
+    /// lives in the App Group beside `deviceID`.
     static var isEnrolled: Bool { SharedStore.defaults.bool(forKey: enrolledKey) }
 
-    /// The name this device joined under, or the platform's until it has one.
     static var name: String {
         SharedStore.defaults.string(forKey: nameKey) ?? LinkedDevice.defaultName(for: AnchorSync.platform)
     }
 
-    /// Settles, once, whether an install that predates the roster is already linked. Called at
-    /// launch by both apps before anything reads the roster. Returns true when it enrolled.
+    /// Called at launch by both apps, once, before anything reads the roster. Returns true
+    /// when it enrolled.
     @discardableResult
     static func decideGrandfathering(now: Date) -> Bool {
         guard !SharedStore.defaults.bool(forKey: decidedKey) else { return false }
@@ -263,8 +239,7 @@ extension DeviceLink {
         return true
     }
 
-    /// Puts this device on the link: writes its entry, clears any revocation of it, and
-    /// remembers the name. Idempotent, so it doubles as the refresh every write makes.
+    /// Idempotent, so it doubles as the refresh every write makes.
     static func enroll(name: String, now: Date) {
         let id = AnchorSync.deviceID
         let entry = DeviceLink.entry(
@@ -276,16 +251,13 @@ extension DeviceLink {
         SharedStore.defaults.set(true, forKey: enrolledKey)
     }
 
-    /// Refreshes this device's entry, if it is on the link. Called beside every other write
-    /// this device makes, so `lastSeen` means what it says.
+    /// Called beside every other write this device makes, so `lastSeen` means what it says.
     static func touch(now: Date) {
         guard isEnrolled else { return }
         enroll(name: name, now: now)
     }
 
-    /// Takes this device off the link. Refused while an anchor holds — see `leaveRefusal` —
-    /// and the caller passes what it knows about that, since the phone's profile and the
-    /// shared record are both a `now` away from being wrong.
+    /// Refused while an anchor holds — see `leaveRefusal`.
     @discardableResult
     static func leave(anchorHoldsHere: Bool, now: Date) -> LeaveRefusal? {
         if let refusal = leaveRefusal(anchorHoldsHere: anchorHoldsHere, anchorHoldsOnLink: recordHolds(AnchorCloud.read(), now: now)) {
@@ -299,9 +271,8 @@ extension DeviceLink {
         return nil
     }
 
-    /// Takes another device off the link from here. The same refusal as leaving: the anchor
-    /// holding anywhere makes every device a party to it. The revoked device un-enrolls itself
-    /// on its next read (`obeyRevocation`); meanwhile `roster().linked` already leaves it out.
+    /// The revoked device un-enrolls itself on its next read (`obeyRevocation`); meanwhile
+    /// `roster().linked` already leaves it out.
     @discardableResult
     static func revoke(_ id: String, anchorHoldsHere: Bool, now: Date) -> LeaveRefusal? {
         if let refusal = leaveRefusal(anchorHoldsHere: anchorHoldsHere, anchorHoldsOnLink: recordHolds(AnchorCloud.read(), now: now)) {
@@ -312,9 +283,8 @@ extension DeviceLink {
         return nil
     }
 
-    /// Whether another device has taken this one off the link since it joined, and if so,
-    /// leaves. Called by every read of the roster, so it happens in whichever process reads
-    /// first. Returns true when it left.
+    /// Leaves if another device has revoked this one since it joined. Called by every read of
+    /// the roster, so it happens in whichever process reads first. Returns true when it left.
     @discardableResult
     static func obeyRevocation() -> Bool {
         guard isEnrolled else { return false }
@@ -328,9 +298,8 @@ extension DeviceLink {
         return true
     }
 
-    /// The roster as iCloud has it. A device that never wrote an entry, or removed it, is not
-    /// in `devices`; a device whose entry cannot be decoded — written by a newer build with a
-    /// platform this one does not know — is left out rather than failing the whole read.
+    /// A device whose entry can't be decoded (written by a newer build with an unknown
+    /// platform) is left out rather than failing the whole read.
     static func roster() -> Roster {
         var roster = Roster()
         for key in AnchorCloud.keys(withPrefix: devicePrefix) {
@@ -344,12 +313,10 @@ extension DeviceLink {
         return roster
     }
 
-    /// The other devices on the link, from here. The list a Devices screen shows.
     static func others() -> [LinkedDevice] { roster().others(than: AnchorSync.deviceID) }
 
     // MARK: Additions: this device's sequence and what it has seen
 
-    /// The next sequence number for an addition this device publishes. One higher every call.
     static func nextAdditionSequence() -> Int {
         let next = SharedStore.defaults.integer(forKey: sequenceKey) + 1
         SharedStore.defaults.set(next, forKey: sequenceKey)
@@ -362,17 +329,16 @@ extension DeviceLink {
         set { SharedStore.defaults.set(newValue, forKey: watermarksKey) }
     }
 
-    /// Additions declined under Ask, by id, so a "Not this time" is not asked again on the
-    /// next read. Kept separately from the watermark: an addition still waiting for an answer
-    /// is below the watermark and not declined, which is what makes it still show.
+    /// Kept separately from the watermark: an addition still awaiting an answer is below the
+    /// watermark and not declined, which is what makes it still show.
     static var declined: Set<String> {
         get { Set(SharedStore.defaults.stringArray(forKey: declinedKey) ?? []) }
         set { SharedStore.defaults.set(Array(newValue).sorted(), forKey: declinedKey) }
     }
 
     #if DEBUG || TESTING_TOOLS
-    /// Forgets the link, for Reset everything: off the link, the name gone, the grandfather
-    /// question open again, and this device's entry and additions out of iCloud.
+    /// For Reset everything: off the link, name gone, grandfather question reopened, entry and
+    /// additions removed from iCloud.
     static func forget() {
         let id = AnchorSync.deviceID
         AnchorCloud.remove(key: deviceKey(id))

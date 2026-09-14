@@ -153,8 +153,7 @@ struct RecordStreakTests {
 
     @Test("a day with no entries does not break it")
     func aDayWithNoEntries() {
-        // Nothing at all on the 7th: the phone was off, or nothing happened. A spend is only
-        // ever written when it happens, so silence is not a spend.
+        // A spend is only ever written when it happens, so silence on the 7th is not a spend.
         let days = [key(6): day(), key(8): day()]
         #expect(Record.streak(days, upTo: at(8, 12), calendar: cal) == 3)
     }

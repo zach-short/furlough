@@ -1,13 +1,6 @@
 import SwiftUI
 
-/// What the app will not stop to explain while you are using it: what a rule means, why a
-/// change waits, and the one way out. Reached from the question mark beside the gear on Home.
-///
-/// Nine pages, one idea each, in the app's own voice, and all nine of them here rather than
-/// on the site — the pages are in `HelpTopics.swift`. Help is wanted at the moment the app is
-/// in the way, which is no time to be handed to a browser that may itself be shielded, and
-/// anything with a number in it reads the number out of the config rather than repeating the
-/// default, so a phone with a week-long delay is not told about 24 hours.
+// Topic pages themselves live in HelpTopics.swift.
 struct HelpView: View {
     @Environment(\.dismiss) private var dismiss
 
@@ -18,8 +11,6 @@ struct HelpView: View {
                     header
                     SectionLabel(text: "The rules")
                     rulesCard
-                    // Its own group rather than the first two rows of "Beyond the rules": the
-                    // Anchor is a half of the app, not an extra hung off the other half.
                     SectionLabel(text: "The Anchor")
                     anchorCard
                     SectionLabel(text: "Beyond the app")
@@ -47,9 +38,6 @@ struct HelpView: View {
         .presentationBackground(Ember.ground)
     }
 
-    /// Both halves in three sentences, so someone who reads nothing else knows there are two of
-    /// them. This used to describe rules alone, which left the Anchor to be discovered from a
-    /// card on Home by anyone who came here first.
     private var header: some View {
         VStack(alignment: .leading, spacing: 0) {
             Eyebrow(text: "Furlough", color: Ember.amber)
@@ -162,9 +150,8 @@ struct HelpView: View {
         .emberCard()
     }
 
-    /// The version in hand and what it was for, so the row says something before it is opened.
-    /// The plain sentence on a build `release-notes.json` has no entry for — a Debug build off a
-    /// branch mid-version is exactly that, and it should not claim to be a release.
+    // Falls back to a plain sentence when release-notes.json has no entry for this build
+    // (e.g. a Debug build mid-version) rather than claiming it's a release.
     private var whatsNewDetail: String {
         guard let current = ReleaseNotes.current() else { return "What changed, version by version" }
         return "\(current.version) · \(current.headline)"
@@ -173,8 +160,7 @@ struct HelpView: View {
 
 // MARK: - The pieces the pages are built from
 
-/// A symbol in the tile every other icon in the app wears: the proportions are `TokenTile`'s,
-/// so a help row and an app row read as the same list.
+// Proportions must match `TokenTile` so a help row reads as the same list as an app row.
 struct HelpTile: View {
     let symbol: String
     var size: CGFloat = 34
@@ -195,7 +181,6 @@ struct HelpTile: View {
     }
 }
 
-/// One topic on the hub: its mark, what it covers, and where it goes.
 struct HelpRow<Icon: View>: View {
     let title: String
     let detail: String
@@ -231,8 +216,6 @@ struct HelpRow<Icon: View>: View {
     }
 }
 
-/// The chrome every help page shares: the wall, the title in the bar, a display heading, the
-/// one paragraph that answers the question, and then the detail.
 struct HelpPage<Content: View>: View {
     let title: String
     let heading: String
@@ -278,8 +261,6 @@ struct HelpPage<Content: View>: View {
     }
 }
 
-/// A card of short points: the thing named, then what it does. The unit every help page is
-/// written in, so no page turns into an essay.
 struct HelpPoints: View {
     struct Point: Identifiable {
         let title: String
@@ -319,9 +300,7 @@ struct HelpPoints: View {
     }
 }
 
-/// A card of numbered steps, for the few places help has to be followed in order rather than
-/// read. The numeral is the one `AddWebsiteGuideView` draws, so a set of steps looks the same
-/// wherever the app gives them.
+// Numeral style must match `AddWebsiteGuideView`'s so numbered steps look the same everywhere.
 struct HelpSteps: View {
     struct Step: Identifiable {
         let title: String
@@ -371,7 +350,6 @@ struct HelpSteps: View {
     }
 }
 
-/// A paragraph with no card under it, for the one thing on a page that is not a list.
 struct HelpProse: View {
     let text: String
 

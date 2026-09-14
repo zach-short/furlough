@@ -1,9 +1,8 @@
 import Foundation
 import Testing
 
-/// A setup file coming back in. The whole of what is being held to here is one sentence: an
-/// import is a proposal, so a file can never be a shorter road to a loosening than the rule
-/// editor is — and nothing outside targets and the base delay travels at all.
+/// An import is a proposal: a file can never be a shorter road to a loosening than the rule
+/// editor is, and nothing outside targets and the base delay travels at all.
 @Suite("Importing a setup")
 struct ConfigImportTests {
     let now = at(8, 12, 0)
@@ -44,7 +43,7 @@ struct ConfigImportTests {
         )
     }
 
-    /// Chrome as this Mac has it today: open 5–7 PM, half an hour a day, and a hazard.
+    // 5–7 PM, 30 min/day, hazard.
     func chrome(id: UUID = UUID()) -> Target {
         Target(
             id: id,
@@ -57,7 +56,7 @@ struct ConfigImportTests {
         )
     }
 
-    /// The plan a Mac would make of `export` against `state`, matched the way the Mac matches.
+    // Matched the way the Mac actually matches, so this mirrors the real plan.
     func plan(_ export: ConfigExport, _ state: SharedState) -> ImportPlan {
         ConfigImport.plan(
             export,
@@ -90,7 +89,6 @@ struct ConfigImportTests {
         #expect(throws: ConfigImport.Refusal.fromTheFuture(version: 2)) { try ConfigImport.read(data) }
     }
 
-    /// A file too new to decode still has to say so as a version, not as a missing key.
     @Test("a file too new to even decode is still read as a version")
     func refusesUndecodableFuture() {
         let data = Data(#"{"version": 9, "shape": "nothing this build knows"}"#.utf8)
@@ -113,9 +111,7 @@ struct ConfigImportTests {
 
     // MARK: The one rule that matters
 
-    /// The attack the whole design exists to stop: export, open the JSON, raise the budget,
-    /// import. It has to come out the far side as a change that waits, exactly as typing the
-    /// same budget into the rule editor would.
+    // The attack this design exists to stop: export, edit the JSON, raise the budget, import.
     @Test("loosening a budget in a text editor still waits out the delay")
     func theBudgetAttack() {
         let target = chrome()
@@ -125,7 +121,7 @@ struct ConfigImportTests {
                                     rule: Rule(windows: [window(1020, 1140)], dailyBudgetMinutes: 1440))])
         let plan = plan(edited, before)
 
-        // Hazard on a 24-hour base waits four days, and the file cannot shorten that.
+        // Hazard on a 24-hour base: four days.
         let due = now.addingTimeInterval(96 * 3600)
         #expect(plan.queued.count == 1)
         #expect(plan.queued.first?.outcome == .queued(due))
@@ -151,8 +147,8 @@ struct ConfigImportTests {
         #expect(before.pending.isEmpty)
     }
 
-    /// One file, two targets, each judged on its own — Messages gets its rule now and YouTube
-    /// waits, rather than both waiting for the slower of them.
+    // Each target judged separately: news tightens now, YouTube waits, rather than both waiting
+    // for the slower of them.
     @Test("each target in a file is judged on its own")
     func eachTargetOnItsOwn() {
         let youTube = Target(
@@ -187,15 +183,15 @@ struct ConfigImportTests {
 
         #expect(plan.queued.count == 1)
         #expect(plan.queued.first?.subject == .tier)
-        // Waits out the tier it has today — hazard, four days — not the one it is moving to.
+        // Waits out today's tier (hazard, 4 days), not the one it's moving to.
         #expect(plan.queued.first?.outcome == .queued(now.addingTimeInterval(96 * 3600)))
 
         ConfigImport.apply(plan, to: &before, now: now)
         #expect(before.config.targets[0].utilityLevel == .hazard)
     }
 
-    /// The tier is read before the rule under it, so a file that raises a tier and loosens a
-    /// rule in one breath pays the longer wait — which is what saving the two by hand does.
+    // Tier is read before the rule under it, so raising both in one file pays the longer wait —
+    // matching what saving them by hand would do.
     @Test("a tier that lands now lengthens the wait on the rule beneath it")
     func tierLandsBeforeTheRuleItLengthens() {
         let target = Target(
@@ -211,7 +207,7 @@ struct ConfigImportTests {
 
         #expect(plan.immediate.map(\.subject) == [.tier])
         #expect(plan.queued.map(\.subject) == [.rule])
-        // Hazard's four days, not the one day the target had when the file was opened.
+        // Hazard's 4 days, not the 1 day the target had when the file was opened.
         #expect(plan.queued.first?.outcome == .queued(now.addingTimeInterval(96 * 3600)))
 
         ConfigImport.apply(plan, to: &before, now: now)
@@ -231,7 +227,7 @@ struct ConfigImportTests {
 
         var lowered = state([chrome()])
         let down = plan(file([], delayHours: 6), lowered)
-        // Chrome is a hazard, so the slowest wait on a 24-hour base is four days.
+        // Chrome (hazard) is the slowest wait on a 24-hour base: 4 days.
         #expect(down.queued.first?.outcome == .queued(now.addingTimeInterval(96 * 3600)))
         ConfigImport.apply(down, to: &lowered, now: now)
         #expect(lowered.config.loosenDelayHours == 24)
@@ -249,8 +245,7 @@ struct ConfigImportTests {
 
     // MARK: A fresh install
 
-    /// The case that actually matters, and it needs no path of its own: nothing here to
-    /// compare against, so everything is a tightening and lands at once.
+    // Nothing to compare against, so everything is a tightening and lands at once.
     @Test("a first import on a fresh install lands whole")
     func aFreshInstall() {
         var before = state([])
@@ -286,8 +281,8 @@ struct ConfigImportTests {
 
     // MARK: What may not travel
 
-    /// The mirror of the export's leak test. A hand-written file carrying the keys the export
-    /// leaves out must be read for its targets and ignored for the rest — quietly, not fatally.
+    // Mirrors the export's leak test: a hand-written file carrying extra keys must still read
+    // its targets and quietly ignore the rest.
     @Test("the anchor, the queue and today's usage are not read from a file")
     func nothingElseTravels() throws {
         let json = """
@@ -330,13 +325,11 @@ struct ConfigImportTests {
         ConfigImport.apply(plan(export, before), to: &before, now: now)
 
         #expect(before.config.anchor == anchorBefore)
-        // The file's runtime is not read in: what was spent and warned here today stands. The
-        // record does move — an import queues loosenings like any edit does, and the record
-        // counts them — so what the file could have set is compared field by field.
+        // Runtime isn't read from the file: today's spend/warned stand as they were.
         #expect(before.runtime.exhausted == runtimeBefore.exhausted)
         #expect(before.runtime.warned == runtimeBefore.warned)
         #expect(before.runtime.clock == runtimeBefore.clock)
-        // The file's own queue is not the device's: nothing it listed is waiting here.
+        // The file's own queue is not the device's.
         #expect(before.pending.allSatisfy { $0.effectiveAt > now })
         #expect(before.config.loosenDelayHours == 24)
     }
@@ -428,19 +421,18 @@ struct ConfigImportTests {
 
     // MARK: Applying
 
-    /// The review can be left open. Reading it is not serving the delay.
+    // Leaving the review open does not serve the delay.
     @Test("a queued change counts its wait from when the plan was made")
     func readingTheReviewServesNothing() {
         var before = state([chrome()])
         let plan = plan(file([exported(.app, "com.google.Chrome", rule: .unrestricted)]), before)
         let anHourLater = now.addingTimeInterval(3600)
         ConfigImport.apply(plan, to: &before, now: anHourLater)
-        // Four days from the moment the button was pressed, not from when the file was opened.
+        // 4 days from when the button was pressed, not when the file was opened.
         #expect(before.pending[0].effectiveAt == anHourLater.addingTimeInterval(96 * 3600))
     }
 
-    /// At most one change per target is ever in flight — the rule editor drops what was queued
-    /// rather than stacking on it, and an import is not allowed to be the one edit that does.
+    // At most one change per target is ever in flight; import must not be the one edit that stacks.
     @Test("an import replaces what was already queued for a target")
     func replacesRatherThanStacks() {
         let target = chrome()
@@ -473,10 +465,8 @@ struct ConfigImportTests {
 
     // MARK: Pressing the button twice
 
-    /// The one place import diverges from `assign`, and the reason the divergence is worth it:
-    /// a file is applied whole and is easy to press twice, and every press used to restart the
-    /// clock on every loosening in it. The activity log for 8 Sep 2026 has three of these
-    /// inside two minutes.
+    // A file is easy to press twice; every press used to restart the clock on every loosening
+    // in it (seen 3x within 2 min in the 8 Sep 2026 activity log).
     @Test("applying the same file twice does not push its loosenings further out")
     func pressingApplyTwiceCostsNothing() {
         var before = state([chrome()])
@@ -498,8 +488,7 @@ struct ConfigImportTests {
         #expect(before.pending[0].effectiveAt == landed)
     }
 
-    /// And the divergence stops there. Anything that differs in the least is a decision, and a
-    /// decision supersedes what was queued on the new clock, exactly as the rule editor does.
+    // Anything that differs at all is a decision, and supersedes what was queued on the new clock.
     @Test("a file that differs from what is queued still supersedes it on the new clock")
     func adifferentFileStillRestartsTheClock() {
         var before = state([chrome()])
@@ -520,8 +509,6 @@ struct ConfigImportTests {
 
     // MARK: What it says afterwards
 
-    /// Every other mutation ends in a sentence. An import that closed in silence was the one
-    /// change in the app that said nothing, and it is the largest one.
     @Test("the confirmation says what is in force now and when the rest lands")
     func whatItSaysAfterwards() {
         let plan = plan(
@@ -535,8 +522,7 @@ struct ConfigImportTests {
         #expect(said.hasPrefix("1 app or website is now managed and 1 loosening is waiting out the delay."))
         let when = try! #require(plan.lastEffectiveAt).formatted(date: .abbreviated, time: .shortened)
         #expect(said.hasSuffix("It takes effect \(when)."))
-        // The review's own sentence is the same shape in the future tense, and the two must not
-        // drift into two vocabularies for one import.
+        // The review's sentence is the same shape in future tense; the two must not drift apart.
         #expect(plan.headline.hasPrefix("1 app or website is new and 1 loosens your rules"))
     }
 
@@ -557,9 +543,6 @@ struct ConfigImportTests {
 
     // MARK: Where the file came from
 
-    /// Decoded since the first version and ignored by the UI until now. A setup file is worth
-    /// keeping and worth sending, so the one from March and the one from last night are the
-    /// same two lines in a Downloads folder.
     @Test("the plan carries when the file was written and by which build")
     func provenanceTravels() {
         let plan = plan(file([exported(.app, "com.google.Chrome")]), state([chrome()]))
@@ -578,8 +561,8 @@ struct ConfigImportTests {
         #expect(!same.canApply)
     }
 
-    /// An import iOS will not register is worse than one that does not happen: the rules land,
-    /// registration throws, `enforce` saves anyway, and nothing at all is monitored.
+    // Worse than not happening: rules land, registration throws, enforce saves anyway, and
+    // nothing is monitored.
     @Test("a plan over the ceiling cannot be applied even though it has changes")
     func overTheCeilingCannotBeApplied() {
         var plan = plan(file([exported(.app, "com.google.Chrome", rule: .unrestricted)]), state([chrome()]))

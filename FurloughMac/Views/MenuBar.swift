@@ -2,32 +2,20 @@ import AppKit
 import Foundation
 import SwiftUI
 
-/// The menu bar item: an hourglass, and the countdown while something is open.
-///
-/// AppKit rather than SwiftUI's `MenuBarExtra`, and not by preference. `MenuBarExtra` produces
-/// no visible status item on this Mac (macOS 26): an app whose entire body is
-/// `MenuBarExtra { Text("test") } label: { Image(systemName: "hourglass") }` shows nothing
-/// either and leaves the same four offscreen menu-bar-sized windows behind, so it was never
-/// anything our label was doing. HANDOFF step 3 has the trace. An `NSStatusItem` is in keeping
-/// anyway: the shield is already an `NSPanel` and the watchdog already `SMAppService`.
+// NSStatusItem, not SwiftUI's MenuBarExtra — MenuBarExtra shows no visible status item on
+// macOS 26 (see HANDOFF step 3).
 @MainActor
 final class MenuBarController: NSObject, NSMenuDelegate {
     private let model: MacModel
     private var item: NSStatusItem?
     private var timer: Timer?
-    /// The last glass drawn, the appearance it was drawn for, and the image the two made, so a
-    /// tick that changes nothing does not redraw the sand.
+    // Cached so an unchanged tick skips redraw.
     private var lastGlass: HourglassState?
     private var lastDark = true
     private var lastImage: NSImage?
-    /// The 120 × 160 drawing at menu bar height. Under 40 pt it draws its bolder chip form,
-    /// the same picture the 12 pt row chips wear, and it stays inside one menu bar slot.
+    // Under 40pt draws the bolder chip form (same as the 12pt row chips).
     private static let glassSize = NSSize(width: 13.5, height: 18)
-    /// The trend row. Wide enough for seven bars with their letters, short enough that the menu
-    /// still reads as a menu rather than as a window.
     private static let trendSize = NSSize(width: 210, height: 64)
-    /// How long to wait for macOS to place the item before giving up on saying where it went:
-    /// twenty tenths of a second. It is usually there within one or two.
     private static let placementAttempts = 20
     private static let placementRetry: TimeInterval = 0.1
 
@@ -36,7 +24,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         super.init()
     }
 
-    /// Puts the item in the menu bar. Idempotent, so a second call cannot leave two hourglasses.
+    // Idempotent — guards against a second status item.
     func install() {
         guard item == nil else { return }
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -46,12 +34,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         item.button?.imagePosition = .imageLeading
         self.item = item
         refresh()
-        // Deferred, because a status item's button frame is (0, 0, w, 0) until macOS lays it
-        // out — measuring at creation is what made this take a session to diagnose. One turn
-        // is not always enough either; `reportPlacement` waits for a frame worth reading.
+        // Deferred: a status item's button frame is (0,0,w,0) until macOS lays it out.
         DispatchQueue.main.async { MainActor.assumeIsolated { self.reportPlacement() } }
-        // The same shape as the enforcer's tick. Nothing counts down in the bar any more, but
-        // the glass still has to fill and empty as windows open and close.
         let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }
         }
@@ -60,29 +44,19 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         self.timer = timer
     }
 
-    /// The hourglass alone, at the sand level this moment has reached. Drawn from
-    /// `Policy.summary`, the same source the widget and the phone's hero read, so the three
-    /// cannot disagree — and it is Furlough's own hourglass rather than an SF Symbol of one.
-    /// ActivityKit does not exist here, so this item is the Mac's Live Activity, and like that
-    /// one it is a still: a new one whenever the picture would differ.
-    ///
-    /// Icon only, and that is the point: with the countdown beside it the item was about 85
-    /// points wide, and on a notched Mac whose menu bar is full macOS pushes an item that big
-    /// under the notch, where it cannot be seen at all. At 27 points it takes one slot. The
-    /// countdown moved to the top of the menu, one click away.
+    // Icon only — a wider item (with countdown) gets pushed under the notch on a full menu
+    // bar and is invisible. The countdown lives at the top of the menu instead.
     private func refresh() {
         guard let button = item?.button else { return }
         let now = model.clock.now
         let summary = Policy.summary(state: model.state, now: now)
         var state = HourglassState.of(summary, now: now)
-        // Rounded to fortieths first: finer than a pixel at this size, so the sand still
-        // visibly drains through a window without a redraw every second.
+        // Rounded to 1/40 — finer than a pixel at this size, avoids per-second redraws while
+        // still animating.
         state.sandLevel = (state.sandLevel * 40).rounded() / 40
         state.moundLevel = (state.moundLevel * 40).rounded() / 40
-        // The glass is drawn in cream and white, for the app's dark room. A menu bar is not
-        // always dark — it follows the desktop picture as much as the system theme — so on a
-        // light one it is drawn in ink instead, which keeps the sand and the status colour
-        // rather than falling back to a silhouette that reads as a smudge at this size.
+        // Menu bar theme follows the desktop picture, not just system appearance — draw in
+        // ink on light so the glass isn't a smudge.
         let isDark = button.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
         if state != lastGlass || isDark != lastDark || lastImage == nil {
             lastGlass = state
@@ -92,20 +66,17 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                 state, onDark: isDark,
                 label: isOpen ? "Furlough, something is open" : "Furlough"
             )
-            // A Mac that will not render the view still gets an hourglass, not a blank item.
             lastImage = lastImage ?? NSImage(systemSymbolName: "hourglass", accessibilityDescription: "Furlough")
         }
         button.image = lastImage
     }
 
-    /// One frame of the drawing as an image, in the glass that suits the ground it will sit on.
-    /// Never a template image: the sand and the glow carry the status, and a template would
-    /// flatten them into one colour.
+    // Never isTemplate: AppKit would flatten the colored sand/glow to one tint.
     private static func still(_ state: HourglassState, onDark: Bool = true, label: String = "Furlough") -> NSImage? {
         var state = state
         if !onDark {
             state.glass = .ink
-            // The glow is a soft halo for a dark room; on a light one it is a smudge.
+            // Glow reads as a smudge on a light background.
             state.glow = nil
         }
         let renderer = ImageRenderer(
@@ -120,25 +91,11 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         return image
     }
 
-    /// Says where macOS actually put the item, because not being able to see it is otherwise
-    /// a silent failure with no error anywhere.
-    ///
-    /// A full menu bar on a notched Mac does not drop the overflow, it places it *under the
-    /// camera housing*, where `isVisible` is `true`, the frame is real, and nothing is on
-    /// screen. The screen's two auxiliary areas are the usable strips either side of the notch,
-    /// so an item intersecting neither is behind it.
-    ///
-    /// The catch is that the frame arrives late. macOS places the item's window a few turns
-    /// after the item is made, and until it does the frame reads (0, 0, w, 0) — which sits at
-    /// the bottom of the screen, intersects neither strip, and so is indistinguishable from an
-    /// item under the notch. Asking once, a turn after install, is why this warned about a
-    /// perfectly visible hourglass on some launches and not others. So it waits for a frame
-    /// that has been laid out, and a frame that never comes says nothing at all rather than
-    /// something wrong.
+    // A full menu bar pushes overflow items under the notch — isVisible true, frame real, but
+    // invisible. The frame also stays (0,0,w,0) for a few run-loop turns after creation, so
+    // this polls until it's actually laid out before judging visibility.
     private func reportPlacement(attempt: Int = 0) {
         let frame = item?.button?.window?.frame ?? .zero
-        // An unplaced item has no height and sits at the origin; a placed one is up in the
-        // menu bar. Either test alone would do, together they cannot be fooled.
         guard frame.height > 0, frame.origin.y > 0 else {
             guard attempt < Self.placementAttempts else { return }
             DispatchQueue.main.asyncAfter(deadline: .now() + Self.placementRetry) {
@@ -146,9 +103,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             }
             return
         }
-        // The screen the item actually landed on, not whichever one is frontmost: on a Mac
-        // driving an external display the menu bar may be over there, and that screen has no
-        // notch and so no auxiliary areas to miss.
+        // Use the screen the item landed on, not NSScreen.main — an external display's menu
+        // bar has no notch.
         guard let screen = NSScreen.screens.first(where: { $0.frame.intersects(frame) }) ?? NSScreen.main
         else { return }
         let beside = [screen.auxiliaryTopLeftArea, screen.auxiliaryTopRightArea].compactMap { $0 }
@@ -166,12 +122,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         }
     }
 
-    /// Rebuilt every time it opens, so the statuses are current rather than as of install.
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
         let now = model.clock.now
-        // The countdown the item used to carry. It does not tick — a menu is built when it
-        // opens and then stands still — but it is right at the moment it is read.
+        // Built once per opening — NSMenu content doesn't tick live once shown.
         if let until = Policy.summary(state: model.state, now: now).openUntil {
             menu.addItem(disabled("\(TimeFormat.countdown(from: now, to: until)) left"))
             menu.addItem(.separator())
@@ -185,9 +139,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                 of: target, config: model.state.config, runtime: model.state.runtime, now: now
             )
             let row = disabled("\(target.displayName): \(TimeFormat.status(status))")
-            // The phone's row chip: the same glass in the same status colour beside the name.
-            // A menu is drawn in the system's appearance, not the bar's, so it is asked rather
-            // than the bar; on a light one the glass goes in as a template, as the item does.
+            // A menu draws in the system's appearance, not the bar's — ask NSApp, not the button.
             let onDark = NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
             row.image = Self.still(
                 HourglassState.of(target, status: status, runtime: model.state.runtime, now: now),
@@ -208,19 +160,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         menu.addItem(open)
     }
 
-    /// The week as seven bars, or nil when there is no week yet — a Mac that has held nothing
-    /// shut gets the menu it has always had rather than a row of empty sticks.
-    ///
-    /// A hosted SwiftUI view rather than a rendered image, unlike the glasses above: those are
-    /// images because an `NSStatusItem`'s button takes one, and a menu item takes a view. The
-    /// view is built here and drawn by AppKit when the menu appears, so `menuNeedsUpdate` pays
-    /// for construction and nothing else.
-    ///
-    /// Which is the question worth answering before putting a chart in a menu at all, since a
-    /// menu that takes a visible beat to open is worse than the one that was there. Measured on
-    /// this Mac, 20 runs each after a warm-up: **0.17 ms** to read the week and build this
-    /// section, against **2.1 ms** to render one hourglass image — and the menu already renders
-    /// one of those for every target row. The chart is the cheapest thing in the rebuild.
+    // NSMenuItem can host a view directly (unlike NSStatusItem's button, which needs an image).
     private func trendItem(now: Date) -> NSMenuItem? {
         let bars = Record.week(model.state.runtime.days, upTo: now)
         guard bars.contains(where: { $0.shieldedMinutes > 0 }) else { return nil }
@@ -237,24 +177,16 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         return item
     }
 
-    /// The way to the window from the menu bar, where Furlough otherwise sits with none.
     @objc private func openFurlough() {
         MacAppDelegate.showWindow()
     }
 }
 
-/// Seven days of held-shut time, as a bar each, for the menu bar's dropdown.
-///
-/// Hand-rolled rather than Swift Charts: seven rectangles need no framework, and a menu that
-/// has to link one to draw them is a dependency bought for a row. It reads `Record.week`, which
-/// is pure and tested, and it accumulates nothing of its own.
-///
-/// Drawn for both appearances. A menu follows the system's theme rather than the menu bar's, so
-/// the ink here is the system's label colour, the way an ordinary menu item's is, rather than
-/// Furlough's cream — which on a light menu would be a bar with nothing in it.
+// Hand-rolled rather than Swift Charts — seven rects don't need a framework dependency.
+// Uses system label/secondary colors, not Furlough's cream: menus follow system appearance,
+// not the bar's.
 struct MenuTrend: View {
     var bars: [Record.DayBar]
-    /// Today's letters, so the strip reads in the reader's own locale.
     private var letters: [String] { Calendar.current.veryShortWeekdaySymbols }
 
     var body: some View {
@@ -262,10 +194,6 @@ struct MenuTrend: View {
             HStack(alignment: .bottom, spacing: 10) {
                 ForEach(bars) { bar in
                     VStack(spacing: 4) {
-                        // The whole column is drawn, so the empty part of a quiet day is still a
-                        // place rather than a gap: the bar grows inside a track. A day that held
-                        // something for a minute still gets a visible stub, because "almost
-                        // nothing" and "nothing" are different answers.
                         Capsule(style: .continuous)
                             .fill(Color.primary.opacity(0.09))
                             .frame(width: 12, height: 30)
@@ -294,8 +222,6 @@ struct MenuTrend: View {
         return letters.indices.contains(index) ? letters[index] : ""
     }
 
-    /// The same sentence the sidebar's card gives the week, so the menu cannot word it
-    /// differently — the seven days here are the seven days there.
     private var total: String {
         let minutes = bars.reduce(0) { $0 + $1.shieldedMinutes }
         return minutes > 0 ? "\(TimeFormat.budget(minutes)) in seven days" : "Nothing held shut"

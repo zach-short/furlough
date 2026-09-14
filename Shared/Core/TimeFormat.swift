@@ -1,8 +1,7 @@
 import Foundation
 
 enum TimeFormat {
-    /// Every date here is rendered through the calendar it was given, so a pinned calendar
-    /// pins the time zone and the locale too and the output does not depend on the machine.
+    /// Uses the given calendar's own locale/time zone, so output never depends on the machine's.
     private static func style(
         _ calendar: Calendar,
         date: Date.FormatStyle.DateStyle? = nil,
@@ -23,20 +22,17 @@ enum TimeFormat {
             .formatted(style(calendar, date: .omitted, time: .shortened))
     }
 
-    /// "8 PM", "8:30 PM", "12 AM" for midnight either end; follows the locale's clock.
     static func shortMinute(_ minute: Int, calendar: Calendar = .current) -> String {
         let wrapped = minute % Furlough.minutesPerDay
         let date = Policy.date(atMinute: wrapped, of: .now, calendar: calendar)
-        // A whole hour drops its minutes: "8 PM" rather than "8:00 PM", which is how it is said.
-        // Never on a 24-hour clock, where the same style leaves "09" — a number, not a time, and
-        // "Open 09 to 22" is not a sentence anybody writes.
+        // Drop minutes on the hour ("8 PM"), but never on a 24-hour clock, where that leaves a
+        // bare "09" instead of a time.
         if wrapped % 60 == 0, !isTwentyFourHour(calendar) {
             return date.formatted(style(calendar).hour(.defaultDigits(amPM: .abbreviated)))
         }
         return date.formatted(style(calendar).hour(.defaultDigits(amPM: .abbreviated)).minute())
     }
 
-    /// Whether this calendar's locale counts the hours to 23 rather than to 12.
     private static func isTwentyFourHour(_ calendar: Calendar) -> Bool {
         switch (calendar.locale ?? .autoupdatingCurrent).hourCycle {
         case .zeroToTwentyThree, .oneToTwentyFour: true
@@ -44,22 +40,17 @@ enum TimeFormat {
         }
     }
 
-    /// A time of day read off a date, for the places that already hold one rather than a
-    /// minute of the day: `Policy.Summary` carries Dates, and the spoken status is built from it.
     static func clock(_ date: Date, calendar: Calendar = .current) -> String {
         date.formatted(style(calendar, date: .omitted, time: .shortened))
     }
 
-    /// When an open window ends. 1440 is midnight tonight; past it is a night's morning, so
-    /// 1680 is 4:00 AM tomorrow. Anything less is an ordinary time today.
+    /// Minutes past 1440 (midnight) are a night's morning, e.g. 1680 == 4:00 AM tomorrow.
     static func until(_ minute: Int, calendar: Calendar = .current) -> String {
         minute > Furlough.minutesPerDay
             ? self.minute(minute - Furlough.minutesPerDay, calendar: calendar)
             : self.minute(minute, calendar: calendar)
     }
 
-    /// A day as a date rather than a time: "Sep 16". For the few things that are days away
-    /// rather than hours — the date the first week ends on.
     static func day(_ date: Date, calendar: Calendar = .current) -> String {
         date.formatted(style(calendar).month(.abbreviated).day())
     }
@@ -68,9 +59,8 @@ enum TimeFormat {
         "\(minute(window.startMinute, calendar: calendar))–\(minute(window.endMinute, calendar: calendar))"
     }
 
-    /// An hour on the clock as it is said out loud: "midnight", "noon", "7 PM". A suggestion
-    /// is made of whole hours, so it never needs the minutes `minute` prints, and "7 PM to
-    /// 4 AM" is what a person reads without stopping.
+    /// An hour said out loud: "midnight", "noon", "7 PM" — no minutes, since a suggestion is
+    /// always whole hours.
     static func hour(_ minute: Int, calendar: Calendar = .current) -> String {
         let wrapped = ((minute % Furlough.minutesPerDay) + Furlough.minutesPerDay) % Furlough.minutesPerDay
         if wrapped == 0 { return "midnight" }
@@ -78,15 +68,12 @@ enum TimeFormat {
         return shortMinute(wrapped, calendar: calendar)
     }
 
-    /// A stretch of the day the way it is spoken: "7 PM to 4 AM", "10 PM to midnight". Reads a
-    /// night as the one span it is, because a suggestion draws it as one band.
     static func span(_ window: TimeWindow, calendar: Calendar = .current) -> String {
         "\(hour(window.startMinute, calendar: calendar)) to \(hour(window.endMinute, calendar: calendar))"
     }
 
-    /// Days as they follow a time in a sentence: "every day", "on weekdays", "on Mon–Thu". The
-    /// three group words are ordinary words and read lowercase mid-sentence; day names are
-    /// names, and keep their capitals.
+    /// The three group words ("every day", "on weekdays") stay lowercase mid-sentence; day
+    /// names keep their capitals.
     static func onDays(_ group: Weekdays, calendar: Calendar = .current) -> String {
         if group == .all { return "every day" }
         if group == .weekdays { return "on weekdays" }
@@ -104,8 +91,7 @@ enum TimeFormat {
         return "\(minutes) min"
     }
 
-    /// The days as they read inside a sentence. "Weekdays", "weekends" and "every day" are
-    /// ordinary words and lose their capital there; "Mon–Thu" is a list of names and keeps its.
+    /// "Weekdays"/"weekends"/"every day" lowercase inline; a name list like "Mon–Thu" keeps its.
     static func daysInline(_ days: Weekdays, calendar: Calendar = .current) -> String {
         let named = self.days(days, calendar: calendar)
         switch days {
@@ -114,11 +100,8 @@ enum TimeFormat {
         }
     }
 
-    /// The week's budgets in one phrase: "30 min/day" while one figure covers it,
-    /// "30 min weekdays, 2 h weekends" when two do, and "varies by day" once it would take
-    /// three clauses to say — a row has room for a phrase, not for a table, and the editor is
-    /// where the seven figures belong. Nil when no day has a real limit, so a caller can leave
-    /// the budget out of the line entirely.
+    /// The week's budgets in one phrase, collapsing to "varies by day" past two distinct
+    /// figures. Nil when no day has a real limit, so a caller can leave the budget out entirely.
     static func budgets(_ rule: Rule, calendar: Calendar = .current) -> String? {
         var groups: [(days: Weekdays, minutes: Int)] = []
         for weekday in 1...7 {
@@ -141,8 +124,6 @@ enum TimeFormat {
             .joined(separator: ", ")
     }
 
-    /// The anchor's drop times, earliest in the day first: "10:00 PM weekdays, lifts 7:00 AM ·
-    /// 11:00 PM weekends, until the tag". "No scheduled drops" when there are none.
     static func anchorSchedules(_ schedules: [AnchorSchedule], calendar: Calendar = .current) -> String {
         guard !schedules.isEmpty else { return "No scheduled drops" }
         return schedules
@@ -155,7 +136,6 @@ enum TimeFormat {
             .joined(separator: " · ")
     }
 
-    /// `days` in the middle of a sentence: the three named groups lose their capital.
     private static func anchorDays(_ days: Weekdays, calendar: Calendar) -> String {
         switch days {
         case .all: "every day"
@@ -165,7 +145,6 @@ enum TimeFormat {
         }
     }
 
-    /// "Every day", "Weekdays", "Weekends", or the days compressed into runs: "Mon–Thu, Sat".
     static func days(_ days: Weekdays, calendar: Calendar = .current) -> String {
         if days == .all { return "Every day" }
         if days == .weekdays { return "Weekdays" }
@@ -191,10 +170,8 @@ enum TimeFormat {
         }.joined(separator: ", ")
     }
 
-    /// The whole week's windows: one list when they are the same every day, else one clause
-    /// per group of days, broader groups first: "Every day 8:00 PM–midnight · Sat, Sun 12:00 AM–2:00 AM".
-    /// A night stored as its two halves is read back as the one span it is, so a rule reads the
-    /// way it was written: "Weekends 5:00 PM–4:00 AM", not an evening and a morning apart.
+    /// A night stored as two halves (`TimeWindow.folded`) is read back as one span, so a rule
+    /// reads the way it was written rather than as an evening and a morning apart.
     static func schedule(_ rule: Rule, calendar: Calendar = .current) -> String {
         if rule.isAllDay { return "All day" }
         let listed = TimeWindow.folded(rule.windows)
@@ -226,7 +203,6 @@ enum TimeFormat {
         return "\(hours) · \(limit)"
     }
 
-    /// The name of the day `daysAhead` days from now.
     static func weekdayName(
         daysAhead: Int,
         abbreviated: Bool = false,
@@ -248,7 +224,6 @@ enum TimeFormat {
         }
     }
 
-    /// The short form for a row's status chip: a time today or tomorrow, else the day.
     static func chip(_ next: NextOpen, from now: Date = .now, calendar: Calendar = .current) -> String {
         if next.isMidnight { return "midnight" }
         if next.daysAhead <= 1 { return minute(next.minuteOfDay, calendar: calendar) }
@@ -271,7 +246,6 @@ enum TimeFormat {
         }
     }
 
-    /// A ticking countdown: "1:12:08" with hours, "12:08" under an hour. Never negative.
     static func countdown(from now: Date, to end: Date) -> String {
         let total = max(0, Int(end.timeIntervalSince(now).rounded(.down)))
         let hours = total / 3600
@@ -304,8 +278,7 @@ enum ShieldText {
         guard let status else {
             return ("Blocked by Furlough", "This is part of a blocked category.")
         }
-        // Today's, because the shield is read today. "You used your 30 min" over an app that
-        // gets two hours tomorrow would be true of the wrong day.
+        // Today's budget, not the rule's general one — the shield is read today.
         let budget = rule.map { TimeFormat.budget($0.budget(on: Policy.weekday(now, calendar: calendar))) } ?? ""
         switch status {
         case .anchored:
@@ -320,9 +293,7 @@ enum ShieldText {
             let when = next.map { "Opens \(TimeFormat.nextOpen($0, calendar: calendar))." } ?? ""
             return ("Time's up for today", "You used your \(budget) for \(name). \(when)")
         case .closed(let next):
-            // The budget of the day it opens on, which is the one being promised. Today's would
-            // be a stranger figure still on a day the rule shuts out entirely, where today's is
-            // zero and the door is opening on two hours.
+            // Budget of the day it opens on, not today's — today may be a day the rule shuts out entirely.
             let opens = rule.map {
                 TimeFormat.budget($0.budget(on: Policy.weekday(Policy.date(at: next, from: now, calendar: calendar), calendar: calendar)))
             } ?? ""

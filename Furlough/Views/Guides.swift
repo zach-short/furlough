@@ -1,20 +1,12 @@
 import SwiftUI
 
-/// The phone's two guides: the steps themselves, and the card that draws them.
-///
-/// The shape they are built in — three steps, one live, the rest dimmed — is `HalfGuide` in
-/// Shared/Core, because the Mac draws the same card from the same struct. What is here is the
-/// phone's own three of each, which are not shared: the first Rules step changes its words with
-/// Screen Time data access, and the Anchor's first step is a tag this Mac has no reader for.
+/// `HalfGuide` itself lives in Shared/Core and is reused by the Mac; these are the phone's own
+/// three steps per half (not shared), since wording differs by platform capability.
 extension HalfGuide {
     // MARK: The two guides
 
-    /// Pick the apps, give the first one a rule, read the list.
-    ///
-    /// `hasUsageNumbers` only changes the first step's words and its button: where Furlough can
-    /// read Screen Time itself, the shortest way to a good first rule is the fortnight it just
-    /// read, and where it cannot, that tour is a thing to find in Settings rather than the first
-    /// wall a new person meets. See `AppModel.considerUsageStep`.
+    /// `hasUsageNumbers` only changes step one's wording and button; see
+    /// `AppModel.considerUsageStep`.
     static func rules(config: Config, hasUsageNumbers: Bool, finished: Bool) -> HalfGuide {
         HalfGuide(half: .rules, steps: [
             Step(
@@ -28,10 +20,7 @@ extension HalfGuide {
                 title: "Give the first one a rule",
                 detail: "A minute budget, and allowed windows if you want them — the same every day, or different at weekends.",
                 footnote: "Adding an app enforces nothing on its own. Saving its first rule is what starts it.",
-                // What step one actually picked up, in icons. Most of these arrive from the
-                // fortnight's Apply button, which folds its card the moment it is pressed and
-                // then sends you here; without this the next thing you see says nothing at all
-                // about what you just agreed to.
+                // Shows what the usage flow's Apply already added, since that flow lands here right after.
                 kinds: config.targets.map(\.kind),
                 isDone: config.targets.contains { $0.rule != nil }
             ),
@@ -44,11 +33,6 @@ extension HalfGuide {
         ])
     }
 
-    /// Pair a tag, choose what it holds, drop it.
-    ///
-    /// The tag comes first because nothing can drop without a key, because the reader only works
-    /// with the app in front of you, and because someone arriving from another blocking product
-    /// already has one in their hand.
     static func anchor(config: Config, finished: Bool) -> HalfGuide {
         let anchor = config.anchor
         return HalfGuide(half: .anchor, steps: [
@@ -61,19 +45,14 @@ extension HalfGuide {
                 title: "Choose what it holds",
                 detail: "A list you lock, or the whole phone with a few apps left open.",
                 footnote: "No delay applies to the Anchor. Dropping it only ever takes things away.",
-                // The list itself, so the step that is about a list shows one. The fortnight's
-                // cards add to it from a screen away, and this is where that lands.
+                // Reflects what the usage flow already added to the Anchor's list.
                 kinds: anchor.kinds,
                 isDone: anchor.hasSomethingToHold
             ),
             Step(
                 title: "Drop it",
-                // Before anything is chosen `heldDescription` counts an empty list — "0 items" —
-                // which is a true sentence about a step that has not happened and a poor one to
-                // read two steps ahead of it.
-                // "\(heldDescription) goes out of reach" reads wrong half the time — a count
-                // takes a plural verb and "Everything except 3" a singular one. Naming the thing
-                // after the colon sidesteps the agreement rather than picking a verb per scope.
+                // Phrased as "Out of reach: X" rather than "X goes out of reach" to dodge
+                // subject-verb agreement between singular/plural forms of heldDescription.
                 detail: anchor.hasSomethingToHold
                     ? "One tap, from here or from the widget. Out of reach: \(anchor.heldDescription)."
                     : "One tap, from here or from the widget, and what you chose goes out of reach.",
@@ -84,11 +63,7 @@ extension HalfGuide {
     }
 }
 
-/// The checklist: three steps, the live one carrying the only button, the rest dimmed.
-///
-/// The caller supplies the button, because each step's is a different thing — Apple's picker, a
-/// push into the editor, an NFC reader, the Anchor button itself — and a card that owned them
-/// all would have to know about every one of those.
+/// Caller supplies the button since each step's action differs (picker, push, NFC reader, etc.).
 struct GuideCard<Action: View>: View {
     let guide: HalfGuide
     @ViewBuilder var action: Action
@@ -118,8 +93,6 @@ struct GuideCard<Action: View>: View {
     }
 }
 
-/// One row of the checklist: its number or its tick, its words, and — on the live one — the
-/// button and nothing else on the card.
 private struct GuideStepRow<Action: View>: View {
     let number: Int
     let step: HalfGuide.Step
@@ -159,12 +132,8 @@ private struct GuideStepRow<Action: View>: View {
         .accessibilityLabel("Step \(number). \(step.title). \(step.isDone ? "Done" : (isLive ? "Now" : "Not yet"))")
     }
 
-    /// Done and not-yet look different from live in the same way: they are not what you are
-    /// being asked to do. A tick is still legible at this opacity; a dim number is the point.
-    ///
-    /// Carried by the marker and the words rather than by the row, because what the step has to
-    /// show for itself is the one thing on it that must not go dim: the icons are there to say
-    /// an app landed, and a step showing them is nearly always a step already done.
+    /// Applied to the marker/text only, not the icon evidence row — icons should stay legible
+    /// even when dimmed.
     private var dimmed: Double { isLive ? 1 : 0.55 }
 
     private var marker: some View {
@@ -187,17 +156,8 @@ private struct GuideStepRow<Action: View>: View {
     }
 }
 
-/// What a step has to show for itself, in Apple's own icons: the apps picked, the list the
-/// anchor holds.
-///
-/// The checklist is where somebody arrives back from the fortnight, and the fortnight's Apply
-/// button folds its card and moves on — so without this, the screen you land on after agreeing
-/// to three suggestions says nothing about the three. Icons rather than a count, because the
-/// question being asked is "did TikTok go through", and a count cannot answer it.
-///
-/// Six, then a number: the same six across the Anchor's own grid uses, and few enough that the
-/// strip still fits beside a step number on the narrowest phone. It is feedback inside a
-/// checklist row and must not turn into the list itself, which is a scroll away on either half.
+/// Icons, not a count — answers "did X go through". Shows up to 6 (matches the Anchor's own
+/// grid) then an overflow count.
 struct GuideStepEvidence: View {
     let kinds: [TargetKind]
     private static let shown = 6
@@ -228,9 +188,7 @@ struct GuideStepEvidence: View {
     }
 }
 
-/// The words inside a live step's button. Its own view because half of these buttons are
-/// `NavigationLink`s — a step whose action is a push should not have to be a second kind of
-/// button to say so.
+/// Separate from `Button` since some steps use `NavigationLink` instead.
 struct GuideButtonLabel: View {
     let title: String
     var systemImage: String?
@@ -247,8 +205,6 @@ struct GuideButtonLabel: View {
     }
 }
 
-/// The one button a live step gets: ember and filled, sized to its words rather than to the
-/// card, so a checklist never looks like three things to press.
 struct GuideButton: View {
     let title: String
     var systemImage: String?
@@ -263,7 +219,6 @@ struct GuideButton: View {
 }
 
 extension View {
-    /// The live step's button, however it is spelled — a `Button` or a `NavigationLink`.
     func guideButton() -> some View {
         buttonStyle(.glassProminent).tint(Ember.ember)
     }

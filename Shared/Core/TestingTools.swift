@@ -3,31 +3,16 @@ import Foundation
 #if DEBUG || TESTING_TOOLS
 /// The switch behind Settings > Testing — the buttons that forget the whole setup.
 ///
-/// There are two locks on those buttons and both have to be open.
-///
-/// The compiler is the first. This file, `resetEverything` on both models, and the sections that
-/// call it are all inside `#if DEBUG || TESTING_TOOLS`, so a plain Release build does not carry
-/// any of it: that is what `scripts/archive.sh` proves against the archived binary before it will
-/// ship, and it is the promise the app makes in onboarding and in Settings. A Release build that
-/// does carry them has to be asked for, by name:
-///
-///     TESTING_TOOLS=1 scripts/archive.sh                                    the phone
-///     xcodebuild -project Furlough.xcodeproj -scheme FurloughMac \
-///       -configuration Release -derivedDataPath build/mac \
-///       SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) TESTING_TOOLS'    the Mac
-///
-/// This switch is the second, and it is the one that matters once a build is out. TestFlight and
-/// the App Store are the same binary — a build is promoted, not rebuilt — so nothing decided at
-/// compile time can tell a tester's copy from a customer's. So a build that carries the buttons
-/// still keeps them put away: the Testing section shows only once it has been asked for, by
-/// clicking the Version row in About five times, and "Hide these buttons" puts it back. A Debug
-/// build starts shown, because that is where the reset button is used every day.
+/// Two gates: the compiler excludes this whole file (and `resetEverything`) from a plain Release
+/// build via `#if DEBUG || TESTING_TOOLS` — `scripts/archive.sh` verifies that against the
+/// archived binary, and an opt-in Release build needs `TESTING_TOOLS=1`/the matching Xcode flag.
+/// Even a build that carries the code keeps it hidden until five clicks on the Version row unlock
+/// it, because TestFlight and the App Store ship the same binary, so nothing at compile time can
+/// tell a tester's copy from a customer's. Debug builds start shown.
 enum TestingTools {
-    /// Beside the state in the App Group rather than in it, so `resetEverything` cannot switch
-    /// off the section the button that was just pressed lives in.
+    /// Outside the App Group state so `resetEverything` can't hide the button that triggered it.
     private static let key = "furlough.testing.shown"
 
-    /// Clicks on the Version row that ask for the section. Enough that nobody arrives by accident.
     private static let clicksToShow = 5
 
     #if DEBUG
@@ -36,7 +21,6 @@ enum TestingTools {
     private static let startsShown = false
     #endif
 
-    /// Whether the Testing section is showing.
     static var isShown: Bool {
         get { SharedStore.defaults.object(forKey: key) as? Bool ?? startsShown }
         set {
@@ -45,8 +29,7 @@ enum TestingTools {
         }
     }
 
-    /// Counts a click on the Version row. Returns true on the click that opens the section, so
-    /// the screen that took the click can say something; the count is not kept across launches.
+    /// True only on the click that opens the section; the count does not persist across launches.
     @MainActor
     static func noteVersionClick() -> Bool {
         guard !isShown else { return false }

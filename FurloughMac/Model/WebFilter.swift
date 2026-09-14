@@ -8,16 +8,13 @@ import SystemExtensions
 /// The app's side of the web filter: installs the system extension, keeps its filter
 /// configuration on, pushes it the hosts to block, and listens for what it drops.
 ///
-/// The extension itself is `FurloughMacFilter`, and every decision it makes is `FlowRules`,
-/// which is pure and tested. This file is the plumbing between the two, and the one place the
-/// app finds out whether the filter is actually running — macOS can switch it off in System
-/// Settings without telling anyone, and Settings > Web is where that has to show.
+/// macOS can switch the extension off in System Settings without telling anyone; this is the
+/// one place the app finds out whether it's actually running.
 @MainActor
 @Observable
 final class WebFilter {
     enum Status: Equatable {
-        /// A system extension only loads from an app inside /Applications, so a build run from
-        /// anywhere else cannot install it.
+        /// A system extension only loads from an app inside /Applications.
         case notInApplications
         case notInstalled
         case installing
@@ -29,10 +26,8 @@ final class WebFilter {
         /// nothing. Turning it on again asks macOS's "filter network content" question again.
         case filterOff
         case on
-        /// The extension is installed and switched on, and macOS refused the *second* question
-        /// — the one that lets it see traffic. A different failure from `failed` and the one
-        /// that reads most like a lie if they are conflated: System Settings shows the toggle
-        /// on, so telling somebody nothing was ever asked of them is plainly false.
+        /// The extension is on, but macOS refused the *second* question — the one that lets it
+        /// see traffic. Distinct from `failed`: the toggle shows on in System Settings here.
         case filterDenied(String, prompted: Bool)
         case failed(String)
 
@@ -54,19 +49,9 @@ final class WebFilter {
 
         /// What to do next: one action at a time, in the order it has to be done.
         ///
-        /// Onboarding and Settings > Web both draw these rather than wording it twice, because
-        /// this is the copy that had to be right and was not. Two rounds of it on 2026-09-09:
-        /// first a single sentence — "allow it under System Settings > General > Login Items &
-        /// Extensions > Network Extensions" — which sent Zach to a page listing Furlough twice
-        /// under *other* headings; then a six-line list that still missed the step that actually
-        /// hid the row. **Network Extensions exists only under By Category.** Under By App, the
-        /// segment macOS may well open on, there is no such row at all — there is a Furlough
-        /// entry, which is not the same thing and leads nowhere. That is step 4, and it is the
-        /// whole reason this walkthrough shows one step at a time instead of a list to skim.
-        ///
-        /// `failed` says the opposite of all of it on purpose: when the activation is refused
-        /// nothing was ever asked of the person, and sending them into System Settings to hunt
-        /// for a prompt that was never made is the worst thing this screen can do.
+        /// Network Extensions exists only under System Settings' By Category view — under By
+        /// App (which may open by default) there is only a plain Furlough entry that leads
+        /// nowhere. See step 4 below.
         var guidance: Guidance {
             switch self {
             case .notInApplications:
@@ -136,9 +121,8 @@ final class WebFilter {
             }
         }
 
-        /// The walk through System Settings. One action each, because every one of them is a
-        /// place to go wrong: the row is below a list that looks like the end of the page, and
-        /// then it is behind a segmented control that may not be on the half you are looking at.
+        /// One step at a time: the row is easy to miss below a list that looks complete, then
+        /// behind a segmented control that may default to the wrong half.
         private static func approvalSteps(verb: String) -> [Guidance.Step] {
             [
                 Guidance.Step(text: "Open System Settings.", figure: .systemSettings, action: .openSystemSettings),
@@ -160,42 +144,32 @@ final class WebFilter {
         }
     }
 
-    /// One state's directions: a line saying where you stand, the steps out of it taken one at a
-    /// time, and the trap it has when it has no steps at all.
     struct Guidance: Equatable {
         var lead: String
         var steps: [Step] = []
         var caution: String?
 
-        /// One thing to do, at most one thing to press, and a picture of what to look for.
         struct Step: Equatable {
             var text: String
-            /// The trap in this particular step, said where it is met rather than in a block at
-            /// the bottom that is read after the mistake.
+            /// Shown inline at the step, not in a block read after the mistake.
             var note: String?
-            /// What this step looks like on screen. Drawn by `StepFigure` in Furlough's own
-            /// tokens rather than shipped as screenshots of macOS: a screenshot goes stale with
-            /// every System Settings redesign, and a drawing can point at the one control that
-            /// matters instead of showing a whole window to search.
+            /// Drawn, not screenshotted: screenshots go stale with each System Settings redesign.
             var figure: Figure?
             var action: Action?
         }
 
-        /// The part of System Settings a step is about.
         enum Figure: Equatable {
             case systemSettings
             case general
             case scrollDown
-            /// The segmented control that hid Network Extensions. The reason for all of this.
+            /// The segmented control that hides Network Extensions under By App.
             case byCategory
             case networkExtensionsRow
             case furloughToggle
             case allowDialog
         }
 
-        /// What a step's button does. An enum rather than a closure so the directions stay a
-        /// value the model owns, and so a step cannot mean one thing in onboarding and another
-        /// in Settings.
+        /// An enum, not a closure, so onboarding and Settings share the same meaning per step.
         enum Action: Equatable {
             case openSystemSettings, checkAgain, turnFilterOn
 
@@ -213,13 +187,9 @@ final class WebFilter {
 
     /// Everything this Mac can say about the filter, in one block of text.
     ///
-    /// The web filter is the one part of Furlough whose state lives almost entirely outside the
-    /// app — macOS owns the extension, and `NEFilterManager` owns the permission — so when it
-    /// goes wrong the app's one-line status is not enough to work from. Twice on 2026-09-09 the
-    /// status said one thing and System Settings showed another: first an activation refused for
-    /// a missing Info.plist key, then "Failed" over an extension that was plainly switched on,
-    /// because the *filter permission* had been refused and both landed in the same case.
-    /// This says which half is which.
+    /// macOS owns the extension and `NEFilterManager` owns the permission separately; this
+    /// reports both, since a failure in one can look identical to a failure in the other from
+    /// the one-line status alone.
     func diagnostics() async -> String {
         var lines: [String] = []
         lines.append("Furlough web filter diagnostics")
@@ -233,10 +203,8 @@ final class WebFilter {
         lines.append("app: \(Bundle.main.bundleURL.path)")
         lines.append("in /Applications: \(Self.isInApplications)")
         lines.append("extension bundled with this build: \(Self.bundledVersion ?? "none found")")
-        // The three lines that say whether this app is the one that installed what macOS is
-        // running. An install replaces the bundle without touching anything macOS lists, so
-        // "installed" disagreeing with "in this build" is the signature of a filter left behind
-        // by an earlier copy — the thing the status alone could never show.
+        // "installed" disagreeing with "in this build" is the signature of a filter left
+        // behind by an earlier copy — an app replacement doesn't touch what macOS has loaded.
         lines.append("this build's extension: \(Self.bundledIdentity ?? "could not be read")")
         lines.append("extension this app installed: \(installedIdentity ?? "none recorded")")
         lines.append("last asked for by a launch: \(attemptedIdentity ?? "none")")
@@ -281,11 +249,9 @@ final class WebFilter {
 
     /// The `com.apple.developer.networking.networkextension` values this copy is signed with.
     ///
-    /// In the report because it is the difference between "you refused it" and "this build was
-    /// never allowed to ask": a system extension content filter wants
-    /// `content-filter-provider-systemextension`, and a development-signed build carries the
-    /// plain `content-filter-provider` because that is all a Mac Team Provisioning Profile
-    /// grants. Nothing on screen says which one you have.
+    /// Distinguishes "refused" from "never allowed to ask": a development-signed build only
+    /// gets the plain `content-filter-provider` entitlement, not
+    /// `content-filter-provider-systemextension`, which a Mac Team Provisioning Profile can't grant.
     static var networkExtensionEntitlement: String {
         guard let task = SecTaskCreateFromSelf(nil),
               let value = SecTaskCopyValueForEntitlement(task, "com.apple.developer.networking.networkextension" as CFString, nil)
@@ -294,8 +260,7 @@ final class WebFilter {
         return String(describing: value)
     }
 
-    /// Puts the same block in the activity log, so a failure leaves its evidence behind whether
-    /// or not anybody thought to press Copy diagnostics.
+    /// Logged too, so a failure leaves evidence even if nobody presses Copy diagnostics.
     func logDiagnostics(because reason: String) async {
         let report = await diagnostics()
         SharedStore.log("web filter diagnostics (\(reason)):")
@@ -304,8 +269,6 @@ final class WebFilter {
         }
     }
 
-    /// Runs what a step's button says it does, so both screens wire the same step to the same
-    /// thing.
     func perform(_ action: Guidance.Action) {
         switch action {
         case .openSystemSettings: Self.openSystemSettings()
@@ -314,39 +277,30 @@ final class WebFilter {
         }
     }
 
-    /// What the filter is, for the two screens that offer it. Separate from `Guidance`, which
-    /// only ever says what to do next.
     static let explainer = "The web filter is a system extension that sees every connection this Mac opens and refuses the ones to a blocked site, whatever opened it. Those get the floating card rather than the shield page.\n\nWithout it a site is held only in the browsers Furlough recognises, by reading the address bar: Safari, Chrome, Arc, Brave, Edge and the other Chromium ones. Anything off that list goes through — Firefox, a browser Furlough has not met, a site saved to the Dock, or an app that loads a page on its own."
 
     private(set) var status: Status = .notInstalled
-    /// Set once Install is pressed and cleared by Remove, so a launch that finds the extension
-    /// gone or switched off can say so rather than silently going without.
     var isWanted: Bool {
         get { SharedStore.defaults.bool(forKey: Self.wantedKey) }
         set { SharedStore.defaults.set(newValue, forKey: Self.wantedKey) }
     }
-    /// Called with the host and the bundle identifier of the app whose connection was dropped.
     var onBlocked: ((String, String) -> Void)?
 
     /// The extension macOS last told us it had accepted, as `bundledIdentity` writes it.
     ///
-    /// This is what makes a replaced app tell itself apart from a fresh one. It sits beside
-    /// `wanted` in the App Group rather than in the state `SharedStore.reset` clears, for the
-    /// same reason `wanted` does: it describes macOS's Mac, not Furlough's setup, and Testing >
-    /// Reset everything leaves the extension where it is.
+    /// Stored outside `SharedState` (like `isWanted`): it describes macOS's Mac, not
+    /// Furlough's setup, so Testing > Reset everything leaves it alone.
     private var installedIdentity: String? {
         get { SharedStore.defaults.string(forKey: Self.installedKey) }
         set { SharedStore.defaults.set(newValue, forKey: Self.installedKey) }
     }
-    /// The identity a launch last asked macOS for without being told it worked. One request per
-    /// build, so a Mac that will not take this copy is not asked again every time it starts.
+    /// One request per build, so a Mac that won't take this copy isn't asked again every launch.
     private var attemptedIdentity: String? {
         get { SharedStore.defaults.string(forKey: Self.attemptedKey) }
         set { SharedStore.defaults.set(newValue, forKey: Self.attemptedKey) }
     }
-    /// Set by `refresh()` when the extension service does not answer at all, which is a
-    /// different thing from a refusal and takes a different repair. `Status.failed` carries
-    /// both, because they read the same to everyone but this.
+    /// Set by `refresh()` when the extension service doesn't answer at all — a different case
+    /// from a refusal, needing a different repair, though `Status.failed` covers both.
     private var queryWentUnanswered = false
 
     private static let wantedKey = "furlough.mac.filter.wanted"
@@ -357,29 +311,20 @@ final class WebFilter {
     private var pushing = false
     private var pushAgain: FilterRules?
 
-    /// The extension can only be activated from an app in /Applications; macOS refuses it
-    /// anywhere else, and says so only in an error code.
+    /// macOS refuses activation from anywhere but /Applications, reporting only an error code.
     static var isInApplications: Bool { Bundle.main.bundleURL.path.hasPrefix("/Applications/") }
 
-    /// Where the extension sits inside this app, which is the only copy this app can install.
     private static var extensionURL: URL {
         Bundle.main.bundleURL.appending(path: "Contents/Library/SystemExtensions/\(FilterXPC.extensionID).systemextension")
     }
 
-    /// The version of the extension this build carries, to tell an older installed copy from it.
     private static var bundledVersion: String? {
         Bundle(url: extensionURL)?.infoDictionary?["CFBundleVersion"] as? String
     }
 
-    /// This build's extension, exactly: its version and the first bytes of its code directory
-    /// hash — the same hash macOS identifies a binary by.
-    ///
-    /// The version alone cannot do this job. `CURRENT_PROJECT_VERSION` sat at `1` for every Mac
-    /// build ever made, so "is the installed copy older than mine?" compared `1` with `1` and
-    /// answered no, on a Mac whose extension had just been replaced out from under it. The hash
-    /// moves with every build whether or not anybody remembers to bump a number, which is the
-    /// property this needs; the version is kept in front of it because it is what a person
-    /// reading the log or the diagnostics can recognise.
+    /// Version plus the first bytes of the code directory hash (the same hash macOS identifies
+    /// a binary by). The version alone can't tell builds apart — `CURRENT_PROJECT_VERSION` sat
+    /// at `1` for every Mac build — but the hash moves with every build regardless.
     private static var bundledIdentity: String? {
         let url = extensionURL
         guard let bundle = Bundle(url: url) else { return nil }
@@ -388,11 +333,8 @@ final class WebFilter {
         return "\(version)+\(stamp)"
     }
 
-    /// The start of a bundle's code directory hash, or nil when it has no readable signature.
-    ///
-    /// Nil rather than a guess on purpose: `FilterRepair` skips the replacement rules when the
-    /// identity cannot be read, so an unreadable signature costs the repair rather than causing
-    /// a reinstall on every launch.
+    /// Nil, not a guess, when the signature can't be read: `FilterRepair` then skips the
+    /// replacement rules rather than reinstalling on every launch.
     private static func codeHash(of url: URL) -> String? {
         var staticCode: SecStaticCode?
         guard SecStaticCodeCreateWithPath(url as CFURL, [], &staticCode) == errSecSuccess,
@@ -405,8 +347,6 @@ final class WebFilter {
         return hash.prefix(6).map { String(format: "%02x", $0) }.joined()
     }
 
-    /// What macOS says right now, as the facts `FilterRepair` turns on. `Status` is the copy and
-    /// the walkthrough; this is the half of it a decision can be made from.
     private var presence: FilterRepair.Presence {
         switch status {
         case .notInApplications: .elsewhere
@@ -423,17 +363,13 @@ final class WebFilter {
 
     // MARK: Lifecycle
 
-    /// Called once at launch. Finds out where the filter stands and puts it back when it can:
-    /// `FilterRepair` decides, and the one case it exists for is an app that has just been
-    /// replaced (HANDOFF 35). A copy switched off in System Settings, or one somebody declined,
-    /// is only reported, never re-asked for.
+    /// `FilterRepair` decides whether to reactivate (the case it exists for: an app just
+    /// replaced). A copy switched off in System Settings, or declined, is only reported.
     func start() {
         link.onBlocked = { [weak self] host, app in self?.onBlocked?(host, app) }
         Task {
-            // Two plain lines around the ask, because on 2026-09-09 a launch wrote no filter
-            // line at all — not even the one that is supposed to be unconditional — and there
-            // was no way to tell a macOS that answered "nothing is wrong" from a macOS that
-            // never answered. These say which.
+            // Logged on both sides of the ask so a "nothing is wrong" answer can be told from
+            // macOS never answering at all.
             SharedStore.log("web filter: asking macOS for its state")
             await refresh()
             SharedStore.log("web filter: macOS says \(status.label)")
@@ -447,27 +383,18 @@ final class WebFilter {
             }
             await repair()
             guard isWanted else { return }
-            // Asked for and not running is the case worth a record. The filter's state lives
-            // outside the app, so by the time anyone looks at a launch that went wrong the
-            // evidence is in macOS rather than here — unless it was written down at the time.
+            // Worth recording now: the filter's state lives in macOS, not here, so evidence of
+            // a bad launch is gone unless it's written down at the time.
             if !status.isOn {
                 await logDiagnostics(because: "the filter is asked for and is not running")
             }
         }
     }
 
-    /// Puts the filter back when this launch can, and says why in the log.
-    ///
-    /// The case worth naming, because it is the one that went wrong silently: replacing
-    /// `/Applications/Furlough.app` — every Mac install, and every update — leaves macOS holding
-    /// the extension the old bundle staged. `systemextensionsctl` still lists it; a properties
-    /// request from the new bundle comes back empty or never answers; and until this, Furlough
-    /// read that as *Not installed*, said so on a screen nobody had opened, and filtered nothing
-    /// until somebody pressed Install. Now the app knows which build's extension macOS took, so a
-    /// launch that finds a different one in its own bundle asks for this one instead.
-    ///
-    /// What it will not do is argue: a filter switched off in System Settings, and one somebody
-    /// was asked about and declined, are both left exactly as they are.
+    /// Every app replacement leaves macOS holding the extension the old bundle staged;
+    /// `systemextensionsctl` still lists it and a properties request from the new bundle can
+    /// come back empty or never answer. This re-activates in that case rather than reporting
+    /// *Not installed*. A filter switched off in System Settings, or declined, is left as is.
     private func repair() async {
         let bundled = Self.bundledIdentity
         let action = FilterRepair.decide(
@@ -479,9 +406,8 @@ final class WebFilter {
         )
         guard case .activate(let reason) = action else { return }
         SharedStore.log("web filter: \(reason.sentence)")
-        // Written down before the request rather than after it, because the launches this has to
-        // survive are the ones that do not come back: a request that hangs, or an app quit while
-        // macOS is still thinking, must not buy another attempt on every launch after it.
+        // Written before the request, not after: a hung request or a quit mid-activation must
+        // not buy another attempt on every subsequent launch.
         attemptedIdentity = bundled
         await activate()
     }
@@ -497,12 +423,9 @@ final class WebFilter {
         queryWentUnanswered = false
         guard let found = await ExtensionRequest.properties() else {
             queryWentUnanswered = true
-            // Not a refusal, and worth saying so: the service that answers this is stuck, which
-            // is a state a Mac can be left in by replacing the app while it holds a reference to
-            // the extension. Pressing Install submits a fresh activation request, which often
-            // replaces the stuck record; a restart is what clears it when that does not. Seen on
-            // Zach's Mac 2026-09-10 after several reinstalls in a row, alongside a filter
-            // permission refused in under a second — the pair is the signature of this.
+            // Not a refusal: the service that answers this can get stuck (e.g. replacing the
+            // app while it holds a reference). Install again submits a fresh request, which
+            // often clears it; a restart clears it when that doesn't.
             status = .failed("macOS did not answer when it was asked about the extension. That is not a refusal — the service that answers is stuck. Install again below; if it still will not turn on, restart the Mac and install again.")
             return nil
         }
@@ -525,8 +448,6 @@ final class WebFilter {
 
     // MARK: Installing and removing
 
-    /// Asks macOS to activate the extension. Two approvals follow, both the person's: the
-    /// extension itself in System Settings, then the filter in a dialog of macOS's own.
     func install() {
         guard Self.isInApplications else {
             status = .notInApplications
@@ -548,8 +469,6 @@ final class WebFilter {
             switch outcome {
             case .completed:
                 SharedStore.log("web filter extension is active")
-                // What macOS has now, so the next launch can tell this build's extension from
-                // the one a future install replaces it with.
                 installedIdentity = Self.bundledIdentity
                 await enableFilter()
             case .afterReboot:
@@ -563,8 +482,6 @@ final class WebFilter {
         }
     }
 
-    /// Turns the filter configuration on. The first time, macOS asks whether Furlough may filter
-    /// network content; refusing lands here as an error and the status says so.
     func enableFilter() async {
         let manager = NEFilterManager.shared()
         // Outside the `do` so the catch can read it; see the note where it is set.
@@ -581,12 +498,9 @@ final class WebFilter {
             manager.providerConfiguration = configuration
             manager.localizedDescription = "Furlough"
             manager.isEnabled = true
-            // Timed, because the two ways this fails need opposite directions and they are
-            // otherwise identical. A refusal that comes back faster than a person could read a
-            // dialog and click Don't Allow is macOS saying no on its own — no question was put
-            // up — and telling somebody to go click Allow in that case sends them hunting for a
-            // prompt that never existed. That mistake has already been made twice on this
-            // screen; this is the app knowing the difference instead of guessing.
+            // Timed: a refusal faster than a person could read a dialog means macOS said no on
+            // its own, with no prompt shown — telling them to click Allow then would send them
+            // hunting for a dialog that never existed.
             asked = Date.now
             try await manager.saveToPreferences()
             status = .on
@@ -594,8 +508,7 @@ final class WebFilter {
             link.connect()
             SharedStore.log("web filter on")
         } catch {
-            // Not `.failed`: reaching here means the extension activated and it is the filter
-            // permission that was refused, which is a different screen and a different fix.
+            // Not `.failed`: the extension activated fine, it's the filter permission refused.
             let prompted = Date.now.timeIntervalSince(asked) >= 1.5
             status = .filterDenied(error.localizedDescription, prompted: prompted)
             SharedStore.log("web filter: not allowed to filter: \(error.localizedDescription) (macOS \(prompted ? "asked and was refused" : "refused without asking"))")
@@ -603,10 +516,8 @@ final class WebFilter {
         }
     }
 
-    /// Takes the filter away: the configuration first, then the extension. Not held behind the
-    /// loosening delay, for the reason the watchdog toggle is not — System Settings can switch
-    /// the extension off regardless, and a button that pretended otherwise would be worse. The
-    /// tab reader keeps enforcing either way.
+    /// Not held behind the loosening delay, like the watchdog toggle: System Settings can
+    /// switch the extension off regardless. The tab reader keeps enforcing either way.
     func remove() {
         isWanted = false
         installedIdentity = nil
@@ -631,7 +542,6 @@ final class WebFilter {
         }
     }
 
-    /// Where macOS keeps the switch: System Settings > General > Login Items & Extensions.
     static func openSystemSettings() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension") {
             NSWorkspace.shared.open(url)
@@ -640,9 +550,8 @@ final class WebFilter {
 
     // MARK: The rules
 
-    /// Hands the extension what to block, when it differs from the last push. `until` is on the
-    /// device's clock and is the moment `Policy` next allows a status to change; past it the
-    /// extension blocks nothing until the next push, which is what makes a stale list harmless.
+    /// `until` is the next moment `Policy` allows a status to change; past it the extension
+    /// blocks nothing, which is what makes a stale list harmless.
     func sync(hosts: Set<String>, until: Date) {
         guard status.isOn else { return }
         let rules = FilterRules(hosts: hosts.sorted(), until: until, version: 0)
@@ -683,19 +592,14 @@ final class WebFilter {
             lastPushed = rules
             SharedStore.log("web filter: \(rules.hosts.count) host(s) blocked until \(rules.until.formatted(date: .omitted, time: .shortened))")
         } catch {
-            // Remembered as pushed so a persistent failure logs once, not once a second; the next
-            // change tries again.
+            // Remembered as pushed so a persistent failure logs once, not once a second.
             lastPushed = rules
             SharedStore.log("web filter: could not save the rules: \(error.localizedDescription)")
         }
     }
 
-    /// What `NEFilterManager` says about the permission, or that it said nothing.
-    ///
-    /// Raced, like the extension query, and for the same reason: this call has been watched
-    /// never returning, and when it hangs it takes the caller with it — `refresh()` at launch
-    /// and Copy diagnostics both, which is how an app that had plenty to say ended up saying
-    /// nothing at all.
+    /// Raced like the extension query: this call has been seen hanging indefinitely, which
+    /// would otherwise take `refresh()` and Copy diagnostics down with it.
     struct ConfigurationReport: Sendable {
         var answered = true
         var error: String?
@@ -746,17 +650,10 @@ private final class OneShot<T: Sendable>: @unchecked Sendable {
 
 /// `work`, or `timedOut` if it has not answered in `seconds`, abandoning whichever loses.
 ///
-/// Deliberately **not** a task group. A group does not return until every child has finished,
-/// so racing a hung call against `Task.sleep` inside one still hangs — which is exactly what
-/// the first attempt at this did on 2026-09-09: a deadline that could never fire, watched not
-/// firing for five minutes. Cancellation is no help either, because the calls that hang here
-/// belong to macOS and do not honour it. So the loser is left running with nobody listening,
-/// which is the only arrangement that actually returns.
-///
-/// Two calls in this file have been seen never returning: the system extension properties
-/// request, and `NEFilterManager.loadFromPreferences`. Both are macOS answering about state it
-/// owns, and either one hanging took `start()`, `refresh()` and Copy diagnostics down with it —
-/// the app could not even say what was wrong, which is worse than any answer would have been.
+/// Deliberately **not** a task group: a group waits for every child, so racing a hung call
+/// against `Task.sleep` inside one still hangs. Cancellation doesn't help either, since the
+/// calls that hang here (the extension properties request, `loadFromPreferences`) belong to
+/// macOS and don't honour it — so the loser is left running unobserved instead.
 private func firstOf<T: Sendable>(
     _ seconds: Double,
     work: @escaping @Sendable () async -> T,
@@ -772,8 +669,8 @@ private func firstOf<T: Sendable>(
     }
 }
 
-/// One `OSSystemExtensionRequest` as an async call. The caller's local keeps it alive until the
-/// request finishes, and the delegate is called on the main queue.
+/// One `OSSystemExtensionRequest` as an async call. The caller's local keeps it alive until it
+/// finishes; the delegate is called on the main queue.
 private final class ExtensionRequest: NSObject, OSSystemExtensionRequestDelegate, @unchecked Sendable {
     struct Info: Sendable {
         var isEnabled: Bool
@@ -794,7 +691,6 @@ private final class ExtensionRequest: NSObject, OSSystemExtensionRequestDelegate
     private var continuation: CheckedContinuation<Answer, Error>?
     private var found: [Info] = []
     private let onNeedsApproval: @Sendable () -> Void
-    /// A properties request answers with what it found; the other two only with how they ended.
     private let isPropertiesRequest: Bool
 
     private init(properties: Bool = false, onNeedsApproval: @escaping @Sendable () -> Void = {}) {
@@ -816,11 +712,8 @@ private final class ExtensionRequest: NSObject, OSSystemExtensionRequestDelegate
         return outcome
     }
 
-    /// Every copy macOS knows about, enabled or not, or nil when macOS does not answer at all.
-    ///
-    /// Nil is a third answer and must not be flattened into "no extension installed": one means
-    /// the Mac has none, the other means the question went unanswered, and they need opposite
-    /// things said about them.
+    /// Nil is a distinct answer from an empty array: nil means macOS never answered, not that
+    /// no extension is installed — they need opposite handling.
     static func properties() async -> [Info]? {
         await firstOf(10, work: {
             let request = ExtensionRequest(properties: true)
@@ -873,9 +766,6 @@ private final class ExtensionRequest: NSObject, OSSystemExtensionRequestDelegate
     }
 }
 
-/// The app's end of the XPC link to the extension: connects while the filter is on, reconnects
-/// when the extension restarts, and hands each dropped connection to `onBlocked` on the main
-/// actor.
 @MainActor
 final class FilterLink {
     var onBlocked: ((String, String) -> Void)?
@@ -916,8 +806,7 @@ final class FilterLink {
         connection = nil
     }
 
-    /// The extension went away — restarted, or not running yet. Try again in a moment, for as
-    /// long as the filter is meant to be on.
+    /// Retries while the filter is still meant to be on.
     private func dropped() {
         connection?.invalidate()
         connection = nil
@@ -929,8 +818,7 @@ final class FilterLink {
     }
 }
 
-/// What the extension calls. Not on the main actor, because XPC calls it on a queue of its own;
-/// it hops over in the closure it was given.
+/// Not on the main actor: XPC calls this on a queue of its own, so it hops over in the closure.
 final class FilterReceiver: NSObject, FilterListening, @unchecked Sendable {
     var onBlocked: (@Sendable (String, String) -> Void)?
 

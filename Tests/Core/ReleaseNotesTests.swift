@@ -1,14 +1,10 @@
 import Foundation
 import Testing
 
-/// The release notes, and the rules README's Versioning section sets for them.
-///
-/// These run against the real `release-notes.json` rather than a fixture, found from `#filePath`
-/// rather than from a bundle: the file is a resource of the two apps and not of this test
-/// bundle, and a fixture would only prove that a copy of the file is well formed. What is worth
-/// testing is that the file both apps and the site actually read is — and that it agrees with
-/// `project.yml`, which is the thing `scripts/version.sh --check` and `scripts/archive.sh`
-/// enforce at the other end.
+/// Runs against the real `release-notes.json` (found via `#filePath`, since it's a resource of
+/// the two apps, not this test bundle) rather than a fixture, which would only prove a copy is
+/// well formed. Also checks it agrees with `project.yml`, as `scripts/version.sh --check` and
+/// `scripts/archive.sh` enforce at the other end.
 @Suite("ReleaseNotes")
 struct ReleaseNotesTests {
     /// The repo root, from this file's own path: Tests/Core/ReleaseNotesTests.swift.
@@ -22,9 +18,7 @@ struct ReleaseNotesTests {
         return (try? ReleaseNotes.decode(try Data(contentsOf: url))) ?? []
     }()
 
-    /// `MARKETING_VERSION: "1.2.0"` out of project.yml's base settings — the one line
-    /// `scripts/version.sh` rewrites, matched on its own indentation so a target's
-    /// `$(MARKETING_VERSION)` cannot be mistaken for it.
+    // Matched by its indentation so a target's `$(MARKETING_VERSION)` isn't mistaken for it.
     private static let marketingVersion: String? = {
         let url = root.appending(path: "project.yml")
         guard let text = try? String(contentsOf: url, encoding: .utf8) else { return nil }
@@ -47,8 +41,7 @@ struct ReleaseNotesTests {
     @Test("every version is three numbers, and no version is written twice")
     func spelling() {
         for release in Self.releases {
-            // The shape README asks for: 1.2.0, never 1.2, so one version cannot be written
-            // down two ways. Padding is what `Version` does; the file does not rely on it.
+            // Always 1.2.0, never 1.2: the file itself must not rely on `Version`'s padding.
             #expect(release.version == release.number.string, "\(release.version) is not MAJOR.MINOR.PATCH")
         }
         let numbers = Self.releases.map(\.number)
@@ -83,8 +76,8 @@ struct ReleaseNotesTests {
     func newestIsCurrent() throws {
         let version = try #require(Self.marketingVersion)
         let newest = try #require(Self.releases.first)
-        // An `unreleased` entry is allowed to sit above the build, which is how a version is
-        // assembled before it is cut. Anything else means a bump was forgotten.
+        // An `unreleased` entry may sit above the build (assembled before it's cut); anything
+        // else means a bump was forgotten.
         #expect(
             newest.number == Version(version) || newest.channel == .unreleased,
             "release-notes.json's newest entry is \(newest.version) but the build is \(version)"
@@ -98,8 +91,7 @@ struct ReleaseNotesTests {
         #expect(Version("1.9.0") < Version("1.10.0"), "a string comparison gets this one wrong")
         #expect(Version("1.0.1") < Version("1.1"))
         #expect(Version("2.0.0") > Version("1.99.99"))
-        // Never fails to parse: anything unreadable is zero, which sorts below every real
-        // version and matches none of them.
+        // Never fails to parse: unreadable input becomes zero, sorting below every real version.
         #expect(Version("").string == "0.0.0")
         #expect(Version("not a version").string == "0.0.0")
         #expect(Version("1.2.3.4") == Version("1.2.3"))
@@ -138,9 +130,8 @@ struct ReleaseNotesTests {
             )
             #expect(kept == expected)
         }
-        // The case that made this worth testing: 1.2.0 is the phone's Settings menu and the
-        // usage step, and changed nothing on the Mac, so it is not in the Mac's list at all.
-        // `bundleRelease()` is what stops the Mac's page reading as if it were on 1.1.0.
+        // 1.2.0 changed nothing on the Mac, so it's absent from the Mac's list entirely;
+        // `bundleRelease()` is what stops the Mac's page reading as if still on 1.1.0.
         let macVersions = ReleaseNotes.filter(Self.releases, to: .mac).map(\.version)
         #expect(!macVersions.contains("1.2.0"))
         #expect(ReleaseNotes.filter(Self.releases, to: .iphone).map(\.version).contains("1.2.0"))
@@ -148,8 +139,7 @@ struct ReleaseNotesTests {
 
     @Test("a date is written the way the rest of Furlough writes one")
     func dayLabels() {
-        // Built rather than looked up: a fixed date in the file is a test that breaks whenever
-        // the file is edited, which is what happened when 1.1.0 was re-dated.
+        // Built rather than a fixed date from the file, which broke once already when 1.1.0 was re-dated.
         func label(_ date: String) -> String {
             ReleaseNotes.Release(
                 version: "9.9.9", date: date, channel: .unreleased,
