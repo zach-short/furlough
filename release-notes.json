@@ -3,8 +3,8 @@
   "versions": [
     {
       "version": "1.2.0",
-      "date": "2026-09-12",
-      "channel": "unreleased",
+      "date": "2026-09-14",
+      "channel": "appstore",
       "headline": "Settings became a menu.",
       "lead": "Settings was every setting at once, which made the two things people come here to change as hard to find as the five they do not. It is a menu now. Beside it, the last of the two-halves work on the usage screen, and the pass that made it feel as quick as it always was. Most of this went out on 11 September inside the final 1.1 builds; this is that batch given the number it should have had. It also drops the floor to iOS 18 and macOS 15, so a device does not need this year's OS just to install it.",
       "changes": [
