@@ -71,6 +71,9 @@ struct AnchorFocusFilter: SetFocusFilterIntent {
         switch AnchorDrop.drop(reason: "focus filter") {
         case .anchored(let anchor):
             SharedStore.log("focus filter dropped the anchor: \(anchor.heldDescription)")
+            // iOS launches Furlough in the background to perform this, so the request may be
+            // refused; the Lock Screen then catches up at the next `enforce`.
+            LiveActivityManager.sync(state: SharedStore.load())
         case .refused(let why):
             // No app on screen to show this to, so it goes in the log instead.
             SharedStore.log("focus filter refused: \(why.message)")

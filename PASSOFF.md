@@ -9,11 +9,16 @@ progress, so item 1 is the tail of that, not the start.
 
 ## The board
 
-**Where it stands, 2026-09-14.** Everything from 2 to 22 has landed or is settled as no, and so
-have 31 and 32 (HANDOFF 47, a parallel session the same day). What is open is **1**, which is
-Apple's to answer and not a session's, and **23 through 30**, none of which has Zach's go-ahead
-yet — every one of those prompts names what to put to him first, and 23 is to be read before the
-rest. The record of each Done item is the HANDOFF step named in its row, which is the truth
+**Where it stands, 2026-09-14 (evening).** Everything from 2 to 22 has landed or is settled as
+no, and so have 31 and 32 (HANDOFF 47) and **27 through 30** (HANDOFF 48, one Opus session on
+Zach's go-ahead, with the four calls its prompts named answered first). What is open is **1**,
+which is Apple's to answer and not a session's, and **23 through 26** — the four Fable items,
+none of which has Zach's go-ahead yet; every one of those prompts names what to put to him first,
+and 23 is to be read before the rest. **Do not paste 27–30**: like the other Done prompts they
+describe work that now exists, and a fresh session following one would build it again.
+Item 30's second half is settled as **no** for the phone (see its row) — the Mac's sidebar got
+the filter; the phone's Rules list did not, and should not be re-proposed without a reason that
+answers what HANDOFF 48 says. The record of each Done item is the HANDOFF step named in its row, which is the truth
 about what was built and is fuller than the prompt that asked for it. **Do not paste a section
 marked Done** — its prompt describes work that already exists, and a fresh session following it
 would build it again. Read the Done prompts only as history, or where one says a later item
@@ -58,10 +63,10 @@ waiting on 1. That is the sentence that went stale; 9 shipped in `e253fc6` regar
 | 24 | Drop the anchor from the notification that warns you | **Open** — added 2026-09-14 | **Fable** | S (1st) | nothing | `Shared/Core/PendingNotifications.swift`, `Furlough/Model/AppModel.swift`, `FurloughMonitor`, `FurloughMac/Model/Enforcer.swift`, `MacModel` |
 | 25 | An automation can say when the anchor lifts | **Open** — added 2026-09-14 | **Fable** | S (2nd) | 24, for the files only | `Shared/Intents/DropAnchorIntent.swift`, `Furlough/Views/AnchorView.swift` (the lift resolver), `Tests/Core` |
 | 26 | A Focus Filter for the Mac | **Open** — added 2026-09-14 | **Fable** | T | nothing | `Shared/Intents/AnchorFocusFilter.swift`, `FurloughMac/Model/MacModel.swift`, `project.yml` |
-| 27 | The Anchor on the Lock Screen | **Open** — added 2026-09-14 | Opus | U | nothing | `Shared/LiveActivity/`, `FurloughWidgets/`, `LiveActivityManager` |
-| 28 | A switch for every notification, and the last five minutes counted down | **Open** — added 2026-09-14 | Opus | V | 24, if 24 runs first | `Shared/Core/PendingNotifications.swift`, `SettingsView`, Mac Settings, `HomeView`, `Components.swift` |
-| 29 | The Mac keeps what it counts | **Open** — added 2026-09-14 | Opus | W | nothing | `FurloughMac/Model/Enforcer.swift`, new `Shared/Core/UsageHistory.swift`, new Mac view, `MenuBar.swift`, new `Tests/Core/UsageHistoryTests.swift` |
-| 30 | The Mac grows a menu, and both apps get a way to find one app | **Open** — added 2026-09-14 | Opus | X | nothing | `FurloughMac/FurloughMacApp.swift`, `MacRootView.swift`, `Furlough/Views/HomeView.swift` |
+| 27 | The Anchor on the Lock Screen | Done — HANDOFF 48 | Opus | U | nothing | `Shared/LiveActivity/`, `FurloughWidgets/`, `LiveActivityManager` |
+| 28 | A switch for every notification, and the last five minutes counted down | Done — HANDOFF 48 | Opus | V | 24, if 24 runs first | `Shared/Core/PendingNotifications.swift`, `SettingsView`, Mac Settings, `HomeView`, `Components.swift` |
+| 29 | The Mac keeps what it counts | Done — HANDOFF 48 | Opus | W | nothing | `FurloughMac/Model/Enforcer.swift`, new `Shared/Core/UsageHistory.swift`, new Mac view, `MenuBar.swift`, new `Tests/Core/UsageHistoryTests.swift` |
+| 30 | The Mac grows a menu, and both apps get a way to find one app | Done — HANDOFF 48; the phone's search settled as no | Opus | X | nothing | `FurloughMac/FurloughMacApp.swift`, `MacRootView.swift`, `Furlough/Views/HomeView.swift` |
 | 31 | The largest text size, audited | Done — HANDOFF 47 | **Sonnet** | Y | nothing | `Furlough/Views/*` (frames only) |
 | 32 | The automations that already work, written down | Done — HANDOFF 47 | **Sonnet** | Z | nothing | `Furlough/Views/HelpTopics.swift`, `site/src/pages/help/`, `Furlough/Views/AnchorScreens.swift` |
 
@@ -1730,6 +1735,13 @@ confirm it is still spent.
 **Model: Fable — a new caller of `AnchorDrop.drop`, reached without the app being opened. Lane
 S, first. Waits on nothing; shares `PendingNotifications.swift` with item 28, so whichever runs
 second rebases on the first.**
+
+> **28 ran first (HANDOFF 48, 2026-09-14), so rebase on it.** `Notifier.post` now takes a
+> `kind:` and posts nothing when this device has that kind switched off; `PendingNotifications
+> .plan`/`.sync` take `muted:` instead of `digest:`; the kinds live in the new
+> `Shared/Core/NotificationKinds.swift`. A notification that grows an action keeps its kind —
+> the action is part of the notification, not a tenth one — so nothing new is needed on that
+> screen, and a muted "Time's up" must not post an actionable copy of itself either.
 
 You are picking up Furlough, Zach's iOS and Mac app blocker. Read `HANDOFF.md` — step 42's item
 17, the Focus Filter, is the closest precedent and its two warnings apply here — then

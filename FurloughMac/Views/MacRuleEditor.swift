@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MacRuleEditor: View {
     @Environment(MacModel.self) private var model
+    @Environment(MacMenuRoute.self) private var menu
     let targetID: UUID
 
     @State private var nickname = ""
@@ -265,6 +266,13 @@ struct MacRuleEditor: View {
         }
         .sheet(isPresented: $showWeek) {
             WeekSheet(week: weekDraft)
+        }
+        // Rules > Visualize Windows. The editor owns this sheet, so the menu asks for it here
+        // rather than growing a second way to open it.
+        .onChange(of: menu.request) { _, request in
+            guard request == .visualizeWindows else { return }
+            showWeek = true
+            menu.request = nil
         }
         .alert("Saved", isPresented: Binding(get: { saved != nil }, set: { if !$0 { saved = nil } }), presenting: saved) { _ in
             Button("OK") { saved = nil }

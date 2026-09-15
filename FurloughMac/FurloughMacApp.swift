@@ -8,12 +8,16 @@ struct FurloughMacApp: App {
     @State private var model = MacModel.shared
     /// Held here, not inside Help: the window that opens Help decides which page it lands on.
     @State private var help = HelpRoute()
+    /// What the menu bar asks the window to do. Same reason it lives here: commands are built
+    /// in the scene, and the window is what can act.
+    @State private var menu = MacMenuRoute()
 
     var body: some Scene {
         Window("Furlough", id: "main") {
             MacRootView()
                 .environment(model)
                 .environment(help)
+                .environment(menu)
                 .frame(minWidth: 880, minHeight: 580)
         }
         .windowStyle(.hiddenTitleBar)
@@ -26,6 +30,12 @@ struct FurloughMacApp: App {
             CommandGroup(replacing: .newItem) {}
             // Replaces the stock Help item, which opened a help book Furlough doesn't ship.
             CommandGroup(replacing: .help) { HelpMenuItem(route: help) }
+            // An app whose Quit is refused while anything is blocked, and whose window is
+            // hidden after onboarding, is exactly the one that should be reachable from up
+            // here. Every item goes through the same path the toolbar uses — see `MacMenuRoute`.
+            CommandGroup(after: .sidebar) { HalfMenuItems(route: menu) }
+            CommandMenu("Rules") { RulesMenuItems(route: menu) }
+            CommandMenu("Anchor") { AnchorMenuItems(route: menu, model: model) }
         }
 
         Window("Furlough Help", id: HelpRoute.windowID) {

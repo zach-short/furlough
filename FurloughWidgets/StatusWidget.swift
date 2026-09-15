@@ -241,10 +241,14 @@ struct StatusWidgetView: View {
         return rest > 0 ? "\(lead) +\(rest)" : lead
     }
 
+    /// The words themselves live in `AnchorText`, shared with the Anchor's Live Activity, so
+    /// the Lock Screen and the home screen cannot word the same fact differently.
     private func anchoredLine(_ summary: Policy.Summary) -> String {
-        let what = summary.anchorsEverything ? "Everything anchored" : "\(summary.anchoredCount) anchored"
-        guard let until = summary.anchorUntil else { return what }
-        return "\(what) · lifts \(until.formatted(date: .omitted, time: .shortened))"
+        AnchorText.line(
+            everything: summary.anchorsEverything,
+            count: summary.anchoredCount,
+            until: summary.anchorUntil
+        )
     }
 
     private func detail(_ text: String) -> some View {

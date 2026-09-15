@@ -21,7 +21,8 @@ struct DropAnchorIntent: AppIntent {
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let answer: String
-        switch AnchorDrop.drop(reason: "intent") {
+        let outcome = AnchorDrop.drop(reason: "intent")
+        switch outcome {
         case .anchored(let anchor) where anchor.anchorsEverything:
             answer = "Anchored. \(anchor.heldDescription) is locked until you scan your tag."
         case .anchored(let anchor):
@@ -29,6 +30,11 @@ struct DropAnchorIntent: AppIntent {
         case .refused(let why):
             answer = why.message
         }
+        // The Anchor's Live Activity, where this process is allowed to start one: run from
+        // Spotlight or Shortcuts it is the app, run from the control or the widget button it is
+        // the widget extension, which may only update and end. A refusal there is logged and
+        // costs nothing — the next time Furlough is opened, `enforce` starts it.
+        if case .anchored = outcome { LiveActivityManager.sync(state: SharedStore.load()) }
         WidgetCenter.shared.reloadAllTimelines()
         // Without this the control keeps showing "Drop Anchor" after it's already dropped.
         ControlCenter.shared.reloadControls(ofKind: Furlough.anchorControlKind)

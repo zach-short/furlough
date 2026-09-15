@@ -47,6 +47,7 @@ final class MonitorExtension: DeviceActivityMonitor {
         let end = ends.count == 1 ? ends.first ?? window.endMinute : nil
         Notifier.post(
             id: "opened-\(activity.rawValue)",
+            kind: .windowOpened,
             title: "Window opened",
             body: end.map { "\(names) — open until \(TimeFormat.until($0))." } ?? "\(names) — open now."
         )
@@ -103,11 +104,14 @@ final class MonitorExtension: DeviceActivityMonitor {
             }
         }
         ShieldReconciler.reconcile(now: now, reason: "scheduled drop")
+        // The anchor's Live Activity was requested ahead by the app with `start:`, so this is
+        // an update in place rather than a start the extension may not perform.
+        LiveActivityManager.sync(state: SharedStore.load(), canStart: false)
         WidgetCenter.shared.reloadAllTimelines()
         guard let dropped else { return }
         let lift = dropped.until.map { " until \(TimeFormat.clock($0))" } ?? " until you scan your tag"
         SharedStore.log("dropped anchor on schedule: \(dropped.heldDescription)\(lift)")
-        Notifier.post(id: "anchor-dropped", title: "Anchor dropped", body: "\(dropped.heldDescription) locked\(lift).")
+        Notifier.post(id: "anchor-dropped", kind: .anchorDropped, title: "Anchor dropped", body: "\(dropped.heldDescription) locked\(lift).")
         AnchorSync.publish(dropped, origin: .drop, now: now)
         SharedStore.announceChange()
     }
@@ -123,10 +127,13 @@ final class MonitorExtension: DeviceActivityMonitor {
             if Policy.liftExpiredAnchor(&state.config, now: now) { lifted = state.config.anchor }
         }
         ShieldReconciler.reconcile(now: now, reason: "anchor lift")
+        // Ending the anchor's activity is the half that matters: one left running after a
+        // release is a phone that says it is locked when it is not.
+        LiveActivityManager.sync(state: SharedStore.load(), canStart: false)
         WidgetCenter.shared.reloadAllTimelines()
         guard let lifted else { return }
         SharedStore.log("anchor lifted by itself")
-        Notifier.post(id: "anchor-lifted", title: "Anchor lifted", body: "Everything it held is back on its own rules.")
+        Notifier.post(id: "anchor-lifted", kind: .anchorLifted, title: "Anchor lifted", body: "Everything it held is back on its own rules.")
         // Informational: the Mac computes the same expiry from the `until` it holds, and
         // `AnchorSync.merge` refuses this as a release.
         AnchorSync.publish(lifted, origin: .lift, now: now)
@@ -162,6 +169,7 @@ final class MonitorExtension: DeviceActivityMonitor {
         if let name = exhaustedName {
             Notifier.post(
                 id: "exhausted-\(parsed.targetID.uuidString)",
+                kind: .budgetSpent,
                 title: "Time's up",
                 body: "\(name) is blocked until its next window."
             )
@@ -195,6 +203,7 @@ final class MonitorExtension: DeviceActivityMonitor {
         if let name = warnedName {
             Notifier.post(
                 id: "warning-\(parsed.targetID.uuidString)",
+                kind: .budgetWarning,
                 title: "\(Furlough.warningMinutes) minutes left",
                 body: "\(name) has about \(Furlough.warningMinutes) minutes left today."
             )
@@ -219,6 +228,7 @@ final class MonitorExtension: DeviceActivityMonitor {
         let names = closing.map(\.displayName).joined(separator: ", ")
         Notifier.post(
             id: "closing-\(activity.rawValue)",
+            kind: .windowClosing,
             title: "Window closing",
             body: "\(names) will close at \(TimeFormat.until(window.endMinute))."
         )
@@ -234,10 +244,7 @@ final class MonitorExtension: DeviceActivityMonitor {
         // Re-planned here too since this runs when the app doesn't; keeps the weekly digest
         // from going stale if Furlough isn't opened all week. `sync` is idempotent.
         let clock = state.clock()
-        PendingNotifications.sync(
-            state: state, now: clock.now, drift: clock.drift,
-            digest: PendingNotifications.wantsWeeklyDigest
-        )
+        PendingNotifications.sync(state: state, now: clock.now, drift: clock.drift)
         WidgetCenter.shared.reloadAllTimelines()
     }
 }

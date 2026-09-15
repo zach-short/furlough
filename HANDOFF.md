@@ -3287,6 +3287,141 @@ The plan for this stretch. Tick each phase off here as it lands.
     and Focus Filters work rather than verified on this phone; ask Zach to build one from the page
     and say whether the taps are still right.
 
+48. **Four Opus items in one session (pass-off 27, 28, 29, 30).** Done 2026-09-14. None of them
+    changes what `Policy.decide` shields; each was a thing Furlough already knew and did not
+    show, or a surface it did not use. Four decisions were put to Zach before any code and all
+    four came back with the recommendation: the anchor supersedes the window activity, fourteen
+    and sixty stay two numbers, the Mac's hero says nothing about what it measured, and the phone
+    does not get search.
+
+    **27. The Anchor on the Lock Screen.** A second `ActivityAttributes` type
+    (`Shared/LiveActivity/AnchorActivityAttributes.swift`) and a second lifecycle, because
+    `ActivityAttributes` is a *type* — a second kind of activity can never be a flag on the
+    first. The attributes carry **nothing**: there is only ever one anchor, so the single
+    activity of that type *is* the hold, which is what lets one scheduled ahead with
+    `Activity.request(start:)` become the live one when its moment arrives, updated in place by
+    the monitor rather than ended and re-requested by a process that may not request anything.
+    Matching by a `droppedAt` in the attributes would have failed: `Policy.scheduledDrop` stamps
+    `anchoredAt` with the callback time, which is minutes later than the minute it promised.
+
+    What should be showing is decided in `Shared/Core/AnchorActivity.swift`, pure and tested:
+    `Policy.anchorActivity(config:now:)` answers the hold that is on, or the one a schedule
+    promises next — and promises nothing the schedule could not perform, checking the same two
+    conditions `scheduledDrop` does (something to hold, a tag paired), because a promise on the
+    Lock Screen at 11 PM that does not happen is worse than no promise. `AnchorText` in the same
+    file is the one wording: `StatusWidget.anchoredLine` now reads it, so the widget and the Lock
+    Screen cannot say the same fact two ways. A timed hold counts down to its lift; a tag-only
+    hold counts up from its drop and carries the one sentence it has ("Only your tag lifts it.").
+
+    The activity carries **no App Intent and must never gain one** — every button on a Live
+    Activity runs an intent, and the only intent that could belong here is a release, which lives
+    behind a tag scan in the app and nowhere else. The file says so.
+
+    Ended on every release path, which is the half that matters: the tag (in-app, through
+    `enforce`), a timed lift (`MonitorExtension.liftIfDue` now syncs, which it did not),
+    and a release over the link (`applyRemoteAnchor` → `enforce`). Started on every drop path the
+    process allows: the app, `DropAnchorIntent`, the Focus Filter, and the monitor's scheduled
+    drop — which updates the activity the app asked for ahead. A drop from Control Center runs in
+    the widget extension, which may not request one; the request is attempted, logged if refused,
+    and the Lock Screen catches up at the next `enforce`.
+
+    **Zach's call:** while the anchor holds, the window activity comes down (a window counting
+    down under a total hold is a countdown to nothing). A *scheduled* anchor supersedes nothing —
+    it is a promise, and the window is still open. The cost, stated when the call was made: a
+    timed lift while the app is closed leaves no window activity until Furlough is next opened,
+    because an extension may not start one.
+
+    **28. A switch for every notification, and the last five minutes counted down.**
+    `Shared/Core/NotificationKinds.swift` is new: `NotificationKind`, one case per notification
+    actually posted, with the row's title and the line under it; and `NotificationPreferences`,
+    the set that is *off*, in the App Group for exactly the reasons `digestPreferenceKey`'s
+    comment gave (device-local, must not travel in an export or wait out a delay, and the monitor
+    reads it outside `UserDefaults.standard`). Stored as the muted set rather than nine booleans,
+    so a kind added later is on by default with no migration. The weekly digest's own preference
+    is **folded in**, not left beside it: `NotificationPreferences.muted(stored:legacyDigest:)` is
+    pure and tested, and honours an older build's `furlough.weeklyDigest` until this build writes
+    its own answer. `plan` takes `muted:` and filters on it; `Notifier.post` takes the kind and
+    returns without posting when it is off — silently, because the thing that would have been
+    announced is already in the activity log. All ten call sites pass their kind.
+
+    The screen is a Settings row on the phone (`Furlough/Views/NotificationsScreen.swift`) and a
+    card in the Mac's Settings, each led by the sentence that is the point: muting blocks nothing
+    and unblocks nothing, so it applies the moment it is tapped. The digest keeps its toggle on
+    the Record screen as well — one value, two places that each have a reason to show it, and
+    they cannot disagree because they read the same store. `setNotification` re-plans rather than
+    calling `enforce`: nothing here moves a shield, so re-registering DeviceActivity for a muted
+    "Window opened" was work for nothing.
+
+    (b) `RuntimeState.warnedAt` was recorded, counted down by the Live Activity, and ignored by
+    the two screens that had the same data: the home hero said "under 5 min left" as static text
+    beside a countdown to the *window*, and the row said nothing. Both now count down to
+    `warnedMoment + Furlough.warningMinutes` — the hero takes the earlier of that and the window's
+    own close, and the row uses `Text(timerInterval:)` from the warning moment, which ticks by
+    itself (the list's clock is `.everyMinute`). Where `warnedMoment` is nil — a warning that
+    fired before the field existed — today's words are kept rather than a number invented.
+
+    **29. The Mac keeps what it counts.** `Shared/Core/UsageHistory.swift`, pure and tested: days
+    of seconds per target, `record`, `prune`, per-target and per-day minutes, a fortnight total,
+    `bars(upTo:)` and `minutes(overLast:upTo:)`. The Mac files the finished ledger and prunes at
+    the day boundary in `Enforcer.apply` — the once-a-day moment that happens whether or not
+    anyone opens Furlough, which is why it is there and not on a second timer. Fourteen days for
+    25 targets measured **2.8 KB**. `Enforcer.measured` is the history plus today's live ledger,
+    since today's seconds are not filed yet.
+
+    **Zach's call:** fourteen and sixty stay two numbers. The record is minutes held *shut* over
+    sixty days; this is minutes *used* over a fortnight, matching the phone's usage page — the
+    phone cannot reach past a fortnight, and a Mac claiming sixty days of used minutes would be
+    claiming a span its other half has no answer for. The two cards sit next to each other at the
+    foot of the sidebar (`FurloughMac/Views/MacUsage.swift`) and each says which number it is.
+    The hero says nothing about it — also his call.
+
+    The menu bar's trend gained used minutes beside shielded, over the **same seven days** (two
+    numbers on one line have to be counted over one span). No second set of bars: used and
+    shielded do not share a scale — a day can hold everything shut for twenty-four hours and be
+    used for twenty minutes — so a bar drawn against the other's ceiling would be a picture of
+    nothing. Cost, measured the way step 42 measured it (20 runs after a warm-up, `-O`, this
+    Mac): `UsageHistory.minutes(overLast: 7)` **0.035 ms**, `Record.week` 0.039 ms in the same
+    harness, against the 2.1 ms `menuNeedsUpdate` spends rendering *one* hourglass per target
+    row. It went in.
+
+    **30. The Mac grows a menu.** `FurloughMacApp.commands` was `CommandGroup(replacing:
+    .newItem) {}` and a Help item — the whole menu bar, in an app whose Quit is refused while
+    anything is blocked and whose window is hidden after onboarding. Now: **Anchor** (Drop Anchor,
+    ⌘D, disabled with `Policy.DropRefusal`'s own sentence as the tooltip and its first sentence as
+    a disabled row under it — and **no Weigh Anchor item ever**, because there is no tag reader on
+    a Mac and a greyed-out release would imply one could exist), **Rules** (Add Application ⌘N,
+    Add Website ⇧⌘N, Visualize Windows ⇧⌘V) and two **View** items for the halves (⌘1 / ⌘2).
+
+    `MacMenuRoute` (`FurloughMac/Views/MacCommands.swift`) is how they reach the window: commands
+    are built in the scene and inherit no window's environment, so each item sets a request and
+    the window performs it through the path its toolbar already calls — never a second
+    implementation. `HelpRoute` is the same idea, one menu older; the model is handed to
+    `AnchorMenuItems` explicitly for the same reason. Visualize Windows is answered by
+    `MacRuleEditor`, which owns that sheet, and is disabled when no rule is open.
+    `MacModel.dropRefusal` answers "would this be refused" without performing it.
+
+    (b) **The phone does not get search — Zach's call.** A home screen you have to search is a
+    sign of too many rules, and the grouping by next opening is meant to make the list readable
+    rather than navigable. The Mac's sidebar got a filter field, appearing only past eight rows
+    (a list you can see all of does not need finding) and filtering whichever half is showing. A
+    plain `localizedCaseInsensitiveContains` over the name the row already shows, so there is no
+    matching logic to hoist into `Shared/Core`. The record and usage cards are about the whole
+    Mac rather than the rows above them, so a filter hides them until it is cleared.
+
+    **What is not verified.** 781 tests in 114 suites pass and all three builds are warning-free,
+    but **nothing here has been seen running**. The Lock Screen, the Dynamic Island, the muted
+    notifications and the countdown all need the phone; the Mac's new card, the menus and the
+    filter need the Mac app installed. Two things to watch in particular: whether macOS shows the
+    tooltip on a *disabled* menu item (if not, the refusal is readable only from the disabled row
+    beneath it), and whether `Activity.request` succeeds from the widget extension's process when
+    the control drops the anchor (the log line says if it did not).
+
+    **Found and not fixed** (raised rather than folded into an unrelated change): the Mac posts
+    its window-closing notification with the title "5 minutes left", while the monitor posts the
+    same kind as "Window closing" — one notification kind, two titles across the two platforms.
+    The new screen calls it "Window closing" on both.
+
+
 ## Style rules
 
 Swift 6 language mode with approachable concurrency, SwiftUI, `@Observable`, async/await, no

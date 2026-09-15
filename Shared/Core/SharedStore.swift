@@ -156,6 +156,14 @@ enum SharedStore {
         defaults.removeObject(forKey: namesKey)
         defaults.removeObject(forKey: tokensKey)
         defaults.removeObject(forKey: anchorNamesKey)
+        // Device-local preferences kept beside the state rather than in it; a reset that left
+        // them behind would be a fresh install still muting something.
+        NotificationPreferences.forgetAll()
+        #if os(macOS)
+        // What the Mac measured. Kept outside the state for the same reason the day's ledger
+        // is, and forgotten here for the same reason as everything above it.
+        defaults.removeObject(forKey: UsageHistory.storeKey)
+        #endif
     }
 
     @discardableResult

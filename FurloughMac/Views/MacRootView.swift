@@ -28,8 +28,12 @@ struct MacRootView: View {
 struct MacHomeView: View {
     @Environment(MacModel.self) private var model
     @Environment(HelpRoute.self) private var route
+    @Environment(MacMenuRoute.self) private var menu
     @Environment(\.openWindow) private var openWindow
     @State private var half: Half
+    /// Types down the sidebar's list. A plain case-insensitive contains, so there is no matching
+    /// logic to hoist into `Shared/Core`; it appears only once the list is past a screenful.
+    @State private var filter = ""
     @State private var selection: UUID?
     @State private var showAddChoice = false
     // Popover anchors to the view it's attached to; can't share the toolbar's flag or it
@@ -50,6 +54,8 @@ struct MacHomeView: View {
     @State private var pendingFilterHost: String?
     @State private var filterOfferHost: FilterOfferHost?
     private var now: Date { model.now }
+    /// A list you can see all of does not need finding; past this it is a scroll.
+    private static let filterAppearsAbove = 8
 
     init(start: Half) { _half = State(initialValue: start) }
 
@@ -93,7 +99,55 @@ struct MacHomeView: View {
         .onChange(of: model.state.config.targets.map(\.id)) { _, ids in
             if let selection, !ids.contains(selection) { self.selection = nil }
         }
+        // The menu bar and the window, kept in step both ways: the View menu writes `half`, and
+        // the segment writes it back so the checkmark is never a guess.
+        .onAppear {
+            menu.half = half
+            menu.hasRuleOpen = isRuleOpen
+        }
+        .onChange(of: half) { _, new in
+            menu.half = new
+            // A query typed against one half would otherwise hide the other's list.
+            filter = ""
+        }
+        .onChange(of: menu.half) { _, new in
+            guard new != half else { return }
+            withAnimation(.snappy(duration: 0.25)) { half = new }
+        }
+        .onChange(of: isRuleOpen) { _, open in menu.hasRuleOpen = open }
+        .onChange(of: menu.request) { _, request in perform(request) }
         .toolbar { windowActions }
+    }
+
+    // MARK: The menu bar
+
+    /// Whether the detail pane is showing a rule, which is what "Visualize windows" acts on.
+    private var isRuleOpen: Bool {
+        guard let selection else { return false }
+        return model.state.config.target(id: selection) != nil
+    }
+
+    /// Every item ends in the call the toolbar already makes — the menu is a second way in, not
+    /// a second implementation.
+    private func perform(_ request: MacMenuRoute.Request?) {
+        guard let request else { return }
+        switch request {
+        case .addApplication:
+            addDestination = model.addDestination(on: half)
+            showAddApp = true
+        case .addWebsite:
+            addDestination = model.addDestination(on: half)
+            showAddSite = true
+        case .dropAnchor:
+            // Disabled in the menu when it would be refused, but the real drop re-reads iCloud
+            // and the roster, so it can still refuse — and then it says so here.
+            if let why = model.dropAnchor() { anchorMessage = why }
+        case .visualizeWindows:
+            // Left for `MacRuleEditor`, which owns the sheet; the item is disabled when no
+            // editor is open, so there is nobody else this could be waiting on.
+            return
+        }
+        menu.request = nil
     }
 
     // MARK: The add flow
@@ -261,6 +315,11 @@ struct MacHomeView: View {
             MacHalfSegment(half: $half)
                 .padding(.horizontal, 20)
                 .padding(.top, 12)
+            if showsFilter {
+                filterField
+                    .padding(.horizontal, 20)
+                    .padding(.top, 10)
+            }
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     MacLinkTraffic(half: half)
@@ -275,6 +334,57 @@ struct MacHomeView: View {
             }
             .padding(.top, 6)
         }
+    }
+
+    /// Only past a screenful, and counted against the whole list rather than the filtered one —
+    /// a field that vanished as soon as it worked would take the query with it.
+    private var showsFilter: Bool {
+        switch half {
+        case .rules: model.state.config.targets.count > Self.filterAppearsAbove
+        case .anchor: model.state.config.anchor.kinds.count > Self.filterAppearsAbove
+        }
+    }
+
+    private var filterField: some View {
+        HStack(spacing: 7) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Ember.faint)
+            TextField("Filter", text: $filter)
+                .textFieldStyle(.plain)
+                .emberBody(12.5)
+                .foregroundStyle(Ember.cream)
+            if !filter.isEmpty {
+                Button { filter = "" } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Ember.faint)
+                }
+                .buttonStyle(.plain)
+                .help("Clear the filter")
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Ember.cream.opacity(0.05), in: Capsule())
+        .overlay(Capsule().strokeBorder(Ember.cardBorder, lineWidth: 1))
+    }
+
+    /// A case-insensitive contains over the name the row itself shows, and nothing cleverer —
+    /// anything more would be matching logic, which belongs in `Shared/Core` with tests.
+    private func matches(_ name: String) -> Bool {
+        filter.isEmpty || name.localizedCaseInsensitiveContains(filter)
+    }
+
+    private var noMatches: some View {
+        Text("Nothing matches \u{201C}\(filter)\u{201D}.")
+            .emberBody(12.5)
+            .foregroundStyle(Ember.muted)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 11)
+            .emberCard()
+            .padding(.top, 12)
     }
 
     @ViewBuilder
@@ -332,12 +442,14 @@ struct MacHomeView: View {
     private var rulesList: some View {
         let state = model.state
         let config = Policy.effectiveConfig(state, now: now)
-        let targets = config.targets
+        let targets = config.targets.filter { matches($0.displayName) }
         let statuses = Dictionary(uniqueKeysWithValues: targets.map { target in
             (target.id, Policy.status(of: target, config: config, runtime: state.runtime, now: now))
         })
         let groups = HomeGroups(targets: targets, statuses: statuses, now: now)
-        if targets.isEmpty {
+        if targets.isEmpty, !filter.isEmpty {
+            noMatches
+        } else if targets.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Nothing yet.")
                     .emberDisplaySmall(15)
@@ -363,7 +475,12 @@ struct MacHomeView: View {
                 .emberCard()
             }
         }
-        MacRecordSection()
+        // The two cards at the foot are about the whole Mac, not the rows above them, so a
+        // filter does not narrow them — it hides them, until it is cleared.
+        if filter.isEmpty {
+            MacRecordSection()
+            MacUsageSection()
+        }
     }
 
     private func row(_ target: Target, status: TargetStatus, anchor: AnchorProfile) -> some View {
@@ -425,9 +542,17 @@ struct MacHomeView: View {
     private var heldList: some View {
         let anchor = model.state.config.anchor
         let isHolding = anchor.isHolding(at: now)
+        let kinds = anchor.kinds.filter { matches(name(of: $0)) }
         SectionLabel(text: anchor.anchorsEverything ? "Stays open" : "Held")
         VStack(spacing: 0) {
-            if anchor.kinds.isEmpty {
+            if kinds.isEmpty, !filter.isEmpty {
+                Text("Nothing matches \u{201C}\(filter)\u{201D}.")
+                    .emberBody(13)
+                    .foregroundStyle(Ember.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 11)
+            } else if anchor.kinds.isEmpty {
                 Text(anchor.anchorsEverything ? "Nothing stays open." : "Nothing held yet.")
                     .emberBody(13)
                     .foregroundStyle(Ember.muted)
@@ -435,7 +560,7 @@ struct MacHomeView: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 11)
             }
-            ForEach(Array(anchor.kinds.enumerated()), id: \.offset) { index, kind in
+            ForEach(Array(kinds.enumerated()), id: \.offset) { index, kind in
                 if index > 0 { CardDivider() }
                 heldRow(kind, isHolding: isHolding)
             }

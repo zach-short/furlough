@@ -4,6 +4,8 @@ import UserNotifications
 /// One local notification Furlough wants outstanding, and when it should fire.
 struct PlannedNotification: Equatable, Identifiable, Sendable {
     var id: String
+    /// Which switch on the notifications screen decides whether this is planned at all.
+    var kind: NotificationKind
     var title: String
     var body: String
     /// On the device's clock — Furlough times must be moved onto it first; see `Clock.Reading.device`.
@@ -19,39 +21,19 @@ enum PendingNotifications {
     static let lead: TimeInterval = 3600
     /// The weekly digest's own prefix, under the one above so `sync` still owns it.
     static let digestPrefix = prefix + "digest."
-    /// Stored in the App Group, not `Config`: this is device-local (must not travel in an export
-    /// or wait out a loosening delay), and the monitor extension needs it outside `UserDefaults.standard`.
-    #if os(iOS)
-    static let digestPreferenceKey = "furlough.weeklyDigest"
-    #else
-    static let digestPreferenceKey = "furlough.mac.weeklyDigest"
-    #endif
-
-    /// Defaults to true when unanswered, since an unread record is what the digest exists to fix.
-    static var wantsWeeklyDigest: Bool {
-        SharedStore.defaults.object(forKey: digestPreferenceKey) as? Bool ?? true
-    }
-
-    static func setWantsWeeklyDigest(_ on: Bool) {
-        SharedStore.defaults.set(on, forKey: digestPreferenceKey)
-    }
-
-    /// Back to what a fresh install has, for the testing reset.
-    static func forgetWeeklyDigest() {
-        SharedStore.defaults.removeObject(forKey: digestPreferenceKey)
-    }
 
     /// Everything that should be outstanding for `state` at `now`. `drift` (from
     /// `Clock.Reading.drift`) moves fire dates onto the device's own clock, since that's what
-    /// the system schedules against. `digest` defaults off since it's a device-local preference.
+    /// the system schedules against. `muted` is this device's own answer
+    /// (`NotificationPreferences.muted`), passed in rather than read here so this stays pure.
     static func plan(
         state: SharedState,
         now: Date,
         drift: TimeInterval = 0,
-        digest: Bool = false,
+        muted: Set<NotificationKind> = [],
         calendar: Calendar = .current
     ) -> [PlannedNotification] {
-        weeklyDigests(state: state, now: now, drift: drift, wanted: digest, calendar: calendar)
+        let planned = weeklyDigests(state: state, now: now, drift: drift, calendar: calendar)
         + state.pending
             .filter { $0.effectiveAt > now }
             .sorted { $0.effectiveAt < $1.effectiveAt }
@@ -63,6 +45,7 @@ enum PendingNotifications {
                 if warnAt > now {
                     planned.append(PlannedNotification(
                         id: id(change, .warning),
+                        kind: .looseningWarning,
                         title: "Loosening lands in an hour",
                         body: "\(what) Cancel it in Furlough until then.",
                         fireAt: warnAt.addingTimeInterval(drift)
@@ -70,26 +53,29 @@ enum PendingNotifications {
                 }
                 planned.append(PlannedNotification(
                     id: id(change, .landed),
+                    kind: .looseningLanded,
                     title: "Change landed",
                     body: what,
                     fireAt: change.effectiveAt.addingTimeInterval(drift)
                 ))
                 return planned
             }
+        return planned.filter { !muted.contains($0.kind) }
     }
 
     /// The digest for the coming Monday, if wanted and the week has something to report. A
     /// one-shot notification, not repeating (its numbers would go stale); re-planned on every
     /// enforce/reconcile. A missed digest is never caught up — the next one is just next Monday.
     private static func weeklyDigests(
-        state: SharedState, now: Date, drift: TimeInterval, wanted: Bool, calendar: Calendar
+        state: SharedState, now: Date, drift: TimeInterval, calendar: Calendar
     ) -> [PlannedNotification] {
-        guard wanted, let next = nextDigestDate(after: now, calendar: calendar) else { return [] }
+        guard let next = nextDigestDate(after: now, calendar: calendar) else { return [] }
         // Re-planning closes the gap between whole days counted now and Monday morning; the id
         // carries a fingerprint of the copy so a changed re-plan replaces rather than duplicates.
         guard let digest = Record.weeklyDigest(state.runtime.days, upTo: next, calendar: calendar) else { return [] }
         return [PlannedNotification(
             id: digestPrefix + fingerprint(digest.title + digest.body),
+            kind: .weeklyDigest,
             title: digest.title,
             body: digest.body,
             fireAt: next.addingTimeInterval(drift)
@@ -157,10 +143,10 @@ enum PendingNotifications {
         state: SharedState,
         now: Date,
         drift: TimeInterval = 0,
-        digest: Bool = false,
+        muted: Set<NotificationKind> = NotificationPreferences.muted,
         calendar: Calendar = .current
     ) {
-        let planned = plan(state: state, now: now, drift: drift, digest: digest, calendar: calendar)
+        let planned = plan(state: state, now: now, drift: drift, muted: muted, calendar: calendar)
         // Only identifiers cross into the callback — UNUserNotificationCenter/UNNotificationRequest aren't Sendable.
         UNUserNotificationCenter.current().getPendingNotificationRequests { existing in
             let scheduled = Set(existing.map(\.identifier).filter { $0.hasPrefix(prefix) })
@@ -196,7 +182,11 @@ enum PendingNotifications {
 /// Posts a local notification now; shared by the monitor extension and the Mac enforcer, which
 /// each used to have their own copy.
 enum Notifier {
-    static func post(id: String, title: String, body: String) {
+    /// Posts nothing when this device has that kind switched off. Silent on purpose: the thing
+    /// that would have been announced is already in the activity log, and a "muted" line per
+    /// window edge would be the noise the switch exists to stop.
+    static func post(id: String, kind: NotificationKind, title: String, body: String) {
+        guard NotificationPreferences.isOn(kind) else { return }
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body

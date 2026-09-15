@@ -213,6 +213,14 @@ struct HomeContent: View {
             (target.id, HourglassState.of(target, status: statuses[target.id] ?? .unconfigured, runtime: state.runtime, now: now))
         })
         let groups = HomeGroups(targets: config.targets, statuses: statuses, now: now)
+        // Only while a target is still open: once the budget is spent the status says so, and
+        // a countdown beside "Used up today" would be counting down to a moment already past.
+        let warnings = Dictionary(uniqueKeysWithValues: config.targets.compactMap { target -> (UUID, Date)? in
+            guard case .open = statuses[target.id],
+                  let at = state.runtime.warnedMoment(target.id, dayKey: Policy.dayKey(now))
+            else { return nil }
+            return (target.id, at)
+        })
 
         VStack(alignment: .leading, spacing: 0) {
             HeroPager(groups: groups, statuses: statuses, glasses: glasses, runtime: state.runtime, anchor: config.anchor, showsEmptyHero: showsEmptyHero, featured: $featured)
@@ -228,6 +236,7 @@ struct HomeContent: View {
                                 glass: glasses[target.id] ?? .unconfigured,
                                 pending: state.pending.first { $0.targetID == target.id },
                                 held: config.anchor.willHold(target),
+                                warnedAt: warnings[target.id],
                                 now: now
                             )
                         }
@@ -523,12 +532,30 @@ struct HeroPage: View {
         }
     }
 
+    /// Where today's last five minutes actually end: the moment the warning fired plus the
+    /// warning's own length. Nil when the warning predates the field.
+    private func budgetDeadline(now: Date) -> Date? {
+        runtime.warnedMoment(target.id, dayKey: Policy.dayKey(now))
+            .map { $0.addingTimeInterval(TimeInterval(Furlough.warningMinutes * 60)) }
+    }
+
     private func line(now: Date) -> Line {
         let budget = target.rule.map { TimeFormat.budget($0.budget(on: Policy.weekday(now))) } ?? ""
         switch status {
         case .open(let until):
             let end = Policy.date(atMinute: until, of: now)
             if runtime.wasWarned(target.id, dayKey: Policy.dayKey(now)) {
+                // The warning moment is the only budget deadline Screen Time ever makes
+                // knowable, and the Live Activity already counts down from it. The window's own
+                // close is still the earlier end where it comes first.
+                if let deadline = budgetDeadline(now: now) {
+                    return Line(
+                        eyebrow: "Open now · \(Furlough.warningMinutes) min left", color: Ember.amber,
+                        big: .countdown(to: min(deadline, end)), sub: "\(budget) budget today"
+                    )
+                }
+                // The warning fired before `warnedAt` existed: today's words, not a number
+                // invented for them.
                 return Line(
                     eyebrow: "Open now · \(Furlough.warningMinutes) min left", color: Ember.amber,
                     big: .countdown(to: end), sub: "\(budget) budget · under \(Furlough.warningMinutes) min left"
@@ -611,6 +638,9 @@ struct TargetRow: View {
     let pending: PendingChange?
     /// Whether the anchor also holds this target; shown as a mark, not a duplicate row.
     var held = false
+    /// When today's 5-minute budget warning fired, where it has and the target is still open.
+    /// The row counts the last five minutes down from it, the way the Live Activity does.
+    var warnedAt: Date?
     var now: Date = .now
 
     var body: some View {
@@ -645,6 +675,23 @@ struct TargetRow: View {
                         .foregroundStyle(Ember.faint)
                         .layoutPriority(-1)
                     }
+                }
+                if let warnedAt {
+                    // Counted from the warning rather than from now, so the system's own timer
+                    // draws the same five minutes however often this row is rebuilt — and it
+                    // ticks by itself, which the list's once-a-minute clock does not.
+                    HStack(spacing: 4) {
+                        Text(
+                            timerInterval: warnedAt...warnedAt.addingTimeInterval(TimeInterval(Furlough.warningMinutes * 60)),
+                            countsDown: true
+                        )
+                        .font(EmberFont.numerals(10.5))
+                        .monospacedDigit()
+                        Text("of today's budget left")
+                            .emberBody(10.5, .semibold)
+                    }
+                    .foregroundStyle(Ember.amber)
+                    .padding(.top, 1)
                 }
                 if let pending {
                     Text(RowCopy.pendingLine(pending))

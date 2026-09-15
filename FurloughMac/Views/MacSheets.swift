@@ -599,6 +599,8 @@ struct SettingsSheet: View {
 
                 recordCard
 
+                notificationsCard
+
                 setupCard
 
                 diagnosticsCard
@@ -889,6 +891,56 @@ struct SettingsSheet: View {
         return model.notificationsGranted == true
             ? week
             : "\(week) Notifications are off, so nothing will arrive until they are allowed."
+    }
+
+    // MARK: Notifications
+
+    /// One switch each. The footnote is the point: muting blocks nothing and unblocks nothing,
+    /// so unlike almost everything else in this app it applies the moment it is clicked.
+    @ViewBuilder
+    private var notificationsCard: some View {
+        SectionLabel(text: "Notifications")
+        VStack(spacing: 0) {
+            ForEach(Array(NotificationKind.allCases.enumerated()), id: \.element) { index, kind in
+                if index > 0 { CardDivider() }
+                notificationRow(kind)
+            }
+        }
+        .emberCard()
+        Footnote(text: notificationsFootnote)
+            .padding(.top, 8)
+    }
+
+    private var notificationsFootnote: String {
+        let base = "Muting one blocks nothing and unblocks nothing, so it takes effect at once — there is no delay to wait out. This Mac's own answers; your iPhone keeps its own."
+        return model.notificationsGranted == true
+            ? base
+            : "\(base) Notifications are off for Furlough, so none of them arrive until they are allowed."
+    }
+
+    private func notificationRow(_ kind: NotificationKind) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(kind.title).emberBody(13).foregroundStyle(Ember.cream)
+                Text(kind.detail)
+                    .emberBody(11.5)
+                    .foregroundStyle(Ember.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+            Toggle(
+                kind.title,
+                isOn: Binding(
+                    get: { !model.mutedNotifications.contains(kind) },
+                    set: { model.setNotification(kind, on: $0) }
+                )
+            )
+            .labelsHidden()
+            .toggleStyle(.switch)
+            .tint(Ember.ember)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     }
 
     // MARK: Your setup

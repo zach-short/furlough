@@ -6,6 +6,7 @@ struct FurloughWidgetsBundle: WidgetBundle {
     var body: some Widget {
         StatusWidget()
         WindowLiveActivity()
+        AnchorLiveActivity()
         DropAnchorControl()
     }
 }

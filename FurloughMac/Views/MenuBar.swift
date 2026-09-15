@@ -165,7 +165,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let bars = Record.week(model.state.runtime.days, upTo: now)
         guard bars.contains(where: { $0.shieldedMinutes > 0 }) else { return nil }
         let item = NSMenuItem()
-        let view = NSHostingView(rootView: MenuTrend(bars: bars))
+        // Used minutes over the *same* seven days, not the history's fortnight: two numbers on
+        // one line have to be counted over one span or neither means anything.
+        let used = model.enforcer.measured.minutes(overLast: 7, upTo: now)
+        let view = NSHostingView(rootView: MenuTrend(bars: bars, usedMinutes: used))
         view.frame = NSRect(x: 0, y: 0, width: Self.trendSize.width, height: Self.trendSize.height)
         item.view = view
         return item
@@ -187,6 +190,11 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 // not the bar's.
 struct MenuTrend: View {
     var bars: [Record.DayBar]
+    /// Minutes actually used over the same seven days — the Mac is the only half that measures
+    /// them. No second set of bars: used and shielded do not share a scale (a day can hold
+    /// everything shut for twenty-four hours and be used for twenty minutes), so a bar drawn
+    /// against the other's ceiling would be a picture of nothing. One row of words instead.
+    var usedMinutes: Int = 0
     private var letters: [String] { Calendar.current.veryShortWeekdaySymbols }
 
     var body: some View {
@@ -224,6 +232,8 @@ struct MenuTrend: View {
 
     private var total: String {
         let minutes = bars.reduce(0) { $0 + $1.shieldedMinutes }
-        return minutes > 0 ? "\(TimeFormat.budget(minutes)) in seven days" : "Nothing held shut"
+        let held = minutes > 0 ? "\(TimeFormat.budget(minutes)) in seven days" : "Nothing held shut"
+        guard usedMinutes > 0 else { return held }
+        return "\(held) · \(TimeFormat.budget(usedMinutes)) used"
     }
 }

@@ -206,7 +206,10 @@ struct DigestPlanTests {
     }
 
     private func plan(_ state: SharedState, digest: Bool, now: Date = at(8, 12, 0), drift: TimeInterval = 0) -> [PlannedNotification] {
-        PendingNotifications.plan(state: state, now: now, drift: drift, digest: digest, calendar: cal)
+        PendingNotifications.plan(
+            state: state, now: now, drift: drift,
+            muted: digest ? [] : [.weeklyDigest], calendar: cal
+        )
     }
 
     @Test("nobody who has not asked for it is planned one")

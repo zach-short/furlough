@@ -33,6 +33,10 @@ struct SettingsView: View {
                         sectionRow("Where the time goes", detail: "The last fortnight, app by app") {
                             UsageView()
                         }
+                        CardDivider()
+                        sectionRow("Notifications", detail: notificationsSummary) {
+                            NotificationsScreen()
+                        }
                     }
                     .emberCard()
                     .padding(.top, 12)
@@ -120,6 +124,15 @@ struct SettingsView: View {
         let card = Record.card(model.state, now: model.state.now)
         guard !card.isEmpty else { return nil }
         return "No budget spent: \(Record.streakLine(card))"
+    }
+
+    /// The count, not a list: nine names would not fit, and the one fact worth knowing without
+    /// opening the screen is whether anything is switched off at all.
+    private var notificationsSummary: String {
+        let muted = model.mutedNotifications.count
+        if muted == 0 { return "Every one arrives" }
+        if muted == NotificationKind.allCases.count { return "All of them muted" }
+        return "\(muted) muted"
     }
 
     private var diagnostics: Diagnostics { model.diagnostics }

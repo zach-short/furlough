@@ -51,10 +51,12 @@ final class AppModel {
     /// Whether the usage step has been shown. Same reasoning as `wasAuthorized`.
     private(set) var hasSeenUsageStep = UserDefaults.standard.bool(forKey: AppModel.usageStepKey)
     private static let usageStepKey = "furlough.sawUsageStep"
-    /// Weekly digest toggle; defaults to on. Lives in the App Group (not app defaults) because
-    /// the monitor extension re-plans it while the app is closed — see
-    /// `PendingNotifications.digestPreferenceKey`.
-    private(set) var weeklyDigest = PendingNotifications.wantsWeeklyDigest
+    /// Which notifications this device has switched off; everything absent is on. Lives in the
+    /// App Group (not app defaults) because the monitor posts and re-plans them while the app is
+    /// closed — see `NotificationPreferences`.
+    private(set) var mutedNotifications = NotificationPreferences.muted
+    /// The weekly digest's own switch, which has a second home on the Record screen it is about.
+    var weeklyDigest: Bool { !mutedNotifications.contains(.weeklyDigest) }
     /// Whether the where-to-leave-it screen has been shown. A flag rather than "anchor has one
     /// tag": forgetting and re-pairing a tag would otherwise look like a first pairing again.
     private(set) var hasSeenTagPlacement = UserDefaults.standard.bool(forKey: AppModel.tagPlacementKey)
@@ -462,15 +464,22 @@ final class AppModel {
         return true
     }
 
-    /// `enforce()` re-plans notifications, so turning the digest off also withdraws any already
-    /// scheduled.
-    func setWeeklyDigest(_ on: Bool) {
-        guard on != weeklyDigest else { return }
-        PendingNotifications.setWantsWeeklyDigest(on)
-        weeklyDigest = on
-        SharedStore.log("weekly digest \(on ? "on" : "off")")
-        enforce(reason: "weekly digest")
+    /// Muting changes nothing about what is shielded, so it applies at once and waits out no
+    /// delay. The re-plan is what withdraws a notification already scheduled — and it is a
+    /// re-plan rather than a whole `enforce`, since nothing here moves a shield.
+    func setNotification(_ kind: NotificationKind, on: Bool) {
+        guard NotificationPreferences.isOn(kind) != on else { return }
+        NotificationPreferences.set(kind, on: on)
+        mutedNotifications = NotificationPreferences.muted
+        SharedStore.log("notification \(kind.rawValue) \(on ? "on" : "off")")
+        let current = SharedStore.load()
+        let clock = current.clock()
+        PendingNotifications.sync(
+            state: current, now: clock.now, drift: clock.drift, muted: mutedNotifications
+        )
     }
+
+    func setWeeklyDigest(_ on: Bool) { setNotification(.weeklyDigest, on: on) }
 
     func requestNotifications() async {
         do {
@@ -522,7 +531,7 @@ final class AppModel {
         ShieldReconciler.reconcile(reason: reason)
         // Rescheduled on every enforce (not just when queued) so the pre-loosening warning
         // stays accurate.
-        PendingNotifications.sync(state: current, now: clock.now, drift: clock.drift, digest: weeklyDigest)
+        PendingNotifications.sync(state: current, now: clock.now, drift: clock.drift, muted: mutedNotifications)
         WidgetCenter.shared.reloadAllTimelines()
         ControlCenter.shared.reloadControls(ofKind: Furlough.anchorControlKind)
         reload()
@@ -1885,9 +1894,9 @@ final class AppModel {
         hasSeenTagPlacement = false
         placingTagID = nil
         // Removed rather than set true: absent is what a fresh install has, and a fresh
-        // install's answer is yes.
-        PendingNotifications.forgetWeeklyDigest()
-        weeklyDigest = true
+        // install's answer is yes to every one of them.
+        NotificationPreferences.forgetAll()
+        mutedNotifications = []
         // Removed rather than emptied: absent is what "never asked" means, so both guides come
         // round again on next launch.
         UserDefaults.standard.removeObject(forKey: Self.finishedGuidesKey)

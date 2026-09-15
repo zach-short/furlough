@@ -5,7 +5,7 @@ import Foundation
 extension Activity: @retroactive @unchecked Sendable {}
 
 /// Keeps the Lock Screen in step with the windows: one Live Activity for the open window, one
-/// scheduled ahead for the next.
+/// scheduled ahead for the next — and since step 48 a second, separate activity for the Anchor.
 ///
 /// `Activity.request(…, start:)` (iOS 26) lets the next window be requested while the app is
 /// foreground and have it arrive later on its own, even on a locked/closed phone — before this,
@@ -18,9 +18,12 @@ enum LiveActivityManager {
     nonisolated static func sync(state: SharedState, canStart: Bool = true) {
         let clock = state.clock()
         let summary = Policy.summary(state: state, now: clock.now).shifted(by: clock.drift)
+        let anchor = Policy
+            .anchorActivity(config: Policy.effectiveConfig(state, now: clock.now), now: clock.now)?
+            .shifted(by: clock.drift)
         let now = clock.device(clock.now)
         Task.detached {
-            await apply(summary: summary, now: now, canStart: canStart)
+            await apply(summary: summary, anchor: anchor, now: now, canStart: canStart)
         }
     }
 
@@ -33,12 +36,22 @@ enum LiveActivityManager {
         var names: [String]
     }
 
-    nonisolated static func apply(summary: Policy.Summary, now: Date, canStart: Bool = true) async {
+    nonisolated static func apply(
+        summary: Policy.Summary,
+        anchor: Policy.AnchorActivity? = nil,
+        now: Date,
+        canStart: Bool = true
+    ) async {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+        await applyAnchor(anchor, now: now, canStart: canStart)
         let existing = Activity<FurloughActivityAttributes>.activities
         var wanted: [Wanted] = []
+        // Zach's call, 2026-09-14: the anchor supersedes the window activity while it holds. A
+        // window counting down under a total hold is a countdown to nothing. A *scheduled*
+        // anchor doesn't supersede anything — it is a promise, and the window is still open.
+        let anchored = anchor.map { !$0.isScheduled } ?? false
 
-        if let openUntil = summary.openUntil, !summary.openNames.isEmpty, openUntil > now {
+        if !anchored, let openUntil = summary.openUntil, !summary.openNames.isEmpty, openUntil > now {
             let contentState = FurloughActivityAttributes.ContentState(
                 openNames: summary.openNames,
                 note: "Open",
@@ -59,7 +72,7 @@ enum LiveActivityManager {
             ))
         }
         // `nextOpenUntil` is nil for an all-day budget — nothing to count down to.
-        if let start = summary.nextOpenAt, let end = summary.nextOpenUntil,
+        if !anchored, let start = summary.nextOpenAt, let end = summary.nextOpenUntil,
            !summary.nextOpenNames.isEmpty, start > now, end > start {
             let contentState = FurloughActivityAttributes.ContentState(
                 openNames: summary.nextOpenNames, note: "Open", warned: false,
@@ -109,6 +122,85 @@ enum LiveActivityManager {
         }
     }
 
+    // MARK: The Anchor
+    //
+    // Its own lifecycle, over its own attributes type. Started on every drop path the app or a
+    // schedule can reach, and — the half that matters — ended on every release path, because an
+    // activity left running after a release is a phone that says it is locked when it is not.
+
+    nonisolated static func applyAnchor(
+        _ plan: Policy.AnchorActivity?, now: Date, canStart: Bool
+    ) async {
+        let existing = Activity<AnchorActivityAttributes>.activities
+        guard let plan else {
+            // Released, or the schedule that promised a hold can no longer perform one.
+            await end(existing)
+            return
+        }
+        let content = ActivityContent(
+            state: AnchorActivityAttributes.ContentState(
+                headline: plan.headline,
+                held: plan.held,
+                droppedAt: plan.droppedAt,
+                until: plan.until,
+                anchorsEverything: plan.anchorsEverything
+            ),
+            // A tag-only hold has no end to go stale at; a timed one goes stale when it lifts.
+            staleDate: plan.until
+        )
+        // There is only ever one anchor, so anything past the first is a duplicate.
+        let current = existing.first
+        await end(Array(existing.dropFirst()))
+
+        if let current {
+            // A pending activity's start cannot be moved, and a started one cannot be put back
+            // to pending, so those two cases are ended and asked for again; everything else —
+            // including a promise becoming the hold it promised — is an update in place.
+            let waiting = isWaitingToStart(current)
+            let keeps = waiting == plan.isScheduled
+                && (!waiting || current.content.state.droppedAt == plan.droppedAt)
+            if keeps {
+                await current.update(content)
+                return
+            }
+            await end([current])
+        }
+        guard canStart else { return }
+        do {
+            if let start = plan.startsAt {
+                // Below iOS 26 there is no scheduled start, so a promised hold simply waits for
+                // the drop itself to be synced — the same fallback the next window takes.
+                guard #available(iOS 26.0, *) else { return }
+                _ = try Activity.request(
+                    attributes: AnchorActivityAttributes(),
+                    content: content,
+                    pushType: nil,
+                    style: .standard,
+                    alertConfiguration: AlertConfiguration(
+                        title: "Anchor dropped",
+                        body: "\(plan.held) locked\(plan.until.map { " until \(TimeFormat.clock($0))" } ?? " until you scan your tag").",
+                        sound: .default
+                    ),
+                    start: start
+                )
+                SharedStore.log("scheduled anchor live activity for \(TimeFormat.clock(start))")
+            } else {
+                _ = try Activity.request(attributes: AnchorActivityAttributes(), content: content, pushType: nil)
+            }
+        } catch {
+            SharedStore.log("anchor live activity request failed: \(error.localizedDescription)")
+        }
+    }
+
+    /// A scheduled activity reads as `.pending` until its start arrives (iOS 26). Below that
+    /// nothing can be scheduled at all, so nothing is ever waiting.
+    private nonisolated static func isWaitingToStart<Attributes: ActivityAttributes>(
+        _ activity: Activity<Attributes>
+    ) -> Bool {
+        guard #available(iOS 26.0, *) else { return false }
+        return activity.activityState == .pending
+    }
+
     /// Compared by minutes covered — the only thing about an activity stable across a sync.
     private nonisolated static func same(
         _ a: FurloughActivityAttributes, _ b: FurloughActivityAttributes
@@ -127,7 +219,10 @@ enum LiveActivityManager {
         )
     }
 
-    private nonisolated static func end(_ activities: [Activity<FurloughActivityAttributes>]) async {
+    /// Generic over the attributes: the window and the anchor are two types with one way out.
+    private nonisolated static func end<Attributes: ActivityAttributes>(
+        _ activities: [Activity<Attributes>]
+    ) async {
         for activity in activities {
             await activity.end(nil, dismissalPolicy: .immediate)
         }

@@ -52,9 +52,12 @@ final class MacModel {
     private(set) var finishedGuides = MacModel.storedFinishedGuides
 
     private(set) var hasOfferedWebFilter = SharedStore.defaults.bool(forKey: MacModel.filterOfferedKey)
-    /// Per-device, like the record it's about — doesn't sync, unlike most settings. See
-    /// `PendingNotifications.digestPreferenceKey`.
-    private(set) var weeklyDigest = PendingNotifications.wantsWeeklyDigest
+    /// Which notifications this Mac has switched off; everything absent is on. Per-device,
+    /// like the record they are about — these do not sync, unlike most settings. See
+    /// `NotificationPreferences`.
+    private(set) var mutedNotifications = NotificationPreferences.muted
+    /// The weekly digest's own switch, which has a second home in Settings > The record.
+    var weeklyDigest: Bool { !mutedNotifications.contains(.weeklyDigest) }
 
     private static let onboardedKey = "furlough.mac.onboarded"
     private static let filterOfferedKey = "furlough.mac.filterOffered"
@@ -97,7 +100,7 @@ final class MacModel {
         enforcer.onDayRollover = { [weak self] state in
             guard let self else { return }
             let clock = state.clock()
-            PendingNotifications.sync(state: state, now: clock.now, drift: clock.drift, digest: self.weeklyDigest)
+            PendingNotifications.sync(state: state, now: clock.now, drift: clock.drift, muted: self.mutedNotifications)
         }
         enforcer.start()
         startTicking()
@@ -360,6 +363,14 @@ final class MacModel {
     }
 
     /// No NFC tag on the Mac: only the phone's tag, via iCloud, can release this anchor.
+    /// Why a drop would be refused right now, without performing one — for the menu item, which
+    /// has to be disabled with a reason rather than enabled and then complaining. Reads the
+    /// cached link answers; `dropAnchor` re-reads them fresh before it actually locks anything.
+    var dropRefusal: Policy.DropRefusal? {
+        var config = state.config
+        return AnchorSync.macDrop(&config, now: now, hasKey: hasKey, cloudAvailable: cloudAvailable)
+    }
+
     func dropAnchor() -> String? {
         var current = SharedStore.load()
         let now = current.now
@@ -470,14 +481,22 @@ final class MacModel {
         return state.config.hasAnyHost
     }
 
-    /// `enforce`'s `sync` withdraws any already-scheduled digest when turned off.
-    func setWeeklyDigest(_ on: Bool) {
-        guard on != weeklyDigest else { return }
-        PendingNotifications.setWantsWeeklyDigest(on)
-        weeklyDigest = on
-        SharedStore.log("weekly digest \(on ? "on" : "off")")
-        enforce(reason: "weekly digest")
+    /// Muting changes nothing about what is shielded, so it applies at once and waits out no
+    /// delay. The re-plan is what withdraws one already scheduled; nothing here moves a shield,
+    /// so it is a re-plan rather than a whole `enforce`.
+    func setNotification(_ kind: NotificationKind, on: Bool) {
+        guard NotificationPreferences.isOn(kind) != on else { return }
+        NotificationPreferences.set(kind, on: on)
+        mutedNotifications = NotificationPreferences.muted
+        SharedStore.log("notification \(kind.rawValue) \(on ? "on" : "off")")
+        let current = SharedStore.load()
+        let clock = current.clock()
+        PendingNotifications.sync(
+            state: current, now: clock.now, drift: clock.drift, muted: mutedNotifications
+        )
     }
+
+    func setWeeklyDigest(_ on: Bool) { setNotification(.weeklyDigest, on: on) }
 
     func noteWebFilterOffered() {
         guard !hasOfferedWebFilter else { return }
@@ -565,7 +584,7 @@ final class MacModel {
         current.runtime.lastRegistration = now
         SharedStore.save(current)
         enforcer.reconcile(reason: reason)
-        PendingNotifications.sync(state: current, now: now, drift: clock.drift, digest: weeklyDigest)
+        PendingNotifications.sync(state: current, now: now, drift: clock.drift, muted: mutedNotifications)
         WidgetCenter.shared.reloadAllTimelines()
         reload()
     }
@@ -906,9 +925,10 @@ final class MacModel {
         wantsBothHalves = false
         anchorHalfAdds = .anchor
         finishedGuides = []
-        // Removed, not set true: absence is what a fresh install has, and its default is yes.
-        PendingNotifications.forgetWeeklyDigest()
-        weeklyDigest = true
+        // Removed, not set true: absence is what a fresh install has, and its default is yes
+        // to every one of them.
+        NotificationPreferences.forgetAll()
+        mutedNotifications = []
         SharedStore.log("reset everything (Debug build)")
         enforce(reason: "reset")
     }
