@@ -2,6 +2,8 @@
 
 **Adapted to this repo 2026-09-14, solo mode.**
 
+**Standard: personal-config `standard/AGENT-PRACTICES.boilerplate.md` v1.0.0 — that release is the 2026-09-14 boilerplate this was adapted from, imported unchanged. The standard is now at v1.0.2; re-adapt from personal-config.**
+
 **What this is.** The working standard for agent-driven development here: how work is scoped
 and decided, how it is sized to a model's context, which model runs what, how several sessions
 run against one checkout without eating each other's work, what a session hands the next one,
