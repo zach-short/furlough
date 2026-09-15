@@ -148,6 +148,22 @@ that merely *implements* a settled decision is yours to take — record it as a 
 HANDOFF step (2.1), with one line on how to reverse it.
 *Test:* the contradiction reaches Zach as a question before the next edit to that file lands.
 
+**R13 — Run the model the item assigns, or hand it to one that is.** Every board row and every
+pass-off prompt states a driver (Part 4). Compare it to the model you are actually running
+**first** — before reading the codebase, before planning, before the first edit — and say in one
+line which you are. If they match, go. If they do not, there are two moves and no third:
+**delegate** the whole prompt to a subagent with that model passed explicitly, or **stop** and
+hand Zach a pass-off prompt (Part 3) carrying what this session already established, naming the
+model it is for. Prefer delegating when the item is self-contained; prefer handing off when it
+needs Zach's decisions along the way, or when the context already built is worth more than the
+work. Never do the work yourself on the wrong model, and never downgrade an assignment because
+the item looked smaller once you had read it — "it turned out to be simple" is a judgement only
+the assigned model gets to make. If an assignment looks wrong, say so and ask (R6); do not
+overrule it. Added 2026-09-14, at Zach's instruction, and in `~/.claude/CLAUDE.md` too, because
+a rule that lives only in a file read *after* work starts fires too late.
+*Test:* the session's first message names both models; a mismatched session's diff is a
+delegation or a pass-off, never an implementation.
+
 ---
 
 # Part 2 — Where work gets written down
@@ -449,6 +465,22 @@ missed API rather than a hole in the lock.
 
 Every board item states its driver, and the close-out repeats it (Part 7, Block C) so Zach can
 set the model before opening the next session.
+
+## The check on pickup
+
+**Stating the driver only works if the session that picks the item up reads it as binding.**
+That is R13, and it is the half of model selection that is not about choosing: compare the
+item's driver to the model you are running, first, and say which you are in one line. On a
+mismatch, delegate the prompt to a subagent with that model passed explicitly — the same rule
+as below, that a subagent never inherits the session's tier — or stop and write the pass-off
+(Part 3) instead of the code. A session that quietly runs a Fable item on the Default tier
+produces a diff that passes every gate and is wrong on the phone, which is the exact failure the
+column exists to prevent, and nothing downstream would catch it.
+
+The one case that is neither: **an item whose driver looks wrong once it is understood.** Raise
+it (R6) with what you now know and let Zach re-assign. Re-reading an item as easier than its
+column says is the commonest way this rule gets broken, and it is broken by the session that has
+read the least.
 
 ## Subagents
 
