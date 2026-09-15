@@ -1,0 +1,42 @@
+{
+  "expected" : {
+    "isAllowed" : true,
+    "status" : "open",
+    "until" : 1320
+  },
+  "function" : "Policy.status",
+  "input" : {
+    "config" : {
+      "loosenDelayHours" : 24,
+      "targets" : [
+        {
+          "addedAt" : "2026-09-01T00:00:00Z",
+          "id" : "20000000-0000-0000-0000-000000000001",
+          "kind" : {
+            "host" : {
+              "_0" : "youtube.com"
+            }
+          },
+          "nickname" : "",
+          "rule" : {
+            "dailyBudgetMinutes" : 60,
+            "windows" : [
+              {
+                "endMinute" : 1320,
+                "startMinute" : 540
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "now" : "2026-09-08T12:00:00Z",
+    "runtime" : {
+      "exhausted" : {
+        "20000000-0000-0000-0000-000000000001" : "2026-09-07"
+      }
+    },
+    "targetID" : "20000000-0000-0000-0000-000000000001"
+  },
+  "name" : "exhaustion is keyed by the day, so a spent Monday leaves Tuesday open"
+}

@@ -1,0 +1,72 @@
+{
+  "expected" : {
+    "anchors" : false,
+    "appNeedsPicker" : false,
+    "existing" : "10000000-0000-0000-0000-000000000002",
+    "hosts" : [
+
+    ],
+    "isNothing" : false,
+    "rule" : {
+      "dailyBudgetMinutes" : 120,
+      "windows" : [
+        {
+          "days" : 127,
+          "endMinute" : 1380,
+          "startMinute" : 1080
+        }
+      ]
+    },
+    "summary" : "Zach's iPhone added Netflix. It brings your iPhone's rule for it."
+  },
+  "function" : "SharedAdditions.landing",
+  "input" : {
+    "addition" : {
+      "addedAt" : "2026-09-08T10:00:00Z",
+      "bundleIDs" : [
+        "com.netflix.netflix"
+      ],
+      "half" : "rules",
+      "hosts" : [
+        "netflix.com"
+      ],
+      "id" : "00000000-0000-0000-0000-0000000000E4",
+      "isApp" : false,
+      "origin" : "phone-a",
+      "platform" : "phone",
+      "rule" : {
+        "dailyBudgetMinutes" : 120,
+        "windows" : [
+          {
+            "endMinute" : 1380,
+            "startMinute" : 1080
+          }
+        ]
+      },
+      "sequence" : 2,
+      "title" : "Netflix"
+    },
+    "companion" : "always",
+    "config" : {
+      "loosenDelayHours" : 24,
+      "targets" : [
+        {
+          "addedAt" : "2026-09-07T09:00:00Z",
+          "id" : "10000000-0000-0000-0000-000000000002",
+          "kind" : {
+            "host" : {
+              "_0" : "netflix.com"
+            }
+          },
+          "nickname" : ""
+        }
+      ]
+    },
+    "from" : "Zach's iPhone",
+    "installed" : {
+
+    },
+    "now" : "2026-09-08T12:00:00Z"
+  },
+  "name" : "the sender's rule is given to a row that has none of its own"
+}

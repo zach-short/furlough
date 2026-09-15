@@ -1,0 +1,36 @@
+{
+  "expected" : {
+    "note" : "released by the phone; already up here",
+    "profile" : {
+      "isAnchored" : false,
+      "kinds" : [
+
+      ],
+      "schedules" : [
+
+      ],
+      "scope" : "chosen",
+      "sequence" : 4,
+      "tags" : [
+
+      ]
+    }
+  },
+  "function" : "AnchorSync.merge",
+  "input" : {
+    "local" : {
+      "isAnchored" : false,
+      "sequence" : 3
+    },
+    "now" : "2026-09-08T12:00:00Z",
+    "remote" : {
+      "isAnchored" : false,
+      "origin" : "tagScan",
+      "platform" : "phone",
+      "sequence" : 4,
+      "writer" : "phone-a",
+      "writtenAt" : "2026-09-08T11:59:00Z"
+    }
+  },
+  "name" : "a release accepted while nothing is holding here still moves the sequence on"
+}

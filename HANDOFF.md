@@ -404,6 +404,14 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   only copy that has to read this phone's own state stays in Swift. The two are wired
   together by `Furlough.helpURL(_:)` and the paths are literals on both sides, so renaming a
   page means editing the Swift too — `bun run build` will not catch it.
+- `protocol/`: the contract in a form that is not Swift, for a port to be built against — what
+  crosses between devices (step 45) and what one device decides (step 46). `README.md` is the
+  whole of it in words; `schema/` is JSON Schema for the four values that cross plus the setup
+  file; `fixtures/` is 90 test vectors with hand-written inputs and expectations generated from
+  the code — 42 for the link, 48 in `policy/` for the rules engine; `tables/` is `Companions`,
+  `AppUtility` and `RuleSuggestion` dumped as JSON. No Swift compiles from here —
+  `Tests/Core/ProtocolFixturesTests.swift` is what runs it all, and regenerating is that test
+  with `TEST_RUNNER_FURLOUGH_WRITE_FIXTURES=1`.
 
 ## How enforcement works (do not break these invariants)
 
@@ -3124,6 +3132,124 @@ The plan for this stretch. Tick each phase off here as it lands.
     the one map between a minute and a point down a column, so a line with the anchor glyph can be
     laid over the same geometry later without deriving it again. Nothing more; it is not this
     grid's screen.
+
+45. **The link contract, in a form that is not Swift (pass-off item 13).** Done 2026-09-14, in
+    `protocol/`. Zach is weighing Android, Windows and Linux (see the "Furlough Beyond Apple"
+    assessment), and every port needs the same two things before a line of Kotlin is worth
+    writing: the exact shape of what crosses between devices, and a way to prove a second
+    implementation merges, drops and lands additions exactly as this one does. Both lived only in
+    Swift and its tests. This is them written down. It builds no port, no relay and no transport,
+    and it changes no existing Swift — the only new code is one test file.
+
+    **`protocol/README.md`** is the contract in words: what crosses and what never does (tokens,
+    and rules as such); the four keys and each entry's lifetime; every field of `AnchorRecord`,
+    `LinkedDevice`, `Revocation` and `SharedAddition` with its meaning and its encoding; the
+    merge rules branch by branch; the Mac-drop guard and why `noCloud` is checked before
+    `noPhone`; the leave refusal; the ring, the watermark per source and the declined set; what a
+    receiver does with an addition on each platform, and why the phone's shape and the Mac's
+    differ; the three settings; the four things a transport has to provide and which of them
+    iCloud gives for free; and a "not decided" list. The sentences are step 37's and the doc
+    comments' — nothing in it is a rule that was not read in the code first.
+
+    **`protocol/schema/`** is JSON Schema (draft 2020-12) for the four values plus
+    `config-export.json` for the setup file, with `Rule` and `TimeWindow` as `$defs` the export
+    schema refers back to.
+
+    **`protocol/fixtures/`** is 42 vectors for the link, one JSON file each, `{name, function,
+    input, expected}`: 11 for every branch of `merge`, 6 for `macDrop` (its four reachable
+    refusals, the drop, and the expired anchor it lifts first — `nothingToAnchor` and `tooSoon`
+    belong to `Policy.drop` and it cannot return them), 9 for the roster and the leave refusal,
+    16 for the ring, `unseen` and the Mac's `landing`. **Inputs are written by hand and
+    expectations by the code**, which is the whole point: with
+    `TEST_RUNNER_FURLOUGH_WRITE_FIXTURES=1` every `expected` is rewritten from current behaviour
+    instead of asserted, so a behaviour change fails the test until somebody regenerates on
+    purpose and the diff of the fixtures is the review. (Plain `FURLOUGH_WRITE_FIXTURES=1` does
+    nothing: `xcodebuild` does not hand its own environment to the test process, and without the
+    prefix the run silently just asserts.)
+
+    **`protocol/tables/`**: `companions.json` (83 pairs), `tiers.json` and
+    `rule-suggestions.json`, dumped from `Companions`, `AppUtility` and `RuleSuggestion` by the
+    same test under the same flag. `other-platforms.json` is keyed by pair title with an
+    `android` and a `windows` column. **Zach's call, twice.** The `windows` column ships empty
+    and stays empty: item 11's house rule is that every entry is confirmed from a vendor source,
+    and most Windows executables cannot be confirmed from a vendor page at all, so what would
+    even *count* as a confirmation there is the undecided part. The `android` column was the same
+    until he asked for the groundwork a Kotlin port needs, and it is now filled for 82 of the 83
+    — each confirmed against its own Play listing, which had to answer 200 **and** name the app
+    in its `og:title`, since a 200 alone only proves some app owns that identifier. `theScore
+    Bet` is the one left empty on purpose. Its test only checks that every key is a real pair
+    title; the values are not a thing a machine can check, which is the reason for the rule.
+
+    **`Tests/Core/ProtocolFixturesTests.swift`** loads every fixture with the real Codable types,
+    runs the pure function and asserts. It finds the files from `#filePath` rather than adding
+    resources, so `project.yml` is untouched. It also checks each schema against a real encode —
+    every key the encoder writes is a property the schema names, every property the schema
+    requires is one the encoder writes, and each enum's raw values equal the schema's `enum` list
+    — by a small recursive walk over `properties`, resolving `$ref` within a file and across
+    them. No JSON Schema library; this project takes no dependencies. The enum lists are guarded
+    by exhaustive `switch`es whose only job is to stop compiling when a case is added.
+
+    Expectations are whole objects where that is what the function produces (`merge` and
+    `macDrop` give back an `AnchorProfile`) and projections where the whole object would be
+    noise: `appended` is checked by the surviving ring's ids and sequences in order, because that
+    is all it decides. Inputs are minimal — `Config` and `AnchorProfile` both decode tolerantly,
+    so a fixture writes only the fields its case is about.
+
+    **The mechanism did its job the first time it was asked to, which is the thing to know about
+    it.** The vectors were written on 2026-09-10 and landed on 2026-09-14, and in between
+    `SharedAdditions.landing` grew a `now:` and a `Landing.anchors`. Regenerating moved *only*
+    the six landing fixtures — merge, `macDrop`, the roster, the ring and all 48 policy vectors
+    came back byte-identical — so the drift was one function wide and the diff said so without
+    anyone having to go looking. Closing it is what the five new landing vectors are
+    (`landing-anchor-half-*`): an addition to the anchor's half takes a new door onto this
+    device's list, is still the whole offer where the row is already blocked but off the list
+    ("Hold it here too?"), is nothing at all where the row is already on it, is refused while the
+    anchor holds — nothing changes the list under a lock — and never joins an everything-except
+    list, where the list is what stays *open*. §8 of the README gained the `anchors` and
+    `owesAnchoredApp` rules with it, including the one a port will get wrong if it is not told:
+    `land` **re-checks** the anchor against the clock rather than trusting `landing.anchors`,
+    because under Ask time passes between the offer and the answer.
+
+    **What Zach should do:** read `protocol/README.md` once as if he were the Android engineer,
+    and say what he could not build from it. Nothing to tap; there is no UI in this.
+
+46. **The rules engine as vectors.** Done 2026-09-14, the second half of item 13. Step 45 pinned
+    what *crosses*; this pins what one device *decides*, because an Android build that syncs the
+    anchor perfectly and gets the windows wrong is not Furlough. Same mechanism, same test file,
+    same flag: 48 vectors in `protocol/fixtures/policy/`, flat and named by prefix (`status-`,
+    `transition-`, `classify-`, `pending-`, `night-`, `week-`, `spans-`), and §11 of
+    `protocol/README.md`. No existing Swift changed.
+
+    13 for `Policy.status` (the five-deep order, the anchor first, exhaustion keyed by the day,
+    the next-open search wrapping past Saturday, and two nights); 6 for `nextTransition`
+    (including a timed anchor's lift beating a window edge); 12 for `classify` — 10 for rules,
+    2 for tiers; 6 for `applyDuePending`; 3 for splitting and folding a night; 5 for a week of
+    per-weekday budgets; 3 for `ActivityLimit.spans`.
+
+    **Three things the vectors pin that a port would otherwise get wrong.** A night is stored as
+    two windows with the morning half's days shifted one day on, and read back as *one*: inside
+    the evening the status says 1680, past 1440, because nothing shuts at the join — unless the
+    morning is worth no minutes, and then it really does end at 1440. `isTighterOrEqual` is
+    compared **day by day**, so a week the same size but rearranged is a loosening while writing
+    one budget out as seven equal ones is not. And `applyDuePending` expires the undo window
+    before anything else and counts the landing into the record — two side effects a port could
+    implement halfway and still pass a naive test, so `landedToday` is in every expectation.
+
+    **The calendar is pinned and has to be**: Gregorian, GMT, `en_US_POSIX`, Sunday first,
+    weekday numbers 1…7 with 1 = Sunday, which is also how `TimeWindow.days` numbers its bits.
+    Run these against a local time zone and half of them disagree for reasons that have nothing
+    to do with the engine. Said in the README and in the suite's own doc comment.
+
+    **`spans` carries a caveat rather than a rule.** The ceiling of 19 is Apple's — one of the 20
+    DeviceActivity activities is the budget tracker — and a port should not inherit the number.
+    What carries over is the decomposition: saved rules *and queued ones*, days stripped so the
+    same hours on different days count once, nothing from a rule that never allows anything.
+    Included because item 13 named `ActivityLimitTests` as a source; the README says plainly
+    which half is Apple's.
+
+    §11 also lists **what the vectors do not cover**, so the set is not mistaken for the whole
+    engine: `Policy.decide` (two functions, one per platform, and a port writes its own),
+    `Policy.summary`, the record, and the delay arithmetic.
 
 ## Style rules
 

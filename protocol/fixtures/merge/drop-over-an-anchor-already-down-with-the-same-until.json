@@ -1,0 +1,42 @@
+{
+  "expected" : {
+    "note" : "already anchored here",
+    "profile" : {
+      "anchoredAt" : "2026-09-08T09:00:00Z",
+      "isAnchored" : true,
+      "kinds" : [
+
+      ],
+      "schedules" : [
+
+      ],
+      "scope" : "chosen",
+      "sequence" : 4,
+      "tags" : [
+
+      ],
+      "until" : "2026-09-08T15:00:00Z"
+    }
+  },
+  "function" : "AnchorSync.merge",
+  "input" : {
+    "local" : {
+      "anchoredAt" : "2026-09-08T09:00:00Z",
+      "isAnchored" : true,
+      "sequence" : 3,
+      "until" : "2026-09-08T15:00:00Z"
+    },
+    "now" : "2026-09-08T12:00:00Z",
+    "remote" : {
+      "anchoredAt" : "2026-09-08T10:00:00Z",
+      "isAnchored" : true,
+      "origin" : "drop",
+      "platform" : "mac",
+      "sequence" : 4,
+      "until" : "2026-09-08T15:00:00Z",
+      "writer" : "mac-a",
+      "writtenAt" : "2026-09-08T10:00:00Z"
+    }
+  },
+  "name" : "a drop that would not tighten the hold leaves it exactly where it was"
+}

@@ -31,7 +31,7 @@ on 1. Read the Done prompts only as history, or where one says a later item shou
 | 10 | Write down the no-QR, no-pause decisions | Done — HANDOFF 23, in the 8a session | Opus | D | nothing | `HANDOFF.md`, `site/src/pages/help/nfc-tags.astro` |
 | 11 | More companion pairs, every one confirmed | Done — HANDOFF 30 | **Sonnet** | F | nothing | `Companions.swift`, `CompanionsTests.swift`, new `design/companions-sources.md` |
 | 12 | Suggested rules by hazard tier, and an audit for quality-of-life defaults like it | Done — HANDOFF 28 | Opus | G | nothing | new `Shared/Core/RuleSuggestion.swift`, `RuleEditorView`, `Tests/Core` |
-| 13 | The link contract: schemas, test vectors and tables a port can be built against | **Open** — added 2026-09-10 | Opus | H | nothing; HANDOFF 37 landed | new `protocol/`, new `Tests/Core/ProtocolFixturesTests.swift`, `HANDOFF.md` |
+| 13 | The link contract: schemas, test vectors and tables a port can be built against | Done — HANDOFF 45 and 46, both halves | Opus | H | nothing; HANDOFF 37 landed | new `protocol/`, new `Tests/Core/ProtocolFixturesTests.swift`, `HANDOFF.md` |
 | 14 | Cache the token map, so the usage page's icons are instant on later visits | **Open** — added 2026-09-10 | Opus | I | the tables-and-monograms commit on main | new `Shared/Core/TokenCache.swift`, `SharedStore`, `UsageReader`, `UsageView.load`, `AppModel.nameUnnamedTargets`, new `Tests/Core/TokenCacheTests.swift`, `HANDOFF.md` |
 | 15 | Apple Watch complication and a wrist-only Drop Anchor | **Settled as no** — HANDOFF 42 | — | J | — | nothing; no target was added |
 | 16 | A StandBy-friendly widget | Done — HANDOFF 42 | Opus | K | nothing | `FurloughWidgets/StatusWidget.swift` |

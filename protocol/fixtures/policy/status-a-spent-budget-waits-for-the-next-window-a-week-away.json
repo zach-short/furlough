@@ -1,0 +1,46 @@
+{
+  "expected" : {
+    "isAllowed" : false,
+    "nextOpen" : {
+      "daysAhead" : 7,
+      "minuteOfDay" : 540
+    },
+    "status" : "exhausted"
+  },
+  "function" : "Policy.status",
+  "input" : {
+    "config" : {
+      "loosenDelayHours" : 24,
+      "targets" : [
+        {
+          "addedAt" : "2026-09-01T00:00:00Z",
+          "id" : "20000000-0000-0000-0000-000000000001",
+          "kind" : {
+            "host" : {
+              "_0" : "youtube.com"
+            }
+          },
+          "nickname" : "",
+          "rule" : {
+            "dailyBudgetMinutes" : 60,
+            "windows" : [
+              {
+                "days" : 4,
+                "endMinute" : 1320,
+                "startMinute" : 540
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "now" : "2026-09-08T12:00:00Z",
+    "runtime" : {
+      "exhausted" : {
+        "20000000-0000-0000-0000-000000000001" : "2026-09-08"
+      }
+    },
+    "targetID" : "20000000-0000-0000-0000-000000000001"
+  },
+  "name" : "a Tuesday-only rule, spent on the Tuesday: the next open is a week out"
+}

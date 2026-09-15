@@ -1,0 +1,11 @@
+{
+  "expected" : {
+    "classification" : "loosening"
+  },
+  "function" : "Policy.classify(newUtility:)",
+  "input" : {
+    "newUtility" : "essential",
+    "targetUtility" : "useful"
+  },
+  "name" : "useful to essential shortens the wait, so it queues — which is what stops marking everything essential from being a way out of the delay"
+}

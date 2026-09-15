@@ -1,0 +1,12 @@
+{
+  "expected" : {
+    "message" : "The anchor is down. Scan your tag to release it, and then any device can be taken off the link.",
+    "refusal" : "anchored"
+  },
+  "function" : "DeviceLink.leaveRefusal",
+  "input" : {
+    "anchorHoldsHere" : true,
+    "anchorHoldsOnLink" : true
+  },
+  "name" : "holding here and on the link is the same one refusal, not two"
+}

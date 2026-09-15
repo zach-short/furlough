@@ -1,0 +1,37 @@
+{
+  "expected" : {
+    "note" : "released by the phone's tag",
+    "profile" : {
+      "isAnchored" : false,
+      "kinds" : [
+
+      ],
+      "schedules" : [
+
+      ],
+      "scope" : "chosen",
+      "sequence" : 4,
+      "tags" : [
+
+      ]
+    }
+  },
+  "function" : "AnchorSync.merge",
+  "input" : {
+    "local" : {
+      "anchoredAt" : "2026-09-08T09:00:00Z",
+      "isAnchored" : true,
+      "sequence" : 3
+    },
+    "now" : "2026-09-08T12:00:00Z",
+    "remote" : {
+      "isAnchored" : false,
+      "origin" : "tagScan",
+      "platform" : "phone",
+      "sequence" : 4,
+      "writer" : "phone-a",
+      "writtenAt" : "2026-09-08T11:59:00Z"
+    }
+  },
+  "name" : "a phone's tag scan releases an anchor holding here"
+}

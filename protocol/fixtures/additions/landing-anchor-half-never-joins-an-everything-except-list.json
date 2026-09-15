@@ -1,0 +1,51 @@
+{
+  "expected" : {
+    "anchors" : false,
+    "appNeedsPicker" : false,
+    "hosts" : [
+      "youtube.com"
+    ],
+    "isNothing" : false,
+    "summary" : "Zach's iPhone anchored YouTube. Block youtube.com here?"
+  },
+  "function" : "SharedAdditions.landing",
+  "input" : {
+    "addition" : {
+      "addedAt" : "2026-09-08T09:00:00Z",
+      "bundleIDs" : [
+
+      ],
+      "half" : "anchor",
+      "hosts" : [
+        "youtube.com"
+      ],
+      "id" : "00000000-0000-0000-0000-0000000000F5",
+      "isApp" : false,
+      "origin" : "phone-a",
+      "platform" : "phone",
+      "sequence" : 5,
+      "title" : "YouTube"
+    },
+    "companion" : "never",
+    "config" : {
+      "anchor" : {
+        "isAnchored" : false,
+        "kinds" : [
+
+        ],
+        "scope" : "everythingExcept",
+        "sequence" : 0
+      },
+      "loosenDelayHours" : 24,
+      "targets" : [
+
+      ]
+    },
+    "from" : "Zach's iPhone",
+    "installed" : {
+
+    },
+    "now" : "2026-09-08T12:00:00Z"
+  },
+  "name" : "everything-except: the door still lands, but the list there is what stays open and never grows"
+}

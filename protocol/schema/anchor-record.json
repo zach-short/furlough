@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://furloughapp.com/protocol/schema/anchor-record.json",
+  "title": "AnchorRecord",
+  "description": "What one device says about the anchor, as the other receives it: the anchor's state and nothing else. Stored as one JSON value under the key furlough.anchor.v1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["sequence", "isAnchored", "writer", "platform", "origin", "writtenAt"],
+  "properties": {
+    "sequence": {
+      "type": "integer",
+      "description": "Monotonic across every device: each write is one past anything either has seen. A record whose sequence is not strictly greater than the local one changes nothing."
+    },
+    "isAnchored": {
+      "type": "boolean",
+      "description": "Whether the writer's anchor is down."
+    },
+    "anchoredAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When it went down. Absent when nothing is holding."
+    },
+    "until": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When a timed hold ends. Absent means only a paired tag lifts it, which is tighter than any date. Judged by the receiver's own clock."
+    },
+    "writer": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The writing device's id, the same string it signs its roster entry with."
+    },
+    "platform": {
+      "enum": ["phone", "pad", "mac"],
+      "description": "What wrote it. An iPad runs the phone build and has no tag reader, so it is its own case: it can be anchored and can never release."
+    },
+    "origin": {
+      "enum": ["drop", "tagScan", "lift"],
+      "description": "How the write came about. drop: by hand, from a widget or Control Center, or by the schedule. tagScan: the one release, a paired tag read by a phone. lift: a timed anchor's until passed, informational only — the receiver computes the same expiry and refuses it as a release."
+    },
+    "writtenAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "The writer's Furlough time at the write."
+    }
+  }
+}

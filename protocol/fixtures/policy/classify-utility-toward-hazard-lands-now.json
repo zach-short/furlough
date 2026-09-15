@@ -1,0 +1,11 @@
+{
+  "expected" : {
+    "classification" : "tightening"
+  },
+  "function" : "Policy.classify(newUtility:)",
+  "input" : {
+    "newUtility" : "hazard",
+    "targetUtility" : "idle"
+  },
+  "name" : "idle to hazard lengthens the wait, so it lands at once"
+}

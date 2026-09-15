@@ -1,0 +1,88 @@
+{
+  "expected" : {
+    "changed" : true,
+    "config" : {
+      "anchor" : {
+        "isAnchored" : false,
+        "kinds" : [
+
+        ],
+        "schedules" : [
+
+        ],
+        "scope" : "chosen",
+        "sequence" : 0,
+        "tags" : [
+
+        ]
+      },
+      "isInTrial" : false,
+      "link" : {
+        "acceptAdditions" : "ask",
+        "companionSite" : "always",
+        "sendAdditions" : "ask"
+      },
+      "loosenDelayHours" : 24,
+      "schemaVersion" : 1,
+      "targets" : [
+        {
+          "addedAt" : "2026-09-01T00:00:00Z",
+          "id" : "20000000-0000-0000-0000-000000000001",
+          "kind" : {
+            "host" : {
+              "_0" : "youtube.com"
+            }
+          },
+          "nickname" : "",
+          "rule" : {
+            "dailyBudgetMinutes" : 30,
+            "windows" : [
+
+            ]
+          }
+        }
+      ]
+    },
+    "landedToday" : 0,
+    "pendingLeft" : [
+
+    ]
+  },
+  "function" : "Policy.applyDuePending",
+  "input" : {
+    "now" : "2026-09-08T12:00:00Z",
+    "state" : {
+      "config" : {
+        "loosenDelayHours" : 24,
+        "targets" : [
+          {
+            "addedAt" : "2026-09-01T00:00:00Z",
+            "id" : "20000000-0000-0000-0000-000000000001",
+            "kind" : {
+              "host" : {
+                "_0" : "youtube.com"
+              }
+            },
+            "nickname" : "",
+            "rule" : {
+              "dailyBudgetMinutes" : 30,
+              "windows" : [
+
+              ]
+            },
+            "undo" : {
+              "savedAt" : "2026-09-08T11:00:00Z"
+            }
+          }
+        ]
+      },
+      "pending" : [
+
+      ],
+      "runtime" : {
+
+      }
+    }
+  },
+  "name" : "an undo window closing is a change coming due like any other, so it is folded in here and not compared against the clock on every read"
+}

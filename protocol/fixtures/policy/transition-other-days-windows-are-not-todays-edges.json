@@ -1,0 +1,35 @@
+{
+  "expected" : {
+    "at" : "2026-09-09T00:00:00Z"
+  },
+  "function" : "Policy.nextTransition",
+  "input" : {
+    "config" : {
+      "loosenDelayHours" : 24,
+      "targets" : [
+        {
+          "addedAt" : "2026-09-01T00:00:00Z",
+          "id" : "20000000-0000-0000-0000-000000000001",
+          "kind" : {
+            "host" : {
+              "_0" : "youtube.com"
+            }
+          },
+          "nickname" : "",
+          "rule" : {
+            "dailyBudgetMinutes" : 60,
+            "windows" : [
+              {
+                "days" : 64,
+                "endMinute" : 1320,
+                "startMinute" : 540
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "now" : "2026-09-08T08:00:00Z"
+  },
+  "name" : "a Saturday-only window read on a Tuesday is not an edge today, so the answer is midnight"
+}

@@ -1,0 +1,27 @@
+{
+  "expected" : {
+    "windows" : [
+      {
+        "days" : 64,
+        "endMinute" : 240,
+        "startMinute" : 1020
+      }
+    ]
+  },
+  "function" : "TimeWindow.folded",
+  "input" : {
+    "windows" : [
+      {
+        "days" : 64,
+        "endMinute" : 1440,
+        "startMinute" : 1020
+      },
+      {
+        "days" : 1,
+        "endMinute" : 240,
+        "startMinute" : 0
+      }
+    ]
+  },
+  "name" : "the two stored halves read back as the one night they were written as — exact rather than a guess, because they allow the very same minutes of the week"
+}

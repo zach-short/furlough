@@ -1,0 +1,55 @@
+{
+  "expected" : {
+    "isAllowed" : true,
+    "status" : "open",
+    "until" : 1440
+  },
+  "function" : "Policy.status",
+  "input" : {
+    "config" : {
+      "loosenDelayHours" : 24,
+      "targets" : [
+        {
+          "addedAt" : "2026-09-01T00:00:00Z",
+          "id" : "20000000-0000-0000-0000-000000000001",
+          "kind" : {
+            "host" : {
+              "_0" : "youtube.com"
+            }
+          },
+          "nickname" : "",
+          "rule" : {
+            "budgetByWeekday" : [
+              0,
+              60,
+              60,
+              60,
+              60,
+              60,
+              60
+            ],
+            "dailyBudgetMinutes" : 60,
+            "windows" : [
+              {
+                "days" : 64,
+                "endMinute" : 1440,
+                "startMinute" : 1020
+              },
+              {
+                "days" : 1,
+                "endMinute" : 240,
+                "startMinute" : 0
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "now" : "2026-09-12T22:00:00Z",
+    "runtime" : {
+
+    },
+    "targetID" : "20000000-0000-0000-0000-000000000001"
+  },
+  "name" : "a Saturday night whose Sunday is worth no minutes: the morning half has no budget, so the night ends at 1440 rather than running on"
+}

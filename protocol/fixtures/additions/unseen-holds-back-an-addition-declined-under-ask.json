@@ -1,0 +1,79 @@
+{
+  "expected" : {
+    "unseen" : [
+      {
+        "origin" : "phone-a",
+        "sequence" : 2,
+        "title" : "Still asking"
+      }
+    ]
+  },
+  "function" : "SharedAdditions.unseen",
+  "input" : {
+    "declined" : [
+      "00000000-0000-0000-0000-0000000000D1"
+    ],
+    "devices" : [
+      {
+        "canRelease" : false,
+        "enrolledAt" : "2026-09-07T08:00:00Z",
+        "id" : "mac-a",
+        "lastSeen" : "2026-09-08T12:00:00Z",
+        "name" : "Studio",
+        "platform" : "mac"
+      },
+      {
+        "canRelease" : true,
+        "enrolledAt" : "2026-09-07T08:00:00Z",
+        "id" : "phone-a",
+        "lastSeen" : "2026-09-08T12:00:00Z",
+        "name" : "Zach's iPhone",
+        "platform" : "phone"
+      }
+    ],
+    "revoked" : {
+
+    },
+    "rings" : {
+      "phone-a" : [
+        {
+          "addedAt" : "2026-09-08T09:00:00Z",
+          "bundleIDs" : [
+
+          ],
+          "half" : "rules",
+          "hosts" : [
+            "declined.com"
+          ],
+          "id" : "00000000-0000-0000-0000-0000000000D1",
+          "isApp" : false,
+          "origin" : "phone-a",
+          "platform" : "phone",
+          "sequence" : 1,
+          "title" : "Not this time"
+        },
+        {
+          "addedAt" : "2026-09-08T10:00:00Z",
+          "bundleIDs" : [
+
+          ],
+          "half" : "rules",
+          "hosts" : [
+            "asking.com"
+          ],
+          "id" : "00000000-0000-0000-0000-0000000000D2",
+          "isApp" : false,
+          "origin" : "phone-a",
+          "platform" : "phone",
+          "sequence" : 2,
+          "title" : "Still asking"
+        }
+      ]
+    },
+    "thisDevice" : "mac-a",
+    "watermarks" : {
+
+    }
+  },
+  "name" : "a declined addition is not offered again, while one still waiting for an answer is: the declined set is what tells them apart"
+}

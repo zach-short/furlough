@@ -1,0 +1,32 @@
+{
+  "expected" : {
+    "hasKey" : true,
+    "others" : "your Zach's iPhone"
+  },
+  "function" : "Roster.hasKey",
+  "input" : {
+    "besides" : "mac-a",
+    "devices" : [
+      {
+        "canRelease" : false,
+        "enrolledAt" : "2026-09-08T08:00:00Z",
+        "id" : "mac-a",
+        "lastSeen" : "2026-09-10T07:00:00Z",
+        "name" : "Studio",
+        "platform" : "mac"
+      },
+      {
+        "canRelease" : true,
+        "enrolledAt" : "2026-09-07T08:00:00Z",
+        "id" : "phone-a",
+        "lastSeen" : "2026-09-10T09:00:00Z",
+        "name" : "Zach's iPhone",
+        "platform" : "phone"
+      }
+    ],
+    "revoked" : {
+
+    }
+  },
+  "name" : "a Mac with an iPhone on the link has a key besides itself"
+}

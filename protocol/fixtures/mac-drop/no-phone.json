@@ -1,0 +1,48 @@
+{
+  "expected" : {
+    "anchor" : {
+      "isAnchored" : false,
+      "kinds" : [
+        {
+          "host" : {
+            "_0" : "youtube.com"
+          }
+        }
+      ],
+      "schedules" : [
+
+      ],
+      "scope" : "chosen",
+      "sequence" : 2,
+      "tags" : [
+
+      ]
+    },
+    "message" : "No iPhone is on the link with this Mac. Only an iPhone's tag can release an anchor dropped here, so Furlough will not lock this Mac until one is — link both under Settings > Devices, then Drop anchor.",
+    "refusal" : "noPhone"
+  },
+  "function" : "AnchorSync.macDrop",
+  "input" : {
+    "cloudAvailable" : true,
+    "config" : {
+      "anchor" : {
+        "kinds" : [
+          {
+            "host" : {
+              "_0" : "youtube.com"
+            }
+          }
+        ],
+        "scope" : "chosen",
+        "sequence" : 2
+      },
+      "loosenDelayHours" : 24,
+      "targets" : [
+
+      ]
+    },
+    "hasKey" : false,
+    "now" : "2026-09-08T12:00:00Z"
+  },
+  "name" : "no device on the link can release, so a drop here would be a lock with no key"
+}

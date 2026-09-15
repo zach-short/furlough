@@ -1,0 +1,1024 @@
+[
+  {
+    "bundleIDs" : [
+      "com.google.ios.youtube"
+    ],
+    "hosts" : [
+      "youtube.com"
+    ],
+    "names" : [
+      "YouTube"
+    ],
+    "title" : "YouTube"
+  },
+  {
+    "bundleIDs" : [
+      "com.google.ios.youtubemusic"
+    ],
+    "hosts" : [
+      "music.youtube.com"
+    ],
+    "names" : [
+      "YouTube Music"
+    ],
+    "title" : "YouTube Music"
+  },
+  {
+    "bundleIDs" : [
+      "com.netflix.netflix"
+    ],
+    "hosts" : [
+      "netflix.com"
+    ],
+    "names" : [
+      "Netflix"
+    ],
+    "title" : "Netflix"
+  },
+  {
+    "bundleIDs" : [
+      "tv.twitch"
+    ],
+    "hosts" : [
+      "twitch.tv"
+    ],
+    "names" : [
+      "Twitch"
+    ],
+    "title" : "Twitch"
+  },
+  {
+    "bundleIDs" : [
+      "com.amazon.aiv.aivapp"
+    ],
+    "hosts" : [
+      "primevideo.com"
+    ],
+    "names" : [
+      "Prime Video",
+      "Amazon Prime Video"
+    ],
+    "title" : "Prime Video"
+  },
+  {
+    "bundleIDs" : [
+      "com.hulu.plus"
+    ],
+    "hosts" : [
+      "hulu.com"
+    ],
+    "names" : [
+      "Hulu"
+    ],
+    "title" : "Hulu"
+  },
+  {
+    "bundleIDs" : [
+      "com.disney.disneyplus"
+    ],
+    "hosts" : [
+      "disneyplus.com"
+    ],
+    "names" : [
+      "Disney+",
+      "Disney Plus"
+    ],
+    "title" : "Disney+"
+  },
+  {
+    "bundleIDs" : [
+      "com.wbd.stream",
+      "com.hbo.hbonow"
+    ],
+    "hosts" : [
+      "max.com"
+    ],
+    "names" : [
+      "Max",
+      "HBO Max"
+    ],
+    "title" : "Max"
+  },
+  {
+    "bundleIDs" : [
+      "com.peacocktv.peacock"
+    ],
+    "hosts" : [
+      "peacocktv.com"
+    ],
+    "names" : [
+      "Peacock TV",
+      "Peacock"
+    ],
+    "title" : "Peacock TV"
+  },
+  {
+    "bundleIDs" : [
+      "com.cbsvideo.app"
+    ],
+    "hosts" : [
+      "paramountplus.com"
+    ],
+    "names" : [
+      "Paramount+",
+      "Paramount Plus"
+    ],
+    "title" : "Paramount+"
+  },
+  {
+    "bundleIDs" : [
+      "com.crunchyroll.iphone"
+    ],
+    "hosts" : [
+      "crunchyroll.com"
+    ],
+    "names" : [
+      "Crunchyroll"
+    ],
+    "title" : "Crunchyroll"
+  },
+  {
+    "bundleIDs" : [
+      "com.rumble.battles"
+    ],
+    "hosts" : [
+      "rumble.com"
+    ],
+    "names" : [
+      "Rumble"
+    ],
+    "title" : "Rumble"
+  },
+  {
+    "bundleIDs" : [
+      "com.kick.mobile"
+    ],
+    "hosts" : [
+      "kick.com"
+    ],
+    "names" : [
+      "Kick"
+    ],
+    "title" : "Kick"
+  },
+  {
+    "bundleIDs" : [
+      "com.zhiliaoapp.musically",
+      "com.ss.iphone.ugc.ame"
+    ],
+    "hosts" : [
+      "tiktok.com"
+    ],
+    "names" : [
+      "TikTok"
+    ],
+    "title" : "TikTok"
+  },
+  {
+    "bundleIDs" : [
+      "com.burbn.instagram"
+    ],
+    "hosts" : [
+      "instagram.com"
+    ],
+    "names" : [
+      "Instagram"
+    ],
+    "title" : "Instagram"
+  },
+  {
+    "bundleIDs" : [
+      "com.reddit.reddit"
+    ],
+    "hosts" : [
+      "reddit.com"
+    ],
+    "names" : [
+      "Reddit"
+    ],
+    "title" : "Reddit"
+  },
+  {
+    "bundleIDs" : [
+      "com.atebits.tweetie2"
+    ],
+    "hosts" : [
+      "x.com",
+      "twitter.com"
+    ],
+    "names" : [
+      "X",
+      "Twitter"
+    ],
+    "title" : "X"
+  },
+  {
+    "bundleIDs" : [
+      "com.burbn.barcelona"
+    ],
+    "hosts" : [
+      "threads.com",
+      "threads.net"
+    ],
+    "names" : [
+      "Threads"
+    ],
+    "title" : "Threads"
+  },
+  {
+    "bundleIDs" : [
+      "xyz.blueskyweb.app"
+    ],
+    "hosts" : [
+      "bsky.app"
+    ],
+    "names" : [
+      "Bluesky"
+    ],
+    "title" : "Bluesky"
+  },
+  {
+    "bundleIDs" : [
+      "com.toyopagroup.picaboo"
+    ],
+    "hosts" : [
+      "snapchat.com"
+    ],
+    "names" : [
+      "Snapchat"
+    ],
+    "title" : "Snapchat"
+  },
+  {
+    "bundleIDs" : [
+      "com.facebook.facebook"
+    ],
+    "hosts" : [
+      "facebook.com"
+    ],
+    "names" : [
+      "Facebook"
+    ],
+    "title" : "Facebook"
+  },
+  {
+    "bundleIDs" : [
+      "com.facebook.messenger"
+    ],
+    "hosts" : [
+      "messenger.com"
+    ],
+    "names" : [
+      "Messenger"
+    ],
+    "title" : "Messenger"
+  },
+  {
+    "bundleIDs" : [
+      "pinterest",
+      "com.pinterest"
+    ],
+    "hosts" : [
+      "pinterest.com"
+    ],
+    "names" : [
+      "Pinterest"
+    ],
+    "title" : "Pinterest"
+  },
+  {
+    "bundleIDs" : [
+      "com.linkedin.linkedin"
+    ],
+    "hosts" : [
+      "linkedin.com"
+    ],
+    "names" : [
+      "LinkedIn"
+    ],
+    "title" : "LinkedIn"
+  },
+  {
+    "bundleIDs" : [
+      "com.tumblr.tumblr"
+    ],
+    "hosts" : [
+      "tumblr.com"
+    ],
+    "names" : [
+      "Tumblr"
+    ],
+    "title" : "Tumblr"
+  },
+  {
+    "bundleIDs" : [
+      "com.quora.app.mobile"
+    ],
+    "hosts" : [
+      "quora.com"
+    ],
+    "names" : [
+      "Quora"
+    ],
+    "title" : "Quora"
+  },
+  {
+    "bundleIDs" : [
+      "com.nextdoor.nextdoor"
+    ],
+    "hosts" : [
+      "nextdoor.com"
+    ],
+    "names" : [
+      "Nextdoor"
+    ],
+    "title" : "Nextdoor"
+  },
+  {
+    "bundleIDs" : [
+      "alexisbarreyat.bereal"
+    ],
+    "hosts" : [
+      "bereal.com"
+    ],
+    "names" : [
+      "BeReal"
+    ],
+    "title" : "BeReal"
+  },
+  {
+    "bundleIDs" : [
+      "com.hnc.discord",
+      "com.hammerandchisel.discord"
+    ],
+    "hosts" : [
+      "discord.com"
+    ],
+    "names" : [
+      "Discord"
+    ],
+    "title" : "Discord"
+  },
+  {
+    "bundleIDs" : [
+      "com.tinyspeck.slackmacgap",
+      "com.tinyspeck.chatlyio"
+    ],
+    "hosts" : [
+      "slack.com"
+    ],
+    "names" : [
+      "Slack"
+    ],
+    "title" : "Slack"
+  },
+  {
+    "bundleIDs" : [
+      "net.whatsapp.whatsapp"
+    ],
+    "hosts" : [
+      "web.whatsapp.com"
+    ],
+    "names" : [
+      "WhatsApp"
+    ],
+    "title" : "WhatsApp"
+  },
+  {
+    "bundleIDs" : [
+      "ru.keepcoder.telegram",
+      "ph.telegra.telegraph"
+    ],
+    "hosts" : [
+      "web.telegram.org"
+    ],
+    "names" : [
+      "Telegram"
+    ],
+    "title" : "Telegram"
+  },
+  {
+    "bundleIDs" : [
+      "us.zoom.xos",
+      "us.zoom.videomeetings"
+    ],
+    "hosts" : [
+      "zoom.us"
+    ],
+    "names" : [
+      "Zoom",
+      "zoom.us"
+    ],
+    "title" : "Zoom"
+  },
+  {
+    "bundleIDs" : [
+      "notion.id"
+    ],
+    "hosts" : [
+      "notion.so"
+    ],
+    "names" : [
+      "Notion"
+    ],
+    "title" : "Notion"
+  },
+  {
+    "bundleIDs" : [
+      "com.figma.desktop"
+    ],
+    "hosts" : [
+      "figma.com"
+    ],
+    "names" : [
+      "Figma"
+    ],
+    "title" : "Figma"
+  },
+  {
+    "bundleIDs" : [
+      "com.canva.canvaeditor"
+    ],
+    "hosts" : [
+      "canva.com"
+    ],
+    "names" : [
+      "Canva"
+    ],
+    "title" : "Canva"
+  },
+  {
+    "bundleIDs" : [
+      "com.fogcreek.trello",
+      "com.atlassian.trello"
+    ],
+    "hosts" : [
+      "trello.com"
+    ],
+    "names" : [
+      "Trello"
+    ],
+    "title" : "Trello"
+  },
+  {
+    "bundleIDs" : [
+      "com.substack.substack"
+    ],
+    "hosts" : [
+      "substack.com"
+    ],
+    "names" : [
+      "Substack"
+    ],
+    "title" : "Substack"
+  },
+  {
+    "bundleIDs" : [
+      "com.medium.reader"
+    ],
+    "hosts" : [
+      "medium.com"
+    ],
+    "names" : [
+      "Medium"
+    ],
+    "title" : "Medium"
+  },
+  {
+    "bundleIDs" : [
+      "com.duolingo.duolingomobile"
+    ],
+    "hosts" : [
+      "duolingo.com"
+    ],
+    "names" : [
+      "Duolingo"
+    ],
+    "title" : "Duolingo"
+  },
+  {
+    "bundleIDs" : [
+      "com.openai.chat"
+    ],
+    "hosts" : [
+      "chatgpt.com",
+      "chat.openai.com"
+    ],
+    "names" : [
+      "ChatGPT"
+    ],
+    "title" : "ChatGPT"
+  },
+  {
+    "bundleIDs" : [
+      "com.anthropic.claude"
+    ],
+    "hosts" : [
+      "claude.ai"
+    ],
+    "names" : [
+      "Claude"
+    ],
+    "title" : "Claude"
+  },
+  {
+    "bundleIDs" : [
+      "com.google.gemini"
+    ],
+    "hosts" : [
+      "gemini.google.com"
+    ],
+    "names" : [
+      "Gemini",
+      "Google Gemini"
+    ],
+    "title" : "Gemini"
+  },
+  {
+    "bundleIDs" : [
+      "ai.perplexity.app"
+    ],
+    "hosts" : [
+      "perplexity.ai"
+    ],
+    "names" : [
+      "Perplexity"
+    ],
+    "title" : "Perplexity"
+  },
+  {
+    "bundleIDs" : [
+      "ai.character.app"
+    ],
+    "hosts" : [
+      "character.ai"
+    ],
+    "names" : [
+      "Character.AI",
+      "Character AI"
+    ],
+    "title" : "Character.AI"
+  },
+  {
+    "bundleIDs" : [
+      "ai.x.grokapp"
+    ],
+    "hosts" : [
+      "grok.com"
+    ],
+    "names" : [
+      "Grok"
+    ],
+    "title" : "Grok"
+  },
+  {
+    "bundleIDs" : [
+      "com.spotify.client"
+    ],
+    "hosts" : [
+      "open.spotify.com"
+    ],
+    "names" : [
+      "Spotify"
+    ],
+    "title" : "Spotify"
+  },
+  {
+    "bundleIDs" : [
+      "com.soundcloud.touchapp"
+    ],
+    "hosts" : [
+      "soundcloud.com"
+    ],
+    "names" : [
+      "SoundCloud"
+    ],
+    "title" : "SoundCloud"
+  },
+  {
+    "bundleIDs" : [
+      "com.pandora"
+    ],
+    "hosts" : [
+      "pandora.com"
+    ],
+    "names" : [
+      "Pandora"
+    ],
+    "title" : "Pandora"
+  },
+  {
+    "bundleIDs" : [
+      "com.aspiro.tidal"
+    ],
+    "hosts" : [
+      "tidal.com"
+    ],
+    "names" : [
+      "TIDAL"
+    ],
+    "title" : "TIDAL"
+  },
+  {
+    "bundleIDs" : [
+      "com.espn.scorecenter"
+    ],
+    "hosts" : [
+      "espn.com"
+    ],
+    "names" : [
+      "ESPN"
+    ],
+    "title" : "ESPN"
+  },
+  {
+    "bundleIDs" : [
+      "com.nfl.gamecenter"
+    ],
+    "hosts" : [
+      "nfl.com"
+    ],
+    "names" : [
+      "NFL"
+    ],
+    "title" : "NFL"
+  },
+  {
+    "bundleIDs" : [
+      "com.bleacherreport.teamstream"
+    ],
+    "hosts" : [
+      "bleacherreport.com"
+    ],
+    "names" : [
+      "Bleacher Report"
+    ],
+    "title" : "Bleacher Report"
+  },
+  {
+    "bundleIDs" : [
+      "com.cnn.iphone"
+    ],
+    "hosts" : [
+      "cnn.com"
+    ],
+    "names" : [
+      "CNN"
+    ],
+    "title" : "CNN"
+  },
+  {
+    "bundleIDs" : [
+      "com.foxnews.foxnews"
+    ],
+    "hosts" : [
+      "foxnews.com"
+    ],
+    "names" : [
+      "FOX News"
+    ],
+    "title" : "FOX News"
+  },
+  {
+    "bundleIDs" : [
+      "com.nytimes.nytimes"
+    ],
+    "hosts" : [
+      "nytimes.com"
+    ],
+    "names" : [
+      "NYTimes",
+      "The New York Times"
+    ],
+    "title" : "NYTimes"
+  },
+  {
+    "bundleIDs" : [
+      "com.cardify.tinder"
+    ],
+    "hosts" : [
+      "tinder.com"
+    ],
+    "names" : [
+      "Tinder"
+    ],
+    "title" : "Tinder"
+  },
+  {
+    "bundleIDs" : [
+      "com.moxco.bumble"
+    ],
+    "hosts" : [
+      "bumble.com"
+    ],
+    "names" : [
+      "Bumble"
+    ],
+    "title" : "Bumble"
+  },
+  {
+    "bundleIDs" : [
+      "co.hinge.mobile.ios"
+    ],
+    "hosts" : [
+      "hinge.co"
+    ],
+    "names" : [
+      "Hinge"
+    ],
+    "title" : "Hinge"
+  },
+  {
+    "bundleIDs" : [
+      "com.grindrguy.grindrx"
+    ],
+    "hosts" : [
+      "grindr.com"
+    ],
+    "names" : [
+      "Grindr"
+    ],
+    "title" : "Grindr"
+  },
+  {
+    "bundleIDs" : [
+      "com.okcupid.app"
+    ],
+    "hosts" : [
+      "okcupid.com"
+    ],
+    "names" : [
+      "OkCupid"
+    ],
+    "title" : "OkCupid"
+  },
+  {
+    "bundleIDs" : [
+
+    ],
+    "hosts" : [
+      "draftkings.com"
+    ],
+    "names" : [
+      "DraftKings",
+      "DraftKings Sportsbook"
+    ],
+    "title" : "DraftKings"
+  },
+  {
+    "bundleIDs" : [
+
+    ],
+    "hosts" : [
+      "fanduel.com"
+    ],
+    "names" : [
+      "FanDuel",
+      "FanDuel Sportsbook"
+    ],
+    "title" : "FanDuel"
+  },
+  {
+    "bundleIDs" : [
+      "com.playmgm.nj.sports2"
+    ],
+    "hosts" : [
+      "betmgm.com"
+    ],
+    "names" : [
+      "BetMGM"
+    ],
+    "title" : "BetMGM"
+  },
+  {
+    "bundleIDs" : [
+      "com.myprizepicks.prizepicks"
+    ],
+    "hosts" : [
+      "prizepicks.com"
+    ],
+    "names" : [
+      "PrizePicks"
+    ],
+    "title" : "PrizePicks"
+  },
+  {
+    "bundleIDs" : [
+      "com.underdogsports.fantasy"
+    ],
+    "hosts" : [
+      "underdogfantasy.com"
+    ],
+    "names" : [
+      "Underdog",
+      "Underdog Sports",
+      "Underdog Fantasy"
+    ],
+    "title" : "Underdog"
+  },
+  {
+    "bundleIDs" : [
+      "com.espn.bet"
+    ],
+    "hosts" : [
+      "thescore.bet"
+    ],
+    "names" : [
+      "theScore Bet"
+    ],
+    "title" : "theScore Bet"
+  },
+  {
+    "bundleIDs" : [
+      "com.valvesoftware.steam"
+    ],
+    "hosts" : [
+      "store.steampowered.com",
+      "steamcommunity.com"
+    ],
+    "names" : [
+      "Steam"
+    ],
+    "title" : "Steam"
+  },
+  {
+    "bundleIDs" : [
+      "com.roblox.robloxmobile"
+    ],
+    "hosts" : [
+      "roblox.com"
+    ],
+    "names" : [
+      "Roblox"
+    ],
+    "title" : "Roblox"
+  },
+  {
+    "bundleIDs" : [
+      "com.chess.iphone"
+    ],
+    "hosts" : [
+      "chess.com"
+    ],
+    "names" : [
+      "Chess.com"
+    ],
+    "title" : "Chess.com"
+  },
+  {
+    "bundleIDs" : [
+      "org.lichess.mobilev2"
+    ],
+    "hosts" : [
+      "lichess.org"
+    ],
+    "names" : [
+      "Lichess"
+    ],
+    "title" : "Lichess"
+  },
+  {
+    "bundleIDs" : [
+      "com.amazon.amazon"
+    ],
+    "hosts" : [
+      "amazon.com"
+    ],
+    "names" : [
+      "Amazon"
+    ],
+    "title" : "Amazon"
+  },
+  {
+    "bundleIDs" : [
+      "com.ebay.iphone"
+    ],
+    "hosts" : [
+      "ebay.com"
+    ],
+    "names" : [
+      "eBay"
+    ],
+    "title" : "eBay"
+  },
+  {
+    "bundleIDs" : [
+      "com.etsy.etsyforios"
+    ],
+    "hosts" : [
+      "etsy.com"
+    ],
+    "names" : [
+      "Etsy"
+    ],
+    "title" : "Etsy"
+  },
+  {
+    "bundleIDs" : [
+      "com.einnovation.temu"
+    ],
+    "hosts" : [
+      "temu.com"
+    ],
+    "names" : [
+      "Temu"
+    ],
+    "title" : "Temu"
+  },
+  {
+    "bundleIDs" : [
+      "zzkko.com.zzkko"
+    ],
+    "hosts" : [
+      "shein.com"
+    ],
+    "names" : [
+      "SHEIN"
+    ],
+    "title" : "SHEIN"
+  },
+  {
+    "bundleIDs" : [
+      "com.walmart.electronics"
+    ],
+    "hosts" : [
+      "walmart.com"
+    ],
+    "names" : [
+      "Walmart"
+    ],
+    "title" : "Walmart"
+  },
+  {
+    "bundleIDs" : [
+      "com.target.target"
+    ],
+    "hosts" : [
+      "target.com"
+    ],
+    "names" : [
+      "Target"
+    ],
+    "title" : "Target"
+  },
+  {
+    "bundleIDs" : [
+      "com.poshmark.poshmark"
+    ],
+    "hosts" : [
+      "poshmark.com"
+    ],
+    "names" : [
+      "Poshmark"
+    ],
+    "title" : "Poshmark"
+  },
+  {
+    "bundleIDs" : [
+      "com.campless.campless"
+    ],
+    "hosts" : [
+      "stockx.com"
+    ],
+    "names" : [
+      "StockX"
+    ],
+    "title" : "StockX"
+  },
+  {
+    "bundleIDs" : [
+      "com.garageitaly.garage"
+    ],
+    "hosts" : [
+      "depop.com"
+    ],
+    "names" : [
+      "Depop"
+    ],
+    "title" : "Depop"
+  },
+  {
+    "bundleIDs" : [
+      "com.alibaba.ialiexpress"
+    ],
+    "hosts" : [
+      "aliexpress.com"
+    ],
+    "names" : [
+      "AliExpress"
+    ],
+    "title" : "AliExpress"
+  },
+  {
+    "bundleIDs" : [
+      "org.craigslist.craigslistmobile"
+    ],
+    "hosts" : [
+      "craigslist.org"
+    ],
+    "names" : [
+      "craigslist"
+    ],
+    "title" : "craigslist"
+  }
+]

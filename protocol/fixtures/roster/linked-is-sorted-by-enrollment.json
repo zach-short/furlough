@@ -1,0 +1,42 @@
+{
+  "expected" : {
+    "linked" : [
+      "phone-a",
+      "mac-a",
+      "pad-a"
+    ]
+  },
+  "function" : "Roster.linked",
+  "input" : {
+    "devices" : [
+      {
+        "canRelease" : false,
+        "enrolledAt" : "2026-09-09T08:00:00Z",
+        "id" : "pad-a",
+        "lastSeen" : "2026-09-10T08:00:00Z",
+        "name" : "iPad",
+        "platform" : "pad"
+      },
+      {
+        "canRelease" : true,
+        "enrolledAt" : "2026-09-07T08:00:00Z",
+        "id" : "phone-a",
+        "lastSeen" : "2026-09-10T09:00:00Z",
+        "name" : "Zach's iPhone",
+        "platform" : "phone"
+      },
+      {
+        "canRelease" : false,
+        "enrolledAt" : "2026-09-08T08:00:00Z",
+        "id" : "mac-a",
+        "lastSeen" : "2026-09-10T07:00:00Z",
+        "name" : "Studio",
+        "platform" : "mac"
+      }
+    ],
+    "revoked" : {
+
+    }
+  },
+  "name" : "the link is the set of written entries, oldest enrollment first"
+}

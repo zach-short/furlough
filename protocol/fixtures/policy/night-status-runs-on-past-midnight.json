@@ -1,0 +1,44 @@
+{
+  "expected" : {
+    "isAllowed" : true,
+    "status" : "open",
+    "until" : 1680
+  },
+  "function" : "Policy.status",
+  "input" : {
+    "config" : {
+      "loosenDelayHours" : 24,
+      "targets" : [
+        {
+          "addedAt" : "2026-09-01T00:00:00Z",
+          "id" : "20000000-0000-0000-0000-000000000001",
+          "kind" : {
+            "host" : {
+              "_0" : "youtube.com"
+            }
+          },
+          "nickname" : "",
+          "rule" : {
+            "dailyBudgetMinutes" : 120,
+            "windows" : [
+              {
+                "endMinute" : 1440,
+                "startMinute" : 1020
+              },
+              {
+                "endMinute" : 240,
+                "startMinute" : 0
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "now" : "2026-09-08T22:00:00Z",
+    "runtime" : {
+
+    },
+    "targetID" : "20000000-0000-0000-0000-000000000001"
+  },
+  "name" : "10 PM inside a 5 PM to 4 AM night: nothing shuts at the join, so the status says the morning it really ends — 1680, past 1440"
+}

@@ -1,0 +1,70 @@
+{
+  "expected" : {
+    "spans" : [
+      {
+        "days" : 127,
+        "endMinute" : 1380,
+        "startMinute" : 480
+      },
+      {
+        "days" : 127,
+        "endMinute" : 1320,
+        "startMinute" : 540
+      }
+    ]
+  },
+  "function" : "ActivityLimit.spans",
+  "input" : {
+    "state" : {
+      "config" : {
+        "loosenDelayHours" : 24,
+        "targets" : [
+          {
+            "addedAt" : "2026-09-01T00:00:00Z",
+            "id" : "20000000-0000-0000-0000-000000000001",
+            "kind" : {
+              "host" : {
+                "_0" : "youtube.com"
+              }
+            },
+            "nickname" : "",
+            "rule" : {
+              "dailyBudgetMinutes" : 60,
+              "windows" : [
+                {
+                  "endMinute" : 1320,
+                  "startMinute" : 540
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "pending" : [
+        {
+          "createdAt" : "2026-09-08T10:00:00Z",
+          "effectiveAt" : "2026-09-09T10:00:00Z",
+          "id" : "30000000-0000-0000-0000-000000000001",
+          "kind" : {
+            "setRule" : {
+              "rule" : {
+                "dailyBudgetMinutes" : 60,
+                "windows" : [
+                  {
+                    "endMinute" : 1380,
+                    "startMinute" : 480
+                  }
+                ]
+              },
+              "targetID" : "20000000-0000-0000-0000-000000000001"
+            }
+          }
+        }
+      ],
+      "runtime" : {
+
+      }
+    }
+  },
+  "name" : "a loosening is queued beside the rule it will replace, not instead of it, so both sets of hours are live at once"
+}

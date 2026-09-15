@@ -1,0 +1,48 @@
+{
+  "expected" : {
+    "at" : "2026-09-08T08:30:00Z"
+  },
+  "function" : "Policy.nextTransition",
+  "input" : {
+    "config" : {
+      "anchor" : {
+        "anchoredAt" : "2026-09-08T07:00:00Z",
+        "isAnchored" : true,
+        "kinds" : [
+          {
+            "host" : {
+              "_0" : "youtube.com"
+            }
+          }
+        ],
+        "scope" : "chosen",
+        "sequence" : 1,
+        "until" : "2026-09-08T08:30:00Z"
+      },
+      "loosenDelayHours" : 24,
+      "targets" : [
+        {
+          "addedAt" : "2026-09-01T00:00:00Z",
+          "id" : "20000000-0000-0000-0000-000000000001",
+          "kind" : {
+            "host" : {
+              "_0" : "youtube.com"
+            }
+          },
+          "nickname" : "",
+          "rule" : {
+            "dailyBudgetMinutes" : 60,
+            "windows" : [
+              {
+                "endMinute" : 1320,
+                "startMinute" : 540
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "now" : "2026-09-08T08:00:00Z"
+  },
+  "name" : "an anchor lifting at 8:30 beats the window opening at 9"
+}

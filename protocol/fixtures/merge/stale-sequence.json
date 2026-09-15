@@ -1,0 +1,37 @@
+{
+  "expected" : {
+    "note" : "stale record (5 is not past 5)",
+    "profile" : {
+      "isAnchored" : false,
+      "kinds" : [
+
+      ],
+      "schedules" : [
+
+      ],
+      "scope" : "chosen",
+      "sequence" : 5,
+      "tags" : [
+
+      ]
+    }
+  },
+  "function" : "AnchorSync.merge",
+  "input" : {
+    "local" : {
+      "isAnchored" : false,
+      "sequence" : 5
+    },
+    "now" : "2026-09-08T12:00:00Z",
+    "remote" : {
+      "anchoredAt" : "2026-09-08T11:00:00Z",
+      "isAnchored" : true,
+      "origin" : "drop",
+      "platform" : "phone",
+      "sequence" : 5,
+      "writer" : "phone-a",
+      "writtenAt" : "2026-09-08T11:00:00Z"
+    }
+  },
+  "name" : "a sequence this device has already seen changes nothing at all"
+}

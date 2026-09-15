@@ -1,0 +1,38 @@
+{
+  "expected" : {
+    "note" : "refused a release that was not a phone's tag scan",
+    "profile" : {
+      "anchoredAt" : "2026-09-08T09:00:00Z",
+      "isAnchored" : true,
+      "kinds" : [
+
+      ],
+      "schedules" : [
+
+      ],
+      "scope" : "chosen",
+      "sequence" : 4,
+      "tags" : [
+
+      ]
+    }
+  },
+  "function" : "AnchorSync.merge",
+  "input" : {
+    "local" : {
+      "anchoredAt" : "2026-09-08T09:00:00Z",
+      "isAnchored" : true,
+      "sequence" : 3
+    },
+    "now" : "2026-09-08T12:00:00Z",
+    "remote" : {
+      "isAnchored" : false,
+      "origin" : "tagScan",
+      "platform" : "mac",
+      "sequence" : 4,
+      "writer" : "mac-a",
+      "writtenAt" : "2026-09-08T11:59:00Z"
+    }
+  },
+  "name" : "a release is refused from a Mac, whatever its origin says"
+}

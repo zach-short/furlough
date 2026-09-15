@@ -1,0 +1,37 @@
+{
+  "expected" : {
+    "note" : "anchored by the other device",
+    "profile" : {
+      "anchoredAt" : "2026-09-08T12:00:00Z",
+      "isAnchored" : true,
+      "kinds" : [
+
+      ],
+      "schedules" : [
+
+      ],
+      "scope" : "chosen",
+      "sequence" : 4,
+      "tags" : [
+
+      ]
+    }
+  },
+  "function" : "AnchorSync.merge",
+  "input" : {
+    "local" : {
+      "isAnchored" : false,
+      "sequence" : 3
+    },
+    "now" : "2026-09-08T12:00:00Z",
+    "remote" : {
+      "isAnchored" : true,
+      "origin" : "drop",
+      "platform" : "mac",
+      "sequence" : 4,
+      "writer" : "mac-a",
+      "writtenAt" : "2026-09-08T11:30:00Z"
+    }
+  },
+  "name" : "an untimed drop with no anchoredAt is stamped with the receiver's own now"
+}

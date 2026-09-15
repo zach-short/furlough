@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://furloughapp.com/protocol/schema/linked-device.json",
+  "title": "LinkedDevice",
+  "description": "What one device says about itself to the others. Each device writes only its own entry, under furlough.device.<id>, and deletes it on leaving — so the roster is the set of entries and no blob is ever fought over.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "platform", "enrolledAt", "lastSeen", "canRelease"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The device id, equal to the <id> in the key and to the anchor record's writer."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "What the person called it. Trimmed; an empty name becomes the platform's own word (iPhone, iPad, Mac). iOS stopped telling third-party apps the device's name in iOS 16, so on a phone this is typed in the guide."
+    },
+    "platform": {
+      "enum": ["phone", "pad", "mac"],
+      "description": "What it is. The same enum the anchor record carries."
+    },
+    "enrolledAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When it joined. A revocation older than this is spent: the device was taken off and came back. Carried over unchanged when the entry is refreshed."
+    },
+    "lastSeen": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When it last wrote anything. Refreshed by every enrollment and every addition, so a device gone quiet for a month reads as one."
+    },
+    "canRelease": {
+      "type": "boolean",
+      "description": "Whether a tag can be read on it, which is the only thing that releases an anchor. True for an iPhone; never for an iPad or a Mac, neither of which has a reader."
+    }
+  }
+}

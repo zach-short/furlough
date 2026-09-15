@@ -1,0 +1,38 @@
+{
+  "expected" : {
+    "note" : "a drop already over by this clock",
+    "profile" : {
+      "isAnchored" : false,
+      "kinds" : [
+
+      ],
+      "schedules" : [
+
+      ],
+      "scope" : "chosen",
+      "sequence" : 4,
+      "tags" : [
+
+      ]
+    }
+  },
+  "function" : "AnchorSync.merge",
+  "input" : {
+    "local" : {
+      "isAnchored" : false,
+      "sequence" : 3
+    },
+    "now" : "2026-09-08T12:00:00Z",
+    "remote" : {
+      "anchoredAt" : "2026-09-08T10:00:00Z",
+      "isAnchored" : true,
+      "origin" : "drop",
+      "platform" : "phone",
+      "sequence" : 4,
+      "until" : "2026-09-08T11:00:00Z",
+      "writer" : "phone-a",
+      "writtenAt" : "2026-09-08T10:00:00Z"
+    }
+  },
+  "name" : "a timed drop whose until has already passed here does not drop here"
+}

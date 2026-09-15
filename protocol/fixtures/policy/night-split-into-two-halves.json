@@ -1,0 +1,27 @@
+{
+  "expected" : {
+    "windows" : [
+      {
+        "days" : 64,
+        "endMinute" : 1440,
+        "startMinute" : 1020
+      },
+      {
+        "days" : 1,
+        "endMinute" : 240,
+        "startMinute" : 0
+      }
+    ]
+  },
+  "function" : "TimeWindow.split",
+  "input" : {
+    "windows" : [
+      {
+        "days" : 64,
+        "endMinute" : 240,
+        "startMinute" : 1020
+      }
+    ]
+  },
+  "name" : "a Saturday 5 PM to 4 AM is stored as a Saturday evening and a Sunday morning: the days shift one on with the halves"
+}

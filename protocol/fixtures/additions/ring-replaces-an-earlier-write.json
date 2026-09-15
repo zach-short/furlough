@@ -1,0 +1,77 @@
+{
+  "expected" : {
+    "ring" : [
+      {
+        "id" : "00000000-0000-0000-0000-0000000000A2",
+        "sequence" : 2
+      },
+      {
+        "id" : "00000000-0000-0000-0000-0000000000A1",
+        "sequence" : 3
+      }
+    ]
+  },
+  "function" : "SharedAdditions.appended",
+  "input" : {
+    "addition" : {
+      "addedAt" : "2026-09-08T11:00:00Z",
+      "bundleIDs" : [
+        "com.google.ios.youtube"
+      ],
+      "half" : "rules",
+      "hosts" : [
+        "youtube.com"
+      ],
+      "id" : "00000000-0000-0000-0000-0000000000A1",
+      "isApp" : true,
+      "origin" : "phone-a",
+      "platform" : "phone",
+      "rule" : {
+        "dailyBudgetMinutes" : 30,
+        "windows" : [
+          {
+            "endMinute" : 1320,
+            "startMinute" : 540
+          }
+        ]
+      },
+      "sequence" : 3,
+      "title" : "YouTube"
+    },
+    "ring" : [
+      {
+        "addedAt" : "2026-09-08T09:00:00Z",
+        "bundleIDs" : [
+          "com.google.ios.youtube"
+        ],
+        "half" : "rules",
+        "hosts" : [
+          "youtube.com"
+        ],
+        "id" : "00000000-0000-0000-0000-0000000000A1",
+        "isApp" : true,
+        "origin" : "phone-a",
+        "platform" : "phone",
+        "sequence" : 1,
+        "title" : "YouTube"
+      },
+      {
+        "addedAt" : "2026-09-08T10:00:00Z",
+        "bundleIDs" : [
+
+        ],
+        "half" : "rules",
+        "hosts" : [
+          "reddit.com"
+        ],
+        "id" : "00000000-0000-0000-0000-0000000000A2",
+        "isApp" : false,
+        "origin" : "phone-a",
+        "platform" : "phone",
+        "sequence" : 2,
+        "title" : "Reddit"
+      }
+    ]
+  },
+  "name" : "a second write about the same target — its first rule landing — replaces the first rather than sitting beside it"
+}

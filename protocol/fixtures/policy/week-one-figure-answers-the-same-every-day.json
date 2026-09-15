@@ -1,0 +1,58 @@
+{
+  "expected" : {
+    "budgets" : [
+      45,
+      45,
+      45,
+      45,
+      45,
+      45,
+      45
+    ],
+    "effectiveBudgets" : [
+      45,
+      45,
+      45,
+      45,
+      45,
+      45,
+      45
+    ],
+    "everAllowed" : [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "isSameBudgetEveryDay" : true,
+    "normalized" : {
+      "dailyBudgetMinutes" : 45,
+      "windows" : [
+
+      ]
+    },
+    "representativeBudget" : 45,
+    "windowsPerDay" : [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ]
+  },
+  "function" : "Rule.week",
+  "input" : {
+    "rule" : {
+      "dailyBudgetMinutes" : 45,
+      "windows" : [
+
+      ]
+    }
+  },
+  "name" : "a rule that never grew a per-day budget answers its one number seven times, so a caller never has to know which kind it is holding"
+}

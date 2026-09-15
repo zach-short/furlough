@@ -1,0 +1,67 @@
+{
+  "expected" : {
+    "budgets" : [
+      45,
+      45,
+      45,
+      45,
+      45,
+      45,
+      45
+    ],
+    "effectiveBudgets" : [
+      45,
+      45,
+      45,
+      45,
+      45,
+      45,
+      45
+    ],
+    "everAllowed" : [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "isSameBudgetEveryDay" : true,
+    "normalized" : {
+      "dailyBudgetMinutes" : 45,
+      "windows" : [
+
+      ]
+    },
+    "representativeBudget" : 45,
+    "windowsPerDay" : [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ]
+  },
+  "function" : "Rule.week",
+  "input" : {
+    "rule" : {
+      "budgetByWeekday" : [
+        45,
+        45,
+        45,
+        45,
+        45,
+        45,
+        45
+      ],
+      "dailyBudgetMinutes" : 999,
+      "windows" : [
+
+      ]
+    }
+  },
+  "name" : "seven equal days say nothing the one number does not, so saving drops the array — and the stale dailyBudgetMinutes underneath is replaced rather than kept"
+}

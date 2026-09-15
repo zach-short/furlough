@@ -1,0 +1,70 @@
+{
+  "expected" : {
+    "changed" : true,
+    "config" : {
+      "anchor" : {
+        "isAnchored" : false,
+        "kinds" : [
+
+        ],
+        "schedules" : [
+
+        ],
+        "scope" : "chosen",
+        "sequence" : 0,
+        "tags" : [
+
+        ]
+      },
+      "isInTrial" : false,
+      "link" : {
+        "acceptAdditions" : "ask",
+        "companionSite" : "always",
+        "sendAdditions" : "ask"
+      },
+      "loosenDelayHours" : 24,
+      "schemaVersion" : 1,
+      "targets" : [
+
+      ]
+    },
+    "landedToday" : 1,
+    "pendingLeft" : [
+
+    ]
+  },
+  "function" : "Policy.applyDuePending",
+  "input" : {
+    "now" : "2026-09-08T12:00:00Z",
+    "state" : {
+      "config" : {
+        "loosenDelayHours" : 24,
+        "targets" : [
+
+        ]
+      },
+      "pending" : [
+        {
+          "createdAt" : "2026-09-07T10:00:00Z",
+          "effectiveAt" : "2026-09-08T10:00:00Z",
+          "id" : "30000000-0000-0000-0000-000000000001",
+          "kind" : {
+            "setRule" : {
+              "rule" : {
+                "dailyBudgetMinutes" : 90,
+                "windows" : [
+
+                ]
+              },
+              "targetID" : "20000000-0000-0000-0000-0000000000FF"
+            }
+          }
+        }
+      ],
+      "runtime" : {
+
+      }
+    }
+  },
+  "name" : "a queued rule whose target has since been removed applies to nothing, and is still spent and counted"
+}

@@ -1,0 +1,47 @@
+{
+  "expected" : {
+    "anchor" : {
+      "anchoredAt" : "2026-09-08T12:00:00Z",
+      "isAnchored" : true,
+      "kinds" : [
+        {
+          "host" : {
+            "_0" : "youtube.com"
+          }
+        }
+      ],
+      "schedules" : [
+
+      ],
+      "scope" : "chosen",
+      "sequence" : 3,
+      "tags" : [
+
+      ]
+    }
+  },
+  "function" : "AnchorSync.macDrop",
+  "input" : {
+    "cloudAvailable" : true,
+    "config" : {
+      "anchor" : {
+        "kinds" : [
+          {
+            "host" : {
+              "_0" : "youtube.com"
+            }
+          }
+        ],
+        "scope" : "chosen",
+        "sequence" : 2
+      },
+      "loosenDelayHours" : 24,
+      "targets" : [
+
+      ]
+    },
+    "hasKey" : true,
+    "now" : "2026-09-08T12:00:00Z"
+  },
+  "name" : "something to hold, the store reachable and a key on the link: the Mac drops, untimed"
+}

@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://furloughapp.com/protocol/schema/shared-addition.json",
+  "title": "SharedAddition",
+  "description": "One thing a linked device added, as the others receive it: what it is called and every identifier and host it goes by — never a token. Each device publishes to a ring of its own under furlough.adds.<id>, holding at most the last 20.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "sequence", "title", "isApp", "bundleIDs", "hosts", "half", "origin", "platform", "addedAt"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "The sender's target id. A second write about the same thing — its first rule landing — replaces the first in the ring rather than sitting beside it."
+    },
+    "sequence": {
+      "type": "integer",
+      "description": "One higher on every write from this sender. Per sender, never compared across senders; what the receiver's watermark counts."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "description": "What to call it: \"YouTube\", or the host when nothing better is known."
+    },
+    "isApp": {
+      "type": "boolean",
+      "description": "Whether the sender's face was an app. A phone receiving one cannot add the app itself and says so; a Mac looks for it among what is installed."
+    },
+    "bundleIDs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Lowercased bundle identifiers it is known by, on either platform. May be empty."
+    },
+    "hosts": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "The hosts the sender actually blocks for it. May be empty."
+    },
+    "rule": {
+      "$ref": "#/$defs/rule",
+      "description": "The sender's rule, if it had one yet. Applied on arrival only where the receiver's row has none — a rule of your own is never overwritten by a device you are not holding."
+    },
+    "half": {
+      "enum": ["rules", "anchor"],
+      "description": "Where it was added: the everyday rules, or the anchor's list."
+    },
+    "origin": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The sending device's id, equal to the <id> in the ring's key. What the receiver's watermark is keyed by."
+    },
+    "platform": {
+      "enum": ["phone", "pad", "mac"],
+      "description": "What the sender was."
+    },
+    "addedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When it was sent. Receivers take unseen additions in this order, oldest first."
+    }
+  },
+  "$defs": {
+    "rule": {
+      "title": "Rule",
+      "description": "When a target may be used, and for how many minutes a day in total. Travels only as a passenger on an addition; there is no rule sync.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dailyBudgetMinutes"],
+      "properties": {
+        "windows": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/timeWindow" },
+          "description": "The allowed spans. Absent or empty means open all day, every day: only the budget limits it. Once there are any, a day none of them covers is blocked."
+        },
+        "dailyBudgetMinutes": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Minutes a day in total. A whole day of budget (1440) is no budget at all."
+        },
+        "budgetByWeekday": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0 },
+          "minItems": 7,
+          "maxItems": 7,
+          "description": "Seven minute counts, Sunday first, when the week is not one number. Anything but exactly seven entries decodes as absent: the safe reading of a damaged field is the rule's one budget, never a day left without one."
+        }
+      }
+    },
+    "timeWindow": {
+      "title": "TimeWindow",
+      "description": "A span of minutes inside one calendar day, on the days of the week it applies. A stored span never crosses midnight: an evening that runs late is an evening window plus an early-morning window whose days are shifted one day on.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["startMinute", "endMinute"],
+      "properties": {
+        "startMinute": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1440,
+          "description": "Minutes from midnight."
+        },
+        "endMinute": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1440,
+          "description": "Exclusive; 1440 is midnight."
+        },
+        "days": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 127,
+          "description": "Days of the week as a bit set, bit 0 Sunday, so bits line up with Calendar's weekday numbers 1…7. Absent means every day (127)."
+        }
+      }
+    }
+  }
+}

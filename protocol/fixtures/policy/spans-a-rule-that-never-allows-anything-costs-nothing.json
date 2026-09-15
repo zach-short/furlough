@@ -1,0 +1,43 @@
+{
+  "expected" : {
+    "spans" : [
+
+    ]
+  },
+  "function" : "ActivityLimit.spans",
+  "input" : {
+    "state" : {
+      "config" : {
+        "loosenDelayHours" : 24,
+        "targets" : [
+          {
+            "addedAt" : "2026-09-01T00:00:00Z",
+            "id" : "20000000-0000-0000-0000-000000000001",
+            "kind" : {
+              "host" : {
+                "_0" : "youtube.com"
+              }
+            },
+            "nickname" : "",
+            "rule" : {
+              "dailyBudgetMinutes" : 0,
+              "windows" : [
+                {
+                  "endMinute" : 1320,
+                  "startMinute" : 540
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "pending" : [
+
+      ],
+      "runtime" : {
+
+      }
+    }
+  },
+  "name" : "hours with no budget behind them are never scheduled, so they cost no span"
+}

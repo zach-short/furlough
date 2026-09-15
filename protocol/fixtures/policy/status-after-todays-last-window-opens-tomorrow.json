@@ -1,0 +1,43 @@
+{
+  "expected" : {
+    "isAllowed" : false,
+    "nextOpen" : {
+      "daysAhead" : 1,
+      "minuteOfDay" : 540
+    },
+    "status" : "closed"
+  },
+  "function" : "Policy.status",
+  "input" : {
+    "config" : {
+      "loosenDelayHours" : 24,
+      "targets" : [
+        {
+          "addedAt" : "2026-09-01T00:00:00Z",
+          "id" : "20000000-0000-0000-0000-000000000001",
+          "kind" : {
+            "host" : {
+              "_0" : "youtube.com"
+            }
+          },
+          "nickname" : "",
+          "rule" : {
+            "dailyBudgetMinutes" : 60,
+            "windows" : [
+              {
+                "endMinute" : 1320,
+                "startMinute" : 540
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "now" : "2026-09-08T23:00:00Z",
+    "runtime" : {
+
+    },
+    "targetID" : "20000000-0000-0000-0000-000000000001"
+  },
+  "name" : "11 PM, past the last window: the next open is tomorrow's"
+}

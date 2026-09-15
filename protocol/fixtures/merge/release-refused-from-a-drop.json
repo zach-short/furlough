@@ -1,0 +1,38 @@
+{
+  "expected" : {
+    "note" : "refused a release that was not a phone's tag scan",
+    "profile" : {
+      "anchoredAt" : "2026-09-08T09:00:00Z",
+      "isAnchored" : true,
+      "kinds" : [
+
+      ],
+      "schedules" : [
+
+      ],
+      "scope" : "chosen",
+      "sequence" : 4,
+      "tags" : [
+
+      ]
+    }
+  },
+  "function" : "AnchorSync.merge",
+  "input" : {
+    "local" : {
+      "anchoredAt" : "2026-09-08T09:00:00Z",
+      "isAnchored" : true,
+      "sequence" : 3
+    },
+    "now" : "2026-09-08T12:00:00Z",
+    "remote" : {
+      "isAnchored" : false,
+      "origin" : "drop",
+      "platform" : "phone",
+      "sequence" : 4,
+      "writer" : "phone-a",
+      "writtenAt" : "2026-09-08T11:59:00Z"
+    }
+  },
+  "name" : "an unanchored drop is refused as a release: only a tag scan lets the anchor up"
+}

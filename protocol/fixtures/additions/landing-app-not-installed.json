@@ -1,0 +1,43 @@
+{
+  "expected" : {
+    "anchors" : false,
+    "appNeedsPicker" : false,
+    "hosts" : [
+      "netflix.com"
+    ],
+    "isNothing" : false,
+    "summary" : "Zach's iPhone added Netflix. Block netflix.com here?"
+  },
+  "function" : "SharedAdditions.landing",
+  "input" : {
+    "addition" : {
+      "addedAt" : "2026-09-08T09:00:00Z",
+      "bundleIDs" : [
+        "com.netflix.netflix"
+      ],
+      "half" : "rules",
+      "hosts" : [
+        "netflix.com"
+      ],
+      "id" : "00000000-0000-0000-0000-0000000000E2",
+      "isApp" : true,
+      "origin" : "phone-a",
+      "platform" : "phone",
+      "sequence" : 1,
+      "title" : "Netflix"
+    },
+    "companion" : "always",
+    "config" : {
+      "loosenDelayHours" : 24,
+      "targets" : [
+
+      ]
+    },
+    "from" : "Zach's iPhone",
+    "installed" : {
+
+    },
+    "now" : "2026-09-08T12:00:00Z"
+  },
+  "name" : "the Mac does not have the app, so only the site lands — which is the least that should happen"
+}

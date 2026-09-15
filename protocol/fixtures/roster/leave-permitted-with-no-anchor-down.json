@@ -1,0 +1,11 @@
+{
+  "expected" : {
+
+  },
+  "function" : "DeviceLink.leaveRefusal",
+  "input" : {
+    "anchorHoldsHere" : false,
+    "anchorHoldsOnLink" : false
+  },
+  "name" : "with no anchor down the link holds nothing that leaving would let go of, so leaving is instant"
+}

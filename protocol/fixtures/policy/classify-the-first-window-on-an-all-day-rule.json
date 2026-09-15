@@ -1,0 +1,34 @@
+{
+  "expected" : {
+    "classification" : "tightening"
+  },
+  "function" : "Policy.classify(newRule:)",
+  "input" : {
+    "newRule" : {
+      "dailyBudgetMinutes" : 30,
+      "windows" : [
+        {
+          "endMinute" : 1320,
+          "startMinute" : 540
+        }
+      ]
+    },
+    "target" : {
+      "addedAt" : "2026-09-01T00:00:00Z",
+      "id" : "20000000-0000-0000-0000-000000000001",
+      "kind" : {
+        "host" : {
+          "_0" : "youtube.com"
+        }
+      },
+      "nickname" : "",
+      "rule" : {
+        "dailyBudgetMinutes" : 30,
+        "windows" : [
+
+        ]
+      }
+    }
+  },
+  "name" : "hours added to a rule that had none: the same budget, fewer minutes it can be spent in"
+}

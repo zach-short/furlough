@@ -1,0 +1,22 @@
+{
+  "expected" : {
+    "windows" : [
+      {
+        "days" : 64,
+        "endMinute" : 1440,
+        "startMinute" : 1020
+      }
+    ]
+  },
+  "function" : "TimeWindow.split",
+  "input" : {
+    "windows" : [
+      {
+        "days" : 64,
+        "endMinute" : 0,
+        "startMinute" : 1020
+      }
+    ]
+  },
+  "name" : "5 PM until midnight has no morning half, so it splits into itself"
+}

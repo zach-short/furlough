@@ -1,0 +1,48 @@
+{
+  "expected" : {
+    "anchor" : {
+      "isAnchored" : false,
+      "kinds" : [
+        {
+          "host" : {
+            "_0" : "youtube.com"
+          }
+        }
+      ],
+      "schedules" : [
+
+      ],
+      "scope" : "chosen",
+      "sequence" : 2,
+      "tags" : [
+
+      ]
+    },
+    "message" : "Furlough cannot reach iCloud, so the Anchor stops at this Mac. Your iPhone's tag is the only thing that can release an anchor dropped here, and it cannot reach this Mac — so Furlough will not drop one until iCloud is back. Turn on iCloud Drive in System Settings > your name > iCloud — the Anchor travels on it.",
+    "refusal" : "noCloud"
+  },
+  "function" : "AnchorSync.macDrop",
+  "input" : {
+    "cloudAvailable" : false,
+    "config" : {
+      "anchor" : {
+        "kinds" : [
+          {
+            "host" : {
+              "_0" : "youtube.com"
+            }
+          }
+        ],
+        "scope" : "chosen",
+        "sequence" : 2
+      },
+      "loosenDelayHours" : 24,
+      "targets" : [
+
+      ]
+    },
+    "hasKey" : true,
+    "now" : "2026-09-08T12:00:00Z"
+  },
+  "name" : "signed out of the store, checked before the roster because it is what makes the roster unanswerable"
+}

@@ -1,0 +1,40 @@
+{
+  "expected" : {
+    "classification" : "tightening"
+  },
+  "function" : "Policy.classify(newRule:)",
+  "input" : {
+    "newRule" : {
+      "budgetByWeekday" : [
+        30,
+        30,
+        30,
+        30,
+        30,
+        30,
+        30
+      ],
+      "dailyBudgetMinutes" : 30,
+      "windows" : [
+
+      ]
+    },
+    "target" : {
+      "addedAt" : "2026-09-01T00:00:00Z",
+      "id" : "20000000-0000-0000-0000-000000000001",
+      "kind" : {
+        "host" : {
+          "_0" : "youtube.com"
+        }
+      },
+      "nickname" : "",
+      "rule" : {
+        "dailyBudgetMinutes" : 30,
+        "windows" : [
+
+        ]
+      }
+    }
+  },
+  "name" : "one figure written out as seven equal ones changes no day, so it is tighter-or-equal and nothing queues"
+}

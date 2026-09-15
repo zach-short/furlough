@@ -1,0 +1,76 @@
+{
+  "expected" : {
+    "budgets" : [
+      30,
+      30,
+      30,
+      60,
+      60,
+      60,
+      120
+    ],
+    "effectiveBudgets" : [
+      30,
+      30,
+      30,
+      60,
+      60,
+      60,
+      120
+    ],
+    "everAllowed" : [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "isSameBudgetEveryDay" : false,
+    "normalized" : {
+      "budgetByWeekday" : [
+        30,
+        30,
+        30,
+        60,
+        60,
+        60,
+        120
+      ],
+      "dailyBudgetMinutes" : 999,
+      "windows" : [
+
+      ]
+    },
+    "representativeBudget" : 30,
+    "windowsPerDay" : [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ]
+  },
+  "function" : "Rule.week",
+  "input" : {
+    "rule" : {
+      "budgetByWeekday" : [
+        30,
+        30,
+        30,
+        60,
+        60,
+        60,
+        120
+      ],
+      "dailyBudgetMinutes" : 999,
+      "windows" : [
+
+      ]
+    }
+  },
+  "name" : "three days at 30 and three at 60: the editor collapsing seven sliders back to one is offered the smaller of the two that tie, never the shadow figure underneath"
+}

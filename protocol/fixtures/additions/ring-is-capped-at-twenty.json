@@ -1,0 +1,428 @@
+{
+  "expected" : {
+    "ring" : [
+      {
+        "id" : "00000000-0000-0000-0000-000000000002",
+        "sequence" : 2
+      },
+      {
+        "id" : "00000000-0000-0000-0000-000000000003",
+        "sequence" : 3
+      },
+      {
+        "id" : "00000000-0000-0000-0000-000000000004",
+        "sequence" : 4
+      },
+      {
+        "id" : "00000000-0000-0000-0000-000000000005",
+        "sequence" : 5
+      },
+      {
+        "id" : "00000000-0000-0000-0000-000000000006",
+        "sequence" : 6
+      },
+      {
+        "id" : "00000000-0000-0000-0000-000000000007",
+        "sequence" : 7
+      },
+      {
+        "id" : "00000000-0000-0000-0000-000000000008",
+        "sequence" : 8
+      },
+      {
+        "id" : "00000000-0000-0000-0000-000000000009",
+        "sequence" : 9
+      },
+      {
+        "id" : "00000000-0000-0000-0000-000000000010",
+        "sequence" : 10
+      },
+      {
+        "id" : "00000000-0000-0000-0000-000000000011",
+        "sequence" : 11
+      },
+      {
+        "id" : "00000000-0000-0000-0000-000000000012",
+        "sequence" : 12
+      },
+      {
+        "id" : "00000000-0000-0000-0000-000000000013",
+        "sequence" : 13
+      },
+      {
+        "id" : "00000000-0000-0000-0000-000000000014",
+        "sequence" : 14
+      },
+      {
+        "id" : "00000000-0000-0000-0000-000000000015",
+        "sequence" : 15
+      },
+      {
+        "id" : "00000000-0000-0000-0000-000000000016",
+        "sequence" : 16
+      },
+      {
+        "id" : "00000000-0000-0000-0000-000000000017",
+        "sequence" : 17
+      },
+      {
+        "id" : "00000000-0000-0000-0000-000000000018",
+        "sequence" : 18
+      },
+      {
+        "id" : "00000000-0000-0000-0000-000000000019",
+        "sequence" : 19
+      },
+      {
+        "id" : "00000000-0000-0000-0000-000000000020",
+        "sequence" : 20
+      },
+      {
+        "id" : "00000000-0000-0000-0000-000000000021",
+        "sequence" : 21
+      }
+    ]
+  },
+  "function" : "SharedAdditions.appended",
+  "input" : {
+    "addition" : {
+      "addedAt" : "2026-09-08T21:00:00Z",
+      "bundleIDs" : [
+
+      ],
+      "half" : "rules",
+      "hosts" : [
+        "twentyone.com"
+      ],
+      "id" : "00000000-0000-0000-0000-000000000021",
+      "isApp" : false,
+      "origin" : "phone-a",
+      "platform" : "phone",
+      "sequence" : 21,
+      "title" : "Twenty-one"
+    },
+    "ring" : [
+      {
+        "addedAt" : "2026-09-08T01:00:00Z",
+        "bundleIDs" : [
+
+        ],
+        "half" : "rules",
+        "hosts" : [
+          "one.com"
+        ],
+        "id" : "00000000-0000-0000-0000-000000000001",
+        "isApp" : false,
+        "origin" : "phone-a",
+        "platform" : "phone",
+        "sequence" : 1,
+        "title" : "One"
+      },
+      {
+        "addedAt" : "2026-09-08T02:00:00Z",
+        "bundleIDs" : [
+
+        ],
+        "half" : "rules",
+        "hosts" : [
+          "two.com"
+        ],
+        "id" : "00000000-0000-0000-0000-000000000002",
+        "isApp" : false,
+        "origin" : "phone-a",
+        "platform" : "phone",
+        "sequence" : 2,
+        "title" : "Two"
+      },
+      {
+        "addedAt" : "2026-09-08T03:00:00Z",
+        "bundleIDs" : [
+
+        ],
+        "half" : "rules",
+        "hosts" : [
+          "three.com"
+        ],
+        "id" : "00000000-0000-0000-0000-000000000003",
+        "isApp" : false,
+        "origin" : "phone-a",
+        "platform" : "phone",
+        "sequence" : 3,
+        "title" : "Three"
+      },
+      {
+        "addedAt" : "2026-09-08T04:00:00Z",
+        "bundleIDs" : [
+
+        ],
+        "half" : "rules",
+        "hosts" : [
+          "four.com"
+        ],
+        "id" : "00000000-0000-0000-0000-000000000004",
+        "isApp" : false,
+        "origin" : "phone-a",
+        "platform" : "phone",
+        "sequence" : 4,
+        "title" : "Four"
+      },
+      {
+        "addedAt" : "2026-09-08T05:00:00Z",
+        "bundleIDs" : [
+
+        ],
+        "half" : "rules",
+        "hosts" : [
+          "five.com"
+        ],
+        "id" : "00000000-0000-0000-0000-000000000005",
+        "isApp" : false,
+        "origin" : "phone-a",
+        "platform" : "phone",
+        "sequence" : 5,
+        "title" : "Five"
+      },
+      {
+        "addedAt" : "2026-09-08T06:00:00Z",
+        "bundleIDs" : [
+
+        ],
+        "half" : "rules",
+        "hosts" : [
+          "six.com"
+        ],
+        "id" : "00000000-0000-0000-0000-000000000006",
+        "isApp" : false,
+        "origin" : "phone-a",
+        "platform" : "phone",
+        "sequence" : 6,
+        "title" : "Six"
+      },
+      {
+        "addedAt" : "2026-09-08T07:00:00Z",
+        "bundleIDs" : [
+
+        ],
+        "half" : "rules",
+        "hosts" : [
+          "seven.com"
+        ],
+        "id" : "00000000-0000-0000-0000-000000000007",
+        "isApp" : false,
+        "origin" : "phone-a",
+        "platform" : "phone",
+        "sequence" : 7,
+        "title" : "Seven"
+      },
+      {
+        "addedAt" : "2026-09-08T08:00:00Z",
+        "bundleIDs" : [
+
+        ],
+        "half" : "rules",
+        "hosts" : [
+          "eight.com"
+        ],
+        "id" : "00000000-0000-0000-0000-000000000008",
+        "isApp" : false,
+        "origin" : "phone-a",
+        "platform" : "phone",
+        "sequence" : 8,
+        "title" : "Eight"
+      },
+      {
+        "addedAt" : "2026-09-08T09:00:00Z",
+        "bundleIDs" : [
+
+        ],
+        "half" : "rules",
+        "hosts" : [
+          "nine.com"
+        ],
+        "id" : "00000000-0000-0000-0000-000000000009",
+        "isApp" : false,
+        "origin" : "phone-a",
+        "platform" : "phone",
+        "sequence" : 9,
+        "title" : "Nine"
+      },
+      {
+        "addedAt" : "2026-09-08T10:00:00Z",
+        "bundleIDs" : [
+
+        ],
+        "half" : "rules",
+        "hosts" : [
+          "ten.com"
+        ],
+        "id" : "00000000-0000-0000-0000-000000000010",
+        "isApp" : false,
+        "origin" : "phone-a",
+        "platform" : "phone",
+        "sequence" : 10,
+        "title" : "Ten"
+      },
+      {
+        "addedAt" : "2026-09-08T11:00:00Z",
+        "bundleIDs" : [
+
+        ],
+        "half" : "rules",
+        "hosts" : [
+          "eleven.com"
+        ],
+        "id" : "00000000-0000-0000-0000-000000000011",
+        "isApp" : false,
+        "origin" : "phone-a",
+        "platform" : "phone",
+        "sequence" : 11,
+        "title" : "Eleven"
+      },
+      {
+        "addedAt" : "2026-09-08T12:00:00Z",
+        "bundleIDs" : [
+
+        ],
+        "half" : "rules",
+        "hosts" : [
+          "twelve.com"
+        ],
+        "id" : "00000000-0000-0000-0000-000000000012",
+        "isApp" : false,
+        "origin" : "phone-a",
+        "platform" : "phone",
+        "sequence" : 12,
+        "title" : "Twelve"
+      },
+      {
+        "addedAt" : "2026-09-08T13:00:00Z",
+        "bundleIDs" : [
+
+        ],
+        "half" : "rules",
+        "hosts" : [
+          "thirteen.com"
+        ],
+        "id" : "00000000-0000-0000-0000-000000000013",
+        "isApp" : false,
+        "origin" : "phone-a",
+        "platform" : "phone",
+        "sequence" : 13,
+        "title" : "Thirteen"
+      },
+      {
+        "addedAt" : "2026-09-08T14:00:00Z",
+        "bundleIDs" : [
+
+        ],
+        "half" : "rules",
+        "hosts" : [
+          "fourteen.com"
+        ],
+        "id" : "00000000-0000-0000-0000-000000000014",
+        "isApp" : false,
+        "origin" : "phone-a",
+        "platform" : "phone",
+        "sequence" : 14,
+        "title" : "Fourteen"
+      },
+      {
+        "addedAt" : "2026-09-08T15:00:00Z",
+        "bundleIDs" : [
+
+        ],
+        "half" : "rules",
+        "hosts" : [
+          "fifteen.com"
+        ],
+        "id" : "00000000-0000-0000-0000-000000000015",
+        "isApp" : false,
+        "origin" : "phone-a",
+        "platform" : "phone",
+        "sequence" : 15,
+        "title" : "Fifteen"
+      },
+      {
+        "addedAt" : "2026-09-08T16:00:00Z",
+        "bundleIDs" : [
+
+        ],
+        "half" : "rules",
+        "hosts" : [
+          "sixteen.com"
+        ],
+        "id" : "00000000-0000-0000-0000-000000000016",
+        "isApp" : false,
+        "origin" : "phone-a",
+        "platform" : "phone",
+        "sequence" : 16,
+        "title" : "Sixteen"
+      },
+      {
+        "addedAt" : "2026-09-08T17:00:00Z",
+        "bundleIDs" : [
+
+        ],
+        "half" : "rules",
+        "hosts" : [
+          "seventeen.com"
+        ],
+        "id" : "00000000-0000-0000-0000-000000000017",
+        "isApp" : false,
+        "origin" : "phone-a",
+        "platform" : "phone",
+        "sequence" : 17,
+        "title" : "Seventeen"
+      },
+      {
+        "addedAt" : "2026-09-08T18:00:00Z",
+        "bundleIDs" : [
+
+        ],
+        "half" : "rules",
+        "hosts" : [
+          "eighteen.com"
+        ],
+        "id" : "00000000-0000-0000-0000-000000000018",
+        "isApp" : false,
+        "origin" : "phone-a",
+        "platform" : "phone",
+        "sequence" : 18,
+        "title" : "Eighteen"
+      },
+      {
+        "addedAt" : "2026-09-08T19:00:00Z",
+        "bundleIDs" : [
+
+        ],
+        "half" : "rules",
+        "hosts" : [
+          "nineteen.com"
+        ],
+        "id" : "00000000-0000-0000-0000-000000000019",
+        "isApp" : false,
+        "origin" : "phone-a",
+        "platform" : "phone",
+        "sequence" : 19,
+        "title" : "Nineteen"
+      },
+      {
+        "addedAt" : "2026-09-08T20:00:00Z",
+        "bundleIDs" : [
+
+        ],
+        "half" : "rules",
+        "hosts" : [
+          "twenty.com"
+        ],
+        "id" : "00000000-0000-0000-0000-000000000020",
+        "isApp" : false,
+        "origin" : "phone-a",
+        "platform" : "phone",
+        "sequence" : 20,
+        "title" : "Twenty"
+      }
+    ]
+  },
+  "name" : "a twenty-first addition drops the oldest: the ring is a rolling window, never a queue"
+}

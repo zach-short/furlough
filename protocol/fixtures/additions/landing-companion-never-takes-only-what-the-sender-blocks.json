@@ -1,0 +1,45 @@
+{
+  "expected" : {
+    "anchors" : false,
+    "appBundleID" : "com.google.ios.youtube",
+    "appName" : "YouTube",
+    "appNeedsPicker" : false,
+    "hosts" : [
+
+    ],
+    "isNothing" : false,
+    "summary" : "Zach's iPhone added YouTube. Block the YouTube app here?"
+  },
+  "function" : "SharedAdditions.landing",
+  "input" : {
+    "addition" : {
+      "addedAt" : "2026-09-08T09:00:00Z",
+      "bundleIDs" : [
+        "com.google.ios.youtube"
+      ],
+      "half" : "rules",
+      "hosts" : [
+
+      ],
+      "id" : "00000000-0000-0000-0000-0000000000E6",
+      "isApp" : true,
+      "origin" : "phone-a",
+      "platform" : "phone",
+      "sequence" : 1,
+      "title" : "YouTube"
+    },
+    "companion" : "never",
+    "config" : {
+      "loosenDelayHours" : 24,
+      "targets" : [
+
+      ]
+    },
+    "from" : "Zach's iPhone",
+    "installed" : {
+      "com.google.ios.youtube" : "YouTube"
+    },
+    "now" : "2026-09-08T12:00:00Z"
+  },
+  "name" : "under companionSite never, the app lands and the table's youtube.com does not — only what the sender actually blocks"
+}

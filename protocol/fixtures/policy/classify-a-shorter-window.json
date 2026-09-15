@@ -1,0 +1,37 @@
+{
+  "expected" : {
+    "classification" : "tightening"
+  },
+  "function" : "Policy.classify(newRule:)",
+  "input" : {
+    "newRule" : {
+      "dailyBudgetMinutes" : 60,
+      "windows" : [
+        {
+          "endMinute" : 1260,
+          "startMinute" : 600
+        }
+      ]
+    },
+    "target" : {
+      "addedAt" : "2026-09-01T00:00:00Z",
+      "id" : "20000000-0000-0000-0000-000000000001",
+      "kind" : {
+        "host" : {
+          "_0" : "youtube.com"
+        }
+      },
+      "nickname" : "",
+      "rule" : {
+        "dailyBudgetMinutes" : 60,
+        "windows" : [
+          {
+            "endMinute" : 1320,
+            "startMinute" : 540
+          }
+        ]
+      }
+    }
+  },
+  "name" : "the same budget inside narrower hours"
+}

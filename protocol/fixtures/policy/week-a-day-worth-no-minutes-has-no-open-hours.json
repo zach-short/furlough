@@ -1,0 +1,83 @@
+{
+  "expected" : {
+    "budgets" : [
+      0,
+      60,
+      60,
+      60,
+      60,
+      60,
+      60
+    ],
+    "effectiveBudgets" : [
+      0,
+      60,
+      60,
+      60,
+      60,
+      60,
+      60
+    ],
+    "everAllowed" : [
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "isSameBudgetEveryDay" : false,
+    "normalized" : {
+      "budgetByWeekday" : [
+        0,
+        60,
+        60,
+        60,
+        60,
+        60,
+        60
+      ],
+      "dailyBudgetMinutes" : 60,
+      "windows" : [
+        {
+          "days" : 127,
+          "endMinute" : 1320,
+          "startMinute" : 540
+        }
+      ]
+    },
+    "representativeBudget" : 60,
+    "windowsPerDay" : [
+      0,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ]
+  },
+  "function" : "Rule.week",
+  "input" : {
+    "rule" : {
+      "budgetByWeekday" : [
+        0,
+        60,
+        60,
+        60,
+        60,
+        60,
+        60
+      ],
+      "dailyBudgetMinutes" : 60,
+      "windows" : [
+        {
+          "endMinute" : 1320,
+          "startMinute" : 540
+        }
+      ]
+    }
+  },
+  "name" : "Sunday is worth nothing, so its window is not offered at all — the hours alone say closed today"
+}

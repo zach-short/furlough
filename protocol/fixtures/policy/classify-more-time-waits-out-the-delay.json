@@ -1,0 +1,31 @@
+{
+  "expected" : {
+    "classification" : "loosening"
+  },
+  "function" : "Policy.classify(newRule:)",
+  "input" : {
+    "newRule" : {
+      "dailyBudgetMinutes" : 60,
+      "windows" : [
+
+      ]
+    },
+    "target" : {
+      "addedAt" : "2026-09-01T00:00:00Z",
+      "id" : "20000000-0000-0000-0000-000000000001",
+      "kind" : {
+        "host" : {
+          "_0" : "youtube.com"
+        }
+      },
+      "nickname" : "",
+      "rule" : {
+        "dailyBudgetMinutes" : 30,
+        "windows" : [
+
+        ]
+      }
+    }
+  },
+  "name" : "half an hour raised to an hour"
+}

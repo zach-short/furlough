@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://furloughapp.com/protocol/schema/config-export.json",
+  "title": "ConfigExport",
+  "description": "A setup as a file: what Furlough hands to another Mac, or to the same person's next phone. Not part of the link — a person hands it over by hand — but a port has to read one. Written pretty-printed with sorted keys and unescaped slashes, because it is a file someone may open and read and two of them are worth diffing. The Anchor, the pending queue, the runtime and the link's own settings are all left out on purpose.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "platform", "exportedAt", "loosenDelayHours", "targets"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "This file's own shape, on its own schedule. Not the store's schemaVersion, which is nobody's business but Furlough's; the two must not be confused."
+    },
+    "platform": {
+      "enum": ["ios", "mac"],
+      "description": "What wrote it, so an import can tell a phone file from a Mac one and say so, rather than failing on an unknown target kind."
+    },
+    "exportedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When it was written."
+    },
+    "appVersion": {
+      "type": "string",
+      "description": "The build that wrote the file, for reading a bug report six months from now."
+    },
+    "loosenDelayHours": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "The base delay anything that hands time back has to wait out. A target's own delay scales this by its tier."
+    },
+    "targets": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/exportedTarget" },
+      "description": "One entry per managed app, website or category."
+    }
+  },
+  "$defs": {
+    "exportedTarget": {
+      "title": "ExportedTarget",
+      "description": "One managed app, website or category, in the form that travels.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "enum": ["app", "website", "category"],
+          "description": "What it is."
+        },
+        "identifier": {
+          "type": "string",
+          "description": "What another device can look this up by: a bundle identifier for a Mac app (\"com.google.Chrome\"), a host for a website (\"youtube.com\"). Absent for anything the phone knows only as a Screen Time token — that token is meaningless off the device that issued it and cannot be turned back into a bundle identifier, so an import on a phone has to ask which app this was."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name the system gave it, where Furlough has been told one. On the phone, what the shield learned; on the Mac, what the bundle says."
+        },
+        "nickname": {
+          "type": "string",
+          "description": "The person's own word for it, when they gave one."
+        },
+        "utility": {
+          "enum": ["essential", "useful", "idle", "hazard"],
+          "description": "The tier, as a word rather than the number the store keeps, because this is a file a person might open. Absent when the tier was never chosen, so \"they said useful\" and \"nobody said\" stay apart."
+        },
+        "rule": {
+          "$ref": "shared-addition.json#/$defs/rule",
+          "description": "Absent for a target added but never given a rule. Nothing is enforced for those, and the file should say so rather than invent an open rule for them."
+        },
+        "alsoBlocks": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "The other doors into this same thing, as hosts: \"youtube.com\" beside the YouTube app. Only hosts — a website half that came from Apple's picker is a token, cannot travel, and is simply absent. Absent rather than empty when there are none."
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "expected" : {
+    "spans" : [
+      {
+        "days" : 127,
+        "endMinute" : 1320,
+        "startMinute" : 540
+      }
+    ]
+  },
+  "function" : "ActivityLimit.spans",
+  "input" : {
+    "state" : {
+      "config" : {
+        "loosenDelayHours" : 24,
+        "targets" : [
+          {
+            "addedAt" : "2026-09-01T00:00:00Z",
+            "id" : "20000000-0000-0000-0000-000000000001",
+            "kind" : {
+              "host" : {
+                "_0" : "youtube.com"
+              }
+            },
+            "nickname" : "",
+            "rule" : {
+              "dailyBudgetMinutes" : 60,
+              "windows" : [
+                {
+                  "days" : 62,
+                  "endMinute" : 1320,
+                  "startMinute" : 540
+                }
+              ]
+            }
+          },
+          {
+            "addedAt" : "2026-09-01T00:00:00Z",
+            "id" : "20000000-0000-0000-0000-000000000002",
+            "kind" : {
+              "host" : {
+                "_0" : "reddit.com"
+              }
+            },
+            "nickname" : "",
+            "rule" : {
+              "dailyBudgetMinutes" : 60,
+              "windows" : [
+                {
+                  "days" : 65,
+                  "endMinute" : 1320,
+                  "startMinute" : 540
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "pending" : [
+
+      ],
+      "runtime" : {
+
+      }
+    }
+  },
+  "name" : "9 to 10 on weekdays and 9 to 10 at the weekend are one span: the days are stripped, because the scheduler is told about hours and the engine decides the day"
+}

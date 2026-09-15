@@ -1,0 +1,40 @@
+{
+  "expected" : {
+    "anchor" : {
+      "isAnchored" : false,
+      "kinds" : [
+
+      ],
+      "schedules" : [
+
+      ],
+      "scope" : "chosen",
+      "sequence" : 2,
+      "tags" : [
+
+      ]
+    },
+    "message" : "Choose what the anchor holds first.",
+    "refusal" : "noList"
+  },
+  "function" : "AnchorSync.macDrop",
+  "input" : {
+    "cloudAvailable" : true,
+    "config" : {
+      "anchor" : {
+        "kinds" : [
+
+        ],
+        "scope" : "chosen",
+        "sequence" : 2
+      },
+      "loosenDelayHours" : 24,
+      "targets" : [
+
+      ]
+    },
+    "hasKey" : true,
+    "now" : "2026-09-08T12:00:00Z"
+  },
+  "name" : "nothing on the list, so there is nothing to hold"
+}

@@ -1,0 +1,110 @@
+{
+  "expected" : {
+    "unseen" : [
+      {
+        "origin" : "phone-a",
+        "sequence" : 1,
+        "title" : "Still on the link"
+      }
+    ]
+  },
+  "function" : "SharedAdditions.unseen",
+  "input" : {
+    "declined" : [
+
+    ],
+    "devices" : [
+      {
+        "canRelease" : false,
+        "enrolledAt" : "2026-09-07T08:00:00Z",
+        "id" : "mac-a",
+        "lastSeen" : "2026-09-08T12:00:00Z",
+        "name" : "Studio",
+        "platform" : "mac"
+      },
+      {
+        "canRelease" : true,
+        "enrolledAt" : "2026-09-07T08:00:00Z",
+        "id" : "phone-a",
+        "lastSeen" : "2026-09-08T12:00:00Z",
+        "name" : "Zach's iPhone",
+        "platform" : "phone"
+      },
+      {
+        "canRelease" : false,
+        "enrolledAt" : "2026-09-07T08:00:00Z",
+        "id" : "pad-a",
+        "lastSeen" : "2026-09-08T12:00:00Z",
+        "name" : "iPad",
+        "platform" : "pad"
+      }
+    ],
+    "revoked" : {
+      "pad-a" : {
+        "at" : "2026-09-08T06:00:00Z",
+        "by" : "phone-a"
+      }
+    },
+    "rings" : {
+      "pad-a" : [
+        {
+          "addedAt" : "2026-09-08T08:00:00Z",
+          "bundleIDs" : [
+
+          ],
+          "half" : "rules",
+          "hosts" : [
+            "gone.com"
+          ],
+          "id" : "00000000-0000-0000-0000-0000000000C2",
+          "isApp" : false,
+          "origin" : "pad-a",
+          "platform" : "pad",
+          "sequence" : 1,
+          "title" : "Left behind"
+        }
+      ],
+      "phone-a" : [
+        {
+          "addedAt" : "2026-09-08T09:00:00Z",
+          "bundleIDs" : [
+
+          ],
+          "half" : "rules",
+          "hosts" : [
+            "linked.com"
+          ],
+          "id" : "00000000-0000-0000-0000-0000000000C1",
+          "isApp" : false,
+          "origin" : "phone-a",
+          "platform" : "phone",
+          "sequence" : 1,
+          "title" : "Still on the link"
+        }
+      ],
+      "stranger-a" : [
+        {
+          "addedAt" : "2026-09-08T07:00:00Z",
+          "bundleIDs" : [
+
+          ],
+          "half" : "rules",
+          "hosts" : [
+            "stranger.com"
+          ],
+          "id" : "00000000-0000-0000-0000-0000000000C3",
+          "isApp" : false,
+          "origin" : "stranger-a",
+          "platform" : "phone",
+          "sequence" : 1,
+          "title" : "Never enrolled"
+        }
+      ]
+    },
+    "thisDevice" : "mac-a",
+    "watermarks" : {
+
+    }
+  },
+  "name" : "a ring left behind by a device that has since been revoked is not read: the gate is the roster, not the store"
+}

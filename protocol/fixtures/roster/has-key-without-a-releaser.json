@@ -1,0 +1,32 @@
+{
+  "expected" : {
+    "hasKey" : false,
+    "others" : "your iPad"
+  },
+  "function" : "Roster.hasKey",
+  "input" : {
+    "besides" : "mac-a",
+    "devices" : [
+      {
+        "canRelease" : false,
+        "enrolledAt" : "2026-09-08T08:00:00Z",
+        "id" : "mac-a",
+        "lastSeen" : "2026-09-10T07:00:00Z",
+        "name" : "Studio",
+        "platform" : "mac"
+      },
+      {
+        "canRelease" : false,
+        "enrolledAt" : "2026-09-09T08:00:00Z",
+        "id" : "pad-a",
+        "lastSeen" : "2026-09-10T08:00:00Z",
+        "name" : "iPad",
+        "platform" : "pad"
+      }
+    ],
+    "revoked" : {
+
+    }
+  },
+  "name" : "an iPad has no reader, so a Mac linked only to one has no key besides itself"
+}

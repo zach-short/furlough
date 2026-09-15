@@ -1,0 +1,65 @@
+{
+  "expected" : {
+    "anchors" : false,
+    "appNeedsPicker" : false,
+    "existing" : "10000000-0000-0000-0000-000000000003",
+    "hosts" : [
+
+    ],
+    "isNothing" : true,
+    "summary" : "Zach's iPhone anchored YouTube."
+  },
+  "function" : "SharedAdditions.landing",
+  "input" : {
+    "addition" : {
+      "addedAt" : "2026-09-08T09:00:00Z",
+      "bundleIDs" : [
+
+      ],
+      "half" : "anchor",
+      "hosts" : [
+        "youtube.com"
+      ],
+      "id" : "00000000-0000-0000-0000-0000000000F3",
+      "isApp" : false,
+      "origin" : "phone-a",
+      "platform" : "phone",
+      "sequence" : 3,
+      "title" : "YouTube"
+    },
+    "companion" : "never",
+    "config" : {
+      "anchor" : {
+        "isAnchored" : false,
+        "kinds" : [
+          {
+            "host" : {
+              "_0" : "youtube.com"
+            }
+          }
+        ],
+        "scope" : "chosen",
+        "sequence" : 0
+      },
+      "loosenDelayHours" : 24,
+      "targets" : [
+        {
+          "addedAt" : "2026-09-07T09:00:00Z",
+          "id" : "10000000-0000-0000-0000-000000000003",
+          "kind" : {
+            "host" : {
+              "_0" : "youtube.com"
+            }
+          },
+          "nickname" : ""
+        }
+      ]
+    },
+    "from" : "Zach's iPhone",
+    "installed" : {
+
+    },
+    "now" : "2026-09-08T12:00:00Z"
+  },
+  "name" : "blocked here and already on the anchor's list: nothing to do, and nobody is asked"
+}

@@ -1,0 +1,36 @@
+{
+  "expected" : {
+    "isAllowed" : false,
+    "status" : "blockedAllDay"
+  },
+  "function" : "Policy.status",
+  "input" : {
+    "config" : {
+      "loosenDelayHours" : 24,
+      "targets" : [
+        {
+          "addedAt" : "2026-09-01T00:00:00Z",
+          "id" : "20000000-0000-0000-0000-000000000001",
+          "kind" : {
+            "host" : {
+              "_0" : "youtube.com"
+            }
+          },
+          "nickname" : "",
+          "rule" : {
+            "dailyBudgetMinutes" : 0,
+            "windows" : [
+
+            ]
+          }
+        }
+      ]
+    },
+    "now" : "2026-09-08T12:00:00Z",
+    "runtime" : {
+
+    },
+    "targetID" : "20000000-0000-0000-0000-000000000001"
+  },
+  "name" : "no budget and no hours is not a closed window, it is blocked all day"
+}

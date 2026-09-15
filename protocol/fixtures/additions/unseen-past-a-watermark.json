@@ -1,0 +1,128 @@
+{
+  "expected" : {
+    "unseen" : [
+      {
+        "origin" : "pad-a",
+        "sequence" : 1,
+        "title" : "From the iPad"
+      },
+      {
+        "origin" : "phone-a",
+        "sequence" : 2,
+        "title" : "Waiting"
+      }
+    ]
+  },
+  "function" : "SharedAdditions.unseen",
+  "input" : {
+    "declined" : [
+      "00000000-0000-0000-0000-0000000000B5"
+    ],
+    "devices" : [
+      {
+        "canRelease" : false,
+        "enrolledAt" : "2026-09-07T08:00:00Z",
+        "id" : "mac-a",
+        "lastSeen" : "2026-09-08T12:00:00Z",
+        "name" : "Studio",
+        "platform" : "mac"
+      },
+      {
+        "canRelease" : true,
+        "enrolledAt" : "2026-09-07T08:00:00Z",
+        "id" : "phone-a",
+        "lastSeen" : "2026-09-08T12:00:00Z",
+        "name" : "Zach's iPhone",
+        "platform" : "phone"
+      },
+      {
+        "canRelease" : false,
+        "enrolledAt" : "2026-09-07T08:00:00Z",
+        "id" : "pad-a",
+        "lastSeen" : "2026-09-08T12:00:00Z",
+        "name" : "iPad",
+        "platform" : "pad"
+      }
+    ],
+    "revoked" : {
+
+    },
+    "rings" : {
+      "mac-a" : [
+        {
+          "addedAt" : "2026-09-08T08:00:00Z",
+          "bundleIDs" : [
+
+          ],
+          "half" : "rules",
+          "hosts" : [
+            "ours.com"
+          ],
+          "id" : "00000000-0000-0000-0000-0000000000B4",
+          "isApp" : false,
+          "origin" : "mac-a",
+          "platform" : "mac",
+          "sequence" : 7,
+          "title" : "Our own"
+        }
+      ],
+      "pad-a" : [
+        {
+          "addedAt" : "2026-09-08T10:00:00Z",
+          "bundleIDs" : [
+
+          ],
+          "half" : "rules",
+          "hosts" : [
+            "pad.com"
+          ],
+          "id" : "00000000-0000-0000-0000-0000000000B3",
+          "isApp" : false,
+          "origin" : "pad-a",
+          "platform" : "pad",
+          "sequence" : 1,
+          "title" : "From the iPad"
+        }
+      ],
+      "phone-a" : [
+        {
+          "addedAt" : "2026-09-08T09:00:00Z",
+          "bundleIDs" : [
+
+          ],
+          "half" : "rules",
+          "hosts" : [
+            "seen.com"
+          ],
+          "id" : "00000000-0000-0000-0000-0000000000B1",
+          "isApp" : false,
+          "origin" : "phone-a",
+          "platform" : "phone",
+          "sequence" : 1,
+          "title" : "Seen"
+        },
+        {
+          "addedAt" : "2026-09-08T11:00:00Z",
+          "bundleIDs" : [
+
+          ],
+          "half" : "rules",
+          "hosts" : [
+            "waiting.com"
+          ],
+          "id" : "00000000-0000-0000-0000-0000000000B2",
+          "isApp" : false,
+          "origin" : "phone-a",
+          "platform" : "phone",
+          "sequence" : 2,
+          "title" : "Waiting"
+        }
+      ]
+    },
+    "thisDevice" : "mac-a",
+    "watermarks" : {
+      "phone-a" : 1
+    }
+  },
+  "name" : "each source's ring is read past that source's own watermark, oldest addedAt first"
+}

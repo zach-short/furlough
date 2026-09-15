@@ -1,0 +1,49 @@
+{
+  "expected" : {
+    "classification" : "loosening"
+  },
+  "function" : "Policy.classify(newRule:)",
+  "input" : {
+    "newRule" : {
+      "budgetByWeekday" : [
+        30,
+        120,
+        30,
+        30,
+        30,
+        30,
+        30
+      ],
+      "dailyBudgetMinutes" : 30,
+      "windows" : [
+
+      ]
+    },
+    "target" : {
+      "addedAt" : "2026-09-01T00:00:00Z",
+      "id" : "20000000-0000-0000-0000-000000000001",
+      "kind" : {
+        "host" : {
+          "_0" : "youtube.com"
+        }
+      },
+      "nickname" : "",
+      "rule" : {
+        "budgetByWeekday" : [
+          120,
+          30,
+          30,
+          30,
+          30,
+          30,
+          30
+        ],
+        "dailyBudgetMinutes" : 30,
+        "windows" : [
+
+        ]
+      }
+    }
+  },
+  "name" : "two hours moved off Sunday onto Monday leaves the week the same size and Monday looser, and a looser Monday is a loosening"
+}

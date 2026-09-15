@@ -1,0 +1,76 @@
+{
+  "expected" : {
+    "budgets" : [
+      30,
+      60,
+      60,
+      60,
+      60,
+      60,
+      120
+    ],
+    "effectiveBudgets" : [
+      30,
+      60,
+      60,
+      60,
+      60,
+      60,
+      120
+    ],
+    "everAllowed" : [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "isSameBudgetEveryDay" : false,
+    "normalized" : {
+      "budgetByWeekday" : [
+        30,
+        60,
+        60,
+        60,
+        60,
+        60,
+        120
+      ],
+      "dailyBudgetMinutes" : 60,
+      "windows" : [
+
+      ]
+    },
+    "representativeBudget" : 60,
+    "windowsPerDay" : [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ]
+  },
+  "function" : "Rule.week",
+  "input" : {
+    "rule" : {
+      "budgetByWeekday" : [
+        30,
+        60,
+        60,
+        60,
+        60,
+        60,
+        120
+      ],
+      "dailyBudgetMinutes" : 60,
+      "windows" : [
+
+      ]
+    }
+  },
+  "name" : "half an hour on Sunday, two on Saturday, an hour the rest of the week"
+}

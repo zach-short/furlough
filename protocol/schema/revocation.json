@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://furloughapp.com/protocol/schema/revocation.json",
+  "title": "Revocation",
+  "description": "One device taking another off the link, written under the revoked device's id (furlough.revoke.<id>) so that device finds it on its next read and un-enrols itself. Any linked device may write one; every other device leaves the revoked device out of the roster immediately.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["by", "at"],
+  "properties": {
+    "by": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The revoking device's id."
+    },
+    "at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When it was written. A revocation older than the entry's enrolledAt is spent rather than deleted, so a device can come back."
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "expected" : {
+    "linked" : [
+      "phone-a",
+      "pad-a"
+    ]
+  },
+  "function" : "Roster.linked",
+  "input" : {
+    "devices" : [
+      {
+        "canRelease" : true,
+        "enrolledAt" : "2026-09-07T08:00:00Z",
+        "id" : "phone-a",
+        "lastSeen" : "2026-09-10T09:00:00Z",
+        "name" : "Zach's iPhone",
+        "platform" : "phone"
+      },
+      {
+        "canRelease" : false,
+        "enrolledAt" : "2026-09-09T08:00:00Z",
+        "id" : "pad-a",
+        "lastSeen" : "2026-09-10T08:00:00Z",
+        "name" : "iPad",
+        "platform" : "pad"
+      }
+    ],
+    "revoked" : {
+      "pad-a" : {
+        "at" : "2026-09-08T06:00:00Z",
+        "by" : "phone-a"
+      }
+    }
+  },
+  "name" : "a revocation older than the enrollment is spent: the device was taken off and came back"
+}

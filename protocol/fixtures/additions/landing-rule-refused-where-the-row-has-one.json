@@ -1,0 +1,68 @@
+{
+  "expected" : {
+    "anchors" : false,
+    "appNeedsPicker" : false,
+    "existing" : "10000000-0000-0000-0000-000000000003",
+    "hosts" : [
+
+    ],
+    "isNothing" : true,
+    "summary" : "Zach's iPhone added Netflix."
+  },
+  "function" : "SharedAdditions.landing",
+  "input" : {
+    "addition" : {
+      "addedAt" : "2026-09-08T11:00:00Z",
+      "bundleIDs" : [
+        "com.netflix.netflix"
+      ],
+      "half" : "rules",
+      "hosts" : [
+        "netflix.com"
+      ],
+      "id" : "00000000-0000-0000-0000-0000000000E5",
+      "isApp" : false,
+      "origin" : "phone-a",
+      "platform" : "phone",
+      "rule" : {
+        "dailyBudgetMinutes" : 120,
+        "windows" : [
+          {
+            "endMinute" : 1380,
+            "startMinute" : 1080
+          }
+        ]
+      },
+      "sequence" : 3,
+      "title" : "Netflix"
+    },
+    "companion" : "always",
+    "config" : {
+      "loosenDelayHours" : 24,
+      "targets" : [
+        {
+          "addedAt" : "2026-09-07T09:00:00Z",
+          "id" : "10000000-0000-0000-0000-000000000003",
+          "kind" : {
+            "host" : {
+              "_0" : "netflix.com"
+            }
+          },
+          "nickname" : "",
+          "rule" : {
+            "dailyBudgetMinutes" : 45,
+            "windows" : [
+
+            ]
+          }
+        }
+      ]
+    },
+    "from" : "Zach's iPhone",
+    "installed" : {
+
+    },
+    "now" : "2026-09-08T12:00:00Z"
+  },
+  "name" : "a rule of your own is never overwritten by a device you are not holding, so nothing at all is left to do"
+}

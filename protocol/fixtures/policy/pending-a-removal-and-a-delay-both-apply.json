@@ -1,0 +1,120 @@
+{
+  "expected" : {
+    "changed" : true,
+    "config" : {
+      "anchor" : {
+        "isAnchored" : false,
+        "kinds" : [
+
+        ],
+        "schedules" : [
+
+        ],
+        "scope" : "chosen",
+        "sequence" : 0,
+        "tags" : [
+
+        ]
+      },
+      "isInTrial" : false,
+      "link" : {
+        "acceptAdditions" : "ask",
+        "companionSite" : "always",
+        "sendAdditions" : "ask"
+      },
+      "loosenDelayHours" : 6,
+      "schemaVersion" : 1,
+      "targets" : [
+        {
+          "addedAt" : "2026-09-01T00:00:00Z",
+          "id" : "20000000-0000-0000-0000-000000000002",
+          "kind" : {
+            "host" : {
+              "_0" : "reddit.com"
+            }
+          },
+          "nickname" : "",
+          "rule" : {
+            "dailyBudgetMinutes" : 30,
+            "windows" : [
+
+            ]
+          }
+        }
+      ]
+    },
+    "landedToday" : 2,
+    "pendingLeft" : [
+
+    ]
+  },
+  "function" : "Policy.applyDuePending",
+  "input" : {
+    "now" : "2026-09-08T12:00:00Z",
+    "state" : {
+      "config" : {
+        "loosenDelayHours" : 24,
+        "targets" : [
+          {
+            "addedAt" : "2026-09-01T00:00:00Z",
+            "id" : "20000000-0000-0000-0000-000000000001",
+            "kind" : {
+              "host" : {
+                "_0" : "youtube.com"
+              }
+            },
+            "nickname" : "",
+            "rule" : {
+              "dailyBudgetMinutes" : 30,
+              "windows" : [
+
+              ]
+            }
+          },
+          {
+            "addedAt" : "2026-09-01T00:00:00Z",
+            "id" : "20000000-0000-0000-0000-000000000002",
+            "kind" : {
+              "host" : {
+                "_0" : "reddit.com"
+              }
+            },
+            "nickname" : "",
+            "rule" : {
+              "dailyBudgetMinutes" : 30,
+              "windows" : [
+
+              ]
+            }
+          }
+        ]
+      },
+      "pending" : [
+        {
+          "createdAt" : "2026-09-07T10:00:00Z",
+          "effectiveAt" : "2026-09-08T10:00:00Z",
+          "id" : "30000000-0000-0000-0000-000000000001",
+          "kind" : {
+            "removeTarget" : {
+              "targetID" : "20000000-0000-0000-0000-000000000001"
+            }
+          }
+        },
+        {
+          "createdAt" : "2026-09-07T11:00:00Z",
+          "effectiveAt" : "2026-09-08T11:00:00Z",
+          "id" : "30000000-0000-0000-0000-000000000002",
+          "kind" : {
+            "setDelay" : {
+              "hours" : 6
+            }
+          }
+        }
+      ],
+      "runtime" : {
+
+      }
+    }
+  },
+  "name" : "different kinds of change land in the same pass"
+}

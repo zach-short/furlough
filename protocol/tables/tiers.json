@@ -1,0 +1,1638 @@
+{
+  "bundleIDPrefixes" : [
+    {
+      "detail" : "1Password holds the passwords you need to sign in anywhere.",
+      "key" : "com.agilebits",
+      "utility" : "essential"
+    },
+    {
+      "detail" : "1Password holds the passwords you need to sign in anywhere.",
+      "key" : "com.1password",
+      "utility" : "essential"
+    },
+    {
+      "detail" : "Bitwarden holds the passwords you need to sign in anywhere.",
+      "key" : "com.bitwarden",
+      "utility" : "essential"
+    },
+    {
+      "detail" : "Blocking an authenticator means you cannot sign in to anything that asks for a code.",
+      "key" : "com.google.authenticator",
+      "utility" : "essential"
+    },
+    {
+      "detail" : "Blocking an authenticator means you cannot sign in to anything that asks for a code.",
+      "key" : "com.microsoft.azureauthenticator",
+      "utility" : "essential"
+    },
+    {
+      "detail" : "Blocking an authenticator means you cannot sign in to anything that asks for a code.",
+      "key" : "com.authy",
+      "utility" : "essential"
+    },
+    {
+      "detail" : "Blocking an authenticator means you cannot sign in to anything that asks for a code.",
+      "key" : "com.duosecurity",
+      "utility" : "essential"
+    },
+    {
+      "detail" : "Uber may be how you get home.",
+      "key" : "com.ubercab",
+      "utility" : "essential"
+    },
+    {
+      "detail" : "Lyft may be how you get home.",
+      "key" : "com.zimride",
+      "utility" : "essential"
+    },
+    {
+      "key" : "com.apple.health",
+      "utility" : "essential"
+    },
+    {
+      "key" : "com.spotify",
+      "utility" : "useful"
+    },
+    {
+      "key" : "org.whispersystems",
+      "utility" : "useful"
+    },
+    {
+      "key" : "net.whatsapp",
+      "utility" : "useful"
+    }
+  ],
+  "bundleIDs" : [
+    {
+      "key" : "ai.character.app",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "ai.perplexity.app",
+      "utility" : "useful"
+    },
+    {
+      "key" : "co.hinge.mobile.ios",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "com.9gag.ios.mobile",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "com.activision.callofduty.shooter",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.airbnb.app",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.alibaba.ialiexpress",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.amazon.aiv.aivapp",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.amazon.amazon",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.amazon.lassen",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.anthropic.claude",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.apple.dt.xcode",
+      "utility" : "useful"
+    },
+    {
+      "detail" : "FaceTime is how you reach people who call you that way.",
+      "key" : "com.apple.facetime",
+      "utility" : "essential"
+    },
+    {
+      "detail" : "Find My is how you locate a lost phone, or a person expecting you.",
+      "key" : "com.apple.findmy",
+      "utility" : "essential"
+    },
+    {
+      "key" : "com.apple.ical",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.apple.mail",
+      "utility" : "useful"
+    },
+    {
+      "detail" : "Maps is how you find your way somewhere unfamiliar.",
+      "key" : "com.apple.maps",
+      "utility" : "essential"
+    },
+    {
+      "key" : "com.apple.mobilemail",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.apple.mobilenotes",
+      "utility" : "useful"
+    },
+    {
+      "detail" : "Phone is how you call anyone, and how anyone calls you.",
+      "key" : "com.apple.mobilephone",
+      "utility" : "essential"
+    },
+    {
+      "key" : "com.apple.mobilesafari",
+      "utility" : "useful"
+    },
+    {
+      "detail" : "Messages is how people reach you, and how codes texted to you arrive.",
+      "key" : "com.apple.mobilesms",
+      "utility" : "essential"
+    },
+    {
+      "detail" : "Clock holds your alarms.",
+      "key" : "com.apple.mobiletimer",
+      "utility" : "essential"
+    },
+    {
+      "key" : "com.apple.music",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.apple.news",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.apple.notes",
+      "utility" : "useful"
+    },
+    {
+      "detail" : "Wallet holds your cards, passes and tickets.",
+      "key" : "com.apple.passbook",
+      "utility" : "essential"
+    },
+    {
+      "detail" : "Settings is also where Furlough itself is switched off, so blocking it locks the escape hatch.",
+      "key" : "com.apple.preferences",
+      "utility" : "essential"
+    },
+    {
+      "key" : "com.apple.reminders",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.apple.safari",
+      "utility" : "useful"
+    },
+    {
+      "detail" : "System Settings is also where Furlough is switched off, so blocking it locks the escape hatch.",
+      "key" : "com.apple.systempreferences",
+      "utility" : "essential"
+    },
+    {
+      "key" : "com.apple.terminal",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.apple.tv",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.asana.asana",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.atebits.tweetie2",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "com.audible.iphone",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.bereal.bereal",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "com.bleacherreport.teamstream",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.burbn.barcelona",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "com.burbn.instagram",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "com.canva.canvaeditor",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.cardify.tinder",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "com.cbsvideo.app",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.chess.iphone",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.crunchyroll.iphone",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.disney.disneyplus",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.draftkings.sportsbook",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "com.duolingo.duolingomobile",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.ebay.iphone",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.einnovation.temu",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "com.epicgames.fortnitegame",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.espn.bet",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "com.espn.scorecenter",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.etsy.etsyforios",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.evernote.iphone.evernote",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.facebook.facebook",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "com.facebook.messenger",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.fanduel.sportsbook",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "com.flipboard.flipboard-ipad",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.fogcreek.trello",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.garageitaly.garage",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.google.chrome",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.google.chrome.ios",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.google.gemini",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.google.ios.youtube",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.google.ios.youtubemusic",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.grindrguy.grindrx",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "com.hnc.discord",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.hulu.plus",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.innersloth.amongus",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.instacart",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.kick.mobile",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "com.kick.streaming",
+      "utility" : "hazard"
+    },
+    {
+      "detail" : "Life360 is how family finds each other.",
+      "key" : "com.life360.safetymap",
+      "utility" : "essential"
+    },
+    {
+      "key" : "com.linkedin.linkedin",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.match.match.com",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "com.mercariapp.ios.mercari",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.microsoft.officemobile",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.microsoft.skype.teams",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.midasplayer.apps.candycrushsaga",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.mojang.minecraftpe",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.monday.monday",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.moxco.bumble",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "com.myprizepicks.prizepicks",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "com.netflix.netflix",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.nextdoor.nextdoor",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.nfl.gamecenter",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.nianticlabs.pokemongo",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.offerup.iphone.consumer",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.okcupid.app",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "com.openai.chat",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.pandora",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.peacocktv.peacock",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.pinterest",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.playmgm.nj.sports2",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "com.poshmark.poshmark",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.quora.app.experts",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.quora.app.mobile",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.reddit.reddit",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "com.robinhood.release.robinhood",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "com.roblox.robloxmobile",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.soundcloud.touchapp",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.squareup.cash",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.ss.iphone.ugc.ame",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "com.supercell.laser",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "com.supercell.magic",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "com.supercell.scroll",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "com.target.target",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.tinyspeck.slackmacgap",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.todoist.ios",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.toyopagroup.picaboo",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "com.ubercab.ubereats",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.vilcsak.bitcoin2",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.vimeo",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.walmart.electronics",
+      "utility" : "useful"
+    },
+    {
+      "detail" : "Waze is how you find your way somewhere unfamiliar.",
+      "key" : "com.waze.iphone",
+      "utility" : "essential"
+    },
+    {
+      "key" : "com.wbd.stream",
+      "utility" : "idle"
+    },
+    {
+      "key" : "com.yourcompany.ppclient",
+      "utility" : "useful"
+    },
+    {
+      "key" : "com.zhiliaoapp.musically",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "com.zynga.wordswithfriends3",
+      "utility" : "idle"
+    },
+    {
+      "key" : "doordash.doordashconsumer",
+      "utility" : "useful"
+    },
+    {
+      "key" : "imgurmobile",
+      "utility" : "idle"
+    },
+    {
+      "key" : "iphone.thescore.com",
+      "utility" : "idle"
+    },
+    {
+      "key" : "net.kortina.labs.venmo",
+      "utility" : "useful"
+    },
+    {
+      "key" : "notion.id",
+      "utility" : "useful"
+    },
+    {
+      "key" : "org.coursera.coursera",
+      "utility" : "useful"
+    },
+    {
+      "key" : "org.khanacademy.khan-academy",
+      "utility" : "useful"
+    },
+    {
+      "key" : "ph.telegra.telegraph",
+      "utility" : "useful"
+    },
+    {
+      "key" : "tv.twitch",
+      "utility" : "idle"
+    },
+    {
+      "key" : "us.williamhill.nj.sports",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "us.zoom.xos",
+      "utility" : "useful"
+    },
+    {
+      "key" : "xyz.blueskyweb.app",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "zzkko.com.zzkko",
+      "utility" : "hazard"
+    }
+  ],
+  "hosts" : [
+    {
+      "detail" : "WhatsApp Web is how some people reach you.",
+      "key" : "web.whatsapp.com",
+      "utility" : "essential"
+    },
+    {
+      "detail" : "Messages is how people reach you, and how codes texted to you arrive.",
+      "key" : "messages.google.com",
+      "utility" : "essential"
+    },
+    {
+      "detail" : "Maps is how you find your way somewhere unfamiliar.",
+      "key" : "maps.google.com",
+      "utility" : "essential"
+    },
+    {
+      "detail" : "Maps is how you find your way somewhere unfamiliar.",
+      "key" : "maps.apple.com",
+      "utility" : "essential"
+    },
+    {
+      "key" : "mail.google.com",
+      "utility" : "useful"
+    },
+    {
+      "key" : "calendar.google.com",
+      "utility" : "useful"
+    },
+    {
+      "key" : "drive.google.com",
+      "utility" : "useful"
+    },
+    {
+      "key" : "docs.google.com",
+      "utility" : "useful"
+    },
+    {
+      "key" : "github.com",
+      "utility" : "useful"
+    },
+    {
+      "key" : "stackoverflow.com",
+      "utility" : "useful"
+    },
+    {
+      "key" : "slack.com",
+      "utility" : "useful"
+    },
+    {
+      "key" : "zoom.us",
+      "utility" : "useful"
+    },
+    {
+      "key" : "open.spotify.com",
+      "utility" : "useful"
+    },
+    {
+      "key" : "linkedin.com",
+      "utility" : "idle"
+    },
+    {
+      "key" : "google.com",
+      "utility" : "useful"
+    },
+    {
+      "key" : "soundcloud.com",
+      "utility" : "useful"
+    },
+    {
+      "key" : "pandora.com",
+      "utility" : "useful"
+    },
+    {
+      "key" : "ebay.com",
+      "utility" : "useful"
+    },
+    {
+      "key" : "etsy.com",
+      "utility" : "useful"
+    },
+    {
+      "key" : "doordash.com",
+      "utility" : "useful"
+    },
+    {
+      "key" : "airbnb.com",
+      "utility" : "useful"
+    },
+    {
+      "key" : "venmo.com",
+      "utility" : "useful"
+    },
+    {
+      "key" : "cash.app",
+      "utility" : "useful"
+    },
+    {
+      "key" : "paypal.com",
+      "utility" : "useful"
+    },
+    {
+      "key" : "asana.com",
+      "utility" : "useful"
+    },
+    {
+      "key" : "trello.com",
+      "utility" : "useful"
+    },
+    {
+      "key" : "duolingo.com",
+      "utility" : "useful"
+    },
+    {
+      "key" : "chatgpt.com",
+      "utility" : "useful"
+    },
+    {
+      "key" : "claude.ai",
+      "utility" : "useful"
+    },
+    {
+      "key" : "gemini.google.com",
+      "utility" : "useful"
+    },
+    {
+      "key" : "perplexity.ai",
+      "utility" : "useful"
+    },
+    {
+      "key" : "web.telegram.org",
+      "utility" : "useful"
+    },
+    {
+      "key" : "notion.so",
+      "utility" : "useful"
+    },
+    {
+      "key" : "evernote.com",
+      "utility" : "useful"
+    },
+    {
+      "key" : "todoist.com",
+      "utility" : "useful"
+    },
+    {
+      "key" : "monday.com",
+      "utility" : "useful"
+    },
+    {
+      "key" : "canva.com",
+      "utility" : "useful"
+    },
+    {
+      "key" : "khanacademy.org",
+      "utility" : "useful"
+    },
+    {
+      "key" : "coursera.org",
+      "utility" : "useful"
+    },
+    {
+      "key" : "audible.com",
+      "utility" : "useful"
+    },
+    {
+      "key" : "instacart.com",
+      "utility" : "useful"
+    },
+    {
+      "key" : "walmart.com",
+      "utility" : "useful"
+    },
+    {
+      "key" : "target.com",
+      "utility" : "useful"
+    },
+    {
+      "key" : "youtube.com",
+      "utility" : "idle"
+    },
+    {
+      "key" : "netflix.com",
+      "utility" : "idle"
+    },
+    {
+      "key" : "twitch.tv",
+      "utility" : "idle"
+    },
+    {
+      "key" : "news.ycombinator.com",
+      "utility" : "idle"
+    },
+    {
+      "key" : "nytimes.com",
+      "utility" : "idle"
+    },
+    {
+      "key" : "espn.com",
+      "utility" : "idle"
+    },
+    {
+      "key" : "pinterest.com",
+      "utility" : "idle"
+    },
+    {
+      "key" : "imgur.com",
+      "utility" : "idle"
+    },
+    {
+      "key" : "hulu.com",
+      "utility" : "idle"
+    },
+    {
+      "key" : "disneyplus.com",
+      "utility" : "idle"
+    },
+    {
+      "key" : "max.com",
+      "utility" : "idle"
+    },
+    {
+      "key" : "primevideo.com",
+      "utility" : "idle"
+    },
+    {
+      "key" : "peacocktv.com",
+      "utility" : "idle"
+    },
+    {
+      "key" : "paramountplus.com",
+      "utility" : "idle"
+    },
+    {
+      "key" : "quora.com",
+      "utility" : "idle"
+    },
+    {
+      "key" : "nextdoor.com",
+      "utility" : "idle"
+    },
+    {
+      "key" : "roblox.com",
+      "utility" : "idle"
+    },
+    {
+      "key" : "chess.com",
+      "utility" : "idle"
+    },
+    {
+      "key" : "poshmark.com",
+      "utility" : "idle"
+    },
+    {
+      "key" : "depop.com",
+      "utility" : "idle"
+    },
+    {
+      "key" : "vimeo.com",
+      "utility" : "idle"
+    },
+    {
+      "key" : "crunchyroll.com",
+      "utility" : "idle"
+    },
+    {
+      "key" : "nfl.com",
+      "utility" : "idle"
+    },
+    {
+      "key" : "bleacherreport.com",
+      "utility" : "idle"
+    },
+    {
+      "key" : "mercari.com",
+      "utility" : "idle"
+    },
+    {
+      "key" : "offerup.com",
+      "utility" : "idle"
+    },
+    {
+      "key" : "aliexpress.com",
+      "utility" : "idle"
+    },
+    {
+      "key" : "coinbase.com",
+      "utility" : "idle"
+    },
+    {
+      "key" : "tiktok.com",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "instagram.com",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "reddit.com",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "old.reddit.com",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "x.com",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "twitter.com",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "facebook.com",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "threads.com",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "threads.net",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "snapchat.com",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "tumblr.com",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "9gag.com",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "draftkings.com",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "fanduel.com",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "temu.com",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "shein.com",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "tinder.com",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "bumble.com",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "hinge.co",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "grindr.com",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "character.ai",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "betmgm.com",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "prizepicks.com",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "kick.com",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "match.com",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "robinhood.com",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "bsky.app",
+      "utility" : "hazard"
+    }
+  ],
+  "names" : [
+    {
+      "detail" : "1Password holds the passwords you need to sign in anywhere.",
+      "key" : "1password",
+      "utility" : "essential"
+    },
+    {
+      "key" : "9gag",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "airbnb",
+      "utility" : "useful"
+    },
+    {
+      "key" : "aliexpress",
+      "utility" : "idle"
+    },
+    {
+      "key" : "amazon",
+      "utility" : "useful"
+    },
+    {
+      "key" : "among us",
+      "utility" : "idle"
+    },
+    {
+      "key" : "among us!",
+      "utility" : "idle"
+    },
+    {
+      "key" : "apple news",
+      "utility" : "idle"
+    },
+    {
+      "key" : "apple tv",
+      "utility" : "idle"
+    },
+    {
+      "key" : "asana",
+      "utility" : "useful"
+    },
+    {
+      "key" : "audible",
+      "utility" : "useful"
+    },
+    {
+      "detail" : "Blocking an authenticator means you cannot sign in to anything that asks for a code.",
+      "key" : "authenticator",
+      "utility" : "essential"
+    },
+    {
+      "detail" : "Blocking an authenticator means you cannot sign in to anything that asks for a code.",
+      "key" : "authy",
+      "utility" : "essential"
+    },
+    {
+      "key" : "bereal",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "betmgm",
+      "utility" : "hazard"
+    },
+    {
+      "detail" : "Bitwarden holds the passwords you need to sign in anywhere.",
+      "key" : "bitwarden",
+      "utility" : "essential"
+    },
+    {
+      "key" : "bleacher report",
+      "utility" : "idle"
+    },
+    {
+      "key" : "bluesky",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "brawl stars",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "bumble",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "caesars sportsbook",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "calendar",
+      "utility" : "useful"
+    },
+    {
+      "key" : "call of duty",
+      "utility" : "idle"
+    },
+    {
+      "key" : "call of duty: mobile",
+      "utility" : "idle"
+    },
+    {
+      "key" : "camera",
+      "utility" : "useful"
+    },
+    {
+      "key" : "candy crush saga",
+      "utility" : "idle"
+    },
+    {
+      "key" : "canva",
+      "utility" : "useful"
+    },
+    {
+      "key" : "cash app",
+      "utility" : "useful"
+    },
+    {
+      "key" : "character ai",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "character.ai",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "chatgpt",
+      "utility" : "useful"
+    },
+    {
+      "key" : "chess.com",
+      "utility" : "idle"
+    },
+    {
+      "key" : "chrome",
+      "utility" : "useful"
+    },
+    {
+      "key" : "clash of clans",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "clash royale",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "claude",
+      "utility" : "useful"
+    },
+    {
+      "detail" : "Clock holds your alarms.",
+      "key" : "clock",
+      "utility" : "essential"
+    },
+    {
+      "key" : "coinbase",
+      "utility" : "idle"
+    },
+    {
+      "key" : "copilot",
+      "utility" : "useful"
+    },
+    {
+      "key" : "coursera",
+      "utility" : "useful"
+    },
+    {
+      "key" : "crunchyroll",
+      "utility" : "idle"
+    },
+    {
+      "key" : "depop",
+      "utility" : "idle"
+    },
+    {
+      "key" : "discord",
+      "utility" : "useful"
+    },
+    {
+      "key" : "disney+",
+      "utility" : "idle"
+    },
+    {
+      "key" : "doordash",
+      "utility" : "useful"
+    },
+    {
+      "key" : "draftkings",
+      "utility" : "hazard"
+    },
+    {
+      "detail" : "Blocking an authenticator means you cannot sign in to anything that asks for a code.",
+      "key" : "duo mobile",
+      "utility" : "essential"
+    },
+    {
+      "key" : "duolingo",
+      "utility" : "useful"
+    },
+    {
+      "key" : "ebay",
+      "utility" : "useful"
+    },
+    {
+      "key" : "espn",
+      "utility" : "idle"
+    },
+    {
+      "key" : "espn bet",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "etsy",
+      "utility" : "useful"
+    },
+    {
+      "key" : "evernote",
+      "utility" : "useful"
+    },
+    {
+      "key" : "facebook",
+      "utility" : "hazard"
+    },
+    {
+      "detail" : "FaceTime is how you reach people who call you that way.",
+      "key" : "facetime",
+      "utility" : "essential"
+    },
+    {
+      "key" : "fanduel",
+      "utility" : "hazard"
+    },
+    {
+      "detail" : "Find My is how you locate a lost phone, or a person expecting you.",
+      "key" : "find my",
+      "utility" : "essential"
+    },
+    {
+      "key" : "flipboard",
+      "utility" : "idle"
+    },
+    {
+      "key" : "fortnite",
+      "utility" : "idle"
+    },
+    {
+      "key" : "gemini",
+      "utility" : "useful"
+    },
+    {
+      "key" : "gmail",
+      "utility" : "useful"
+    },
+    {
+      "detail" : "Blocking an authenticator means you cannot sign in to anything that asks for a code.",
+      "key" : "google authenticator",
+      "utility" : "essential"
+    },
+    {
+      "detail" : "Google Maps is how you find your way somewhere unfamiliar.",
+      "key" : "google maps",
+      "utility" : "essential"
+    },
+    {
+      "key" : "grindr",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "hbo max",
+      "utility" : "idle"
+    },
+    {
+      "key" : "health",
+      "utility" : "essential"
+    },
+    {
+      "key" : "hinge",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "hulu",
+      "utility" : "idle"
+    },
+    {
+      "key" : "imgur",
+      "utility" : "idle"
+    },
+    {
+      "key" : "instacart",
+      "utility" : "useful"
+    },
+    {
+      "key" : "instagram",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "khan academy",
+      "utility" : "useful"
+    },
+    {
+      "key" : "kick",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "kindle",
+      "utility" : "useful"
+    },
+    {
+      "detail" : "Life360 is how family finds each other.",
+      "key" : "life360",
+      "utility" : "essential"
+    },
+    {
+      "key" : "linkedin",
+      "utility" : "idle"
+    },
+    {
+      "detail" : "Lyft may be how you get home.",
+      "key" : "lyft",
+      "utility" : "essential"
+    },
+    {
+      "key" : "mail",
+      "utility" : "useful"
+    },
+    {
+      "detail" : "Maps is how you find your way somewhere unfamiliar.",
+      "key" : "maps",
+      "utility" : "essential"
+    },
+    {
+      "key" : "match",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "max",
+      "utility" : "idle"
+    },
+    {
+      "key" : "mercari",
+      "utility" : "idle"
+    },
+    {
+      "detail" : "Messages is how people reach you, and how codes texted to you arrive.",
+      "key" : "messages",
+      "utility" : "essential"
+    },
+    {
+      "key" : "messenger",
+      "utility" : "useful"
+    },
+    {
+      "detail" : "Blocking an authenticator means you cannot sign in to anything that asks for a code.",
+      "key" : "microsoft authenticator",
+      "utility" : "essential"
+    },
+    {
+      "key" : "microsoft copilot",
+      "utility" : "useful"
+    },
+    {
+      "key" : "microsoft teams",
+      "utility" : "useful"
+    },
+    {
+      "key" : "minecraft",
+      "utility" : "idle"
+    },
+    {
+      "key" : "monday.com",
+      "utility" : "useful"
+    },
+    {
+      "key" : "music",
+      "utility" : "useful"
+    },
+    {
+      "key" : "netflix",
+      "utility" : "idle"
+    },
+    {
+      "key" : "news",
+      "utility" : "idle"
+    },
+    {
+      "key" : "nextdoor",
+      "utility" : "idle"
+    },
+    {
+      "key" : "nfl",
+      "utility" : "idle"
+    },
+    {
+      "key" : "notes",
+      "utility" : "useful"
+    },
+    {
+      "key" : "notion",
+      "utility" : "useful"
+    },
+    {
+      "key" : "offerup",
+      "utility" : "idle"
+    },
+    {
+      "key" : "okcupid",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "pandora",
+      "utility" : "useful"
+    },
+    {
+      "key" : "paramount+",
+      "utility" : "idle"
+    },
+    {
+      "key" : "paypal",
+      "utility" : "useful"
+    },
+    {
+      "key" : "peacock",
+      "utility" : "idle"
+    },
+    {
+      "key" : "perplexity",
+      "utility" : "useful"
+    },
+    {
+      "detail" : "Phone is how you call anyone, and how anyone calls you.",
+      "key" : "phone",
+      "utility" : "essential"
+    },
+    {
+      "key" : "photos",
+      "utility" : "useful"
+    },
+    {
+      "key" : "pinterest",
+      "utility" : "idle"
+    },
+    {
+      "key" : "podcasts",
+      "utility" : "useful"
+    },
+    {
+      "key" : "poe",
+      "utility" : "useful"
+    },
+    {
+      "key" : "pokemon go",
+      "utility" : "idle"
+    },
+    {
+      "key" : "pokémon go",
+      "utility" : "idle"
+    },
+    {
+      "key" : "poshmark",
+      "utility" : "idle"
+    },
+    {
+      "key" : "prime video",
+      "utility" : "idle"
+    },
+    {
+      "key" : "prizepicks",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "quora",
+      "utility" : "idle"
+    },
+    {
+      "key" : "reddit",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "reminders",
+      "utility" : "useful"
+    },
+    {
+      "key" : "robinhood",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "roblox",
+      "utility" : "idle"
+    },
+    {
+      "key" : "safari",
+      "utility" : "useful"
+    },
+    {
+      "detail" : "Settings is also where Furlough itself is switched off, so blocking it locks the escape hatch.",
+      "key" : "settings",
+      "utility" : "essential"
+    },
+    {
+      "key" : "shein",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "signal",
+      "utility" : "useful"
+    },
+    {
+      "key" : "slack",
+      "utility" : "useful"
+    },
+    {
+      "key" : "snapchat",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "soundcloud",
+      "utility" : "useful"
+    },
+    {
+      "key" : "spotify",
+      "utility" : "useful"
+    },
+    {
+      "key" : "target",
+      "utility" : "useful"
+    },
+    {
+      "key" : "telegram",
+      "utility" : "useful"
+    },
+    {
+      "key" : "temu",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "thescore",
+      "utility" : "idle"
+    },
+    {
+      "key" : "threads",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "tiktok",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "tinder",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "todoist",
+      "utility" : "useful"
+    },
+    {
+      "key" : "trello",
+      "utility" : "useful"
+    },
+    {
+      "key" : "tumblr",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "twitch",
+      "utility" : "idle"
+    },
+    {
+      "key" : "twitter",
+      "utility" : "hazard"
+    },
+    {
+      "detail" : "Uber may be how you get home.",
+      "key" : "uber",
+      "utility" : "essential"
+    },
+    {
+      "key" : "uber eats",
+      "utility" : "useful"
+    },
+    {
+      "key" : "venmo",
+      "utility" : "useful"
+    },
+    {
+      "key" : "vimeo",
+      "utility" : "idle"
+    },
+    {
+      "detail" : "Wallet holds your cards, passes and tickets.",
+      "key" : "wallet",
+      "utility" : "essential"
+    },
+    {
+      "key" : "walmart",
+      "utility" : "useful"
+    },
+    {
+      "detail" : "Waze is how you find your way somewhere unfamiliar.",
+      "key" : "waze",
+      "utility" : "essential"
+    },
+    {
+      "key" : "whatsapp",
+      "utility" : "useful"
+    },
+    {
+      "key" : "words with friends",
+      "utility" : "idle"
+    },
+    {
+      "key" : "x",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "youtube",
+      "utility" : "idle"
+    },
+    {
+      "key" : "youtube music",
+      "utility" : "useful"
+    },
+    {
+      "key" : "youtube shorts",
+      "utility" : "hazard"
+    },
+    {
+      "key" : "zoom",
+      "utility" : "useful"
+    }
+  ]
+}

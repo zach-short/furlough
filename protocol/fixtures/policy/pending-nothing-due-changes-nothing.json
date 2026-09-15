@@ -1,0 +1,64 @@
+{
+  "expected" : {
+    "changed" : false,
+    "config" : {
+      "anchor" : {
+        "isAnchored" : false,
+        "kinds" : [
+
+        ],
+        "schedules" : [
+
+        ],
+        "scope" : "chosen",
+        "sequence" : 0,
+        "tags" : [
+
+        ]
+      },
+      "isInTrial" : false,
+      "link" : {
+        "acceptAdditions" : "ask",
+        "companionSite" : "always",
+        "sendAdditions" : "ask"
+      },
+      "loosenDelayHours" : 24,
+      "schemaVersion" : 1,
+      "targets" : [
+
+      ]
+    },
+    "landedToday" : 0,
+    "pendingLeft" : [
+      "30000000-0000-0000-0000-000000000001"
+    ]
+  },
+  "function" : "Policy.applyDuePending",
+  "input" : {
+    "now" : "2026-09-08T12:00:00Z",
+    "state" : {
+      "config" : {
+        "loosenDelayHours" : 24,
+        "targets" : [
+
+        ]
+      },
+      "pending" : [
+        {
+          "createdAt" : "2026-09-08T10:00:00Z",
+          "effectiveAt" : "2026-09-09T10:00:00Z",
+          "id" : "30000000-0000-0000-0000-000000000001",
+          "kind" : {
+            "setDelay" : {
+              "hours" : 6
+            }
+          }
+        }
+      ],
+      "runtime" : {
+
+      }
+    }
+  },
+  "name" : "a change effective tomorrow is left where it is"
+}

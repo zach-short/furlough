@@ -1,0 +1,158 @@
+{
+  "bundleIDs" : [
+    {
+      "budgetMinutes" : 120,
+      "key" : "com.amazon.aiv.aivapp",
+      "utility" : "idle"
+    },
+    {
+      "budgetMinutes" : 120,
+      "key" : "com.apple.tv",
+      "utility" : "idle"
+    },
+    {
+      "budgetMinutes" : 120,
+      "key" : "com.cbsvideo.app",
+      "utility" : "idle"
+    },
+    {
+      "budgetMinutes" : 120,
+      "key" : "com.crunchyroll.iphone",
+      "utility" : "idle"
+    },
+    {
+      "budgetMinutes" : 120,
+      "key" : "com.disney.disneyplus",
+      "utility" : "idle"
+    },
+    {
+      "budgetMinutes" : 120,
+      "key" : "com.hulu.plus",
+      "utility" : "idle"
+    },
+    {
+      "budgetMinutes" : 120,
+      "key" : "com.netflix.netflix",
+      "utility" : "idle"
+    },
+    {
+      "budgetMinutes" : 120,
+      "key" : "com.peacocktv.peacock",
+      "utility" : "idle"
+    },
+    {
+      "budgetMinutes" : 30,
+      "key" : "com.toyopagroup.picaboo",
+      "utility" : "hazard"
+    },
+    {
+      "budgetMinutes" : 120,
+      "key" : "com.wbd.stream",
+      "utility" : "idle"
+    }
+  ],
+  "hosts" : [
+    {
+      "budgetMinutes" : 120,
+      "key" : "netflix.com",
+      "utility" : "idle"
+    },
+    {
+      "budgetMinutes" : 120,
+      "key" : "hulu.com",
+      "utility" : "idle"
+    },
+    {
+      "budgetMinutes" : 120,
+      "key" : "disneyplus.com",
+      "utility" : "idle"
+    },
+    {
+      "budgetMinutes" : 120,
+      "key" : "max.com",
+      "utility" : "idle"
+    },
+    {
+      "budgetMinutes" : 120,
+      "key" : "primevideo.com",
+      "utility" : "idle"
+    },
+    {
+      "budgetMinutes" : 120,
+      "key" : "peacocktv.com",
+      "utility" : "idle"
+    },
+    {
+      "budgetMinutes" : 120,
+      "key" : "paramountplus.com",
+      "utility" : "idle"
+    },
+    {
+      "budgetMinutes" : 120,
+      "key" : "crunchyroll.com",
+      "utility" : "idle"
+    },
+    {
+      "budgetMinutes" : 30,
+      "key" : "snapchat.com",
+      "utility" : "hazard"
+    }
+  ],
+  "names" : [
+    {
+      "budgetMinutes" : 120,
+      "key" : "apple tv",
+      "utility" : "idle"
+    },
+    {
+      "budgetMinutes" : 120,
+      "key" : "crunchyroll",
+      "utility" : "idle"
+    },
+    {
+      "budgetMinutes" : 120,
+      "key" : "disney+",
+      "utility" : "idle"
+    },
+    {
+      "budgetMinutes" : 120,
+      "key" : "hbo max",
+      "utility" : "idle"
+    },
+    {
+      "budgetMinutes" : 120,
+      "key" : "hulu",
+      "utility" : "idle"
+    },
+    {
+      "budgetMinutes" : 120,
+      "key" : "max",
+      "utility" : "idle"
+    },
+    {
+      "budgetMinutes" : 120,
+      "key" : "netflix",
+      "utility" : "idle"
+    },
+    {
+      "budgetMinutes" : 120,
+      "key" : "paramount+",
+      "utility" : "idle"
+    },
+    {
+      "budgetMinutes" : 120,
+      "key" : "peacock",
+      "utility" : "idle"
+    },
+    {
+      "budgetMinutes" : 120,
+      "key" : "prime video",
+      "utility" : "idle"
+    },
+    {
+      "budgetMinutes" : 30,
+      "key" : "snapchat",
+      "utility" : "hazard"
+    }
+  ]
+}
