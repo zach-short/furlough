@@ -30,6 +30,22 @@ marked Done** — its prompt describes work that already exists, and a fresh ses
 would build it again. Read the Done prompts only as history, or where one says a later item
 should revisit it.
 
+**Item 1's own prompt went stale too, and the row is corrected above (2026-09-14, evening).** An
+Opus session ran it and found that its central premise — HANDOFF 19's "nothing has been submitted
+for App Store review" — had been false for five days. **Version 1.0 was submitted 2026-09-09, was
+rejected 2026-09-10 under Guideline 2.1 for want of a demo video of the phone and the NFC tag on
+real hardware, was answered with one, and went back in as 1.2.0, which is `WAITING_FOR_REVIEW`.**
+So the prompt's steps read differently than they were written: step 1 (privacy manifest vs. label)
+is verified on the manifest side against the binary actually in review and is one web-form check
+on the label side; step 2's review notes were not only written but already survived a rejection
+and a rewrite, and the `UsageView` degrade path it asks about is confirmed in the code; step 3's
+rejection playbook was the one genuinely undone piece and is now `design/store/REVIEW-REPLIES.md`;
+step 4 is correctly gated and was not attempted. **Step 5's premise is simply wrong** — item 9 did
+not wait for this approval, iPad shipped in `e253fc6`, and the consequence runs the other way:
+1.3.0 is `UIDeviceFamily = [1, 2]`, so **the submission after this one will demand a 13-inch iPad
+screenshot set that does not exist**. That is unowned work and is not on this board. Per R5 the
+prompt below is left as written rather than edited into a lie; HANDOFF 19 is the truth.
+
 **Four rows were stale until 2026-09-14** and are corrected above: 9, 14, 21 and 22 all shipped
 while the board still said Open, because the sessions that built them updated `HANDOFF.md` and
 not this table. 9 in particular said "gated on 1" long after it had gone without waiting. **A
@@ -42,7 +58,7 @@ waiting on 1. That is the sentence that went stale; 9 shipped in `e253fc6` regar
 
 | # | Task | Status | Model | Lane | Waits on | Files it owns |
 |---|------|--------|-------|------|----------|---------------|
-| 1 | Land the submission, then put the Mac back on Release | **Open** — in progress, see HANDOFF 19 | Opus | Gated | Zach's ASC access | `DEPLOYMENT.md` (archive), `README.md`, `HANDOFF.md` |
+| 1 | Land the submission, then put the Mac back on Release | **Held — waiting on Apple.** The submission is *landed*: 1.2.0 is `WAITING_FOR_REVIEW` (2026-09-14). Steps 1–3 and 5 are done — HANDOFF 19's 2026-09-14 update. What is left is Apple's answer, one web-form check, and step 4, which cannot start until approval | Opus | Gated | **Apple.** Then Zach, for the testing-button call in step 4 | `DEPLOYMENT.md` (archive), `design/store/LISTING.md`, new `design/store/REVIEW-REPLIES.md`, `HANDOFF.md` |
 | 2 | Scheduled and timed Anchor, plus Control Center and the widget button | Done — HANDOFF 24 | **Fable** | A (2nd) | 3 | `AnchorProfile`, `Policy`, `Monitoring`, `MonitorExtension`, `AnchorView`, `PhoneIntents`, `FurloughWidgets` |
 | 3 | Anchor everything except an allowlist | Done — HANDOFF 13 | **Fable** | A (1st) | nothing | `AnchorProfile`, `Policy.decide`, `Decision`, `ShieldReconciler`, `AnchorView` |
 | 4 | Sync the Anchor across devices | Done — HANDOFF 18 | **Fable** | A (3rd) | 2 and 3 | new `Shared/Core/AnchorSync.swift`, `AppModel`, `MacModel`, entitlements, privacy page |

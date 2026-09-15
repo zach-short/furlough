@@ -1260,6 +1260,73 @@ The plan for this stretch. Tick each phase off here as it lands.
     record, iPad a later build on the same one, the Mac not an App Store app at all. Section 9
     has the iPad recipe and why `TARGETED_DEVICE_FAMILY` was deliberately put back to `"1"`.
 
+    **Updated 2026-09-14 (evening). The submission is landed and in review; the two paragraphs
+    above are five days stale and wrong in both directions.** Read back through the API at 21:45
+    and 21:50 with the key in DEPLOYMENT.md, re-run it rather than trusting this:
+
+    - **"Nothing has been submitted for App Store review" is false.** Version **1.0 was submitted
+      2026-09-09 01:01 ET and was REJECTED on 2026-09-10 under Guideline 2.1**, asking for a demo
+      video of the phone and the NFC tag filmed together on real hardware. That was answered: the
+      video is live at `https://furloughapp.com/review/anchor` (HTTP 200, a 20.4 MB `video/mp4`,
+      checked 2026-09-14) and the App Review notes were rewritten around it on 2026-09-13
+      (`design/store/LISTING.md:425-455`). The record was renamed and resubmitted: **version
+      1.2.0, build `202609140523`, is `WAITING_FOR_REVIEW`** as of 2026-09-14 21:50, submitted
+      2026-09-14 17:29 UTC. Review submission `d1fe0e5e-be41-4aed-9377-7af5aaad2398`, its one item
+      `READY_FOR_REVIEW`. It is the same version record throughout —
+      `b60441f6-a8f1-4619-8e04-5584a68d46db`, created 2026-09-08, which has been 1.0 and is now
+      1.2.0. **Nothing is waiting on a session here; it is waiting on Apple.**
+    - **Five builds is now eleven**, newest `1.3.0 (202609150033)`, all VALID, internal TestFlight
+      live on every one.
+    - **The record is complete and was checked field by field**, not inferred from the state:
+      release type `AFTER_APPROVAL` (approval publishes it with no second click), review contact
+      Zachary Short / `support@furloughapp.com` / `+17576155959`, `demoAccountRequired` false,
+      notes **3933 characters** — byte-identical in length to the block in
+      `design/store/LISTING.md`, which strips to 3933 too, so what Apple holds is what the file
+      says. Ten `APP_IPHONE_67` screenshots, all `COMPLETE`. Marketing URL `https://furloughapp.com`,
+      support URL `https://furloughapp.com/support`, both 200. Content rights
+      `DOES_NOT_USE_THIRD_PARTY_CONTENT`. A price schedule exists.
+    - **The privacy manifest agrees with Data Not Collected, verified in the binary under review**
+      rather than in the source: `PrivacyInfo.xcprivacy` is at the root of `Furlough.app` and in
+      all four `.appex` of `build/Furlough-202609140523.xcarchive`, and its contents are
+      `NSPrivacyCollectedDataTypes` empty, `NSPrivacyTracking` false, `NSPrivacyTrackingDomains`
+      empty, with only the three required-reason codes this step already lists. Both entitlements
+      are on that binary (`codesign -d --entitlements :-`). **The one half that cannot be checked
+      from here is the App Store privacy *label* itself** — the questionnaire has no API
+      (`scripts/store-submit.sh:23-24`), so only the web form can show it. That the submission was
+      accepted proves it is *answered*, not that it says Data Not Collected; Zach confirms that in
+      App Store Connect > App Privacy.
+    - **`UsageView` really does degrade when data access is refused**, which the review notes
+      claim to Apple and which is therefore worth being sure of: `Furlough/Views/UsageView.swift:113-118`
+      takes the `tour` branch when `hasDataAccess` is false, and `tour` (`:343-345`) hosts
+      `DeviceActivityReport(.rank(position), filter: UsageReader.filter())` — the report-extension
+      path. `UsageReader.hasDataAccess(_:)` (`Furlough/Model/UsageReader.swift:47-50`) is false
+      below iOS 26.4 and for every status but `.approvedWithDataAccess`, so the degraded path is
+      the default everywhere outside the EU. Verified by reading, not run with the capability
+      refused.
+
+    **The replies to the likely rejections are written, in `design/store/REVIEW-REPLIES.md`** —
+    the three pass-off item 1 asked for (entitlement justification, "no way to unblock" read as a
+    broken feature, the Screen Time escape undocumented), plus the 2.1 hardware letter that
+    actually arrived and the usage-screen 2.3.1 that is likeliest next. Each is pasteable into
+    Resolution Center as written, with its claims cited to the tree beneath it where Apple does
+    not see them.
+
+    **The iPad note pass-off item 1 asked for, with its premise corrected.** Item 9 did *not* wait
+    for this approval — iPad shipped independently in `e253fc6` and is in 1.3.0. What that changes
+    is the opposite of what the prompt assumed, and it matters: the build **in review** is
+    iPhone-only (`UIDeviceFamily = [1]` in `Furlough-202609140523.xcarchive`, read 2026-09-14), so
+    the submission in flight is safe and needs no iPad screenshots. The **1.3.0** build is
+    `UIDeviceFamily = [1, 2]`. So **the next submission after this one will demand a 13-inch iPad
+    screenshot set (2064 × 2752)**, which does not exist — `design/store/raw/` holds iPhone
+    captures only — and which the Simulator cannot produce, because Family Controls does not run
+    there (DEPLOYMENT.md section 9). That is a real piece of work standing between 1.3.0 and the
+    App Store, and it is nobody's board item yet.
+
+    **Still Zach's, none of it a session's:** confirm the App Privacy label reads Data Not
+    Collected in the web form; wait on Apple. The Mac Release rebuild that is the second half of
+    pass-off item 1 stays correctly gated on approval and was not attempted — with the
+    testing-button question in that prompt still unanswered and still due before it is run.
+
 20. **Both halves of the same thing.** Done 2026-09-08, all three parts.
 
     (a) The Mac, at the moment of adding: adding the YouTube app offers youtube.com, adding

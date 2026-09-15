@@ -434,10 +434,15 @@ any particular product, because "designated hardware" is the framing the rejecti
 `~/Projects/archive/furlough/demo-video/DEMO-VIDEO.md`: what Apple's four bullets require, the
 camera rig that keeps the tag and the screen in one frame, and a shot list.
 
-**The URL is a placeholder.** The block below holds
-`[PASTE THE VIDEO URL HERE BEFORE SUBMITTING]`, and `store-submit.sh` reads the notes straight out
-of this file. It will not send it: since 2026-09-13 the script refuses to run while the notes hold
-a `[PASTE … ]`, printing the line number, before it mints a token or writes anything. That is the
+~~**The URL is a placeholder.**~~ **Filled in, and the paragraph was stale: corrected 2026-09-14.**
+The block below holds the real URL, `https://furloughapp.com/review/anchor`, which returned HTTP
+200 serving a 20.4 MB `video/mp4` when checked on 2026-09-14, and which reached Apple in the notes
+now on the record. A grep for `[PASTE` over this file on 2026-09-14 hits only this paragraph — the
+prose, which the extractor never reads — so the notes block is clean and the guard passes.
+
+**The guard itself still stands and is the part worth keeping.** `store-submit.sh` reads the notes
+straight out of this file and, since 2026-09-13, refuses to run while the block holds a
+`[PASTE … ]`, printing the line number, before it mints a token or writes anything. That is the
 convention for anything in this block that has to be filled in by hand — mark it `[PASTE … ]` and
 the guard covers it too.
 
@@ -510,9 +515,13 @@ message often lands there.
 ### What Apple enforces here, confirmed against the API 2026-09-08
 
 - **Review Notes cannot exceed 4000 characters.** The draft above was 4290 and was rejected with
-  `ENTITY_ERROR.ATTRIBUTE.INVALID.TOO_LONG`. It is now **3937**, which is what the block above
-  holds, after the 2026-09-13 rewrite that added the demo video and trimmed 474 characters to pay
-  for it. That day the web form refused a paste
+  `ENTITY_ERROR.ATTRIBUTE.INVALID.TOO_LONG`. It is now **3933** — measured 2026-09-14 by running
+  `store-submit.sh`'s own extractor over this file and stripping, and confirmed against the live
+  record, which also reads 3933, so what Apple holds is what the block above says. (This line said
+  3937 until 2026-09-14; the count was four characters out, harmlessly, and is corrected rather
+  than deleted so the next person does not re-measure to check.) The count settled there after the
+  2026-09-13 rewrite that added the demo video and trimmed to pay for it. That day the web form
+  refused a paste
   at 4290: it was the old draft, pasted from a stale copy rather than from this file. Copy the
   block from here (`build/review-notes.txt` is written from it, and `pbcopy < build/review-notes.txt`
   puts it on the clipboard exactly), and clear the field before pasting.
@@ -522,10 +531,12 @@ message often lands there.
 - **`contactPhone` must lead with `+` and a country code.** Apple's own example is
   `+44 844 209 0611`.
 
-**Where this gets written, and by what.** App `6810006594`, version `1.0`
-(`b60441f6-a8f1-4619-8e04-5584a68d46db`, **REJECTED** since 2026-09-10), review-details record
-`dd22a325-f43a-4695-b50b-e0ffda9710ce`. The API key `L6A2R4SBXQ` on this machine can write it, so
-none of this has to be retyped into the web form.
+**Where this gets written, and by what.** App `6810006594`, version record
+`b60441f6-a8f1-4619-8e04-5584a68d46db` — one record throughout, which was `1.0` and, since the
+resubmission, is **`1.2.0` and `WAITING_FOR_REVIEW`** (read back 2026-09-14; it was **REJECTED**
+from 2026-09-10 until then). Review-details record `dd22a325-f43a-4695-b50b-e0ffda9710ce`. The API
+key `L6A2R4SBXQ` on this machine can write all of it, so none of this has to be retyped into the
+web form.
 
 ---
 
@@ -640,6 +651,17 @@ Per the handoff, wording problems belong here rather than in a quiet edit.
 ---
 
 ## Submitted
+
+**Read this first, 2026-09-14.** The section below records the *first* submission and stops
+there. What happened after it: **1.0 was rejected on 2026-09-10 under Guideline 2.1**, asking for a
+demo video of the phone and the tag on real hardware; the notes were rewritten around the video on
+2026-09-13 (see the App Review notes section); and the record was renamed and resubmitted as
+**1.2.0 on build `202609140523`, submitted 2026-09-14 17:29 UTC**, where it sits at
+`WAITING_FOR_REVIEW` — review submission `d1fe0e5e-be41-4aed-9377-7af5aaad2398`. The replies to
+draft against a second letter are in `design/store/REVIEW-REPLIES.md`. Everything the paragraph
+below says about the record still holds: ten screenshots attached, content rights declared,
+release type `AFTER_APPROVAL`, all re-verified 2026-09-14. **When it goes live, set `appStoreURL`
+in `site/src/site.ts` and redeploy** — that is still owed, and is item 7 of the section above.
 
 **Version 1.0 was submitted to App Review on 2026-09-09 at 01:01 ET** (05:01 UTC), by Zach in
 the web form, with build `202609090423`. Read back through the API a minute later: review
