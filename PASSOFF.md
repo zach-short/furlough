@@ -104,6 +104,14 @@ rather than a hole in the lock.
 
 ## Session rules (every prompt below repeats these; they are Zach's)
 
+**Check the model before anything else.** Every prompt below names one, and the board's Model
+column says why. Compare it to your own model *first* — before reading the codebase, before
+planning, before the first edit. If it matches, say so in a line and go. If it does not, either
+delegate the whole prompt to a subagent with that model set, or stop and hand Zach a pass-off
+prompt carrying what you have already established, naming the model it is for. Never do the work
+on the wrong model, and never downgrade an assignment because the task looks small once you have
+read it: the column is a safety choice, not a preference. Also in `~/.claude/CLAUDE.md`.
+
 Read `HANDOFF.md` first, then `README.md`, then `design/DESIGN.md`. The build and test
 commands, the invariants and the code map are in HANDOFF; do not re-derive them. Never run
 `git commit` or `git push`. When the work is ready, run `git status --short`, then print two
