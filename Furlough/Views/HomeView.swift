@@ -117,10 +117,10 @@ struct HalfTabBar: View {
                             .frame(width: 22, height: 20)
                         Text(value.title)
                             .emberBody(10.5, .bold)
-                            .frame(height: 13)
+                            .frame(minHeight: 13)
                     }
                     .foregroundStyle(value == half ? Ember.amber : Ember.muted)
-                    .frame(width: 68)
+                    .frame(minWidth: 68)
                     .padding(.vertical, 9)
                     .contentShape(Capsule())
                 }

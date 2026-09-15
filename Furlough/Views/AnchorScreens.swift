@@ -172,6 +172,8 @@ struct AnchorTagsScreen: View {
             .emberCard()
             placementRow
                 .padding(.top, 10)
+            automationsRow
+                .padding(.top, 6)
             SectionLabel(text: "Scanner")
             autoArmCard
         }
@@ -219,6 +221,26 @@ struct AnchorTagsScreen: View {
                 Image(systemName: "questionmark.circle")
                     .font(.system(size: 12, weight: .semibold))
                 Text("Where to leave it")
+                    .emberBody(12.5, .semibold)
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(Ember.muted)
+            .padding(.horizontal, 8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Sits right under "Where to leave it": the two pieces of advice about living with the
+    /// Anchor day to day, rather than pairing or scoping it.
+    private var automationsRow: some View {
+        NavigationLink {
+            AutomationsHelp()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "wand.and.stars")
+                    .font(.system(size: 12, weight: .semibold))
+                Text("Have something else drop it for you")
                     .emberBody(12.5, .semibold)
                 Spacer(minLength: 0)
             }

@@ -630,13 +630,13 @@ struct MonogramTile: View {
                 Text(letter)
                     .emberDisplaySmall(size * 0.5)
                     .foregroundStyle(Brand.isLight(color) ? Color(hex: Brand.ink) : Ember.cream)
-                    .frame(width: size, height: size)
+                    .frame(minWidth: size, minHeight: size)
                     .background(Color(hex: color), in: shape)
             } else if let letter, !isSite {
                 Text(letter)
                     .emberDisplaySmall(size * 0.5)
                     .foregroundStyle(Ember.amber)
-                    .frame(width: size, height: size)
+                    .frame(minWidth: size, minHeight: size)
                     .background(Color.white.opacity(0.07), in: shape)
             } else {
                 Image(systemName: isSite ? TokenTile.hostSymbol : "square.dashed")

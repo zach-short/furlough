@@ -1,0 +1,77 @@
+---
+import Base from '../../layouts/Base.astro';
+import { site } from '../../site';
+
+// Drop Anchor has been a Shortcuts action, a Control Center control, a widget button and a
+// Focus Filter since each of those shipped. This page adds no capability at all — it writes
+// down the four automations that already work, because nothing else on the app or the site
+// said so. It is also why no geofencing work appears anywhere else in this file: the capability
+// already exists, and only the documentation was missing.
+---
+
+<Base
+  title="Automations that already work"
+  description="Four Shortcuts and Focus Filter recipes that drop Furlough's Anchor for you: a time of day, an arrival, a Focus turning on, and leaving a place."
+>
+  <section class="wrap page">
+    <header class="head" data-reveal>
+      <canvas class="mark" width="60" height="80" data-hourglass="anchored" data-still aria-hidden="true"></canvas>
+      <div class="eyebrow ember">Help · The Anchor</div>
+      <h1 class="display">Let something else drop it for you.</h1>
+      <p class="sub">Furlough for iPhone · four recipes, nothing new underneath them</p>
+    </header>
+
+    <article class="card prose body" data-reveal style="--d: .1s">
+      <p><a href="/help/the-anchor/">Drop Anchor</a> is already a Shortcuts action, a Control Center button, a widget tap, and — since the Anchor learned a Focus Filter — something a Focus can trigger too. So "when I arrive at the library, drop anchor," "at 10 PM, drop anchor," and "when Sleep Focus turns on, drop anchor" are each one automation away already. Nothing below is a new feature; it is four exact recipes for automations built from what already exists.</p>
+
+      <div class="note">
+        <p><strong>Every one of these drops the anchor, and none of them lifts it.</strong> A Shortcut that could lift the anchor is a Shortcut you could delete at 9:59 PM. Only your paired tag ever does that — see <a href="/help/the-anchor/">Using the Anchor</a> for why.</p>
+      </div>
+
+      <h2>At a time of day</h2>
+      <ol>
+        <li>Open <strong>Shortcuts</strong> › <span class="path">Automation</span> › <span class="path">+</span> › <span class="path">Create Personal Automation</span> › <span class="path">Time of Day</span>.</li>
+        <li>Pick the time, and the days if you only want it on some of them — 10 PM on school nights, say.</li>
+        <li>Add Action, search <strong>Furlough</strong>, and choose <span class="path">Drop Anchor</span>.</li>
+        <li>Turn off <span class="path">Ask Before Running</span>, so it fires on its own.</li>
+      </ol>
+
+      <h2>When you arrive somewhere</h2>
+      <ol>
+        <li>Same start: <span class="path">Automation</span> › <span class="path">+</span> › <span class="path">Create Personal Automation</span> › <span class="path">Arrive</span>.</li>
+        <li>Pick the place — home, the office, wherever you want the anchor already down before you get there.</li>
+        <li>Add <span class="path">Drop Anchor</span> the same way as above, and turn off <span class="path">Ask Before Running</span>.</li>
+      </ol>
+      <p>An Arrive automation needs your location while it watches for you, which iOS asks permission for on its own, separately from anything Furlough does.</p>
+
+      <h2>When a Focus turns on</h2>
+      <p>This one is not built in Shortcuts at all — a Focus Filter lives in Settings, because it is Apple's mechanism rather than an automation.</p>
+      <ol>
+        <li>Open <strong>Settings</strong> › <span class="path">Focus</span> › the Focus you want it tied to — Sleep, Work, or one you made.</li>
+        <li><span class="path">Focus Filters</span> › <span class="path">Add Filter</span> › <strong>Furlough</strong>.</li>
+        <li>Turn on <span class="path">Drop the Anchor</span>, the one thing there is to configure, and tap <span class="path">Add</span>.</li>
+      </ol>
+      <p>Turning the Focus back off does not lift the anchor — only the tag does, the same as everywhere else in Furlough.</p>
+
+      <h2>When you leave somewhere</h2>
+      <ol>
+        <li>Same start, once more: <span class="path">Automation</span> › <span class="path">+</span> › <span class="path">Create Personal Automation</span> › <span class="path">Leave</span>.</li>
+        <li>Pick the place — leaving the office at the end of the day is the obvious one.</li>
+        <li>Add <span class="path">Drop Anchor</span>, and turn off <span class="path">Ask Before Running</span>, as above.</li>
+      </ol>
+
+      <p><strong>Not yet run on a phone.</strong> These steps are written from how Shortcuts automations and Focus Filters work, not from a phone that has run every one of them. If a step reads differently on yours, that is the thing worth writing in about.</p>
+
+      <p class="contact">More: <a href="/help/the-anchor/">Using the Anchor</a> · <a href="/help/">All help</a> · <a href={`mailto:${site.email}`}>{site.email}</a></p>
+    </article>
+  </section>
+</Base>
+
+<style>
+  .page { padding: clamp(24px, 6vh, 64px) 0 0; max-width: 760px; }
+  .mark { width: 60px; height: 80px; margin-bottom: 20px; }
+  .head h1 { margin-top: 12px; font-size: clamp(32px, 4.6vw, 52px); }
+  .sub { color: var(--faint); font-size: 14px; margin-top: 14px; }
+  .body { margin-top: 28px; padding: clamp(22px, 4vw, 36px); }
+  .contact { margin-top: 32px; padding-top: 18px; border-top: 1px solid var(--edge); font-size: 14px; }
+</style>

@@ -32,6 +32,8 @@ struct DayBar: View {
                     Text(TimeFormat.shortMinute(hour * 60))
                         .font(EmberFont.numerals(9))
                         .foregroundStyle(Ember.faint)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                         .position(x: CGFloat(hour) / 24 * geo.size.width, y: 6)
                 }
             }

@@ -3251,6 +3251,42 @@ The plan for this stretch. Tick each phase off here as it lands.
     engine: `Policy.decide` (two functions, one per platform, and a port writes its own),
     `Policy.summary`, the record, and the delay arithmetic.
 
+47. **The largest text size, audited (pass-off item 31), and the automations that already work,
+    written down (pass-off item 32).** Done 2026-09-14, no Shared/Core changes, so no new tests.
+
+    **Item 31.** `EmberFont` scales with Dynamic Type because it is `Font.custom(_:size:)`; what
+    did not scale was the box around some of that text. Walked every `.frame(width:)`/
+    `.frame(height:)` in `Furlough/Views/` and `Shared/UI/` and fixed the ones that wrap a `Text`
+    and would clip it at the largest accessibility size, leaving every purely decorative frame
+    (icons, dots, dividers, the hourglass, sliders) untouched: the half tab bar's label
+    (`HomeView.swift`'s `HalfTabBar`, the site named as the clearest example) and its column
+    width now use `minHeight`/`minWidth` rather than a fixed size; the numbered step badge that
+    repeats in four places (`AddWebsiteGuideView`, `HelpView`'s `HelpSteps`, `Guides.swift`,
+    `LinkCards.swift`'s `LinkStepsCard`) grows the same way; so does the weekday letter in
+    `RuleEditorView`'s `DayStrip` and the monogram letter in `UsageCard.swift`'s `MonogramTile`.
+    `DayBar.swift`'s hour-axis labels are positioned by raw pixel offset inside a
+    `GeometryReader` rather than a frame a box can grow to fit, so they got `lineLimit(1)` +
+    `minimumScaleFactor(0.7)` instead — shrink rather than overlap, the same convention
+    `WeekGrid.swift`'s `WindowBlock.label` already uses for exactly this reason.
+    `WeekGrid.swift`'s own hour-gutter labels already carry `lineLimit(1)` and were left alone;
+    `UsageReportFrame.height` is fixed for an unrelated reason (a `DeviceActivityReport`
+    extension cannot report its own height) and was not touched. Nothing moves at the default
+    text size — verify at Settings > Accessibility > Display & Text Size > Larger Text, dragged
+    to the top, walking Home, the rule editor, the Anchor page, Pending and Settings.
+
+    **Item 32.** `DropAnchorIntent` was already a Shortcuts action, a Control Center control, a
+    widget button and (since step 42) a Focus Filter; nothing about dropping the anchor changed
+    here; only the fact that four automations already work was written down. A new
+    `AutomationsHelp` page in `HelpTopics.swift`, linked from `HelpView`'s Anchor card and a
+    second small row under "Where to leave it" on `AnchorScreens.swift`'s `AnchorTagsScreen`, so
+    the two pieces of advice about living with the Anchor sit in one place. A matching page at
+    `site/src/pages/help/automations.astro`, linked from `help/index.astro`. Every recipe says
+    plainly at the top that it drops and none of them lift, and why: a Shortcut that could lift
+    is a Shortcut that could be deleted at 9:59 PM. **Not run on a phone** — like the Settings/App
+    Store automation in step 23's `PickerHelp`, these are written from how Shortcuts automations
+    and Focus Filters work rather than verified on this phone; ask Zach to build one from the page
+    and say whether the taps are still right.
+
 ## Style rules
 
 Swift 6 language mode with approachable concurrency, SwiftUI, `@Observable`, async/await, no

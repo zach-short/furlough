@@ -1003,7 +1003,7 @@ struct DayStrip: View {
                     Text(calendar.veryShortStandaloneWeekdaySymbols[weekday - 1])
                         .font(EmberFont.label(10))
                         .foregroundStyle(on || isLocked ? Ember.ground : Ember.faint)
-                        .frame(width: 26, height: 26)
+                        .frame(minWidth: 26, minHeight: 26)
                         .background(isLocked ? Ember.cream : on ? Ember.amber : Color.white.opacity(0.07), in: Circle())
                         .overlay(Circle().strokeBorder(on || isLocked ? Color.clear : Ember.cardBorder, lineWidth: 1))
                         .contentShape(Circle())

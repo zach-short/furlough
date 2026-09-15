@@ -9,12 +9,25 @@ progress, so item 1 is the tail of that, not the start.
 
 ## The board
 
-**Where it stands, 2026-09-09.** Ten of the twelve have landed; the record of each is the
-HANDOFF step named below, which is the truth about what was built and is fuller than the
-prompt that asked for it. **Do not paste a section marked Done** — its prompt describes work
-that already exists, and a fresh session following it would build it again. The two left are
-both gated on Apple, not on a session: 1 waits for the submission to be approved, and 9 waits
-on 1. Read the Done prompts only as history, or where one says a later item should revisit it.
+**Where it stands, 2026-09-14.** Everything from 2 to 22 has landed or is settled as no, and so
+have 31 and 32 (HANDOFF 47, a parallel session the same day). What is open is **1**, which is
+Apple's to answer and not a session's, and **23 through 30**, none of which has Zach's go-ahead
+yet — every one of those prompts names what to put to him first, and 23 is to be read before the
+rest. The record of each Done item is the HANDOFF step named in its row, which is the truth
+about what was built and is fuller than the prompt that asked for it. **Do not paste a section
+marked Done** — its prompt describes work that already exists, and a fresh session following it
+would build it again. Read the Done prompts only as history, or where one says a later item
+should revisit it.
+
+**Four rows were stale until 2026-09-14** and are corrected above: 9, 14, 21 and 22 all shipped
+while the board still said Open, because the sessions that built them updated `HANDOFF.md` and
+not this table. 9 in particular said "gated on 1" long after it had gone without waiting. **A
+status here is a claim about the working tree, so check it against the tree** — `git log` for
+the files in the row, or the HANDOFF step — before taking a row's word that there is work to do.
+
+**Where it stood, 2026-09-09**, when the first twelve were written: ten of them had landed, and
+the two left were both gated on Apple — 1 waiting for the submission to be approved, and 9
+waiting on 1. That is the sentence that went stale; 9 shipped in `e253fc6` regardless.
 
 | # | Task | Status | Model | Lane | Waits on | Files it owns |
 |---|------|--------|-------|------|----------|---------------|
@@ -27,20 +40,20 @@ on 1. Read the Done prompts only as history, or where one says a later item shou
 | 7 | Live Activity at window start | Done — HANDOFF 10 | Opus | C | nothing | `LiveActivityManager`, `MonitorExtension` |
 | 8a | Help pages: blocking Safari, Settings and the App Store; what the Mac cannot reach | Done — HANDOFF 23 | Opus | D | nothing | `site/src/pages/help/` |
 | 8b | Mac content filter (network extension) | Done — HANDOFF 26 | **Fable** | E | Zach's go-ahead | new `FurloughMacFilter` target, `project.yml`, `MacModel` |
-| 9 | iPad | **Open** — gated on 1 | Opus | Gated | 1 approved; 4 or the no-NFC rule | `project.yml`, every iOS view that presents a sheet or popover |
+| 9 | iPad | Done — `e253fc6`, shipped in 1.3.0; no HANDOFF step | Opus | Gated | was 1 approved; it went without waiting | `project.yml`, every iOS view that presents a sheet or popover |
 | 10 | Write down the no-QR, no-pause decisions | Done — HANDOFF 23, in the 8a session | Opus | D | nothing | `HANDOFF.md`, `site/src/pages/help/nfc-tags.astro` |
 | 11 | More companion pairs, every one confirmed | Done — HANDOFF 30 | **Sonnet** | F | nothing | `Companions.swift`, `CompanionsTests.swift`, new `design/companions-sources.md` |
 | 12 | Suggested rules by hazard tier, and an audit for quality-of-life defaults like it | Done — HANDOFF 28 | Opus | G | nothing | new `Shared/Core/RuleSuggestion.swift`, `RuleEditorView`, `Tests/Core` |
 | 13 | The link contract: schemas, test vectors and tables a port can be built against | Done — HANDOFF 45 and 46, both halves | Opus | H | nothing; HANDOFF 37 landed | new `protocol/`, new `Tests/Core/ProtocolFixturesTests.swift`, `HANDOFF.md` |
-| 14 | Cache the token map, so the usage page's icons are instant on later visits | **Open** — added 2026-09-10 | Opus | I | the tables-and-monograms commit on main | new `Shared/Core/TokenCache.swift`, `SharedStore`, `UsageReader`, `UsageView.load`, `AppModel.nameUnnamedTargets`, new `Tests/Core/TokenCacheTests.swift`, `HANDOFF.md` |
+| 14 | Cache the token map, so the usage page's icons are instant on later visits | Done — HANDOFF 38, "half two: don't ask twice" | Opus | I | the tables-and-monograms commit on main | new `Shared/Core/TokenCache.swift`, `SharedStore`, `UsageReader`, `UsageView.load`, `AppModel.nameUnnamedTargets`, new `Tests/Core/TokenCacheTests.swift`, `HANDOFF.md` |
 | 15 | Apple Watch complication and a wrist-only Drop Anchor | **Settled as no** — HANDOFF 42 | — | J | — | nothing; no target was added |
 | 16 | A StandBy-friendly widget | Done — HANDOFF 42 | Opus | K | nothing | `FurloughWidgets/StatusWidget.swift` |
 | 17 | Focus Filter: drop the Anchor when a Focus turns on | Done — HANDOFF 42 | Opus | L | nothing | new `Shared/Intents/AnchorFocusFilter.swift` |
 | 18 | A trend view in the Mac's menu bar | Done — HANDOFF 42 | Opus | M | nothing | `FurloughMac/Views/MenuBar.swift`, `Shared/Core/Record.swift` |
 | 19 | A weekly digest notification | Done — HANDOFF 42 | Opus | N | nothing | `Shared/Core/Record.swift`, `Shared/Core/PendingNotifications.swift`, `AppModel`, `MacModel`, `MonitorExtension` |
 | 20 | Onboarding: where to put the tag | Done — HANDOFF 42 | Opus | O | nothing | new `Furlough/Views/TagPlacementView.swift`, `AppModel`, `RootView`, `AnchorScreens` |
-| 21 | The hero phone becomes a phone you can page through | **Open** — added 2026-09-14 | Opus | P | the homepage demos being on main | `site/src/components/HeroPage.astro`, `site/src/lib/hourglass.ts` |
-| 22 | Drag the week grid: windows edited where they are drawn, on both apps | **Open** — added 2026-09-14 | Opus | Q | nothing | new `Shared/Core/WeekDraft.swift`, new `Shared/UI/WeekGrid.swift`, `Furlough/Views/WeekView.swift`, `FurloughMac/Views/MacWeekView.swift`, new `Tests/Core/WeekDraftTests.swift`, `project.yml`, `HANDOFF.md` |
+| 21 | The hero phone becomes a phone you can page through | Done — `5c07425` and `b0011a1`; site only, no HANDOFF step | Opus | P | the homepage demos being on main | `site/src/components/HeroPage.astro`, `site/src/lib/hourglass.ts` |
+| 22 | Drag the week grid: windows edited where they are drawn, on both apps | Done — HANDOFF 44 | Opus | Q | nothing | new `Shared/Core/WeekDraft.swift`, new `Shared/UI/WeekGrid.swift`, `Furlough/Views/WeekView.swift`, `FurloughMac/Views/MacWeekView.swift`, new `Tests/Core/WeekDraftTests.swift`, `project.yml`, `HANDOFF.md` |
 | 23 | The time zone is the clock Furlough does not watch | **Open** — added 2026-09-14 | **Fable** | R | nothing | `Shared/Core/Clock.swift`, `Shared/Core/Policy.swift`, `Models.swift` (`RuntimeState`), `Shared/UI/ClockBanner.swift`, new `Tests/Core/ZoneTests.swift` |
 | 24 | Drop the anchor from the notification that warns you | **Open** — added 2026-09-14 | **Fable** | S (1st) | nothing | `Shared/Core/PendingNotifications.swift`, `Furlough/Model/AppModel.swift`, `FurloughMonitor`, `FurloughMac/Model/Enforcer.swift`, `MacModel` |
 | 25 | An automation can say when the anchor lifts | **Open** — added 2026-09-14 | **Fable** | S (2nd) | 24, for the files only | `Shared/Intents/DropAnchorIntent.swift`, `Furlough/Views/AnchorView.swift` (the lift resolver), `Tests/Core` |
@@ -49,17 +62,17 @@ on 1. Read the Done prompts only as history, or where one says a later item shou
 | 28 | A switch for every notification, and the last five minutes counted down | **Open** — added 2026-09-14 | Opus | V | 24, if 24 runs first | `Shared/Core/PendingNotifications.swift`, `SettingsView`, Mac Settings, `HomeView`, `Components.swift` |
 | 29 | The Mac keeps what it counts | **Open** — added 2026-09-14 | Opus | W | nothing | `FurloughMac/Model/Enforcer.swift`, new `Shared/Core/UsageHistory.swift`, new Mac view, `MenuBar.swift`, new `Tests/Core/UsageHistoryTests.swift` |
 | 30 | The Mac grows a menu, and both apps get a way to find one app | **Open** — added 2026-09-14 | Opus | X | nothing | `FurloughMac/FurloughMacApp.swift`, `MacRootView.swift`, `Furlough/Views/HomeView.swift` |
-| 31 | The largest text size, audited | **Open** — added 2026-09-14 | **Sonnet** | Y | nothing | `Furlough/Views/*` (frames only) |
-| 32 | The automations that already work, written down | **Open** — added 2026-09-14 | **Sonnet** | Z | nothing | `Furlough/Views/HelpTopics.swift`, `site/src/pages/help/`, `Furlough/Views/AnchorScreens.swift` |
+| 31 | The largest text size, audited | Done — HANDOFF 47 | **Sonnet** | Y | nothing | `Furlough/Views/*` (frames only) |
+| 32 | The automations that already work, written down | Done — HANDOFF 47 | **Sonnet** | Z | nothing | `Furlough/Views/HelpTopics.swift`, `site/src/pages/help/`, `Furlough/Views/AnchorScreens.swift` |
 
 **Two things landed that this board never planned**, so look for them in HANDOFF rather than
 here: the first week with capped delays and the 15-minute undo (HANDOFF 27, the lane-f
 session — it is why item 10's prompt carries a correction), and the Mac's Reset everything
 going all the way back to a first run (HANDOFF 31, with the detail in its "The Mac" section).
 
-**Item 13 was added 2026-09-10**, after HANDOFF 37 landed: the link contract as data, so a port on another platform can be built against the real record shapes and the real merge rules. It is the one open item not gated on Apple, and it is parallel-safe with everything.
+**Item 13 was added 2026-09-10**, after HANDOFF 37 landed: the link contract as data, so a port on another platform can be built against the real record shapes and the real merge rules. It was the one open item not gated on Apple, and it landed 2026-09-14 as HANDOFF 45 and 46 — both halves, the second on the go-ahead the prompt asked for.
 
-**Item 14 was added 2026-09-10**, the third step of the usage-page speed-up whose first two (cards drawn from the tables, letters for icons, a deadline on the token query) landed the same day: keep Screen Time's answer in the App Group store so the next visit opens on it. Small, iOS only, and it waits only on that commit being on main.
+**Item 14 was added 2026-09-10**, the third step of the usage-page speed-up whose first two (cards drawn from the tables, letters for icons, a deadline on the token query) landed the same day: keep Screen Time's answer in the App Group store so the next visit opens on it. Small, iOS only, and it landed the same day as the first two, written up inside HANDOFF 38 rather than as a step of its own — which is why this row read Open for four days.
 
 **Items 15 through 20 were added 2026-09-12**, from a session that was asked what else might be nice on iOS or the Mac rather than told what to build, and **all six were answered and closed the same day** — see HANDOFF 42. Five were built in one session; 15 is settled as no and should not be re-proposed without a reason that answers what is written there. Do not paste sections 15–20: like the other Done prompts they describe work that now exists, and two of them describe it wrongly. Item 16's first step ("add `.systemLarge`") rests on a false premise — StandBy scales the **small** widget and there is no StandBy family — and item 17's configurable scope was dropped on Zach's call, because applying a scope means writing `Config.anchor.scope` from a new process and could narrow the hold as easily as widen it. Both were Opus in the end rather than Fable: the Watch never happened, and the Focus Filter turned out to add no new anchor logic at all, only a fourth caller of `AnchorDrop.drop`.
 
@@ -68,9 +81,9 @@ real — the budget slider drags, the week grid is edited by hand, the utility t
 delay, the Anchor wants a held press. Both items come from the same observation: a control that
 can be touched teaches what a rule is faster than a paragraph does. They are two prompts and not
 one because they share no file and no language — 21 is Astro and TypeScript in `site/`, 22 is
-SwiftUI in two app targets — so they run in parallel, in their own worktrees. Take 22 first if
-only one gets run: it is the one Zach has wanted for a while, and it is the app rather than the
-page about the app.
+SwiftUI in two app targets — so they ran in parallel, in their own worktrees. **Both landed the
+same day they were written**: 21 as `5c07425` and `b0011a1`, 22 as HANDOFF 44. The advice that
+stood here — take 22 first, it is the app rather than the page about the app — is spent.
 
 **Items 23 through 32 were added 2026-09-14**, from a session asked what is missing from either
 app rather than told what to build — the same question that produced 15–20, asked again now that

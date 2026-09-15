@@ -79,7 +79,7 @@ private struct StepRow: View {
                 .font(EmberFont.numerals(13))
                 .monospacedDigit()
                 .foregroundStyle(Ember.amber)
-                .frame(width: 26, height: 26)
+                .frame(minWidth: 26, minHeight: 26)
                 .background(Color.white.opacity(0.07), in: Circle())
                 .overlay(Circle().strokeBorder(Ember.cardBorder, lineWidth: 1))
             VStack(alignment: .leading, spacing: 2) {

@@ -180,7 +180,7 @@ struct LinkStepsCard: View {
                             .font(EmberFont.numerals(11))
                             .foregroundStyle(Ember.amber)
                     }
-                    .frame(width: 24, height: 24)
+                    .frame(minWidth: 24, minHeight: 24)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(step.title)
                             .emberDisplaySmall(13.5)

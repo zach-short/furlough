@@ -255,6 +255,67 @@ struct AnchorHelp: View {
     }
 }
 
+// MARK: - Automations
+
+// What the picker's own automation section (in `PickerHelp`) does for Settings and the App
+// Store, this does for the Anchor: nothing here is new, `DropAnchorIntent` has been a Shortcuts
+// action, a Control Center control, a widget button and a Focus Filter since it shipped. Only
+// the documentation was missing, which is why this page has no logic of its own.
+struct AutomationsHelp: View {
+    var body: some View {
+        HelpPage(
+            title: "Automations",
+            heading: "Let something else drop it for you.",
+            lead: "Drop Anchor is already a Shortcuts action, a Control Center button, a widget tap and a Focus Filter. Nothing below is a new feature — it is four exact recipes for automations built from what already exists."
+        ) {
+            HelpProse("Every one of these drops the anchor, and none of them lifts it. A Shortcut that could lift the anchor is a Shortcut you could delete at 9:59 PM. Only your paired tag ever does that, which is the whole point of Using the Anchor.")
+                .padding(.top, 12)
+
+            SectionLabel(text: "At a time of day")
+            HelpSteps([
+                .init("Open Shortcuts", "Automation, then the + in the corner, then Create Personal Automation, then Time of Day."),
+                .init("Pick the time", "And the days, if you only want it on some of them — 10 PM on school nights, say."),
+                .init("Add the action", "Add Action, search Furlough, and choose Drop Anchor."),
+                .init("Turn off Ask Before Running", "So it fires on its own rather than asking first."),
+            ])
+            .padding(.top, 10)
+
+            SectionLabel(text: "When you arrive somewhere")
+            HelpSteps([
+                .init("Same start", "Automation, +, Create Personal Automation, then Arrive."),
+                .init("Pick the place", "Home, the office, wherever you want the anchor already down before you get there."),
+                .init("Add Drop Anchor", "The same action as above, and the same Ask Before Running to turn off."),
+            ])
+            .padding(.top, 10)
+            Footnote(text: "Arrive needs your location while it watches for you, which iOS asks permission for on its own, separately from anything Furlough does.")
+                .padding(.top, 8)
+
+            SectionLabel(text: "When a Focus turns on")
+            HelpProse("This one is not built in Shortcuts at all — a Focus Filter lives in Settings, because it is Apple's mechanism rather than an automation.")
+                .padding(.top, 2)
+            HelpSteps([
+                .init("Open Settings", "Focus, then the Focus you want it tied to — Sleep, Work, or one you made."),
+                .init("Focus Filters", "Add Filter, then Furlough."),
+                .init("Turn on Drop the Anchor", "The one thing there is to configure. Add to finish."),
+            ])
+            .padding(.top, 10)
+            Footnote(text: "Turning the Focus back off does not lift the anchor — only the tag does, the same as everywhere else in Furlough.")
+                .padding(.top, 8)
+
+            SectionLabel(text: "When you leave somewhere")
+            HelpSteps([
+                .init("Same start, once more", "Automation, +, Create Personal Automation, then Leave."),
+                .init("Pick the place", "Leaving the office at the end of the day is the obvious one."),
+                .init("Add Drop Anchor", "And turn off Ask Before Running, as above."),
+            ])
+            .padding(.top, 10)
+
+            Footnote(text: "Written from how Shortcuts automations and Focus Filters work rather than from a phone that has run every one of them. If a step reads differently on yours, that is the thing worth writing in about.")
+                .padding(.top, 12)
+        }
+    }
+}
+
 // MARK: - Across your devices
 
 // Mirrors `HelpTopic.devices` on the Mac, written separately per device: here the tag is the

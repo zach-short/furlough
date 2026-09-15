@@ -152,7 +152,7 @@ private struct GuideStepRow<Action: View>: View {
                     .foregroundStyle(isLive ? Ember.ground : Ember.faint)
             }
         }
-        .frame(width: 24, height: 24)
+        .frame(minWidth: 24, minHeight: 24)
     }
 }
 
