@@ -41,6 +41,16 @@ on 1. Read the Done prompts only as history, or where one says a later item shou
 | 20 | Onboarding: where to put the tag | Done — HANDOFF 42 | Opus | O | nothing | new `Furlough/Views/TagPlacementView.swift`, `AppModel`, `RootView`, `AnchorScreens` |
 | 21 | The hero phone becomes a phone you can page through | **Open** — added 2026-09-14 | Opus | P | the homepage demos being on main | `site/src/components/HeroPage.astro`, `site/src/lib/hourglass.ts` |
 | 22 | Drag the week grid: windows edited where they are drawn, on both apps | **Open** — added 2026-09-14 | Opus | Q | nothing | new `Shared/Core/WeekDraft.swift`, new `Shared/UI/WeekGrid.swift`, `Furlough/Views/WeekView.swift`, `FurloughMac/Views/MacWeekView.swift`, new `Tests/Core/WeekDraftTests.swift`, `project.yml`, `HANDOFF.md` |
+| 23 | The time zone is the clock Furlough does not watch | **Open** — added 2026-09-14 | **Fable** | R | nothing | `Shared/Core/Clock.swift`, `Shared/Core/Policy.swift`, `Models.swift` (`RuntimeState`), `Shared/UI/ClockBanner.swift`, new `Tests/Core/ZoneTests.swift` |
+| 24 | Drop the anchor from the notification that warns you | **Open** — added 2026-09-14 | **Fable** | S (1st) | nothing | `Shared/Core/PendingNotifications.swift`, `Furlough/Model/AppModel.swift`, `FurloughMonitor`, `FurloughMac/Model/Enforcer.swift`, `MacModel` |
+| 25 | An automation can say when the anchor lifts | **Open** — added 2026-09-14 | **Fable** | S (2nd) | 24, for the files only | `Shared/Intents/DropAnchorIntent.swift`, `Furlough/Views/AnchorView.swift` (the lift resolver), `Tests/Core` |
+| 26 | A Focus Filter for the Mac | **Open** — added 2026-09-14 | **Fable** | T | nothing | `Shared/Intents/AnchorFocusFilter.swift`, `FurloughMac/Model/MacModel.swift`, `project.yml` |
+| 27 | The Anchor on the Lock Screen | **Open** — added 2026-09-14 | Opus | U | nothing | `Shared/LiveActivity/`, `FurloughWidgets/`, `LiveActivityManager` |
+| 28 | A switch for every notification, and the last five minutes counted down | **Open** — added 2026-09-14 | Opus | V | 24, if 24 runs first | `Shared/Core/PendingNotifications.swift`, `SettingsView`, Mac Settings, `HomeView`, `Components.swift` |
+| 29 | The Mac keeps what it counts | **Open** — added 2026-09-14 | Opus | W | nothing | `FurloughMac/Model/Enforcer.swift`, new `Shared/Core/UsageHistory.swift`, new Mac view, `MenuBar.swift`, new `Tests/Core/UsageHistoryTests.swift` |
+| 30 | The Mac grows a menu, and both apps get a way to find one app | **Open** — added 2026-09-14 | Opus | X | nothing | `FurloughMac/FurloughMacApp.swift`, `MacRootView.swift`, `Furlough/Views/HomeView.swift` |
+| 31 | The largest text size, audited | **Open** — added 2026-09-14 | **Sonnet** | Y | nothing | `Furlough/Views/*` (frames only) |
+| 32 | The automations that already work, written down | **Open** — added 2026-09-14 | **Sonnet** | Z | nothing | `Furlough/Views/HelpTopics.swift`, `site/src/pages/help/`, `Furlough/Views/AnchorScreens.swift` |
 
 **Two things landed that this board never planned**, so look for them in HANDOFF rather than
 here: the first week with capped delays and the 15-minute undo (HANDOFF 27, the lane-f
@@ -61,6 +71,18 @@ one because they share no file and no language — 21 is Astro and TypeScript in
 SwiftUI in two app targets — so they run in parallel, in their own worktrees. Take 22 first if
 only one gets run: it is the one Zach has wanted for a while, and it is the app rather than the
 page about the app.
+
+**Items 23 through 32 were added 2026-09-14**, from a session asked what is missing from either
+app rather than told what to build — the same question that produced 15–20, asked again now that
+those are closed. None of them has Zach's go-ahead yet; every one names what to put to him
+first. **23 is not a feature and should be read before the rest**: it is a hole in the same lock
+HANDOFF step 4 closed, left open on the other axis, and it is the only item here that changes
+what `Policy.decide` shields. Everything proposed was checked against the code before it was
+written down, so three obvious-sounding ideas are not in the list: a tag tap already drops the
+anchor as well as lifting it (`AnchorView`'s `.drop` branch), `AnchorDrop.drop` already takes an
+`until` (item 25 is only about the caller that never passes one), and location- and
+Focus-triggered drops already work through Shortcuts, which is why item 32 is a page rather than
+a mechanism. The Watch stays settled as no.
 
 **Lanes run in parallel with each other; tasks inside a lane run one after another.**
 A, B, C, D and E can all be open at once, each in its own worktree. Inside A the order is
@@ -1540,3 +1562,648 @@ hour later and watch the sentence under it change, drag its bottom edge to 11, t
 on Thursday to add one, then open the day from the same grid and check the pickers say what the
 grid said. Then the same three gestures on the Mac, with the cursor changing over an edge. Then
 save the rule and confirm a loosening still asks for the delay rather than landing at once.
+
+---
+
+# Fable: where a mistake becomes an unblock
+
+Four items. Each one either changes what `Policy.decide` shields, adds a writer of
+`Config.anchor`, or crosses devices. Read HANDOFF's "How enforcement works (do not break these
+invariants)" before any of them.
+
+---
+
+## 23. The time zone is the clock Furlough does not watch
+
+**Open — proposed 2026-09-14. Not a feature: a hole.**
+
+**Model: Fable — it changes what `Policy.decide` shields, on every app at once. Lane R. Waits
+on nothing, but it is the least parallel-safe item on the board: it touches `Clock`, `Policy`
+and `RuntimeState`, so run it in its own worktree and land it before 27–30 go near
+`PendingNotifications`.**
+
+You are picking up Furlough, Zach's iOS and Mac app blocker. Read `HANDOFF.md` — especially
+step 4, "The clock cannot be an unblock button" — then `README.md`, then
+`Shared/Core/Clock.swift` and `Shared/Core/Policy.swift`. Session rules: never commit or push;
+when done, print `git add <your files>` and a lowercase `git commit -m "..."` for Zach, with no
+Co-Authored-By; run `xcodegen generate` after adding a file; keep the build warning-free; every
+`Shared/Core` change gets tests in `Tests/Core`; you cannot see the phone, so end with what Zach
+should tap and see. Ask Zach before building anything marked "decide with Zach". Another session
+is usually mid-edit in this tree, so work in a throwaway worktree (`git worktree add --detach
+<your scratchpad>/wt-zone HEAD`, `xcodegen generate` there, build with `-derivedDataPath` under
+your scratchpad), copy only your own files back once green, and remove the worktree after.
+
+**Why this exists.** `Clock` defends the wall clock by comparing `Date` against
+`CLOCK_MONOTONIC`, so moving the date forward in Settings changes nothing. A **time zone**
+change moves neither of those numbers: the same instant is the same `Date` in every zone, so
+`Clock.read` answers `drift == 0` and the clock stays trusted. But every decision runs on
+`Calendar.current`, which carries the device's current zone — `Policy.dayKey`,
+`minuteOfDay`, `weekday` and `date(atMinute:)` all default to `.current`. Three things follow,
+and all three are reachable from Settings > General > Date & Time > Time Zone with no delay, no
+Pending entry and nothing in the log:
+
+1. Every window's local hours remap at once. Set the zone five hours forward and a 10 PM window
+   opens now.
+2. `dayKey` rolls. `RuntimeState.isExhausted` is `exhausted[id] == dayKey`, so a budget you have
+   already spent comes back.
+3. On the Mac it is cleaner than that: `Enforcer.tick` replaces `UsageLedger` whenever the day
+   key changes (`FurloughMac/Model/Enforcer.swift:155`), so the count restarts at zero seconds.
+
+This is the same class of hole step 4 closed, left open on the other axis. It has to be shut on
+the same terms: not by refusing the change, but by making the loosening half of it wait.
+
+**What is fixed.** Read these in the code before changing anything; do not relitigate them.
+
+- `ClockMark` is `wall` + `uptime`. `Clock.read` answers a `Reading` of `now` and `drift`;
+  `SharedState.now` is the only time the rules may use; `Clock.stamp` deliberately keeps the old
+  mark while the clock is untrusted, because it is then the only thing that knows the real time.
+- **DST is a zone-offset change nobody chose.** `TimeZone.current.secondsFromGMT()` moves by
+  3600 twice a year with no user action, and reading that as a zone change would hold every
+  loosening in the country twice a year. Key on `TimeZone.current.identifier`; a changed offset
+  under the *same* identifier is an ordinary DST transition and must be invisible here.
+- `Policy.decide` is pure and already takes a `calendar`. That is the seam — nothing outside
+  `Policy` needs to learn what a time zone is.
+- A moved **wall clock** holds pending changes, because `state.now` becomes the projection and
+  `applyDuePending` cannot reach them. A moved **zone** is different in kind: it delays nothing,
+  it re-reads the same rules against different local hours. Do not reuse the drift mechanism for
+  it; the answer is to decide under both zones.
+
+**The shape, which is the app's own rule applied to the clock.** Tightening applies instantly;
+loosening waits. So: hold the old zone for the delay, and let the new zone apply at once
+wherever it is *tighter*.
+
+- The effective decision is the tighter of two decisions — one in the held zone, one in the
+  current zone.
+- The effective day key is the **held** zone's, because a new day refills budgets, which is a
+  loosening whichever way the traveller flew.
+
+A person who really has moved gets a stricter first day, on their home hours where those are
+stricter. That is the right direction for a commitment device to fail in, and it lapses on its
+own.
+
+Do these, in order:
+
+1. **`Shared/Core/Clock.swift`**: `struct ZoneMark: Codable, Equatable { var identifier: String;
+   var since: Date }`, and `RuntimeState.zone: ZoneMark?` with a tolerant decode (nil on a store
+   written before this — follow the pattern the rest of `RuntimeState.init(from:)` already uses).
+   A first reading is trusted, exactly as a missing `ClockMark` is.
+2. A pure `Clock.zone(mark:current:now:hold:) -> ZoneReading`, no I/O: `.settled` when the mark
+   is nil or the identifier matches, `.moved(from: String, until: Date)` while
+   `now < mark.since + hold`. Stamp the mark wherever `ClockMark` is stamped today, and keep the
+   old one while a move is still being held — same reason `Clock.stamp` keeps the old mark.
+3. A pure `Policy.tighter(_ a: Decision, _ b: Decision) -> Decision` folding two decisions per
+   target: shielded beats open, the earlier close beats the later one, `exhausted` beats `open`.
+   Write the truth table out in the doc comment — this function is the whole defence and it is
+   the one a later reader will need to check.
+4. One wrapper every shield-deriving caller goes through — `ShieldReconciler`,
+   `MonitorExtension`, `Enforcer`, `Policy.summary`, `Policy.status`, the home screen — that
+   decides once when `.settled` and twice, folded with `tighter`, when `.moved`. Do not change
+   `Policy.decide`'s signature; the two calendars are built by the wrapper.
+5. The day key: while `.moved`, every reader of `dayKey` uses the held zone's calendar —
+   `exhausted`, `warned`, the record, and the Mac's `UsageLedger`. One helper, one place.
+6. **Say it.** `Shared/UI/ClockBanner.swift` already exists and is already shown in
+   `PendingChangesView` and `MacSheets`; give it a zone case — what changed, which zone is still
+   being honoured, and when it stops. `SharedStore.log` records the move the way a clock change
+   is recorded, so Diagnostics shows it.
+7. Device-local, like the digest preference: the zone mark must not travel in `ConfigExport`,
+   must not wait out a loosening delay, and `SharedStore.reset()` must forget it.
+
+Keep: `Policy.decide` pure and its signature unchanged; no new I/O in `Clock`; nothing here
+writes `Config`; the one escape README documents (Screen Time access off) stays exactly what it
+is.
+
+Decide with Zach, before building: **how long the held zone holds.** The candidates are the base
+loosening delay (`config.loosenDelayHours`) and a flat 24 hours. The base delay is the more
+consistent answer — a zone change loosens every app at once, which is the same argument
+`setDelay` already makes when lowering the delay — but it means a 4-day Hazard tier does not
+lengthen it, and Zach may want it to. Also ask whether a traveller should get any way to say "I
+really did fly": my read is no, and the reason is worth saying to him — a button that shortens
+this is an unblock button with a passport, and the hold expires on its own inside a day.
+
+Tests: `Tests/Core/ZoneTests.swift`, every case on a pinned `Calendar` with an explicit
+`TimeZone`, never `.current`:
+
+- New York → Tokyo at 9 AM: a 10 PM–midnight window stays shut, and opens on the held zone's
+  schedule instead.
+- Tokyo → New York: the tighter of the two still wins, and nothing already shielded is released.
+- A spent budget stays spent across the rolled day key, and the Mac's ledger is not reset.
+- `America/New_York` across both DST boundaries: `.settled` throughout, no hold, no banner.
+- The hold expires: after it, only the current zone is consulted.
+- A store with no `ZoneMark` decodes and reads as settled (follow `DecodingTests`).
+- `Policy.tighter` against its own truth table, including two decisions that disagree about
+  which target is open.
+
+Hand back: the two-zone decision, the banner, the tests, the count from `xcodebuild test
+-project Furlough.xcodeproj -scheme FurloughCoreTests -destination 'platform=macOS,arch=arm64'`,
+and the two git blocks. What Zach should do: pick an app whose window has not opened yet today,
+set the zone forward past its start, and watch it stay shut with the banner saying why; set the
+zone back and watch the banner go; then spend a small budget, roll the zone past midnight, and
+confirm it is still spent.
+
+---
+
+## 24. Drop the anchor from the notification that warns you
+
+**Open — proposed 2026-09-14.**
+
+**Model: Fable — a new caller of `AnchorDrop.drop`, reached without the app being opened. Lane
+S, first. Waits on nothing; shares `PendingNotifications.swift` with item 28, so whichever runs
+second rebases on the first.**
+
+You are picking up Furlough, Zach's iOS and Mac app blocker. Read `HANDOFF.md` — step 42's item
+17, the Focus Filter, is the closest precedent and its two warnings apply here — then
+`README.md`, then `Shared/Core/AnchorDrop.swift` and `Shared/Core/PendingNotifications.swift`.
+Session rules as in item 23.
+
+**Why this exists.** Furlough's notifications arrive at exactly the moment of temptation —
+"Window closing in 5 minutes", "5 minutes of budget left", "Time's up" — and every one of them
+is a dead end: reading it is all a person can do. Dropping the anchor needs no tag and only ever
+tightens, which is why it is already safe from Control Center, the widget, a Shortcut and a
+Focus. It is not yet available from the one surface that finds you without being opened.
+
+**What is fixed.** Read these before changing anything; do not relitigate them.
+
+- `Notifier.post(id:title:body:)` is the single choke point for immediate notifications — ten
+  call sites across `FurloughMonitor/MonitorExtension.swift` and `FurloughMac/Model/Enforcer.swift`.
+  `PendingNotifications.plan`/`sync` is the choke point for scheduled ones, and
+  `PlannedNotification` is their value type. Add to those two, never to a call site.
+- `AnchorDrop.drop(until:reason:)` is the single entry point for a drop from any process and
+  wraps the pure, tested `Policy.drop`. It has **no** release function, deliberately. Nothing you
+  add may lift, and the comment you write there should say so, the way `AnchorFocusFilter`'s
+  off-case does.
+- A `UNNotificationAction` whose options do **not** include `.foreground` launches the app in the
+  background to handle the response. That is the app's own process, not a new one — but it is a
+  new caller, and the rule is the same.
+- `UNUserNotificationCenter.setNotificationCategories` is set per app and applies to
+  notifications its extensions post. The hazard is ordering: a notification posted by the monitor
+  before the app has ever registered the category shows no button. Register at every app launch
+  and say in HANDOFF that the first run after an update may show one buttonless notification.
+- `Policy.DropRefusal` already has a written sentence for every refusal. Use them; do not draft
+  new ones.
+
+Do these, in order:
+
+1. One category identifier in `Shared/Core/Furlough.swift` beside `anchorControlKind`, and one
+   action inside it. Register from the app at launch on both platforms.
+2. `Notifier.post` grows `category: String? = nil`; `PlannedNotification` grows the same field and
+   `PendingNotifications.apply` sets `content.categoryIdentifier` from it.
+3. The handler, in the app's `UNUserNotificationCenterDelegate`, calls `AnchorDrop.drop(reason:
+   "notification")` and nothing else. No lift branch exists, not even one that returns early.
+4. The refusal path: a notification action cannot raise an alert, so post a reply notification
+   carrying `refusal.message`. "Choose apps and pair a tag first" is the common one and it is
+   already written.
+5. The Mac: `Enforcer`'s four posts get the same treatment, but the Mac's drop is
+   `AnchorSync.macDrop` behind the `hasKey`/`cloudAvailable` guards, not `AnchorDrop` — route the
+   Mac handler through `MacModel`'s existing drop so `.noPhone` and `.noCloud` still refuse.
+
+Keep: no lift, ever, from any surface you touch; `Policy.decide` untouched; a failed or ignored
+action changes nothing about the shields.
+
+Decide with Zach, before building: **which notifications carry the button.** My proposal is the
+four that are about a moment — window opened, window closing, five minutes of budget left, time's
+up — and not the two about a queued change or the weekly digest, which are about a rule rather
+than a temptation. His call, and it is cheap to change later.
+
+Tests: `Tests/Core` cannot post a notification, so test what is pure — that `plan` attaches the
+category to exactly the notifications chosen and to none of the others. The rest is a device
+check.
+
+Hand back: the category, the handler, the Mac path, and the tests. What Zach should do: set a
+window to close six minutes out, lock the phone, and long-press the notification when it arrives
+— then check Diagnostics for `anchored (notification)`.
+
+---
+
+## 25. An automation can say when the anchor lifts
+
+**Open — proposed 2026-09-14.**
+
+**Model: Fable — it is the anchor's only way out, set from a process that is not the app. Lane
+S, second, behind 24 for the files rather than the logic. Small.**
+
+You are picking up Furlough, Zach's iOS and Mac app blocker. Read `HANDOFF.md` step 24 (the
+Anchor's clock), then `Shared/Core/AnchorSchedule.swift`'s `Policy.drop`,
+`Shared/Intents/DropAnchorIntent.swift`, and the `timedUntil` computation in
+`Furlough/Views/AnchorView.swift`. Session rules as in item 23.
+
+**Why this exists.** `AnchorDrop.drop` already takes an `until`. `Policy.drop` already validates
+it and refuses anything under `Furlough.minimumWindowMinutes` as `.tooSoon`. The Anchor screen
+already lets a person choose a lift at drop time. `DropAnchorIntent` is the one caller that never
+passes one — so "at 10 PM, drop anchor until 7 AM" cannot be written as a single Shortcut, and an
+automation silently inherits whatever "Lifts by itself" was last left at on a screen the person
+has to remember to have visited. This is a missing parameter, not a new power.
+
+**What is fixed.**
+
+- `Policy.drop` refuses outright when the anchor is already down, so a parameter can never
+  shorten a hold that exists. `tighterUntil` is the function that already decides which of two
+  lifts wins on the scheduled path; if you need that answer anywhere, call it.
+- The screen already offers exactly this freedom. Do not re-litigate whether a timed anchor
+  should exist — HANDOFF step 24 settled it.
+- `DropAnchorIntent` is compiled into both the app and the widget extension, goes through
+  `AnchorDrop` and never `AppModel`, and must stay that way.
+
+Do these:
+
+1. An optional `@Parameter` on `DropAnchorIntent` for the lift.
+2. Resolve it to an absolute `Date` by reusing the Anchor screen's own roll-to-tomorrow rule
+   rather than writing a second copy — lift it into `Shared/Core` if that is what sharing takes,
+   with tests.
+3. Pass it to `AnchorDrop.drop(until:)` and surface `.tooSoon` through the dialog the intent
+   already returns.
+4. The Control Center control and the widget button keep passing nothing, which keeps meaning
+   "whatever the screen says".
+5. Leave the existing parameterless `AppShortcut` phrases alone, so "Drop anchor in Furlough"
+   still means today's thing.
+
+Decide with Zach, before building: **a time of day or a date.** My read is a time of day, because
+"until 7 AM" in a nightly automation has to mean tomorrow's 7 AM, and a `Date` parameter is the
+sharp edge that gets that wrong at 11 PM. His call.
+
+Keep: nothing here may lift an anchor that is already down; no new writer of `Config.anchor`
+beyond the one that exists.
+
+Tests: the roll-to-tomorrow resolution against a pinned calendar (including a run at 11 PM for a
+7 AM lift, and one at 6 AM for a 7 AM lift), and the 15-minute refusal.
+
+Hand back: a Shortcut Zach can build in a minute — Drop Anchor, lift 7 AM — and what the dialog
+says when he runs it twice in a row.
+
+---
+
+## 26. A Focus Filter for the Mac
+
+**Open — proposed 2026-09-14.**
+
+**Model: Fable — it writes `Config.anchor` from a new process on a platform that crosses to the
+phone. Lane T. Waits on nothing; parallel-safe.**
+
+You are picking up Furlough, Zach's iOS and Mac app blocker. Read `HANDOFF.md` step 42's item 17
+**in full** before writing a line — it is the same file and its two hazards are the whole of the
+difficulty — then `Shared/Intents/AnchorFocusFilter.swift` and `Shared/Core/AnchorSync.swift`'s
+`macDrop`. Session rules as in item 23.
+
+**Why this exists.** `AnchorFocusFilter` is `#if os(iOS)`. A Focus syncs across a person's
+devices, so turning on a Work Focus already reaches the Mac — and Furlough on the Mac is the half
+that cannot be told. The Mac has the drop path and the link; it has no way to hear a Focus.
+
+**What is fixed.** From step 42, and not to be re-derived:
+
+- The system performs a Focus Filter **twice** — once on activation with the configured
+  parameters, once on deactivation with every parameter back at its default. `dropsAnchor` is
+  both the switch and the parameter that tells the two calls apart. The off-case returns without
+  writing anything, and wiring it to a release is the one edit that would turn this into an
+  unblock button on a schedule.
+- There is **no scope parameter**, on Zach's call, and there must not be one here: applying a
+  scope means writing `Config.anchor.scope` from a new process, and it runs backwards as easily
+  as forwards.
+- `displayRepresentation` is an instance property, which is how the iOS filter's configuration
+  row reads the live anchor and names what it would take. Do the same on the Mac.
+- The Mac refuses to drop with no linked iPhone (`.noPhone`) or signed out of iCloud
+  (`.noCloud`), because only an iPhone's tag lifts an anchor. A Filter fires with no UI, so a
+  refusal has to reach the person some other way.
+
+Do these:
+
+1. Make the existing file cross-platform rather than copying it — one filter, two platforms.
+2. Route the Mac's `perform` through `MacModel`'s drop (refusals and all), not `AnchorDrop`,
+   which is iOS-only.
+3. A refused activation posts a notification carrying `refusal.message`. Silence here would be a
+   Focus that a person believes is locking their Mac and is not.
+4. `project.yml` adds the file to the Mac target; run `xcodegen generate`.
+
+Decide with Zach: whether the Mac's filter should be offered at all while no iPhone is on the
+link, or hidden until one is. Offering it and refusing it is honest; hiding it is quieter.
+
+Keep: no release path; no scope parameter; nothing new in `Config`.
+
+Tests: whatever you add to `Shared/Core` gets tests; the Filter's two calls are a device check.
+
+Hand back: what Zach should do — configure the Filter under System Settings > Focus on the Mac,
+turn that Focus on and watch the Mac lock and the phone follow, then turn it off and confirm
+**nothing lifts**.
+
+---
+
+# Opus: where the failure mode is a bad screen or a missed API
+
+Four items. None of them changes what is shielded; each is a thing Furlough already knows and
+does not show, or a surface it does not use.
+
+---
+
+## 27. The Anchor on the Lock Screen
+
+**Open — proposed 2026-09-14.**
+
+**Model: Opus. Lane U. Waits on nothing; parallel-safe — it adds an attributes type and a widget
+view and touches `LiveActivityManager`.**
+
+You are picking up Furlough, Zach's iOS and Mac app blocker. Read `HANDOFF.md` — step 10, the
+Live Activity at window start, is the precedent for everything hard here — then `README.md`,
+then `Shared/LiveActivity/`, `FurloughWidgets/WindowLiveActivity.swift` and
+`Shared/UI/HourglassStill.swift`. Session rules as in item 23.
+
+**Why this exists.** `FurloughActivityAttributes` is window-only: `windowStart`, `windowEnd`,
+`openNames`. The Anchor — the half a person feels most, the one that cannot be talked out of —
+puts nothing on the Lock Screen and nothing in the Dynamic Island. A timed drop has a real end
+date to count down. A tag-only drop has a start and one sentence, which is the sentence worth
+seeing at 11 PM. The glass is drawn at its status in the rows, the widget, the activity and the
+Island already; this is the one place it is missing.
+
+**What is fixed.**
+
+- `LiveActivityManager.sync`/`apply` owns every activity's lifecycle and is called from
+  `AppModel.enforce`, the monitor and the Mac's equivalent. `ActivityAttributes` is a *type*, so
+  a second kind of activity is a second type and a second lifecycle, not a flag on the first.
+- `Policy.Summary.shifted(by: clock.drift)` is how the existing manager puts Furlough time onto
+  the device's own clock before the system renders it. Miss that and the countdown lies whenever
+  the clock is untrusted.
+- Step 10 already worked out how an activity is arranged ahead of a moment nobody is present for
+  — the scheduled-start `Activity.request`. A scheduled anchor drop is performed by
+  `MonitorExtension`, so check the same question there before assuming an extension can start
+  one, and if it cannot, arrange it ahead the way step 10 did.
+- A Live Activity's buttons run App Intents. The only intent this one may carry is none. Say so
+  in the file.
+
+Do these:
+
+1. A second attributes type for the anchor: what it holds (`heldDescription` is written), when it
+   dropped, and the lift where there is one.
+2. A view beside `WindowLiveActivity`, plus Dynamic Island compact, minimal and expanded, drawn
+   with the glass that already exists rather than a new one.
+3. Lifecycle in `LiveActivityManager`: started on every drop path (the app, the intent, the
+   control, the Filter, the monitor's schedule, a sync from another device) and **ended on every
+   release path** — the tag, a timed lift, the monitor's lift callback, and a release that
+   arrives over the link. An activity left running after a release is a phone that says it is
+   locked when it is not, which is worse than no activity.
+4. Reuse the widget's own words. `StatusWidget` already renders the anchor's state; a second
+   wording of the same fact is a bug waiting to be reported.
+
+Decide with Zach: **whether both activities may be on screen at once.** My read is that the
+anchor supersedes the window one while it holds — a window countdown under a total hold is a
+countdown to nothing — but it is a visible call and it is his.
+
+Keep: nothing here writes `Config`; no intent on the activity; `Policy` untouched.
+
+Tests: Core tests for any pure state-derivation you add. The activity itself is a device check.
+
+Hand back: what Zach should do — drop the anchor with a 20-minute lift, lock the phone, watch the
+Island and the Lock Screen count down; then drop it tag-only and check the wording; then scan the
+tag and confirm the activity disappears rather than lingering.
+
+---
+
+## 28. A switch for every notification, and the last five minutes counted down
+
+**Open — proposed 2026-09-14. Two small things in one file.**
+
+**Model: Opus. Lane V. Shares `PendingNotifications.swift` with item 24 — whichever runs second
+rebases on the first.**
+
+You are picking up Furlough, Zach's iOS and Mac app blocker. Read `HANDOFF.md` step 42's item 19
+(the weekly digest) for why its preference lives where it does, then
+`Shared/Core/PendingNotifications.swift`. Session rules as in item 23.
+
+**Why (a) exists.** `digestPreferenceKey` is the only notification preference Furlough has. The
+other nine fire unconditionally, so a person who finds "Window opened" noisy has one lever — iOS's
+own switch — and it takes "Time's up" and the loosening warnings with it. Muting a notification
+changes nothing about what is shielded, so unlike almost everything else in this app it applies
+instantly and waits out no delay. The screen should say that out loud; it is the rare setting
+here that is free.
+
+**Why (b) exists.** `RuntimeState.warnedAt` records the moment the five-minute warning fired, and
+the Live Activity already counts down from it. The home screen says "under 5 min left" as static
+text (`Furlough/Views/HomeView.swift:534`) and the row says nothing at all. Same data, two places
+that do not use it.
+
+**What is fixed.**
+
+- The preference lives in the **App Group**, not `Config`: it is this device's own, it must not
+  travel in an export or wait out a loosening delay, and an app extension does not share the
+  app's `UserDefaults.standard` — the monitor needs to read it. `digestPreferenceKey`'s comment
+  says all of this; follow it exactly.
+- `Notifier.post` and `PendingNotifications.plan` are the two choke points. Ten call sites feed
+  the first.
+- `warnedMoment(_:dayKey:)` returns nil for a warning that fired before the field existed. Where
+  it is nil, keep today's words — do not invent a number.
+
+Do these:
+
+1. A `NotificationKind` with one case per notification actually posted: window opened, window
+   closing, five minutes of budget, time's up, anchor dropped, anchor lifted, loosening lands in
+   an hour, change landed, weekly digest. Fold the existing digest preference into it rather than
+   leaving two mechanisms.
+2. `Notifier.post` takes the kind and returns without posting when it is off; `plan` filters on
+   it. Every one of the ten call sites passes its kind — that is the whole of the change at the
+   edges.
+3. Defaults: every kind on, matching today. `SharedStore.reset()` and the testing reset forget
+   them, the way `forgetWeeklyDigest` already does.
+4. A screen: on the phone, a row under the existing `sectionRow` pattern in `SettingsView`; on
+   the Mac, its Settings. One line at the top saying muting applies at once and mutes nothing
+   that is enforced.
+5. (b) The five-minute countdown: use `warnedMoment + Furlough.warningMinutes` as the deadline in
+   the home hero and the target row, so the phone counts the last five minutes down the way the
+   Live Activity already does.
+
+Keep: no `Config` field; nothing crosses to another device; `Policy` untouched.
+
+Tests: `plan` omits exactly the kinds that are off and keeps the rest; a store with no
+preferences reads as all-on; the digest preference written by an older build still reads
+correctly after the fold (follow `DecodingTests`).
+
+Hand back: what Zach should tap — turn "Window opened" off, open a window, get nothing; turn it
+back on and check the next one arrives. Then watch a budget's last five minutes count down on the
+home screen.
+
+---
+
+## 29. The Mac keeps what it counts
+
+**Open — proposed 2026-09-14.**
+
+**Model: Opus. Lane W. Waits on nothing; Mac-only and parallel-safe.**
+
+You are picking up Furlough, Zach's iOS and Mac app blocker. Read `HANDOFF.md`, then
+`README.md`'s Mac table, then `FurloughMac/Model/Enforcer.swift` and `Shared/Core/Record.swift`.
+Session rules as in item 23.
+
+**Why this exists.** The Mac is the only half of Furlough that genuinely *measures* time:
+`Enforcer.tick` counts seconds while an app or a site is in front and the Mac is not idle. It
+then throws the measurement away at every day boundary — `UsageLedger` is replaced whenever the
+day key changes (`Enforcer.swift:155`). So the phone, which cannot see how much of a budget was
+used, has a fortnight view; and the Mac, which knows precisely, has nothing. The menu bar's trend
+(step 42, item 18) draws *shielded* minutes for the same reason: used minutes are not kept.
+
+**What is fixed.**
+
+- `UsageLedger` is deliberately outside `RuntimeState`, because on iOS the counting is Apple's.
+  Keep it that way: what you add is Mac-local history, not a new shared model field.
+- `Enforcer.onDayRollover(SharedState)` already exists and already fires once a day whether or
+  not anyone opens Furlough — `MacModel.start()` wires it to `PendingNotifications.sync`. That is
+  where a prune belongs; do not add a second timer.
+- The Mac's "Reset everything" goes all the way back to a first run (HANDOFF 31). Whatever you
+  store has to go with it.
+- `Record` keeps 60 days and is about minutes *held shut*. This is about minutes *used*. They are
+  different numbers and must not be folded into one screen that blurs them.
+
+Do these:
+
+1. Keep the last fourteen days of ledgers — matching the phone's fortnight — under a new App
+   Group key, pruned in `onDayRollover`. Fourteen days of `[UUID: Double]` is nothing; say the
+   measured size in HANDOFF anyway.
+2. A pure `Shared/Core/UsageHistory.swift` over them: per target, per day, and a fortnight total,
+   with `Tests/Core/UsageHistoryTests.swift`. Pure in, pure out — no `SharedStore` inside it.
+3. A Mac screen in the sidebar's foot beside The record, drawn with the existing card and
+   hourglass components rather than new ones. Reuse `Shared/Usage/UsageCards.swift`'s shapes
+   where they fit; do not port the phone's Screen Time plumbing, which has no Mac equivalent.
+4. The menu bar trend gains used minutes beside shielded, if it reads clearly in one row. Check
+   the cost the way step 42 did — that section measured 0.17 ms against 2.1 ms for one hourglass
+   — and drop it if it does not.
+5. `SharedStore.reset()` forgets it.
+
+Decide with Zach: whether fourteen and sixty should be one number, and whether a Mac that has
+been counting for a fortnight should say anything on the home hero or leave it to the screen.
+
+Keep: nothing shared with iOS's model; `Policy` untouched; no new notification.
+
+Hand back: the screen, the tests, and what Zach should do — leave the Mac running a day, then
+open the screen and check the totals against what he believes he did.
+
+---
+
+## 30. The Mac grows a menu, and both apps get a way to find one app
+
+**Open — proposed 2026-09-14. Two small things; split them if the second turns out to be a no.**
+
+**Model: Opus. Lane X. Waits on nothing; parallel-safe.**
+
+You are picking up Furlough, Zach's iOS and Mac app blocker. Read `HANDOFF.md`'s "The Mac"
+section, then `FurloughMac/FurloughMacApp.swift` and `FurloughMac/Views/MacRootView.swift`.
+Session rules as in item 23.
+
+**Why (a) exists.** `FurloughMacApp.commands` is `CommandGroup(replacing: .newItem) {}` and a
+Help item, and that is the entire menu bar — so the Mac app has no menu of its own and no key
+equivalents beyond ⌘? and the default buttons inside sheets. An app whose Quit is refused while
+anything is blocked, and whose window is hidden after onboarding, is exactly the one that should
+be reachable from the menu bar.
+
+**Why (b) exists.** `searchable` appears nowhere in either app. At twenty-five targets the Mac
+sidebar and the phone's hero pager are both a scroll.
+
+Do these:
+
+1. An Anchor menu: Drop Anchor with a key equivalent, disabled with `Policy.DropRefusal`'s own
+   sentence as the tooltip when it would be refused. No Weigh Anchor item — there is no tag
+   reader on a Mac and a greyed-out release would imply one could exist.
+2. A Rules menu: Add Application, Add Website, Visualize windows — each calling what the toolbar
+   calls today, not a second path.
+3. View items for the two sidebar halves, matching the phone's two pages.
+4. (b) A filter field on the Mac sidebar, and `.searchable` on the phone's Rules list.
+
+Decide with Zach, before building (b): **whether the phone gets search at all.** There is a
+reasonable answer that it should not — a home screen you have to search is a sign of too many
+rules, and the grouping by next opening is meant to make the list readable rather than
+navigable. The Mac's sidebar is the stronger case of the two.
+
+Keep: every menu item calls an existing path; nothing new can be reached only from a menu;
+`Policy` untouched.
+
+Tests: none for menus. If the filter gains any matching logic beyond a case-insensitive contains,
+it goes in `Shared/Core` with tests.
+
+Hand back: what Zach should do — ⌘-drop the anchor from the menu with no tag paired and read the
+refusal, then pair one and do it again.
+
+---
+
+# Sonnet: mechanical and verifiable, no logic
+
+Two items. Neither touches `Shared/Core`, so neither needs tests, and both are safe to run beside
+anything else on the board.
+
+---
+
+## 31. The largest text size, audited
+
+**Open — proposed 2026-09-14.**
+
+**Model: Sonnet — a walk through view files changing frames. Lane Y. Waits on nothing;
+parallel-safe, but it edits `Furlough/Views/*` broadly, so run it when no other phone-UI lane is
+open and keep the diff to frames.**
+
+You are picking up Furlough, Zach's iOS and Mac app blocker. Read `HANDOFF.md`, then
+`design/DESIGN.md`, then `Shared/UI/Theme.swift`. Session rules: never commit or push; when done,
+print `git add <your files>` and a lowercase `git commit -m "..."` for Zach, with no
+Co-Authored-By; keep the build warning-free; you cannot see the phone, so end with exactly what
+Zach should set and look at.
+
+**Why this exists.** `EmberFont` builds every face with `Font.custom(_:size:)`, which **does**
+scale with Dynamic Type — so the text grows as it should. What does not grow is the box around
+it, and there are boxes. The clearest is the half tab bar in `Furlough/Views/HomeView.swift:118`:
+the icon gets `.frame(width: 22, height: 20)` and the label `.frame(height: 13)`, so at the
+largest accessibility size the label is clipped inside a 13-point box. Nobody has walked the app
+at that size.
+
+Do these:
+
+1. Find every `.frame(height:)` and `.frame(width:)` that wraps or constrains a `Text` in
+   `Furlough/Views/` and `Shared/UI/`. List them all first, in the file, before changing any.
+2. Fix the ones that clip at the largest accessibility size: remove the frame, change it to
+   `minHeight`, or use `@ScaledMetric` where the fixed height is load-bearing for alignment with
+   something else. Choose per site; do not apply one rule to all of them.
+3. **The acceptance test is that nothing moves at the default size.** If a change is visible at
+   the default, it is the wrong change.
+
+Do not touch: the hourglass (`Shared/UI/Hourglass.swift`, `HourglassGeometry.swift`,
+`HourglassStill.swift`) — its geometry is meant to be fixed and it is already
+`accessibilityHidden(true)`; the widgets, whose text does not scale the same way and whose
+families have hard size budgets; the Mac, which has no Dynamic Type.
+
+Tests: none — nothing in `Shared/Core` changes.
+
+Hand back: the list of every site you found and which you changed, and what Zach should do —
+Settings > Accessibility > Display & Text Size > Larger Text, drag to the top, then walk Home,
+the rule editor, the Anchor page, Pending and Settings and say what still clips.
+
+---
+
+## 32. The automations that already work, written down
+
+**Open — proposed 2026-09-14.**
+
+**Model: Sonnet — copy and one help topic, no logic. Lane Z. Waits on nothing; parallel-safe.**
+
+You are picking up Furlough, Zach's iOS and Mac app blocker. Read `HANDOFF.md`, then
+`site/src/pages/help/nfc-tags.astro`'s "Why a tag and not a code" for the voice already settled,
+then `Furlough/Views/HelpTopics.swift` and `Furlough/Model/PhoneIntents.swift`. Session rules as
+in item 31.
+
+**Why this exists.** Drop Anchor is already an App Intent, already a Control Center control,
+already a widget button, already in Spotlight and Shortcuts, and — since HANDOFF 42 — already a
+Focus Filter. So "when I arrive at the library, drop anchor", "at 10 PM, drop anchor", "when
+Sleep Focus turns on, drop anchor" are each one automation away, and nothing in the app or on the
+site says so. This is the cheapest item on the board: it is a page, not a mechanism. It is also
+why no geofencing work is proposed anywhere in this file — the capability exists and only the
+documentation is missing.
+
+Do these:
+
+1. A help topic in `Furlough/Views/HelpTopics.swift` and the matching page under
+   `site/src/pages/help/`, with three or four recipes written as the exact taps in Shortcuts:
+   a time of day, an arrival, a Focus turning on, and leaving a place if it reads well.
+2. Say plainly at the top that every one of these **drops** and none of them lifts, and why — a
+   Shortcut that could lift is a Shortcut that can be deleted at 9:59 PM. That sentence is the
+   point of the page, not a caveat at the bottom of it.
+3. Link it where "Where to leave it" already sits on the Anchor screen
+   (`Furlough/Views/AnchorScreens.swift`), so the two pieces of advice about living with the
+   Anchor are in one place.
+4. Check each recipe against the current Shortcuts app before writing the taps down. A recipe
+   with a wrong tap is worse than no page.
+
+Keep: no new code paths; no new persisted state; nothing here is something Furlough tracks doing.
+
+Tests: none.
+
+Hand back: the topic in the app and the page on the site, and one automation Zach can build from
+the page in under a minute to check the taps are right.
