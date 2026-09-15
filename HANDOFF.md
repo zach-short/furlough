@@ -1290,11 +1290,14 @@ The plan for this stretch. Tick each phase off here as it lands.
       all four `.appex` of `build/Furlough-202609140523.xcarchive`, and its contents are
       `NSPrivacyCollectedDataTypes` empty, `NSPrivacyTracking` false, `NSPrivacyTrackingDomains`
       empty, with only the three required-reason codes this step already lists. Both entitlements
-      are on that binary (`codesign -d --entitlements :-`). **The one half that cannot be checked
-      from here is the App Store privacy *label* itself** — the questionnaire has no API
-      (`scripts/store-submit.sh:23-24`), so only the web form can show it. That the submission was
-      accepted proves it is *answered*, not that it says Data Not Collected; Zach confirms that in
-      App Store Connect > App Privacy.
+      are on that binary (`codesign -d --entitlements :-`). ~~**The one half that cannot be checked
+      from here is the App Store privacy *label* itself.**~~ **Closed the same evening, 2026-09-14:
+      Zach opened App Store Connect > App Privacy himself and it reads Data Not Collected**, which
+      agrees with the manifest verified above, so the two sides of step 1 match and neither can
+      bounce the review. The reason it had to be him stands and is worth keeping: the
+      questionnaire has no API (`scripts/store-submit.sh:23-24`), so only the web form can show
+      it, and the submission being accepted proves the questionnaire is *answered* rather than
+      proving what it says. A session cannot reach this one; ask Zach.
     - **`UsageView` really does degrade when data access is refused**, which the review notes
       claim to Apple and which is therefore worth being sure of: `Furlough/Views/UsageView.swift:113-118`
       takes the `tour` branch when `hasDataAccess` is false, and `tour` (`:343-345`) hosts
@@ -1322,10 +1325,14 @@ The plan for this stretch. Tick each phase off here as it lands.
     there (DEPLOYMENT.md section 9). That is a real piece of work standing between 1.3.0 and the
     App Store, and it is nobody's board item yet.
 
-    **Still Zach's, none of it a session's:** confirm the App Privacy label reads Data Not
-    Collected in the web form; wait on Apple. The Mac Release rebuild that is the second half of
-    pass-off item 1 stays correctly gated on approval and was not attempted — with the
-    testing-button question in that prompt still unanswered and still due before it is run.
+    **Confirmed 2026-09-14, the same evening: Zach checked App Store Connect > App Privacy
+    directly and it reads Data Not Collected**, agreeing with the manifest side already verified
+    against the binary in review. That closes the one half of step 1 that could not be checked
+    from here, and with it every part of pass-off item 1 that did not need Apple.
+
+    **Still Zach's, none of it a session's:** wait on Apple. The Mac Release rebuild that is the
+    second half of pass-off item 1 stays correctly gated on approval and was not attempted — with
+    the testing-button question in that prompt still unanswered and still due before it is run.
 
 20. **Both halves of the same thing.** Done 2026-09-08, all three parts.
 
