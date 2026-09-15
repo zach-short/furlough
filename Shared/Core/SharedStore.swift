@@ -136,17 +136,38 @@ enum SharedStore {
     }
 
     /// Every save records both clocks, which is what lets Furlough keep its own time. The mark
-    /// only advances while the device's clock agrees with it; see `Clock`.
+    /// only advances while the device's clock agrees with it; see `Clock`. The zone mark is
+    /// stamped beside it on the same terms: it moves to a new zone only once the old one has
+    /// been honoured for the hold.
     @discardableResult
     static func save(_ state: SharedState) -> SharedState {
         var state = state
+        let now = state.now
         state.runtime.clock = Clock.stamp(state.runtime.clock)
+        let zone = Clock.stampZone(state.runtime.zone, current: TimeZone.current.identifier, now: now, hold: state.zoneHold)
+        noteZone(from: state.runtime.zone, to: zone, hold: state.zoneHold)
+        state.runtime.zone = zone
         do {
             defaults.set(try encoder.encode(state), forKey: stateKey)
         } catch {
             log("Failed to encode state: \(error)")
         }
         return state
+    }
+
+    /// Records a zone move the way a clock change is recorded: once per crossing, from whichever
+    /// process saved first, so Diagnostics shows it. A first mark and an unchanged one say nothing.
+    private static func noteZone(from old: ZoneMark?, to new: ZoneMark, hold: TimeInterval) {
+        guard let old, old != new else { return }
+        let current = TimeZone.current.identifier
+        if old.movedAt == nil, let movedAt = new.movedAt {
+            let until = TimeFormat.clock(movedAt.addingTimeInterval(hold))
+            log("time zone is now \(current); keeping \(old.identifier) until \(until)")
+        } else if old.identifier != new.identifier {
+            log("time zone hold over; now on \(new.identifier)")
+        } else {
+            log("time zone back to \(new.identifier)")
+        }
     }
 
     /// Forgets every target, rule, pending change, the Anchor, the names iOS gave us and the

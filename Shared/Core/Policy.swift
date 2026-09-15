@@ -351,9 +351,15 @@ enum Policy {
     }
 
     static func decide(config: Config, runtime: RuntimeState, now: Date, calendar: Calendar = .current) -> Decision {
+        decision(config: config, now: now, statuses: statuses(config: config, runtime: runtime, now: now, calendar: calendar))
+    }
+
+    /// The shields from statuses already decided — the seam the two-zone `decide` folds through,
+    /// so the token arithmetic exists once. A target the statuses somehow miss is shut, not open.
+    static func decision(config: Config, now: Date, statuses: [UUID: TargetStatus]) -> Decision {
         var decision = Decision()
         for target in config.targets {
-            let status = status(of: target, config: config, runtime: runtime, now: now, calendar: calendar)
+            let status = statuses[target.id] ?? .blockedAllDay
             decision.statuses[target.id] = status
             // Every door, not just the face — status is per target, so linking costs nothing here.
             for kind in target.kinds {
@@ -420,9 +426,15 @@ enum Policy {
     }
     #else
     static func decide(config: Config, runtime: RuntimeState, now: Date, calendar: Calendar = .current) -> Decision {
+        decision(config: config, now: now, statuses: statuses(config: config, runtime: runtime, now: now, calendar: calendar))
+    }
+
+    /// The shields from statuses already decided — the seam the two-zone `decide` folds through.
+    /// A target the statuses somehow miss is shut, not open.
+    static func decision(config: Config, now: Date, statuses: [UUID: TargetStatus]) -> Decision {
         var decision = Decision()
         for target in config.targets {
-            let status = status(of: target, config: config, runtime: runtime, now: now, calendar: calendar)
+            let status = statuses[target.id] ?? .blockedAllDay
             decision.statuses[target.id] = status
             guard !status.isAllowed else { continue }
             // Every door, as on the phone: an imported setup can link a host onto a Mac app.
@@ -461,6 +473,140 @@ enum Policy {
         return decision
     }
     #endif
+
+    /// Every target's status at `now`, on one calendar.
+    static func statuses(config: Config, runtime: RuntimeState, now: Date, calendar: Calendar = .current) -> [UUID: TargetStatus] {
+        Dictionary(uniqueKeysWithValues: config.targets.map { target in
+            (target.id, status(of: target, config: config, runtime: runtime, now: now, calendar: calendar))
+        })
+    }
+
+    // MARK: Two zones
+
+    /// The shields while a time zone move is being held: decided once when the zone is settled,
+    /// twice while it is not — once under the zone the device left, once under the one it is in
+    /// — and folded to the tighter of the two. `decide` itself keeps its one calendar, so the
+    /// tests can pin one; every shield-deriving caller goes through this instead.
+    static func decide(
+        config: Config, runtime: RuntimeState, now: Date, zone: Clock.ZoneReading, calendar: Calendar = .current
+    ) -> Decision {
+        decision(config: config, now: now, statuses: statuses(config: config, runtime: runtime, now: now, zone: zone, calendar: calendar))
+    }
+
+    static func statuses(
+        config: Config, runtime: RuntimeState, now: Date, zone: Clock.ZoneReading, calendar: Calendar = .current
+    ) -> [UUID: TargetStatus] {
+        guard let held = zone.heldCalendar(like: calendar) else {
+            return statuses(config: config, runtime: runtime, now: now, calendar: calendar)
+        }
+        let honoured = statuses(config: config, runtime: runtime, now: now, calendar: held)
+        return statuses(config: config, runtime: runtime, now: now, calendar: calendar).reduce(into: [:]) { folded, entry in
+            folded[entry.key] = tighter(honoured[entry.key] ?? entry.value, in: held, entry.value, in: calendar, now: now)
+        }
+    }
+
+    static func status(
+        of target: Target, config: Config, runtime: RuntimeState, now: Date, zone: Clock.ZoneReading,
+        calendar: Calendar = .current
+    ) -> TargetStatus {
+        guard let held = zone.heldCalendar(like: calendar) else {
+            return status(of: target, config: config, runtime: runtime, now: now, calendar: calendar)
+        }
+        return tighter(
+            status(of: target, config: config, runtime: runtime, now: now, calendar: held), in: held,
+            status(of: target, config: config, runtime: runtime, now: now, calendar: calendar), in: calendar,
+            now: now
+        )
+    }
+
+    /// The day a budget is spent on: the held zone's while a move is held. The one place every
+    /// reader of `exhausted`, `warned`, the record and the Mac's ledger gets its key from.
+    static func dayKey(_ date: Date, zone: Clock.ZoneReading, calendar: Calendar = .current) -> String {
+        dayKey(date, calendar: zone.dayCalendar(like: calendar))
+    }
+
+    /// The sooner of the two zones' next edges, since either can change the folded answer.
+    static func nextTransition(config: Config, after now: Date, zone: Clock.ZoneReading, calendar: Calendar = .current) -> Date {
+        let edge = nextTransition(config: config, after: now, calendar: calendar)
+        guard let held = zone.heldCalendar(like: calendar) else { return edge }
+        return min(edge, nextTransition(config: config, after: now, calendar: held))
+    }
+
+    /// The tighter of a target's two statuses, `a` read in `aCal` and `b` in `bCal`, answered in
+    /// `bCal`'s frame — the device's own, which is what every reader of a minute or a `NextOpen`
+    /// assumes. This function is the whole defence, so the table is written out:
+    ///
+    /// | a \ b            | anchored | blockedAllDay | exhausted(n)      | closed(n)          | open(u)          | unconfigured    |
+    /// |------------------|----------|---------------|-------------------|--------------------|------------------|-----------------|
+    /// | anchored         | anchored | anchored      | anchored          | anchored           | anchored         | anchored        |
+    /// | blockedAllDay    | anchored | blockedAllDay | blockedAllDay     | blockedAllDay      | blockedAllDay    | blockedAllDay   |
+    /// | exhausted(m)     | anchored | blockedAllDay | exhausted(later)  | exhausted(later)   | exhausted(m)     | exhausted(m)    |
+    /// | closed(m)        | anchored | blockedAllDay | exhausted(later)  | closed(later)      | closed(m)        | closed(m)       |
+    /// | open(t)          | anchored | blockedAllDay | exhausted(n)      | closed(n)          | open(earlier)    | open(t)         |
+    /// | unconfigured     | anchored | blockedAllDay | exhausted(n)      | closed(n)          | open(u)          | unconfigured    |
+    ///
+    /// Shielded beats open; between two shut answers the later reopening wins, and a spent budget
+    /// is named over a closed window because the day it was spent on is the held zone's; between
+    /// two open answers the earlier close wins. A nil `nextOpen` means never, which is later than
+    /// any date. Minutes and days from `a` are moved into `b`'s frame by way of the instant they
+    /// name, so a close at 10 PM in the held zone is 11 PM here, not 10.
+    static func tighter(_ a: TargetStatus, in aCal: Calendar, _ b: TargetStatus, in bCal: Calendar, now: Date) -> TargetStatus {
+        switch (a, b) {
+        case (.anchored, _), (_, .anchored):
+            return .anchored
+        case (.blockedAllDay, _), (_, .blockedAllDay):
+            return .blockedAllDay
+        case (.exhausted(let m), .exhausted(let n)):
+            return .exhausted(nextOpen: later(m, in: aCal, n, in: bCal, now: now))
+        case (.exhausted(let m), .closed(let n)):
+            return .exhausted(nextOpen: later(m, in: aCal, n, in: bCal, now: now))
+        case (.closed(let m), .exhausted(let n)):
+            return .exhausted(nextOpen: later(m, in: aCal, n, in: bCal, now: now))
+        case (.exhausted(let m), .open), (.exhausted(let m), .unconfigured):
+            return .exhausted(nextOpen: m.map { rebase($0, from: aCal, into: bCal, now: now) })
+        case (.open, .exhausted(let n)), (.unconfigured, .exhausted(let n)):
+            return .exhausted(nextOpen: n)
+        case (.closed(let m), .closed(let n)):
+            return .closed(nextOpen: later(m, in: aCal, n, in: bCal, now: now) ?? n)
+        case (.closed(let m), .open), (.closed(let m), .unconfigured):
+            return .closed(nextOpen: rebase(m, from: aCal, into: bCal, now: now))
+        case (.open, .closed(let n)), (.unconfigured, .closed(let n)):
+            return .closed(nextOpen: n)
+        case (.open(let t), .open(let u)):
+            let closesA = date(atMinute: t, of: now, calendar: aCal)
+            let closesB = date(atMinute: u, of: now, calendar: bCal)
+            return .open(until: closesA < closesB ? rebase(minute: t, from: aCal, into: bCal, now: now) : u)
+        case (.open(let t), .unconfigured):
+            return .open(until: rebase(minute: t, from: aCal, into: bCal, now: now))
+        case (.unconfigured, .open(let u)):
+            return .open(until: u)
+        case (.unconfigured, .unconfigured):
+            return .unconfigured
+        }
+    }
+
+    /// The later reopening, in `bCal`'s frame; nil (never) beats any date.
+    private static func later(_ m: NextOpen?, in aCal: Calendar, _ n: NextOpen?, in bCal: Calendar, now: Date) -> NextOpen? {
+        guard let m, let n else { return nil }
+        let opensA = date(at: m, from: now, calendar: aCal)
+        let opensB = date(at: n, from: now, calendar: bCal)
+        return opensA > opensB ? rebase(m, from: aCal, into: bCal, now: now) : n
+    }
+
+    /// A minute of `now`'s day (past 1440 for a night) read in `aCal`, as the same instant's
+    /// minute of `now`'s day in `bCal`.
+    private static func rebase(minute: Int, from aCal: Calendar, into bCal: Calendar, now: Date) -> Int {
+        let instant = date(atMinute: minute, of: now, calendar: aCal)
+        return bCal.dateComponents([.minute], from: bCal.startOfDay(for: now), to: instant).minute ?? minute
+    }
+
+    private static func rebase(_ next: NextOpen, from aCal: Calendar, into bCal: Calendar, now: Date) -> NextOpen {
+        let instant = date(at: next, from: now, calendar: aCal)
+        return NextOpen(
+            minuteOfDay: minuteOfDay(instant, calendar: bCal),
+            daysAhead: daysAhead(of: instant, from: now, calendar: bCal)
+        )
+    }
 
     /// The next instant at which some status can change: a window edge later today, else
     /// midnight — or a timed anchor's lift, when that comes first.
@@ -550,6 +696,24 @@ enum Policy {
 
     static func summary(state: SharedState, now: Date, calendar: Calendar = .current) -> Summary {
         let config = effectiveConfig(state, now: now)
+        return summary(
+            state: state, config: config, now: now, calendar: calendar,
+            statuses: statuses(config: config, runtime: state.runtime, now: now, calendar: calendar)
+        )
+    }
+
+    /// The summary while a zone move is held, from the folded statuses; see `decide(…zone:)`.
+    static func summary(state: SharedState, now: Date, zone: Clock.ZoneReading, calendar: Calendar = .current) -> Summary {
+        let config = effectiveConfig(state, now: now)
+        return summary(
+            state: state, config: config, now: now, calendar: calendar,
+            statuses: statuses(config: config, runtime: state.runtime, now: now, zone: zone, calendar: calendar)
+        )
+    }
+
+    private static func summary(
+        state: SharedState, config: Config, now: Date, calendar: Calendar, statuses: [UUID: TargetStatus]
+    ) -> Summary {
         var summary = Summary()
         summary.pendingCount = state.pending.filter { $0.effectiveAt > now }.count
         summary.isAnchored = config.anchor.isHolding(at: now)
@@ -568,7 +732,7 @@ enum Policy {
         var unnamedNext: [String] = []
 
         for target in config.targets {
-            switch status(of: target, config: config, runtime: state.runtime, now: now, calendar: calendar) {
+            switch statuses[target.id] ?? .blockedAllDay {
             case .anchored:
                 summary.blockedCount += 1
             case .unconfigured:

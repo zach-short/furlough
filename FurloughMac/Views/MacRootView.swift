@@ -261,7 +261,7 @@ struct MacHomeView: View {
         }
     }
 
-    private var toolbarSummary: Policy.Summary { Policy.summary(state: model.state, now: now) }
+    private var toolbarSummary: Policy.Summary { Policy.summary(state: model.state, now: now, zone: model.state.zone(now: now)) }
 
     private struct CompanionPrompt: Identifiable {
         let id = UUID()
@@ -443,8 +443,9 @@ struct MacHomeView: View {
         let state = model.state
         let config = Policy.effectiveConfig(state, now: now)
         let targets = config.targets.filter { matches($0.displayName) }
+        let zone = state.zone(now: now)
         let statuses = Dictionary(uniqueKeysWithValues: targets.map { target in
-            (target.id, Policy.status(of: target, config: config, runtime: state.runtime, now: now))
+            (target.id, Policy.status(of: target, config: config, runtime: state.runtime, now: now, zone: zone))
         })
         let groups = HomeGroups(targets: targets, statuses: statuses, now: now)
         if targets.isEmpty, !filter.isEmpty {
@@ -675,9 +676,7 @@ struct MacHomeView: View {
     private var hero: some View {
         let state = model.state
         let config = Policy.effectiveConfig(state, now: now)
-        let statuses = Dictionary(uniqueKeysWithValues: config.targets.map { target in
-            (target.id, Policy.status(of: target, config: config, runtime: state.runtime, now: now))
-        })
+        let statuses = Policy.statuses(config: config, runtime: state.runtime, now: now, zone: state.zone(now: now))
         let groups = HomeGroups(targets: config.targets, statuses: statuses, now: now)
         return MacHeroPager(
             targets: groups.ordered,

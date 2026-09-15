@@ -36,6 +36,9 @@ final class Enforcer {
     private var clockOff = false
     /// The web filter runs on the device's clock; dates handed to it are shifted by this.
     private var drift: TimeInterval = 0
+    /// Settled, or a time zone move still being held; every decision and every day key here
+    /// reads through it. See `Clock.ZoneReading`.
+    private var zone: Clock.ZoneReading = .settled
     private(set) var now = Date.now
     private let shield = ShieldPanel()
     private static let idleAfter: TimeInterval = 120
@@ -55,6 +58,14 @@ final class Enforcer {
             forName: NSNotification.Name.NSSystemClockDidChange, object: nil, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick(reason: "clock changed") }
+        })
+        // A zone change is the same attempt on the other axis. Foundation caches the system
+        // zone per process, so it is reset before the tick re-reads `TimeZone.current`.
+        observers.append(NotificationCenter.default.addObserver(
+            forName: NSNotification.Name.NSSystemTimeZoneDidChange, object: nil, queue: .main
+        ) { [weak self] _ in
+            NSTimeZone.resetSystemTimeZone()
+            MainActor.assumeIsolated { self?.tick(reason: "time zone changed") }
         })
         let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick(reason: nil) }
@@ -97,11 +108,12 @@ final class Enforcer {
         }
         now = clock.now
         drift = clock.drift
+        zone = state.zone(now: clock.now)
         return clock.now
     }
 
     func usedSeconds(for id: UUID) -> Int {
-        ledger.dayKey == Policy.dayKey(now) ? Int(ledger.seconds[id] ?? 0) : 0
+        ledger.dayKey == Policy.dayKey(now, zone: zone) ? Int(ledger.seconds[id] ?? 0) : 0
     }
 
     /// What has been measured, today included — today's seconds are still in the live ledger,
@@ -114,7 +126,7 @@ final class Enforcer {
 
     #if DEBUG || TESTING_TOOLS
     func resetUsage() {
-        ledger = UsageLedger(dayKey: Policy.dayKey(now))
+        ledger = UsageLedger(dayKey: Policy.dayKey(now, zone: zone))
         ledger.save()
         history = UsageHistory()
         history.save()
@@ -162,9 +174,13 @@ final class Enforcer {
 
     @discardableResult
     private func apply(_ state: inout SharedState, now: Date, elapsed: TimeInterval) -> Decision {
-        let dayKey = Policy.dayKey(now)
+        // The held zone's day while a zone move is held, so the ledger is not replaced by a
+        // midnight that only the zone setting brought.
+        let zone = state.zone(now: now)
+        self.zone = zone
+        let dayKey = Policy.dayKey(now, zone: zone)
         // Mac counts a second at a time; the phone batches at its reconciles. See `Record.accumulate`.
-        Record.accumulate(&state, now: now)
+        Record.accumulate(&state, now: now, calendar: zone.dayCalendar())
         if ledger.dayKey != dayKey {
             // The day that just ended is the only complete measurement the Mac ever has, so it
             // is filed before the ledger is replaced. This is the once-a-day moment that
@@ -178,7 +194,7 @@ final class Enforcer {
             windowWarned = [:]
             onDayRollover?(state)
         }
-        var decision = Policy.decide(config: state.config, runtime: state.runtime, now: now)
+        var decision = Policy.decide(config: state.config, runtime: state.runtime, now: now, zone: zone)
         let front = Front.current(browsers: browsers, readsAddress: state.config.targets.contains { $0.kind.isHost })
 
         if elapsed > 0, !Self.isIdle(), let used = front.target(in: state.config),
@@ -186,10 +202,10 @@ final class Enforcer {
             let seconds = (ledger.seconds[used.id] ?? 0) + elapsed
             ledger.seconds[used.id] = seconds
             ledger.save()
-            let budget = rule.budget(on: Policy.weekday(now))
+            let budget = rule.budget(on: Policy.weekday(now, calendar: zone.dayCalendar()))
             if seconds >= Double(budget * 60), !state.runtime.isExhausted(used.id, dayKey: dayKey) {
                 state.runtime.exhausted[used.id.uuidString] = dayKey
-                Record.markSpent(used.id, in: &state, now: now)
+                Record.markSpent(used.id, in: &state, now: now, calendar: zone.dayCalendar())
                 SharedStore.log("budget spent: \(used.displayName)")
                 let next = Policy.nextOpen(in: rule, afterWeekday: Policy.weekday(now)).map { "Opens \(TimeFormat.nextOpen($0))." } ?? ""
                 Notifier.post(
@@ -198,14 +214,14 @@ final class Enforcer {
                     title: "Time's up",
                     body: "You used your \(TimeFormat.budget(budget)) for \(used.displayName). \(next)"
                 )
-                decision = Policy.decide(config: state.config, runtime: state.runtime, now: now)
+                decision = Policy.decide(config: state.config, runtime: state.runtime, now: now, zone: zone)
             } else if budget > Furlough.warningMinutes,
                       seconds >= Double((budget - Furlough.warningMinutes) * 60),
                       !state.runtime.wasWarned(used.id, dayKey: dayKey) {
                 state.runtime.warned[used.id.uuidString] = dayKey
                 // Keep in sync with `warned`; a half-set pair goes unnoticed until much later.
                 state.runtime.warnedAt[used.id.uuidString] = now
-                Record.markWarned(used.id, in: &state, now: now)
+                Record.markWarned(used.id, in: &state, now: now, calendar: zone.dayCalendar())
                 SharedStore.log("5 minutes of budget left: \(used.displayName)")
                 Notifier.post(
                     id: "warning-\(used.id.uuidString)",
@@ -237,7 +253,7 @@ final class Enforcer {
         // list left behind by a force quit can't outlive its window.
         webFilter.sync(
             hosts: decision.blockedHosts,
-            until: Policy.nextTransition(config: state.config, after: now).addingTimeInterval(drift)
+            until: Policy.nextTransition(config: state.config, after: now, zone: zone).addingTimeInterval(drift)
         )
         lastDecision = decision
         return decision

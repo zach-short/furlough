@@ -17,7 +17,7 @@ enum LiveActivityManager {
     /// draws its timer against the device clock) ever sees it.
     nonisolated static func sync(state: SharedState, canStart: Bool = true) {
         let clock = state.clock()
-        let summary = Policy.summary(state: state, now: clock.now).shifted(by: clock.drift)
+        let summary = Policy.summary(state: state, now: clock.now, zone: state.zone(now: clock.now)).shifted(by: clock.drift)
         let anchor = Policy
             .anchorActivity(config: Policy.effectiveConfig(state, now: clock.now), now: clock.now)?
             .shifted(by: clock.drift)

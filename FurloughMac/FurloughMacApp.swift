@@ -92,6 +92,7 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationC
         // to the menu bar.
         if !Self.opensWindowAtLaunch { NSApp.setActivationPolicy(.accessory) }
         UNUserNotificationCenter.current().delegate = self
+        AnchorOffer.register()
         MacModel.shared.start()
         let menuBar = MenuBarController(model: MacModel.shared)
         menuBar.install()
@@ -190,5 +191,20 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationC
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
         [.banner, .sound]
+    }
+
+    /// The Drop anchor button on a notification (`AnchorOffer`). Through the Mac's own drop,
+    /// refusals and all: no linked iPhone or no iCloud still says no, since only an iPhone's tag
+    /// lifts an anchor dropped here. Nothing on this path can lift.
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse
+    ) async {
+        guard response.actionIdentifier == Furlough.anchorNotificationAction else { return }
+        SharedStore.log("drop anchor asked for from a notification")
+        let refusal = await MainActor.run { MacModel.shared.dropAnchor() }
+        guard let refusal else { return }
+        // A notification action cannot raise an alert, so the refusal comes back the same way.
+        Notifier.reply(id: "anchor-refused", title: "Anchor not dropped", body: refusal)
     }
 }

@@ -315,16 +315,11 @@ struct AnchorPage: View {
         return "\(held) · ready"
     }
 
-    /// Nil when the tag is the only way back. Rolls to tomorrow if today's time is already
-    /// past or within `Furlough.minimumWindowMinutes` (the monitor's minimum wake window).
+    /// Nil when the tag is the only way back. The roll-to-tomorrow rule is `Policy.liftDate`,
+    /// shared with the Drop Anchor intent so a Shortcut's "until 7 AM" means what this does.
     private var timedUntil: Date? {
         guard liftsBySelf else { return nil }
-        let now = model.clock.now
-        let soonest = now.addingTimeInterval(TimeInterval(Furlough.minimumWindowMinutes * 60))
-        let today = Policy.date(atMinute: liftMinute, of: now)
-        if today >= soonest { return today }
-        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: now) ?? now
-        return Policy.date(atMinute: liftMinute, of: tomorrow)
+        return Policy.liftDate(atMinute: liftMinute, from: model.clock.now)
     }
 
     private var timedRow: some View {

@@ -30,10 +30,11 @@ final class MonitorExtension: DeviceActivityMonitor {
         let now = state.now
         let config = Policy.effectiveConfig(state, now: now)
         let weekday = Policy.weekday(now)
+        let zone = state.zone(now: now)
         let opened: [(name: String, until: Int)] = config.targets.compactMap { target in
             guard let rule = target.rule, !rule.isAllDay else { return nil }
             guard !(window.startMinute == 0 && rule.continues(into: weekday) != nil) else { return nil }
-            guard case .open(let until) = Policy.status(of: target, config: config, runtime: state.runtime, now: now)
+            guard case .open(let until) = Policy.status(of: target, config: config, runtime: state.runtime, now: now, zone: zone)
             else { return nil }
             let isThisWindow = until == window.endMinute
                 || (window.endMinute == Furlough.minutesPerDay && until > Furlough.minutesPerDay)
@@ -152,16 +153,19 @@ final class MonitorExtension: DeviceActivityMonitor {
             // Every distinct weekly budget is registered, so a Monday callback can be another
             // day's threshold — same guard that filtered stale edits, extended to cover all
             // weekday budgets.
-            let weekday = Policy.weekday(now)
+            // Today is the held zone's day while a zone move is held, so a budget spent there
+            // stays spent when the device's own day rolls.
+            let zone = state.zone(now: now)
+            let weekday = Policy.weekday(now, calendar: zone.dayCalendar())
             let budget = rule.effectiveBudget(on: weekday)
             guard rule.isEverAllowed(on: weekday), parsed.minutes >= budget else {
                 SharedStore.log("ignored stale threshold \(parsed.minutes) < today's budget \(budget)")
                 return
             }
-            let day = Policy.dayKey(now)
+            let day = Policy.dayKey(now, zone: zone)
             guard !state.runtime.isExhausted(target.id, dayKey: day) else { return }
             state.runtime.exhausted[target.id.uuidString] = day
-            Record.markSpent(target.id, in: &state, now: now)
+            Record.markSpent(target.id, in: &state, now: now, calendar: zone.dayCalendar())
             exhaustedName = target.displayName
         }
         ShieldReconciler.reconcile(now: now, reason: "threshold \(parsed.minutes)m")
@@ -188,15 +192,16 @@ final class MonitorExtension: DeviceActivityMonitor {
             guard let target = state.config.target(id: parsed.targetID), let rule = target.rule else { return }
             // Must match today's budget exactly, so a Monday doesn't get its warning early
             // from a loaded weekend threshold.
-            let weekday = Policy.weekday(now)
+            let zone = state.zone(now: now)
+            let weekday = Policy.weekday(now, calendar: zone.dayCalendar())
             guard rule.isEverAllowed(on: weekday), parsed.minutes == rule.effectiveBudget(on: weekday) else { return }
-            let day = Policy.dayKey(now)
+            let day = Policy.dayKey(now, zone: zone)
             guard !state.runtime.wasWarned(target.id, dayKey: day),
                   !state.runtime.isExhausted(target.id, dayKey: day) else { return }
             state.runtime.warned[target.id.uuidString] = day
             // Furlough's own `now`, so the Live Activity deadline can't be moved by touching the clock.
             state.runtime.warnedAt[target.id.uuidString] = now
-            Record.markWarned(target.id, in: &state, now: now)
+            Record.markWarned(target.id, in: &state, now: now, calendar: zone.dayCalendar())
             warnedName = target.displayName
         }
         LiveActivityManager.sync(state: SharedStore.load(), canStart: false)
@@ -216,10 +221,11 @@ final class MonitorExtension: DeviceActivityMonitor {
         let state = SharedStore.load()
         let now = state.now
         let config = Policy.effectiveConfig(state, now: now)
+        let zone = state.zone(now: now)
         // A windowless rule never closes (midnight only resets its budget); neither does a
         // night's evening half, whose `until` is next morning.
         let closing = config.targets.filter { target in
-            if case .open(let until) = Policy.status(of: target, config: config, runtime: state.runtime, now: now) {
+            if case .open(let until) = Policy.status(of: target, config: config, runtime: state.runtime, now: now, zone: zone) {
                 return until == window.endMinute && !(target.rule?.isAllDay ?? false)
             }
             return false

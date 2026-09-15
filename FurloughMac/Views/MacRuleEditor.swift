@@ -286,7 +286,10 @@ struct MacRuleEditor: View {
     private func header(_ target: Target) -> some View {
         TargetHero(
             target: target,
-            status: Policy.status(of: target, config: model.state.config, runtime: model.state.runtime, now: now),
+            status: Policy.status(
+                of: target, config: model.state.config, runtime: model.state.runtime, now: now,
+                zone: model.state.zone(now: now)
+            ),
             runtime: model.state.runtime,
             usedSeconds: model.usedSeconds(for: target.id),
             now: now

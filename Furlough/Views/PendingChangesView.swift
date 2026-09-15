@@ -13,6 +13,9 @@ struct PendingChangesView: View {
                     if !clock.isTrusted {
                         ClockBanner(drift: clock.drift)
                     }
+                    if case .moved(let from, let until) = model.state.zone(now: clock.now) {
+                        ClockBanner(zone: from, until: until, now: clock.now)
+                    }
                     if pending.isEmpty {
                         VStack(spacing: 8) {
                             Image(systemName: "checkmark.circle")

@@ -36,7 +36,8 @@ final class ShieldExtension: ShieldConfigurationDataSource {
         if let target, let learned { remember(learned, for: target) }
         let nickname = target?.nickname ?? ""
         let name = nickname.isEmpty ? (systemName ?? "This app") : nickname
-        var status = target.map { Policy.status(of: $0, config: config, runtime: state.runtime, now: now) }
+        let zone = state.zone(now: now)
+        var status = target.map { Policy.status(of: $0, config: config, runtime: state.runtime, now: now, zone: zone) }
         if status == nil {
             // Things the anchor holds that are not targets, directly or through their category.
             let anchoredDirectly = kind.map { config.anchor.blocks($0, at: now) } ?? false

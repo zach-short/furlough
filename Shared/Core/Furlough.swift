@@ -11,6 +11,10 @@ enum Furlough {
     /// Here rather than on `DropAnchorControl` because the drop itself (not just the control)
     /// needs to ask for a redraw.
     static let anchorControlKind = "com.zachshort.furlough.dropAnchor"
+    /// The notifications that carry a Drop anchor button, and the button itself; registered by
+    /// both apps at launch (`AnchorOffer.register`) and read back by their notification delegates.
+    static let anchorNotificationCategory = "com.zachshort.furlough.notification.moment"
+    static let anchorNotificationAction = "com.zachshort.furlough.notification.dropAnchor"
     static let minutesPerDay = 1440
     /// DeviceActivity rejects schedules shorter than 15 minutes.
     static let minimumWindowMinutes = 15

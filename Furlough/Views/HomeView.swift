@@ -206,9 +206,7 @@ struct HomeContent: View {
     var body: some View {
         let state = model.state
         let config = Policy.effectiveConfig(state, now: now)
-        let statuses = Dictionary(uniqueKeysWithValues: config.targets.map { target in
-            (target.id, Policy.status(of: target, config: config, runtime: state.runtime, now: now))
-        })
+        let statuses = Policy.statuses(config: config, runtime: state.runtime, now: now, zone: state.zone(now: now))
         let glasses = Dictionary(uniqueKeysWithValues: config.targets.map { target in
             (target.id, HourglassState.of(target, status: statuses[target.id] ?? .unconfigured, runtime: state.runtime, now: now))
         })

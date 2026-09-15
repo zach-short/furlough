@@ -17,7 +17,8 @@ struct StatusProvider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (StatusEntry) -> Void) {
-        completion(StatusEntry(date: .now, summary: Policy.summary(state: SharedStore.load(), now: .now)))
+        let state = SharedStore.load()
+        completion(StatusEntry(date: .now, summary: Policy.summary(state: state, now: .now, zone: state.zone(now: .now))))
     }
 
     /// One entry per status change over the next 36h, plus every 3 min while draining so the
@@ -31,10 +32,12 @@ struct StatusProvider: TimelineProvider {
         var cursor = clock.now
         let horizon = cursor.addingTimeInterval(36 * 3600)
         while entries.count < 200, cursor < horizon {
-            let summary = Policy.summary(state: state, now: cursor)
+            // The zone reading moves with the cursor, so the timeline settles when the hold does.
+            let zone = state.zone(now: cursor)
+            let summary = Policy.summary(state: state, now: cursor, zone: zone)
             entries.append(StatusEntry(date: clock.device(cursor), summary: summary.shifted(by: clock.drift)))
             let config = Policy.effectiveConfig(state, now: cursor)
-            let next = Policy.nextTransition(config: config, after: cursor)
+            let next = Policy.nextTransition(config: config, after: cursor, zone: zone)
             guard next > cursor else { break }
             let draining = summary.openUntil != nil || !summary.allDayNames.isEmpty
             let step = draining ? min(next, cursor.addingTimeInterval(180)) : next

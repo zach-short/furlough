@@ -705,6 +705,9 @@ struct RuntimeState: Codable, Equatable {
     var warnedAt: [String: Date] = [:]
     /// Both clocks as they stood at the last save, so a wall clock moved forward is visible.
     var clock: ClockMark?
+    /// The zone Furlough honours, so a zone moved in Settings is visible too. Device-local, like
+    /// `clock`: it never travels in an export and never waits out a delay.
+    var zone: ZoneMark?
     var lastReconcile: Date?
     var lastRegistration: Date?
     var registrationError: String?
@@ -731,6 +734,8 @@ struct RuntimeState: Codable, Equatable {
         warned = try container.decodeIfPresent([String: String].self, forKey: .warned) ?? [:]
         warnedAt = try container.decodeIfPresent([String: Date].self, forKey: .warnedAt) ?? [:]
         clock = try container.decodeIfPresent(ClockMark.self, forKey: .clock)
+        // Absent on a store written before the zone was watched: trusted, as a missing clock mark is.
+        zone = try container.decodeIfPresent(ZoneMark.self, forKey: .zone)
         lastReconcile = try container.decodeIfPresent(Date.self, forKey: .lastReconcile)
         lastRegistration = try container.decodeIfPresent(Date.self, forKey: .lastRegistration)
         registrationError = try container.decodeIfPresent(String.self, forKey: .registrationError)

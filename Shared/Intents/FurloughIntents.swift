@@ -19,7 +19,7 @@ struct WhatsOpenIntent: AppIntent {
         let state = SharedStore.load()
         let now = state.clock().now
         let sentence = StatusSpeech.sentence(
-            Policy.summary(state: state, now: now),
+            Policy.summary(state: state, now: now, zone: state.zone(now: now)),
             hasTargets: !state.config.targets.isEmpty,
             now: now
         )

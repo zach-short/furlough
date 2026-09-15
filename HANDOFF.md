@@ -262,6 +262,14 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   `Policy.drop`, `scheduledDrop`, `liftExpiredAnchor`, `classify(newSchedules:against:)`,
   `Config.anchorDelayHours`; step 24),
   `AnchorDrop.swift` (iOS only: the one function that drops the anchor from any process),
+  `AnchorLift.swift` (`Policy.liftDate`, the roll-to-tomorrow rule a lift named as a time of
+  day resolves by, shared by the Anchor screen and the Drop Anchor intent; step 49),
+  `AnchorOffer.swift` (the Drop anchor button on a notification: which kinds carry it, the
+  category's registration, and `Notifier.reply`; step 49),
+  `Clock.swift` (`ClockMark` and `Clock.read`/`stamp`, step 4; `ZoneMark`, `Clock.zone`/
+  `stampZone` and `ZoneReading`, the time zone a device left held beside the one it is in, and
+  `SharedState.zone(now:)`/`zoneHold`; step 49 — `Policy.tighter` and the `zone:` wrappers on
+  `decide`, `statuses`, `status`, `summary`, `nextTransition` and `dayKey` live in `Policy.swift`),
   `AnchorSync.swift` (the anchor across devices: `AnchorRecord`, the pure `merge` and
   `macDrop`, and `AnchorCloud`, the iCloud key-value store; step 18),
   `DeviceLink.swift` (the roster: `LinkChoice`, `LinkPreferences`, `LinkedDevice`,
@@ -293,8 +301,10 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   see step 38).
 - `Shared/Intents`: `FurloughIntents.swift` (What's Open, both platforms), `StatusSpeech.swift`
   (its sentence, tested), `DropAnchorIntent.swift` (iOS; compiled into the app and the widget
-  extension, see step 8), `AnchorFocusFilter.swift` (iOS; a system Focus drops the anchor, and
-  turning that Focus off does nothing at all — see step 42).
+  extension, see step 8; since step 49 with an optional "Lifts at" time of day),
+  `AnchorFocusFilter.swift` (both platforms since step 49; a system Focus drops the anchor, and
+  turning that Focus off does nothing at all — see step 42; on the Mac through
+  `MacModel.dropAnchor`, refusals posted as a notification).
 - `Tests/Core` (target `FurloughCoreTests`, macOS, Swift Testing, no host app): `Support.swift`
   (the pinned calendar and the fixtures), `ModelsTests`, `PolicyStatusTests`,
   `PolicyPendingTests`, `PolicySummaryTests`, `NamingTests`, `DecodingTests`, `ClockTests`,
@@ -302,7 +312,8 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   `ActivityLimitTests`, `PendingTextTests`, `CompanionsTests`, `ConfigImportTests`,
   `HostTargetTests`, `HostImportTests`, `AnchorCandidatesTests`, `AnchorScopeTests`,
   `AnchorScheduleTests`, `AnchorSyncTests`, `DeviceLinkTests`, `SharedAdditionsTests`,
-  `BrandTests`, `TokenCacheTests`, `WeekDraftTests`. 742 tests in 104 suites. It builds for **macOS**, so it
+  `BrandTests`, `TokenCacheTests`, `WeekDraftTests`, `ZoneTests`, `AnchorLiftTests`,
+  `AnchorOfferTests`. 811 tests in 120 suites (2026-09-14, evening). It builds for **macOS**, so it
   reads the Mac's `TargetKind` and the Mac's `Decision`: the iOS `Decision.filteredHosts` and
   `ShieldReconciler.apply` cannot be reached from any test, which is why the nil-when-empty
   filter policy is a property of `Decision` rather than a line inside the reconciler.
@@ -338,7 +349,9 @@ table. Not yet seen on the phone: install, then check the test steps in the last
   pending changes, calls `Monitoring.register`, `ShieldReconciler.reconcile`, reloads widgets,
   syncs the Live Activity), `Model/Monitoring.swift` (DeviceActivity registration),
   `Model/TagScanner.swift` (Core NFC tag session as one
-  async call; the identifier is read at detection, no connect), `Views/`: `Root` (dark scheme,
+  async call; the identifier is read at detection, no connect),
+  `Model/NotificationDelegate.swift` (the app delegate: registers the Drop anchor button's
+  category before launch finishes and handles its tap; step 49), `Views/`: `Root` (dark scheme,
   ember tint, holds the launch screen for a returning user and dissolves between launch,
   onboarding and home), `Launch` (`LaunchView`, the `Launch` timings,
   `HourglassState.launching`), `Onboarding`, `Anchor` (`AnchorView`, `AnchorCard` on Home, `AnchorToggleButton`,
@@ -3420,6 +3433,161 @@ The plan for this stretch. Tick each phase off here as it lands.
     its window-closing notification with the title "5 minutes left", while the monitor posts the
     same kind as "Window closing" — one notification kind, two titles across the two platforms.
     The new screen calls it "Window closing" on both.
+
+49. **The time zone is the clock Furlough did not watch (pass-off item 23), a Drop anchor
+    button on the notifications that tempt you (24), a lift time on the Drop Anchor intent (25),
+    and the Focus Filter on the Mac (26).** Done 2026-09-14, the four Fable items, in one session,
+    in a throwaway worktree while 27–30 were being built in this tree. **Gates green, not seen
+    running**: nothing here has been on a phone or walked on the Mac. **The four calls the
+    pass-offs name were not put to Zach first** — the session was non-interactive — so each was
+    built on the pass-off's own recommendation and isolated to one line, named below, so a
+    different answer is a one-line change. They are listed again at the end.
+
+    **23. The zone.** `ClockMark` defends the wall clock by comparing `Date` against
+    `CLOCK_MONOTONIC`; a time zone change moves neither number, so it read as nothing while
+    every decision ran on `Calendar.current`. Three things followed from Settings > General >
+    Date & Time > Time Zone, with no delay and nothing in the log: every window's local hours
+    remapped at once (a 10 PM window opened at 9 AM once the zone said Tokyo), the day key
+    rolled and a spent budget came back, and the Mac's `UsageLedger` was replaced at the rolled
+    key. Closed on the same terms as step 4: the loosening half waits, the tightening half
+    applies at once.
+
+    - `ZoneMark { identifier, movedAt }` in `Shared/Core/Clock.swift`, `RuntimeState.zone`
+      (tolerant decode; absent is trusted, as a missing `ClockMark` is). **Not the `since` the
+      pass-off sketched**: the hold is measured from when the move was *first seen*
+      (`movedAt`, written by the first save after it), because a hold measured from the last
+      save is a hold a quiet day eats — the phone can go from one midnight callback to the next
+      without saving. Keyed on the identifier, never the offset, so DST is invisible; tested
+      across both New York boundaries.
+    - `Clock.zone(mark:current:now:hold:)` answers a `ZoneReading` — `.settled`, or
+      `.moved(from:until:)` — and `Clock.stampZone` stamps on the same terms as `Clock.stamp`:
+      the old zone is kept while the move is held, let go once the hold has run out or the
+      device has come back. `SharedStore.save` stamps it beside the clock mark and logs each
+      crossing once, from whichever process saved first ("time zone is now X; keeping Y until
+      …", "time zone back to …", "time zone hold over; now on …"), so Diagnostics shows it.
+    - `Policy.tighter(_:in:_:in:now:)` is the whole defence and its truth table is in the doc
+      comment: shielded beats open, the later reopening between two shut answers, the earlier
+      close between two open ones, exhausted named over closed, a nil `nextOpen` (never) later
+      than any date. Answered in the device's own frame — a minute or a `NextOpen` from the
+      held zone is moved by way of the instant it names, so a 5 PM close in New York is 4 PM
+      in Chicago. Folded at the *status* level: `decide` was split into `statuses(…)` and
+      `decision(config:now:statuses:)` so the token arithmetic exists once, rather than a second
+      `tighter(Decision, Decision)` that would have been the same rule written twice.
+    - The wrappers every shield-deriving caller goes through, all taking `zone:` and building
+      the two calendars themselves: `Policy.decide`, `statuses`, `status`, `summary`,
+      `nextTransition` and `dayKey`. `SharedState.zone(now:)` is the reading (the mark,
+      `TimeZone.current`, `zoneHold`). Converted: `ShieldReconciler`, `MonitorExtension` (the
+      two announcements, the threshold and warning writes and their guards, `Record.markSpent`
+      / `markWarned`), `Enforcer` (its ledger key, `usedSeconds`, both `decide`s, the warning
+      and exhaustion writes, the web filter's `until`; it also ticks on
+      `NSSystemTimeZoneDidChange` after `NSTimeZone.resetSystemTimeZone()`, as it does on
+      `NSSystemClockDidChange`), `ShieldExtension`, `HomeView`, `MacRootView` (three),
+      `MenuBar` (three), `MacRuleEditor`, `WhatsOpenIntent`, `LiveActivityManager`, both
+      widget providers (the reading moves with the timeline's cursor, so the timeline settles
+      when the hold does). **Left on the device's day, cosmetic**: `HourglassState.of`'s amber
+      `warned`, and the "5 min left" eyebrow in `HomeView`'s and `MacHero`'s hero lines.
+    - `Policy.decide`'s own signature is unchanged and it stays pure; the tests keep pinning one
+      calendar. Nothing here writes `Config`, `ConfigExport` never carried the runtime,
+      `SharedStore.reset()` drops the state key the mark lives in, and the mark waits out no
+      delay. The one escape README documents is exactly what it was.
+    - The banner: `ClockBanner(zone:until:now:)` beside the clock case, in both Pending screens
+      (`PendingChangesView`, the Mac's `PendingSheet`). `Clock.describeMove` is the sentence
+      ("Your time zone is now Japan Standard Time. Furlough is keeping Eastern Time until
+      10:00 PM tomorrow."), `Clock.zoneName` the names, both tested. **Copy not put to Zach**;
+      it follows the clock banner's register.
+    - **The hold is the base loosening delay** — `SharedState.zoneHold`, `config.delayHours(for:
+      nil)` hours, so the first week's cap applies. Built on the pass-off's recommendation (a
+      zone change loosens every window at once, the argument `setDelay` already makes); the
+      other candidate is a flat day, and that one property is the whole difference. No way to
+      say "I really did fly", on the pass-off's reasoning: a button that shortens this is an
+      unblock button with a passport, and the hold lapses on its own. A traveller gets a first
+      day on the intersection of home hours and local hours.
+    - **Raised, not built — the wake gap on iOS.** `Monitoring.register` schedules window
+      activities in `Calendar.current`, so the monitor is woken at the *device* zone's edges
+      only; a held-zone edge that falls between wakes is acted on at the next wake or the next
+      app activation. For a large move that is harmless — the intersection of the two
+      schedules is empty and everything stays shut. For a one-zone move it is a real leak in
+      the loosening direction: 9–5 held in New York and read in Chicago should close at 4 PM
+      Chicago, and nothing wakes the monitor until Chicago's 5 PM, so it stays open an hour.
+      Closing it means registering the held zone's spans too during the hold (converted into
+      device minutes, split at midnight) and living with the 19-span cap. The Mac has no gap;
+      it ticks every second.
+    - `Tests/Core/ZoneTests.swift`, 21 tests in 4 suites: the reading and the stamp, the DST
+      boundaries, New York → Tokyo (shut at 9 AM, shut at 10 PM New York too, open on Tokyo's
+      evening once the hold lapses), New York → Chicago (open where both agree, closed on the
+      earlier close, the reopening rebased), Tokyo → New York (nothing already shielded
+      released), the spent budget across the rolled key, two targets that disagree both shut,
+      the sooner transition, settled equals plain, the truth table row by row, and decoding
+      with and without a mark. README has a bullet under the clock one.
+
+    **24. The button.** `Shared/Core/AnchorOffer.swift`: `carries(kind)` says which
+    notifications carry **Drop anchor** — the four about a moment (`.windowOpened`,
+    `.windowClosing`, `.budgetWarning`, `.budgetSpent`) and not the ones about a rule or about
+    the anchor itself. **Built on the pass-off's proposal; that switch is the whole of it.**
+    Keyed on step 48's `NotificationKind`, which landed in this tree in the same hours, rather
+    than on an identifier prefix — 24 rebased on 28, as the board said whichever ran second
+    would. `category(for:)` is what both choke points set `categoryIdentifier` from
+    (`Notifier.post` and `PendingNotifications.apply`); `register()` registers the category,
+    one action, no `.foreground` and no authentication, at every launch of both apps. The
+    identifiers are `Furlough.anchorNotificationCategory` / `anchorNotificationAction`.
+    iOS: `Furlough/Model/NotificationDelegate.swift`, an app delegate via
+    `@UIApplicationDelegateAdaptor` so the notification center's delegate exists before launch
+    finishes; the tap calls `AnchorDrop.drop(reason: "notification")` and then the intent's own
+    follow-ups (the Lock Screen, the widget, the control), and a refusal comes back as a
+    notification through `Notifier.reply`, which ignores the mutes because a reply to a tap
+    that went silent would be a tap that looked like it worked. `willPresent` is deliberately
+    not implemented on iOS, so foreground behaviour is what it was. Mac: `MacAppDelegate`
+    handles the same action through `MacModel.dropAnchor()`, so `.noPhone` and `.noCloud` still
+    refuse. **No lift branch on either, not even one that returns early.** The ordering hazard
+    the pass-off named stands: categories are set per app, so the first notification the
+    monitor posts after an update, before the app has run once, shows no button.
+    `Tests/Core/AnchorOfferTests.swift` pins the four, that nothing `plan` schedules gets one,
+    and that the identifiers are distinct.
+
+    **25. The lift.** `Policy.liftDate(atMinute:from:calendar:)` in
+    `Shared/Core/AnchorLift.swift` is the Anchor screen's roll-to-tomorrow rule lifted out —
+    today at the minute if at least `Furlough.minimumWindowMinutes` away, else tomorrow — and
+    `AnchorView.timedUntil` now calls it. `DropAnchorIntent.liftsAt: Date?` with `kind: .time`,
+    **a time of day, built on the pass-off's recommendation** (a `Date` is the sharp edge that
+    gets 11 PM wrong); resolved on Furlough's clock and passed to `AnchorDrop.drop(until:)`.
+    `.tooSoon` still comes back through the dialog, though the roll rule makes it unreachable
+    from here. The control, the widget button and the bare phrase pass nothing, which keeps
+    meaning "the tag alone"; the `AppShortcut` phrases are untouched. The dialog says
+    "Anchored. 3 items until 7:00 AM, or sooner with your tag."; a second run says "Already
+    anchored." `Tests/Core/AnchorLiftTests.swift`: 11 PM → tomorrow, 6 AM → today, the
+    fifteen-minute edge both sides, midnight, and the raw-date refusal.
+
+    **26. The Mac's Focus Filter.** `AnchorFocusFilter.swift` is one file on two platforms
+    now. The Mac's `perform` goes through `MacModel.dropAnchor()` on the main actor, refusals
+    and all, and a refused activation is posted as a notification (`Notifier.reply`), because a
+    Filter fires with no UI and silence would be a Focus a person believes is locking their Mac
+    and is not. `displayRepresentation` on the Mac says the refusal *ahead of time*, in the
+    refusal's own words (`macRefusalAhead`: `.noCloud`, then `.noPhone`, read the way
+    `MacModel.refreshLink` reads them). **Offered and refused rather than hidden**: the question
+    the pass-off asked has one answer, because a Focus Filter cannot be withheld from the list
+    per device — the system lists every `SetFocusFilterIntent` the app declares. `project.yml`
+    needed nothing: `Shared/Intents` was already in the Mac's sources, guarded by the `#if`
+    that came off. `ControlCenter` stays under `#if os(iOS)`.
+
+    **The four calls, each built on the recommendation and each one line to reverse.** (1) The
+    zone hold is the base loosening delay, not a flat day — `SharedState.zoneHold`. (2) No
+    traveller's button; nothing to remove. (3) The button rides the four moment notifications —
+    `AnchorOffer.carries`. (4) The intent's lift is a time of day — `DropAnchorIntent.liftsAt`'s
+    `kind`. And one the pass-off asked that has no second answer: the Mac's Filter is offered
+    and refused, because it cannot be hidden.
+
+    **What is not verified.** 811 tests in 120 suites pass and all three builds are
+    warning-free (the Mac log's one line is the system extension's own AppIntents-metadata
+    notice, there before this). Nothing has been seen running. The phone: pick an app whose
+    window has not opened yet today, set the zone forward past its start under Settings >
+    General > Date & Time, and watch it stay shut with the banner on the Pending screen saying
+    why; set the zone back and watch the banner go; spend a small budget, roll the zone past
+    midnight and confirm it is still spent; set a window to close six minutes out, lock the
+    phone, and long-press the notification when it arrives — then check Diagnostics for
+    `anchored (notification)`; build a Shortcut — Drop Anchor, Lifts at 7:00 AM — run it and
+    read the dialog, then run it again. The Mac: configure the Filter under System Settings >
+    Focus, turn that Focus on, watch the Mac lock and the phone follow, turn it off and confirm
+    nothing lifts; with the phone off the link, watch the Filter's own row say why it will not.
 
 
 ## Style rules

@@ -49,7 +49,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private func refresh() {
         guard let button = item?.button else { return }
         let now = model.clock.now
-        let summary = Policy.summary(state: model.state, now: now)
+        let summary = Policy.summary(state: model.state, now: now, zone: model.state.zone(now: now))
         var state = HourglassState.of(summary, now: now)
         // Rounded to 1/40 — finer than a pixel at this size, avoids per-second redraws while
         // still animating.
@@ -125,8 +125,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
         let now = model.clock.now
+        let zone = model.state.zone(now: now)
         // Built once per opening — NSMenu content doesn't tick live once shown.
-        if let until = Policy.summary(state: model.state, now: now).openUntil {
+        if let until = Policy.summary(state: model.state, now: now, zone: zone).openUntil {
             menu.addItem(disabled("\(TimeFormat.countdown(from: now, to: until)) left"))
             menu.addItem(.separator())
         }
@@ -136,7 +137,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         }
         for target in targets {
             let status = Policy.status(
-                of: target, config: model.state.config, runtime: model.state.runtime, now: now
+                of: target, config: model.state.config, runtime: model.state.runtime, now: now, zone: zone
             )
             let row = disabled("\(target.displayName): \(TimeFormat.status(status))")
             // A menu draws in the system's appearance, not the bar's — ask NSApp, not the button.

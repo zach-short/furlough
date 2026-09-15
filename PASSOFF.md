@@ -11,11 +11,17 @@ progress, so item 1 is the tail of that, not the start.
 
 **Where it stands, 2026-09-14 (evening).** Everything from 2 to 22 has landed or is settled as
 no, and so have 31 and 32 (HANDOFF 47) and **27 through 30** (HANDOFF 48, one Opus session on
-Zach's go-ahead, with the four calls its prompts named answered first). What is open is **1**,
-which is Apple's to answer and not a session's, and **23 through 26** — the four Fable items,
-none of which has Zach's go-ahead yet; every one of those prompts names what to put to him first,
-and 23 is to be read before the rest. **Do not paste 27–30**: like the other Done prompts they
-describe work that now exists, and a fresh session following one would build it again.
+Zach's go-ahead, with the four calls its prompts named answered first), and **23 through 26**
+(HANDOFF 49, one Fable session — **without** the go-ahead its prompts asked for: the session
+was non-interactive, so each of the four calls was built on the prompt's own recommendation
+and isolated to one line, and HANDOFF 49 lists them for Zach to reverse or keep). What is open
+is **1**, which is Apple's to answer and not a session's. **Do not paste 23–30**: like the other
+Done prompts they describe work that now exists, and a fresh session following one would build
+it again. Item 23's prompt also describes the mark wrongly — the hold is measured from when the
+move was first seen (`movedAt`), not from a `since` refreshed on every save — and its test
+"opens on the held zone's schedule instead" was not what the tighter-of-two rule it also
+specifies produces: under both zones a 10 PM New York window stays shut on Tokyo's evening and
+on New York's, and opens on Tokyo's once the hold lapses. HANDOFF 49 is the truth.
 Item 30's second half is settled as **no** for the phone (see its row) — the Mac's sidebar got
 the filter; the phone's Rules list did not, and should not be re-proposed without a reason that
 answers what HANDOFF 48 says. The record of each Done item is the HANDOFF step named in its row, which is the truth
@@ -59,10 +65,10 @@ waiting on 1. That is the sentence that went stale; 9 shipped in `e253fc6` regar
 | 20 | Onboarding: where to put the tag | Done — HANDOFF 42 | Opus | O | nothing | new `Furlough/Views/TagPlacementView.swift`, `AppModel`, `RootView`, `AnchorScreens` |
 | 21 | The hero phone becomes a phone you can page through | Done — `5c07425` and `b0011a1`; site only, no HANDOFF step | Opus | P | the homepage demos being on main | `site/src/components/HeroPage.astro`, `site/src/lib/hourglass.ts` |
 | 22 | Drag the week grid: windows edited where they are drawn, on both apps | Done — HANDOFF 44 | Opus | Q | nothing | new `Shared/Core/WeekDraft.swift`, new `Shared/UI/WeekGrid.swift`, `Furlough/Views/WeekView.swift`, `FurloughMac/Views/MacWeekView.swift`, new `Tests/Core/WeekDraftTests.swift`, `project.yml`, `HANDOFF.md` |
-| 23 | The time zone is the clock Furlough does not watch | **Open** — added 2026-09-14 | **Fable** | R | nothing | `Shared/Core/Clock.swift`, `Shared/Core/Policy.swift`, `Models.swift` (`RuntimeState`), `Shared/UI/ClockBanner.swift`, new `Tests/Core/ZoneTests.swift` |
-| 24 | Drop the anchor from the notification that warns you | **Open** — added 2026-09-14 | **Fable** | S (1st) | nothing | `Shared/Core/PendingNotifications.swift`, `Furlough/Model/AppModel.swift`, `FurloughMonitor`, `FurloughMac/Model/Enforcer.swift`, `MacModel` |
-| 25 | An automation can say when the anchor lifts | **Open** — added 2026-09-14 | **Fable** | S (2nd) | 24, for the files only | `Shared/Intents/DropAnchorIntent.swift`, `Furlough/Views/AnchorView.swift` (the lift resolver), `Tests/Core` |
-| 26 | A Focus Filter for the Mac | **Open** — added 2026-09-14 | **Fable** | T | nothing | `Shared/Intents/AnchorFocusFilter.swift`, `FurloughMac/Model/MacModel.swift`, `project.yml` |
+| 23 | The time zone is the clock Furlough does not watch | Done — HANDOFF 49; the hold is the base delay, built on the recommendation, one property to change; the iOS wake gap is raised there, not built | **Fable** | R | nothing | `Shared/Core/Clock.swift`, `Shared/Core/Policy.swift`, `Models.swift` (`RuntimeState`), `Shared/UI/ClockBanner.swift`, new `Tests/Core/ZoneTests.swift` |
+| 24 | Drop the anchor from the notification that warns you | Done — HANDOFF 49; the four moment kinds carry it, built on the proposal; rebased on 28's `NotificationKind` | **Fable** | S (1st) | nothing | new `Shared/Core/AnchorOffer.swift`, new `Furlough/Model/NotificationDelegate.swift`, `FurloughMacApp.swift`, `PendingNotifications.swift` (two lines) |
+| 25 | An automation can say when the anchor lifts | Done — HANDOFF 49; a time of day, built on the recommendation | **Fable** | S (2nd) | 24, for the files only | new `Shared/Core/AnchorLift.swift`, `Shared/Intents/DropAnchorIntent.swift`, `Furlough/Views/AnchorView.swift`, new `Tests/Core/AnchorLiftTests.swift` |
+| 26 | A Focus Filter for the Mac | Done — HANDOFF 49; offered and refused, since a Filter cannot be hidden per device | **Fable** | T | nothing | `Shared/Intents/AnchorFocusFilter.swift`; `project.yml` needed nothing |
 | 27 | The Anchor on the Lock Screen | Done — HANDOFF 48 | Opus | U | nothing | `Shared/LiveActivity/`, `FurloughWidgets/`, `LiveActivityManager` |
 | 28 | A switch for every notification, and the last five minutes counted down | Done — HANDOFF 48 | Opus | V | 24, if 24 runs first | `Shared/Core/PendingNotifications.swift`, `SettingsView`, Mac Settings, `HomeView`, `Components.swift` |
 | 29 | The Mac keeps what it counts | Done — HANDOFF 48 | Opus | W | nothing | `FurloughMac/Model/Enforcer.swift`, new `Shared/Core/UsageHistory.swift`, new Mac view, `MenuBar.swift`, new `Tests/Core/UsageHistoryTests.swift` |

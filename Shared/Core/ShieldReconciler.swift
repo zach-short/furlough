@@ -27,8 +27,10 @@ enum ShieldReconciler {
         }
         // Every callback and every edit ends here, and a status only changes at an edge that
         // wakes us, so this is where the record counts its minutes. See `Record.accumulate`.
-        Record.accumulate(&state, now: now)
-        let decision = Policy.decide(config: state.config, runtime: state.runtime, now: now)
+        let zone = state.zone(now: now)
+        Record.accumulate(&state, now: now, calendar: zone.dayCalendar())
+        // Under both zones while a move is held, folded to the tighter; see `Clock.ZoneReading`.
+        let decision = Policy.decide(config: state.config, runtime: state.runtime, now: now, zone: zone)
         apply(decision)
         state.runtime.lastReconcile = now
         SharedStore.save(state)

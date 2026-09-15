@@ -164,6 +164,7 @@ enum PendingNotifications {
             content.title = note.title
             content.body = note.body
             content.sound = .default
+            if let category = AnchorOffer.category(for: note.kind) { content.categoryIdentifier = category }
             // A calendar trigger (not a time interval) survives the app being closed. Seconds
             // are included so it doesn't fire early, at the top of the minute.
             let parts = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: note.fireAt)
@@ -191,6 +192,8 @@ enum Notifier {
         content.title = title
         content.body = body
         content.sound = .default
+        // The Drop anchor button, on the notifications about a moment; see `AnchorOffer`.
+        if let category = AnchorOffer.category(for: kind) { content.categoryIdentifier = category }
         let request = UNNotificationRequest(identifier: id, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request) { error in
             if let error { SharedStore.log("notification failed: \(error.localizedDescription)") }
