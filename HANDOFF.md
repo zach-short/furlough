@@ -3128,8 +3128,17 @@ The plan for this stretch. Tick each phase off here as it lands.
 ## Style rules
 
 Swift 6 language mode with approachable concurrency, SwiftUI, `@Observable`, async/await, no
-third-party dependencies. Keep it small: one app target plus the three extensions. Shared
-code that the monitor extension uses must not import SwiftUI (memory limits).
+third-party dependencies. Keep it small: as of 2026-09-14 that is nine targets — two apps
+(`Furlough`, `FurloughMac`), six extensions (`FurloughMonitor`, `FurloughShield`,
+`FurloughWidgets`, `FurloughReport`, `FurloughMacFilter`, `FurloughMacWidgets`) and the
+`FurloughCoreTests` bundle. It read "one app target plus the three extensions" until then,
+which was true before the Mac (2026-09-07) and stopped being true without anyone noticing.
+Shared code that the monitor extension uses must not import SwiftUI (memory limits).
+
+The process standard — how work is scoped, sized, handed off and closed — is
+`AGENT-PRACTICES.md`, adopted 2026-09-14. There is deliberately no separate Swift conventions
+file: with one author, no linter and no CI, these five lines plus the invariants above are the
+whole standard (Zach's call, 2026-09-14).
 
 ## The Mac (added 2026-09-07)
 

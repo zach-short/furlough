@@ -17,10 +17,11 @@ settings:
     SWIFT_APPROACHABLE_CONCURRENCY: YES
     SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY: YES
     IPHONEOS_DEPLOYMENT_TARGET: "18.0"
-    # iPhone only. This project-level value does NOT win on its own: XcodeGen writes its
-    # own platform preset at the target level, and target beats project, so every iOS
-    # target repeats it below. Removing those repeats silently ships a universal app,
-    # which then makes App Store Connect demand a 13-inch iPad screenshot set.
+    # This project-level value does NOT win on its own: XcodeGen writes its own platform
+    # preset at the target level, and target beats project, so every iOS target repeats
+    # the real value below — "1,2", iPhone and iPad, since iPad support landed 2026-09-14.
+    # Editing this line alone changes nothing; edit the repeats. They are what App Store
+    # Connect reads, and "1,2" is what makes it demand a 13-inch iPad screenshot set.
     TARGETED_DEVICE_FAMILY: "1"
     # MAJOR.MINOR.PATCH, always three components, and never bumped without an entry for the
     # new number in release-notes.json — scripts/archive.sh refuses to cut a build otherwise.
