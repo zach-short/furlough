@@ -101,11 +101,26 @@ waiting on 1. That is the sentence that went stale; 9 shipped in `e253fc6` regar
 | 30 | The Mac grows a menu, and both apps get a way to find one app | Done — HANDOFF 48; the phone's search settled as no | Opus | X | nothing | `FurloughMac/FurloughMacApp.swift`, `MacRootView.swift`, `Furlough/Views/HomeView.swift` |
 | 31 | The largest text size, audited | Done — HANDOFF 47 | **Sonnet** | Y | nothing | `Furlough/Views/*` (frames only) |
 | 32 | The automations that already work, written down | Done — HANDOFF 47 | **Sonnet** | Z | nothing | `Furlough/Views/HelpTopics.swift`, `site/src/pages/help/`, `Furlough/Views/AnchorScreens.swift` |
+| 33 | The site sends a Mac visitor to the Mac build | Done — HANDOFF 50; site only, not deployed | Opus | AA | nothing | new `site/src/pages/mac.astro`, `site/src/components/StoreButton.astro`, `Nav.astro`, `Footer.astro`, `site/src/pages/index.astro`, `support.astro`, `site/src/styles/global.css`, `site/src/site.ts` |
+| 34 | Furlough for Mac, from download to first block, watched on a clean Mac | Open | Opus | AA (2nd) | 33, and Zach deploying it | `site/src/pages/mac.astro`, possibly `FurloughMac/` |
 
 **Two things landed that this board never planned**, so look for them in HANDOFF rather than
 here: the first week with capped delays and the 15-minute undo (HANDOFF 27, the lane-f
 session — it is why item 10's prompt carries a correction), and the Mac's Reset everything
 going all the way back to a first run (HANDOFF 31, with the detail in its "The Mac" section).
+
+**Items 33 and 34 were added 2026-09-16**, out of Zach downloading 1.2.0 from the App Store onto
+his Mac and finding it was not the Mac app. It is not, and the store is the reason: the listing
+carries a **Mac** compatibility heading ("Requires macOS 15.0 or later and a Mac with Apple M1
+chip or later", read off the page 2026-09-16), so Apple silicon Macs are offered the iPhone
+build — which HANDOFF 43's "The Mac" section predicted on 2026-09-07 would "launch but could not
+enforce". 33 is the site half and is done: a `/mac` page, and every Mac call to action pointing
+at it rather than at the App Store. **33 does not fix the cause.** That is one checkbox in App
+Store Connect — "available on Mac with Apple silicon", which wants turning off — and it is
+Zach's, because an ASC write is not a thing an agent session does here. 34 is what 33 could not
+verify and deliberately did not write: the install watched end to end on a clean Mac, so the
+first-run permissions can be documented in the order they actually appear rather than merely
+named. HANDOFF 43 has listed that walkthrough as owed since 2026-09-14.
 
 **Item 13 was added 2026-09-10**, after HANDOFF 37 landed: the link contract as data, so a port on another platform can be built against the real record shapes and the real merge rules. It was the one open item not gated on Apple, and it landed 2026-09-14 as HANDOFF 45 and 46 — both halves, the second on the go-ahead the prompt asked for.
 

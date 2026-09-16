@@ -134,6 +134,47 @@ h3.display { font-family: var(--display-small); font-weight: 600; font-size: 19p
 .glass.square::after { border-radius: 13px 13px 40% 40%; }
 .glass svg { width: 18px; height: 18px; flex: 0 0 auto; }
 
+/* Platform swap. Base.astro's inline script stamps html.is-mac before the body paints; these
+   rules and index.astro's card ordering are the only things that read it. They only ever
+   hide, never restore a display value, so each element keeps whatever display its own classes
+   give it. A visitor with JS off keeps the iPhone default, which is why the nav and the hero
+   fine print also carry a plain /mac link that is never hidden either way. */
+html:not(.is-mac) .only-mac { display: none; }
+html.is-mac .only-ios { display: none; }
+
+/* Where both platforms stay visible — the download card, /mac — the visitor's own leads with
+   the ember fill and the other stays plain glass. Shipped as plain glass and painted by these
+   rules rather than carrying `prominent` in the markup, because CSS can add a look but cannot
+   take a class away. */
+.glass[data-plat='ios'],
+html.is-mac .glass[data-plat='mac'] {
+  background: linear-gradient(160deg, rgba(229, 86, 61, 0.96), rgba(214, 74, 50, 0.9));
+  box-shadow: 0 10px 34px rgba(229, 86, 61, 0.32);
+}
+.glass[data-plat='ios']::before,
+html.is-mac .glass[data-plat='mac']::before {
+  background: linear-gradient(160deg, rgba(255, 224, 200, 0.7), rgba(255, 255, 255, 0.1) 50%, rgba(255, 224, 200, 0.55));
+}
+.glass[data-plat='ios']:hover,
+html.is-mac .glass[data-plat='mac']:hover {
+  background: linear-gradient(160deg, rgba(236, 98, 72, 1), rgba(220, 80, 55, 0.94));
+}
+/* …and on a Mac the iPhone button hands the lead back. */
+html.is-mac .glass[data-plat='ios'] {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.05));
+  box-shadow: none;
+}
+html.is-mac .glass[data-plat='ios']::before {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.08) 50%, rgba(255, 255, 255, 0.5));
+}
+html.is-mac .glass[data-plat='ios']:hover {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08));
+}
+/* The leader comes first as well as leading. Keyed on data-plat rather than on child position,
+   because the pair is one component and an Astro-scoped `:nth-child` rule in the page that uses
+   it cannot reach children that carry a different component's scope id. */
+html.is-mac .glass[data-plat='ios'] { order: 1; }
+
 /* Cards: white 6 % fill, white 12 % 1 pt border, radius 20, blurred. */
 .card {
   background: var(--card); border: 1px solid var(--edge); border-radius: var(--radius);

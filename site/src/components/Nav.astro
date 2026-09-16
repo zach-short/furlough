@@ -13,7 +13,11 @@ const cta = site.appStoreURL ? { href: site.appStoreURL, label: 'Get the app' } 
     <nav class="links" aria-label="Site">
       <a class="glass" href="/help/" aria-current={path === '/help' ? 'page' : undefined}>Help</a>
       <a class="glass" href="/help/nfc-tags/" aria-current={path === '/help/nfc-tags' ? 'page' : undefined}>NFC tags</a>
-      <a class="glass prominent" href={cta.href}>{cta.label}</a>
+      <a class="glass" href="/mac/" aria-current={path === '/mac' ? 'page' : undefined}>Mac</a>
+      {/* Twins, one hidden by the platform rules in global.css: the App Store listing is the
+          iPhone build, so on a Mac the loudest link on every page must not point at it. */}
+      <a class="glass prominent only-ios" href={cta.href}>{cta.label}</a>
+      <a class="glass prominent only-mac" href="/mac/">Get it for Mac</a>
     </nav>
   </div>
 </header>
@@ -38,6 +42,8 @@ const cta = site.appStoreURL ? { href: site.appStoreURL, label: 'Get the app' } 
   .links a[aria-current='page'] { background: linear-gradient(160deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.1)); }
   @media (max-width: 720px) {
     .links a[href='/help/nfc-tags/'] { display: none; }
+    /* :not(.prominent) so this reaches the nav link and never the Mac CTA, which shares its href. */
+    .links a[href='/mac/']:not(.prominent) { display: none; }
   }
   @media (max-width: 360px) {
     .links .glass:not(.prominent) { display: none; }

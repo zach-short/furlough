@@ -3672,6 +3672,61 @@ The plan for this stretch. Tick each phase off here as it lands.
     Focus, turn that Focus on, watch the Mac lock and the phone follow, turn it off and confirm
     nothing lifts; with the phone off the link, watch the Filter's own row say why it will not.
 
+50. **The site sends a Mac visitor to the Mac build, not to the App Store.** Done 2026-09-16.
+    Zach installed 1.2.0 from the App Store on his Mac and found it was not the Mac app. It is
+    not: the listing at `apps.apple.com/app/id6810006594` carries a **Mac** compatibility
+    heading — "Requires macOS 15.0 or later and a Mac with Apple M1 chip or later", read off the
+    page's own markup on 2026-09-16 — so "available on Mac with Apple silicon" is switched on in
+    App Store Connect and Macs are being served the iPhone build. Step 43's "The Mac" section
+    called that outcome on 2026-09-07 and nobody had connected it to the store listing: "Running
+    the iOS build on the Mac ('Designed for iPhone') would launch but could not enforce."
+
+    **The site half is what this step changed.** The DMG existed but lived in exactly one place,
+    the `#download` card at the foot of the homepage, while the nav CTA and the hero button both
+    went straight to the App Store on every platform — so a Mac visitor's first two chances to
+    act both led to the build that cannot enforce. There is now `site/src/pages/mac.astro`, the
+    page step 43 said this needed ("The equivalent is Developer ID plus notarization, from a
+    page on furloughapp.com"): the download, why it is not on the Mac App Store (the sandbox),
+    and the three permissions macOS asks for. It is in the nav, the footer, and the support
+    page's Mac line, which pointed only at GitHub before.
+
+    **The platform swap is CSS over one class, and the class already existed.**
+    `Base.astro`'s inline `<head>` script has stamped `html.is-mac` before first paint since
+    before this step, with the right iPadOS guard (iPadOS reports `Macintosh`, so it also
+    requires `maxTouchPoints <= 1`); the only thing reading it was one `order: -1` rule. The
+    rules now live in `global.css` beside it: `.only-ios`/`.only-mac` **only ever hide**, never
+    restore a display value, so each element keeps the display its own classes give it, and
+    `[data-plat]` paints whichever button is the visitor's. Shipped as plain glass and painted,
+    rather than carrying `prominent` in the markup, because CSS can add a look but cannot take
+    a class away.
+
+    **One bug worth keeping.** The old ordering rule was `:global(html.is-mac) .cactions >
+    :nth-child(2)` inside `index.astro`. Astro scopes the *child* half of such a selector to the
+    page's own cid, so the moment both buttons moved into `StoreButton.astro` it silently
+    stopped matching and the Mac button led on colour but not on position. Ordering is keyed on
+    `[data-plat]` in `global.css` now. Any page-scoped rule reaching into a component's children
+    has this failure mode, and it fails quietly.
+
+    **Every Mac call to action points at `/mac`, not at the `.dmg`.** One download route, so the
+    first-run explanation is always on the path — which matters once the walkthrough below is
+    written. `/mac` itself is the only direct link to the file.
+
+    **What is not verified, and what is still owed.** The site builds clean (16 pages, `/mac`
+    among them) and was walked in the browser pane at 1280×900 and at 375×812: the swap, the
+    ordering, the hidden twin, no console errors, and every internal link 200 including the
+    `.dmg`. The detection guard was replayed against five real user-agent/touch pairs — macOS
+    true, iPadOS false, iPhone false, Windows false. **Not** seen: the DMG downloaded and
+    installed from the deployed site on a clean Mac. Nothing is deployed; `furlough deploy` is
+    Zach's to run. Still owed, and deliberately out of this step's scope (Zach's call,
+    2026-09-16): the first-run walkthrough as an ordered, watched sequence — this page names the
+    three permissions but not the order of the prompts, because that flow has never been watched
+    on a clean Mac (step 43 says so). And the thing no site copy can fix: **the App Store
+    Connect checkbox above.**
+
+    **One stale line found, not edited.** "The Mac" section says `FurloughMac` is "macOS 26".
+    `project.yml:6` and every per-target `MACOSX_DEPLOYMENT_TARGET` say 15.0, and the store
+    listing agrees. `site.ts`'s `macMinimumOS` uses 15.0. Left for whoever owns that section.
+
 
 ## Style rules
 

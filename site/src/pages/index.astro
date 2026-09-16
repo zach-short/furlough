@@ -29,7 +29,7 @@ const tiers = [
   <!-- Hero -->
   <section class="hero wrap">
     <div class="hero-text" data-reveal>
-      <div class="eyebrow amber">Furlough · for iPhone</div>
+      <div class="eyebrow amber"><span class="only-ios">Furlough · for iPhone</span><span class="only-mac">Furlough · for Mac</span></div>
       <h1 class="display">No unblock button.</h1>
       <p class="lede">
         Two ways to put an app out of reach, and neither has a button that hands it back. Give apps a daily budget and the hours they're allowed, where the only way to loosen a rule is to wait. Or anchor the phone in one tap, and lift it only with an NFC tag you left somewhere else.
@@ -38,7 +38,10 @@ const tiers = [
         <StoreButton />
         <a class="glass large" href="#how">How it works</a>
       </div>
-      <p class="fine faint">iOS 18 or later, and a Mac app that locks with it. Built on Apple's Screen Time API. Nothing collected.</p>
+      <p class="fine faint">
+        <span class="only-ios">iOS 18 or later, and <a href="/mac/">a Mac app that locks with it</a>. Built on Apple's Screen Time API. Nothing collected.</span>
+        <span class="only-mac">macOS {site.macMinimumOS} or later. The Mac app enforces on its own, because Apple's Screen Time API does not exist on macOS. Nothing collected. <a href={site.appStoreURL ?? '/#download'}>The iPhone app is on the App Store.</a></span>
+      </p>
     </div>
     <div class="hero-demo" data-reveal style="--d: .15s">
       <HeroPage />
@@ -328,16 +331,12 @@ const tiers = [
         <h2 class="display">Ready when you are.</h2>
         <p class="lede">Free of accounts, free of servers, and free of an unblock button. It only works if you mean it.</p>
         <div class="cactions">
-          <StoreButton />
-          <a class="glass large" href={site.macDownloadURL} rel="noopener">
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
-              <path fill-rule="evenodd" clip-rule="evenodd" d="M6 4a2 2 0 0 0-2 2v8.5h16V6a2 2 0 0 0-2-2H6zm-.5 2a.5.5 0 0 1 .5-.5h12a.5.5 0 0 1 .5.5v7H5.5V6z"/>
-              <path d="M2 16.5h20l-.9 2.1a2 2 0 0 1-1.84 1.22H4.74a2 2 0 0 1-1.84-1.22L2 16.5z"/>
-            </svg>
-            Download for Mac
-          </a>
+          <StoreButton mode="pair" />
         </div>
-        <p class="fine faint">Signed with a Developer ID and notarized by Apple, v{site.macVersion}. Furlough for Mac is also open source. <a href={site.githubURL} rel="noopener">Build it from GitHub.</a></p>
+        <p class="fine faint">
+          <span class="only-mac">The App Store listing is the iPhone app. It installs on an Apple silicon Mac and blocks nothing there, because Apple's Screen Time API does not exist on macOS — <a href="/mac/">the Mac app is a separate download</a>.</span>
+          <span class="only-ios">Furlough for Mac is a separate download, signed and notarized by Apple. <a href="/mac/">What it is, and what macOS will ask for.</a></span>
+        </p>
       </div>
     </div>
   </section>
@@ -1180,8 +1179,6 @@ const tiers = [
   .appicon { width: 96px; height: 96px; border-radius: 22%; flex: 0 0 auto; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), 0 0 60px rgba(229, 86, 61, 0.25); }
   .cta .lede { margin-top: 10px; font-size: 16.5px; }
   .cactions { margin-top: 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-  /* On a Mac, lead with the Mac download instead of the App Store button. */
-  :global(html.is-mac) .cactions > :nth-child(2) { order: -1; }
   .cta .fine { font-size: 13px; margin-top: 14px; }
   @media (max-width: 640px) { .cta { flex-direction: column; align-items: flex-start; padding: 26px 22px; } }
 </style>

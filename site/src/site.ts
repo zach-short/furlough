@@ -12,6 +12,9 @@ export const site = {
   // scripts/archive-mac.sh cuts a new one — public/downloads/ keeps only the latest.
   macDownloadURL: '/downloads/Furlough-1.2.0.dmg',
   macVersion: '1.2.0',
+  // MACOSX_DEPLOYMENT_TARGET in project.yml:6. Stated on /mac so nobody downloads 5 MB to
+  // find out their Mac is too old.
+  macMinimumOS: '15.0',
   // Cloudflare Email Routing forwards this to the real inbox — domain address, not personal.
   email: 'support@furloughapp.com',
   author: 'Zach Short',

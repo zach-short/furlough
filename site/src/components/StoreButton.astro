@@ -1,20 +1,38 @@
 ---
 import { site } from '../site';
-interface Props { large?: boolean }
-const { large = true } = Astro.props;
+interface Props {
+  large?: boolean;
+  /** `one` shows just the visitor's platform (the hero). `pair` shows both, the visitor's
+      leading — see the `[data-plat]` rules in global.css. */
+  mode?: 'one' | 'pair';
+}
+const { large = true, mode = 'one' } = Astro.props;
+// In `pair` both are always visible; in `one` the platform classes hide the other.
+const iosOnly = mode === 'one' ? 'only-ios' : '';
+const macOnly = mode === 'one' ? 'only-mac' : '';
 ---
 
 {site.appStoreURL ? (
-  <a class:list={['glass', 'prominent', 'store', { large }]} href={site.appStoreURL} rel="noopener">
+  <a class:list={['glass', 'store', iosOnly, { large }]} data-plat="ios" href={site.appStoreURL} rel="noopener">
     <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M16.37 12.64c-.02-2.3 1.88-3.4 1.96-3.45-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.15-2.76.83-3.48.83-.72 0-1.83-.81-3.01-.79-1.55.02-2.98.9-3.78 2.29-1.61 2.79-.41 6.92 1.16 9.19.77 1.11 1.68 2.36 2.87 2.31 1.15-.05 1.59-.75 2.98-.75 1.39 0 1.78.75 3 .72 1.24-.02 2.02-1.13 2.78-2.24.88-1.29 1.24-2.54 1.26-2.6-.03-.01-2.41-.93-2.42-3.71zM14.1 5.9c.63-.77 1.06-1.83.94-2.9-.91.04-2.02.61-2.67 1.37-.58.67-1.1 1.76-.96 2.8 1.02.08 2.05-.52 2.69-1.27z"/></svg>
-    <span class="text"><small>Download on the</small>App Store</span>
+    <span class="text"><small>Download on the</small>App Store · iPhone</span>
   </a>
 ) : (
-  <span class:list={['glass', 'store', 'soon', { large }]} aria-disabled="true" title="The App Store listing is on its way">
+  <span class:list={['glass', 'store', 'soon', iosOnly, { large }]} aria-disabled="true" title="The App Store listing is on its way">
     <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M16.37 12.64c-.02-2.3 1.88-3.4 1.96-3.45-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.15-2.76.83-3.48.83-.72 0-1.83-.81-3.01-.79-1.55.02-2.98.9-3.78 2.29-1.61 2.79-.41 6.92 1.16 9.19.77 1.11 1.68 2.36 2.87 2.31 1.15-.05 1.59-.75 2.98-.75 1.39 0 1.78.75 3 .72 1.24-.02 2.02-1.13 2.78-2.24.88-1.29 1.24-2.54 1.26-2.6-.03-.01-2.41-.93-2.42-3.71zM14.1 5.9c.63-.77 1.06-1.83.94-2.9-.91.04-2.02.61-2.67 1.37-.58.67-1.1 1.76-.96 2.8 1.02.08 2.05-.52 2.69-1.27z"/></svg>
-    <span class="text"><small>Coming soon to the</small>App Store</span>
+    <span class="text"><small>Coming soon to the</small>App Store · iPhone</span>
   </span>
 )}
+
+{/* Points at /mac rather than straight at the .dmg: the Mac build asks for a system extension
+    and per-browser Automation on first run, and that page is where it gets explained. */}
+<a class:list={['glass', 'store', macOnly, { large }]} data-plat="mac" href="/mac/">
+  <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M6 4a2 2 0 0 0-2 2v8.5h16V6a2 2 0 0 0-2-2H6zm-.5 2a.5.5 0 0 1 .5-.5h12a.5.5 0 0 1 .5.5v7H5.5V6z"/>
+    <path d="M2 16.5h20l-.9 2.1a2 2 0 0 1-1.84 1.22H4.74a2 2 0 0 1-1.84-1.22L2 16.5z"/>
+  </svg>
+  <span class="text"><small>Download for</small>Mac · v{site.macVersion}</span>
+</a>
 
 <style>
   .store { gap: 10px; }
