@@ -405,7 +405,10 @@ table. Not yet seen on the phone: install, then check the test steps in the last
 - `FurloughShield/ShieldExtension.swift`: reads shared state, writes the copy via `ShieldText`,
   and records the name iOS gives the app it is covering (see the naming note below).
 - `FurloughWidgets/`: `StatusWidget.swift`, `WindowLiveActivity.swift`, bundle.
-- `design/`: `DESIGN.md`, `HOURGLASS.md` (the next brief);
+- `design/`: `DESIGN.md`, `HOURGLASS.md` (the next brief), `MAC-FIRST-RUN.md` (the script for
+  watching the Mac's first run on a clean account, written 2026-09-16 for pass-off item 34 —
+  the ordered prediction, the exact macOS prompt wording read off this Mac's frameworks, and
+  what to bring back; `/mac`'s permissions copy gets rewritten from what it produces);
   `scripts/make-icon.swift` (the app icon, drawn from the hourglass),
   `scripts/make-noise.swift` (the wall grain).
 - `site/`: the Astro site at furloughapp.com (`bun install`, `bun run build`; static output,

@@ -102,7 +102,8 @@ waiting on 1. That is the sentence that went stale; 9 shipped in `e253fc6` regar
 | 31 | The largest text size, audited | Done — HANDOFF 47 | **Sonnet** | Y | nothing | `Furlough/Views/*` (frames only) |
 | 32 | The automations that already work, written down | Done — HANDOFF 47 | **Sonnet** | Z | nothing | `Furlough/Views/HelpTopics.swift`, `site/src/pages/help/`, `Furlough/Views/AnchorScreens.swift` |
 | 33 | The site sends a Mac visitor to the Mac build | Done — HANDOFF 50; site only, not deployed | Opus | AA | nothing | new `site/src/pages/mac.astro`, `site/src/components/StoreButton.astro`, `Nav.astro`, `Footer.astro`, `site/src/pages/index.astro`, `support.astro`, `site/src/styles/global.css`, `site/src/site.ts` |
-| 34 | Furlough for Mac, from download to first block, watched on a clean Mac | Open | Opus | AA (2nd) | 33, and Zach deploying it | `site/src/pages/mac.astro`, possibly `FurloughMac/` |
+| 34 | Furlough for Mac, from download to first block, watched on a clean Mac | Open — the walk is scripted in `design/MAC-FIRST-RUN.md`; the copy waits on Zach walking it | Opus | AA (2nd) | 33, Zach deploying it, and the walk | `design/MAC-FIRST-RUN.md`, `site/src/pages/mac.astro` |
+| 35 | The filter offer is spent by a copy that could never take it | Open — found in 34's reading, 2026-09-16 | Opus | AB | nothing | `FurloughMac/Views/MacFilterOffer.swift`, `FurloughMac/Model/MacModel.swift` |
 
 **Two things landed that this board never planned**, so look for them in HANDOFF rather than
 here: the first week with capped delays and the 15-minute undo (HANDOFF 27, the lane-f
@@ -2287,3 +2288,72 @@ Tests: none.
 
 Hand back: the topic in the app and the page on the site, and one automation Zach can build from
 the page in under a minute to check the taps are right.
+
+---
+
+## 35. The filter offer is spent by a copy that could never take it
+
+**Open — found 2026-09-16, reading for item 34. Not folded into it: that item is the walkthrough
+and the copy, and this is app behaviour (Zach's call, 2026-09-16).**
+
+**Model: Opus. Lane AB. Waits on nothing; parallel-safe.**
+
+You are picking up Furlough, Zach's iOS and Mac app blocker. Read `HANDOFF.md` first — the build
+and test commands, the invariants and the code map are there; do not re-derive them — then
+`README.md`, then `design/DESIGN.md`. Read HANDOFF 36 (why the filter left the first run) before
+changing anything. Session rules as in item 31: never run `git commit` or `git push`, run
+`xcodegen generate` after adding a file, keep the build warning-free, every change to
+`Shared/Core` gets tests in `Tests/Core`, and ask Zach when a decision is his.
+
+**Why this exists.** `WebFilterOfferSheet` is asked **once, ever** — `onDisappear` calls
+`model.noteWebFilterOffered()` on every dismissal path, which is deliberate and right, and its
+own footnote says "Furlough will not ask again." But the sheet can be raised in a state where the
+offer is impossible to take, and it is spent anyway.
+
+`WebFilter.isInApplications` is `Bundle.main.bundleURL.path.hasPrefix("/Applications/")`. A copy
+running anywhere else — most realistically **straight from the mounted DMG**, which is a thing
+people do instead of dragging — reports `.notInApplications` from both `refresh()` and
+`install()`. Then, at the moment the first website is added:
+
+1. `MacFilterOffer.swift:61` groups `.notInApplications` with `.on` in the button branch, so the
+   sheet shows a single **prominent Done** — the same treatment as "the filter is on and you are
+   finished" — and **no Install button**, because there is nothing Install could do.
+2. The two paragraphs explaining what the filter is and why the tab reader is not enough are
+   gated on `status == .notInstalled` (`MacFilterOffer.swift:20`), so they are skipped. The one
+   sales pitch this feature ever gets is not shown to the person who most needs it.
+3. `onDisappear` fires, the offer is counted, and after they move Furlough to `/Applications` and
+   reopen it they are **never offered the filter again**. They have to find Settings > Web on
+   their own, having been shown a screen that read like completion.
+
+The guidance itself is good and should be kept: `Status.guidance` for `.notInApplications` says
+"macOS loads a system extension only from an app in the Applications folder" with the three
+steps. The defect is that a correct explanation is wrapped in a sheet that looks finished and
+costs them the only offer.
+
+Do these:
+
+1. **Do not spend the offer on a state that could not take it.** `noteWebFilterOffered()` should
+   not fire when the status is `.notInApplications`. Decide where the guard goes — the sheet's
+   `onDisappear` or `noteWebFilterOffered` itself — and say why in the HANDOFF step. Consider
+   whether `.installing` and `.awaitingApproval` deserve the same treatment: those are offers
+   taken and in flight, so they probably do count. `.failed` is the interesting third case.
+2. **Give `.notInApplications` its own button branch.** It is not `.on`. A non-prominent Done at
+   most, and consider an action that does the work — "Move to Applications" is a plain file move
+   plus a relaunch, and if you propose that, ask Zach before building it: it is the app moving
+   itself, which is a bigger promise than a button.
+3. **Show the explanation in this state too.** Widen the `.notInstalled` gate so the two
+   paragraphs appear whenever the filter is not already on.
+4. Check the same three questions against **Settings > Web** (`MacSheets.swift` around line 1008),
+   which has its own copy of the status branches and may have the same grouping.
+
+Keep: the offer stays once-only for every state that could actually take it — HANDOFF 36 settled
+that and it is not being re-opened. The filter stays out of the first run. Nothing about
+enforcement changes.
+
+Tests: `Shared/Core` changes only if the guard lands there. If it does, a new file in
+`Tests/Core` named for the feature.
+
+Hand back: what Zach should do — run Furlough **from inside the mounted DMG**, add a website, and
+say what the sheet now shows and whether the offer comes back after moving the app to
+`/Applications` and reopening. Item 34's walkthrough (`design/MAC-FIRST-RUN.md`, step 3) has him
+doing that once already, so the before picture may exist by the time you read this.
