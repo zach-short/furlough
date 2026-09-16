@@ -64,6 +64,7 @@ COMMANDS=(
   "version:the marketing version, and bumping it by the rules"
   "gen:regenerate Furlough.xcodeproj from project.yml"
   "open:open the project in Xcode"
+  "puck:render the anchor puck and zip it for whoever is printing it"
   "archive:cut and audit a Release build, stopping at the .ipa"
   "beta:archive, then upload it to TestFlight"
   "submit:send an uploaded build to external Beta App Review"
@@ -275,6 +276,7 @@ case "${1:-help}" in
   version)   shift; scripts/version.sh "$@" ;;
   gen)       shift; xcodegen generate "$@" ;;
   open)      shift; open Furlough.xcodeproj ;;
+  puck)      shift; scripts/puck.sh "$@" ;;
   archive)   shift; run_logged scripts/archive.sh "$@" ;;
   beta)      shift
              # --tools is the one flag worth a name of its own: it is an env var on the script

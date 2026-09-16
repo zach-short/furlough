@@ -216,6 +216,21 @@ natural print: desk, bedside, front door.
 
 ## Export
 
+To hand the puck to someone who is printing it, build the whole package rather than
+exporting by hand — four STLs named in print order, `print-instructions.txt` as the
+READ ME, and the `.scad` sources so they can change the fit without asking:
+
+```bash
+furlough puck
+```
+
+`furlough puck --bead 0.40` moves the snap bead, in the STLs **and** in the sources it
+packages, so a tester never reads 0.30 in a package that isn't. It refuses to write an
+STL that isn't a closed solid. The zip is named after the bead when you override it, so
+two test packages can sit in one folder.
+
+The parts on their own:
+
 ```
 openscad -D 'variant="press"' -D 'part="body"' -o body.stl anchor-puck.scad
 openscad -D 'variant="press"' -D 'part="lid"'  -o lid.stl  anchor-puck.scad

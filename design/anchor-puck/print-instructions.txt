@@ -1,0 +1,51 @@
+FURLOUGH PUCK
+=============
+Round case for an NFC sticker. Two parts, no screws, no glue.
+
+The last version fell off because the lid was only held by friction. This one
+has a ring on the lid that clicks into a groove in the body.
+
+
+PRINT THESE TWO
+---------------
+  1 - body.stl     open side UP
+  2 - lid.stl      flat face DOWN  (don't flip it - the logo side goes on the bed)
+
+  0.2mm layers, 4 walls, 20% infill
+  No supports. No brim.
+  PLA or PETG is fine.
+
+  Don't use metal-filled or carbon-fibre filament. It stops the NFC working.
+
+
+ASSEMBLE
+--------
+  1. Stick the NFC sticker inside the lid, centred on the flat part.
+  2. Push the lid onto the body until it clicks.
+  3. To get it back off: fingernail in the notch on the side.
+
+Then tap a phone on the side with the logo. It should read from about half an
+inch away. If that works, you're done.
+
+
+IF THE LID ISN'T RIGHT
+----------------------
+Open  source/anchor-puck.scad  in OpenSCAD (free). Near the top you'll find:
+
+      bead = 0.30;
+
+  Still pulls off          ->  make it 0.40
+  Won't push on, or the
+  body cracks              ->  make it 0.20
+
+Then File > Export > STL. Do it twice - once with part set to "body", once
+with part set to "lid". Both parts have to match, so always redo both.
+
+
+OR SKIP THE HASSLE
+------------------
+The "twist version (backup)" folder has a different design - the lid drops on
+and locks with a quarter turn, like a pill bottle. Nothing to adjust, it just
+works. Print those two files instead if this one gives you trouble.
+
+Thanks for testing it.
