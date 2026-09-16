@@ -60,6 +60,21 @@ fit_gap = 0.20;
 // Cut a fingernail slot in the rim so the cap can be prised back off.
 notch = true;
 
+/* [Snap bead] */
+// Ring around the plug that clicks into a groove in the bore. This, not fit_gap,
+// is what holds a press cap on — friction alone is a tolerance lottery.
+snap = true;
+// How far the bead stands proud of the plug, on radius, mm. THE tuning knob.
+// 0.20 light click, 0.30 firm, 0.40 needs a thumb. Raise if it pulls off.
+bead = 0.30;
+// Flat on the bead crest, mm. Keeps it from being a knife edge that shears off.
+bead_flat = 0.2;
+// Diametral slack of the bead once it is home in the groove, mm.
+bead_gap = 0.15;
+// Bead centre, mm below the body rim when seated. Near the rim so the wall can
+// flare rather than stretch; that is what keeps it from splitting the body.
+bead_z = 1.5;
+
 /* [Bayonet] */
 // Lugs around the cup. Three self-centres; two is enough if you want a wider grip.
 lugs = 3;
@@ -96,6 +111,16 @@ plug_d = bore_d - fit_gap;
 pocket_d = tag_d + 1.0;
 body_h = height - lid_t;
 
+// The bead and the groove it lands in are one shape described twice: the bead is drawn
+// on the plug, the groove is the same trapezoid cut into the bore, bead_gap wider. Both
+// flanks are 45 degrees, which is the steepest either part can print without support —
+// the bead's underside overhangs in the cap, the groove's ceiling overhangs in the body.
+bead_r  = plug_d/2 + (snap ? bead : 0);       // crest radius on the plug
+grv_r   = bead_r + (snap ? bead_gap/2 : 0);   // crest radius of the groove
+bead_zc = lid_t + bead_z;                     // bead centre, in the cap's own z
+grv_zc  = body_h - bead_z;                    // groove centre, in the body's own z
+bead_hz = bead + bead_flat/2;                 // crest flat to where the flank meets the wall
+
 // twist
 cap_face = lid_t + tag_t + 0.4;              // tap face plus the tag's own recess
 skirt_h = height - cap_face - foot_h;
@@ -114,10 +139,21 @@ run_z1 = run_z0 + lug_h + bay_gap;
 
 echo(str(variant, ": assembled ", outer_d, " x ", height, "mm  tag pocket ", pocket_d,
          "mm  ", lid_t, "mm over the tag"));
+if (variant != "twist" && snap)
+    echo(str("snap: bore ", bore_d, "  plug ", plug_d, "  bead ", 2 * bead_r,
+             " over the bore by ", 2 * bead_r - bore_d, "  groove ", 2 * grv_r));
 assert(plug_h >= tag_t + 0.5, "plug_h leaves no room for the tag — raise it or thin the tag");
 assert(bore_d / 2 > pocket_d / 2 + 2, "tag is too wide for this shell — raise outer_d");
 assert(!logo || lid_t - logo_depth >= 0.6, "the mark would leave the tap face too thin");
 assert(!logo || logo_h <= tag_d, "keep the mark inside the tag pocket");
+assert(!snap || 2 * bead > fit_gap,
+       "the bead is smaller than the clearance it has to cross — it would never touch");
+assert(!snap || bead_z + bead_hz <= plug_h - mouth,
+       "the bead has run off the end of the plug — lower bead_z or raise plug_h");
+assert(!snap || bead_z - bead_hz >= mouth,
+       "the groove has run into the bore's lead-in chamfer — raise bead_z");
+assert(!snap || outer_d/2 - grv_r >= 1.0,
+       "the groove would leave under 1mm of body wall — shrink bead or raise outer_d");
 assert(cup_bore > pocket_d, "bayonet collar has eaten the tag pocket — raise outer_d");
 assert(lug_h > lug_out, "a lug needs to be taller than it is proud, or it has no flat top");
 assert(entry_arc + lock_arc < 360 / lugs - 10, "channels have left too little wall between them");
@@ -143,6 +179,12 @@ module body() {
                 [outer_d/2, body_h],
                 [bore_d/2 + mouth, body_h],
                 [bore_d/2, body_h - mouth],
+                if (snap) each [
+                    [bore_d/2, grv_zc + bead_hz],
+                    [grv_r,    grv_zc + bead_flat/2],
+                    [grv_r,    grv_zc - bead_flat/2],
+                    [bore_d/2, grv_zc - bead_hz],
+                ],
                 [bore_d/2, floor_t],
                 [0, floor_t],
             ]);
@@ -166,6 +208,12 @@ module lid() {
                 [outer_d/2, chamfer],
                 [outer_d/2, lid_t],
                 [plug_d/2, lid_t],
+                if (snap) each [
+                    [plug_d/2, bead_zc - bead_hz],
+                    [bead_r,   bead_zc - bead_flat/2],
+                    [bead_r,   bead_zc + bead_flat/2],
+                    [plug_d/2, bead_zc + bead_hz],
+                ],
                 [plug_d/2, lid_t + plug_h - mouth],
                 [plug_d/2 - mouth, lid_t + plug_h],
                 [pocket_d/2, lid_t + plug_h],

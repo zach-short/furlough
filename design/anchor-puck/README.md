@@ -8,7 +8,7 @@ Two variants of the same Ø40 × 10 object, set by `variant` in the `.scad`:
 
 | | | |
 | --- | --- | --- |
-| `press` | a cap that pushes on | fewest features, tightest tolerance, opens with a fingernail |
+| `press` | a cap that pushes on | fewest features, clicks onto a snap bead, opens with a fingernail |
 | `twist` | a cap that drops on and locks with a quarter turn | three lugs, a detent, no tolerance chasing |
 
 Both carry the app's anchor mark cut into the tap face.
@@ -49,21 +49,23 @@ All in mm; the names match the parameters in the `.scad`.
 | `floor_t` | 2.0 | Bottom. |
 | `lid_t` | 1.2 | **The critical one.** Plastic between tag and phone. Six layers at 0.2; 1.2 rather than 1.0 so the 0.5 mm engraving still leaves 0.7. Do not exceed 1.5. |
 | `plug_h` | 3.0 | How deep the cap plugs in; also the depth of the tag cavity. |
-| `fit_gap` | 0.20 | Diametral clearance, plug vs bore. This is the tuning knob. |
+| `fit_gap` | 0.20 | Diametral clearance, plug vs bore. Since the bead arrived this only guides the plug in; it is no longer what holds the cap on. |
+| `bead` | 0.30 | How far the snap ring stands proud of the plug, on radius. **This is the tuning knob.** |
+| `bead_z` | 1.5 | How far below the rim it clicks. Near the rim on purpose — the wall flares instead of stretching. |
 | `tag_d` | 25 | Sticker diameter. The cavity is drawn 1 mm wider. |
 | `chamfer` | 0.8 | 45° break on the outside edges so it doesn't feel printed. |
 | `notch` | true | Fingernail slot in the rim, so a press fit is still reversible. |
 | `pad_recess` | 0 | Set to 0.8 for a felt-pad or VHB recess in the underside. |
 
-Derived: bore Ø36.0, plug Ø35.8, tag cavity Ø26.0 × 3.0 deep, and a Ø36 × 3.8
-ballast well in the floor of the body.
+Derived: bore Ø36.0, plug Ø35.8, snap bead Ø36.4 into a Ø36.55 groove, tag cavity
+Ø26.0 × 3.0 deep, and a Ø36 × 3.8 ballast well in the floor of the body.
 
 ```
         ┌──────────────────────────┐  ← tap here
         │▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓│  lid_t 1.2  (all that's between tag and phone)
         │███░░░░░ NFC ░░░░░░░░░████│  cavity Ø26 × 3.0, sticker adhered to the roof
-        ├───┬──────────────────┬───┤  plug Ø35.8 into bore Ø36.0
-        │   │                  │   │
+        ├──◄┬──────────────────┬►──┤  bead Ø36.4 clicks into groove Ø36.55
+        │   │                  │   │  plug Ø35.8 guides in bore Ø36.0
         │   │   ballast well   │   │  Ø36 × 3.8 — coins, washers, sand, or nothing
         │   │                  │   │
         │   └──────────────────┘   │  floor 2.0
@@ -111,13 +113,35 @@ Set `logo = false` for a blank face.
 
 ## The fit
 
-The plug is 0.2 mm under the bore, which is a firm push on a well-tuned printer.
-Print the lid on its own first (six minutes) and try it before committing to a set:
+A press fit held by friction alone is a lottery you lose on someone else's printer:
+the plug is 0.2 mm under the bore, and if their machine runs even slightly lean that
+gap is simply a gap and the cap falls off. It did. So the cap no longer hangs on
+friction — a ring around the plug stands 0.30 mm proud, crosses the bore 0.4 mm
+oversize, and clicks into a groove cut 1.5 mm below the rim.
 
-- Falls out or rattles → drop `fit_gap` to 0.10.
-- Won't seat with thumb pressure → raise to 0.30.
+Both flanks of the bead are at 45°, which is not a styling choice: in the cap the
+bead's underside overhangs, in the body the groove's ceiling overhangs, and 45° is
+the steepest either will print unsupported. Symmetric flanks mean it pushes on and
+prises off with about the same force, which is what the fingernail notch is for.
+
+The groove sits near the rim so the body wall **flares** rather than stretches —
+0.2 mm of radial give at Ø36 is about 1.1 % hoop strain, which is close enough to
+PLA's limit that spending it on bending instead of tension is what keeps the body
+from splitting.
+
+`bead` is the only number worth touching, and both parts change when you do, so
+re-export both:
+
+- Clicks on but still pulls off → raise `bead` to 0.40.
+- Won't seat with thumb pressure, or the body cracks → drop it to 0.20.
+- PETG takes the click more happily than PLA; ABS/ASA happier still.
 - Want it permanent → a thin ring of CA glue on the flange ledge. You'll never need
   to open it; the tag has nothing on it to update.
+
+Set `snap = false` for the old friction-only fit, if you want to compare the two.
+
+One thing the bead costs: you can no longer test the fit by printing the lid alone.
+A snap needs both halves, and the body is the slow one.
 
 ## Assembly
 
@@ -148,10 +172,12 @@ between the tag and whatever it's sitting on.
 cap has three L-channels, and it locks in 30° of turn. Same Ø40 × 10 outside, same
 sticker, same mark.
 
-It exists because a press fit is a tolerance problem — 0.20 mm is either right or it
-isn't, and it changes with filament and nozzle temperature. A bayonet doesn't care:
-0.35 mm of clearance everywhere, and the joint still ends up tight because the cap
-lands on a shoulder rather than on the fit. It also just feels better to close.
+It exists because a press fit is a tolerance problem. The snap bead answers most of
+that — it holds on a click rather than on a gap — but the bead still has to be sized
+for a printer, and 0.30 mm is not right everywhere. A bayonet doesn't care at all:
+0.35 mm of clearance everywhere, nothing to tune, and the joint still ends up tight
+because the cap lands on a shoulder rather than on the fit. It also just feels better
+to close. If you are printing a set for someone else, print this one.
 
 | Feature | Size |
 | --- | --- |
