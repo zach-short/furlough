@@ -140,6 +140,13 @@ re-export both:
 
 Set `snap = false` for the old friction-only fit, if you want to compare the two.
 
+Field note, 2026-09-16: the one tester so far printed the 0.30 default after the
+friction-only cap had fallen off, and called it a little too tight. The next package went
+out at 0.20 — half the interference, 0.2 mm over the bore instead of 0.4 — rather than at
+the numeric midpoint of 0.15, because `fit_gap` eats the first 0.1 of any bead and 0.15
+would leave only 0.1 mm to hold on. If 0.20 is right on that printer, the default should
+follow it.
+
 One thing the bead costs: you can no longer test the fit by printing the lid alone.
 A snap needs both halves, and the body is the slow one.
 
@@ -224,8 +231,8 @@ READ ME, and the `.scad` sources so they can change the fit without asking:
 furlough puck
 ```
 
-`furlough puck --bead 0.40` moves the snap bead, in the STLs **and** in the sources it
-packages, so a tester never reads 0.30 in a package that isn't. It refuses to write an
+`furlough puck --bead 0.40` moves the snap bead, in the STLs, in the sources it packages
+**and** in the line the READ ME quotes, so a tester never reads 0.30 in a package that isn't. It refuses to write an
 STL that isn't a closed solid. The zip is named after the bead when you override it, so
 two test packages can sit in one folder.
 

@@ -16,8 +16,9 @@
 # --bead exists because that is the one number a tester is ever told to change. The snap bead
 # holds the press cap on (design/anchor-puck/README.md, "The fit"); if a printer runs lean the
 # answer is 0.40 and if it cracks the body it is 0.20, and either way both halves have to be
-# re-exported together or they no longer match. Passing it here does both at once and names the
-# zip after the value, so two test packages can sit in the same folder without a guessing game.
+# re-exported together or they no longer match. Passing it here does both at once, writes the
+# value into the packaged source and the READ ME that quotes it, and names the zip after the
+# value, so two test packages can sit in the same folder without a guessing game.
 #
 # It does not commit, tag, or upload. Zach commits.
 
@@ -94,11 +95,15 @@ render twist lid  "$PKG/twist version (backup)/2 - cap.stl"
 cp "$NOTES" "$PKG/READ ME.txt"
 cp "$SRC/anchor-puck.scad" "$SRC/anchor-mark.scad" "$PKG/source/"
 
-# The READ ME tells the tester to edit `bead` and re-export. If this run already moved it, the
-# sources they get should say so too, or they will read 0.30 in a package that is not 0.30.
+# The READ ME tells the tester to edit `bead` and re-export, and quotes the line they will find.
+# If this run already moved it, the source they get and the line the READ ME quotes both have
+# to say so, or they will read 0.30 in a package that is not 0.30. The READ ME's guidance is
+# written relative to that line ("go up by 0.05") so it stays right whatever the number is.
 if [[ -n "$BEAD" ]]; then
   perl -i -pe "s/^bead = [0-9.]+;/bead = $BEAD;/" "$PKG/source/anchor-puck.scad"
   grep -q "^bead = $BEAD;" "$PKG/source/anchor-puck.scad" || die "could not set bead in the packaged source"
+  perl -i -pe "s/^(\s*)bead = [0-9.]+;/\${1}bead = $BEAD;/" "$PKG/READ ME.txt"
+  grep -q "bead = $BEAD;" "$PKG/READ ME.txt" || die "could not set bead in the packaged READ ME"
 fi
 
 mkdir -p "$OUT"

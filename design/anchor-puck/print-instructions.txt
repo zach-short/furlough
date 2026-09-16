@@ -34,9 +34,11 @@ Open  source/anchor-puck.scad  in OpenSCAD (free). Near the top you'll find:
 
       bead = 0.30;
 
-  Still pulls off          ->  make it 0.40
+  That number is how hard the lid grips. Stay between 0.10 and 0.40.
+
+  Still pulls off          ->  go up by 0.05 or 0.10
   Won't push on, or the
-  body cracks              ->  make it 0.20
+  body cracks              ->  go down by 0.05 or 0.10
 
 Then File > Export > STL. Do it twice - once with part set to "body", once
 with part set to "lid". Both parts have to match, so always redo both.
