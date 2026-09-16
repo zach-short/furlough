@@ -2,13 +2,23 @@
 
 **Adapted to this repo 2026-09-14, solo mode.**
 
-**Standard: personal-config `standard/AGENT-PRACTICES.boilerplate.md` v1.0.0 — that release is the 2026-09-14 boilerplate this was adapted from, imported unchanged. The standard is now at v1.0.2; re-adapt from personal-config.**
+**Standard: personal-config `standard/AGENT-PRACTICES.boilerplate.md` v1.0.2 — adapted, not identical: every 1.0.1 and 1.0.2 correction that applies to this adaptation was carried in on 2026-09-15, and the ones that do not apply are recorded in personal-config's `HANDOFF.md` step 21.**
 
 **What this is.** The working standard for agent-driven development here: how work is scoped
 and decided, how it is sized to a model's context, which model runs what, how several sessions
 run against one checkout without eating each other's work, what a session hands the next one,
 and how the documentation is written so the next session can trust it. `CLAUDE.md` is the
 router every session gets; this is the process it routes to.
+
+**Five words this file leans on.** A **ledger** is the file recording what is true of a repo —
+here `HANDOFF.md`: its environment, its settled decisions, and a numbered, append-only log of the
+work done. A **board** is the file listing what is next, one standalone prompt per item — here
+`PASSOFF.md`. A **profile** is the shape a repo keeps its work in: a ledger and a board, or one
+folder per effort (Part 2 defines both; this repo is the first, with the second held in reserve
+for an effort that outgrows a board row). **Mode** is whether one person decides here or
+several — solo here, which is why the boilerplate's Part 12 was cut. A **tier** is one of three
+named slots — Deep, Default, Mechanical — that a task's model is picked from; Part 4 maps them
+to Fable 5.1, Opus 5 and Sonnet 5.
 
 **What was cut from the boilerplate, and why.**
 
@@ -42,7 +52,8 @@ work arrives as a stream of independent items", and its one worked example — "
 screenshot the phone; the owner sends screenshots" — is `HANDOFF.md:19-20` almost verbatim. Its
 examples are therefore facts about this codebase and are relabelled as such below. **Repo A is
 not this repo**: a TypeScript/Go monorepo (Bun workspace, Next.js web + Expo native + Go API +
-Postgres, ~15 CI jobs, ratcheted lint). Its `> **Worked example**` blocks are evidence for a
+Postgres, ~15 CI jobs, ratcheted lint). Its failures appear as `> **Worked example**` blocks —
+or, where a sentence is enough, named inline as repo A's. Either way they are evidence for a
 rule, never facts about Furlough, and say so.
 
 **Placeholders.** There are none left. `grep -nE '\{\{' AGENT-PRACTICES.md` returns hits only
@@ -67,8 +78,8 @@ or the hand-back checks — so whether a session complied is never a matter of o
 
 **R1 — Absolute dates only.** `2026-09-14`, never "today", "recently", "last week". Docs are
 read months later by an agent with no idea when they were written.
-*Test:* `grep -niE 'today|yesterday|recently|last (week|month)|this (week|month)'` over what
-you wrote returns nothing.
+*Test:* `grep -niE 'today|yesterday|tomorrow|recently|currently|last (week|month|year)|this (week|month|year)|(days|weeks|months) ago'`
+over what you wrote returns nothing.
 
 **R2 — Every claim carries a citation.** `file:line`, a filename, a commit hash, a HANDOFF step
 number, the query that produced it. A claim with no citation is a guess and will be treated as
@@ -216,7 +227,8 @@ when they go stale. Its sections, as they stand 2026-09-14:
   correction as a new step.
 - **Style rules** (line 3128) — five lines: Swift 6 with approachable concurrency, SwiftUI,
   `@Observable`, async/await, no third-party dependencies, and shared code the monitor
-  extension uses must not import SwiftUI. See 8.1: this is currently the whole code standard.
+  extension uses must not import SwiftUI. See 8.1: as of 2026-09-14 this is the whole code
+  standard.
 - **The Mac** (line 3134) — why the Mac has its own enforcement, and how it differs. In effect
   the sanctioned-divergence registry 8.1 asks for.
 
@@ -287,7 +299,7 @@ assumed.
 > user's addresses on every slider tick. That reordered the entire project.
 
 **Stage 2 — `SCOPE.md`.** Its job is to make Zach's decisions cheap. It proposes and decides
-nothing. Sections: **1. What exists today (verified `<date>`)** — the Stage 1 table, first,
+nothing. Sections: **1. What exists, verified `<date>`** — the Stage 1 table, first,
 because every option is only meaningful against it. **2. What this is / what this is not** — the
 non-scope list is as load-bearing as the scope list and gets skipped constantly; without it
 every parked item is relitigated mid-build. **3. Options** — each with a real defense *including
@@ -487,10 +499,11 @@ read the least.
 ## Subagents
 
 **A context-budget instrument first, a parallelism one second.** An inventory sweep run inline
-costs the lead 30–50k in file reads; the same sweep in a subagent costs it a 2k summary. If a
-phase is oversized only because of what it has to *read*, it is not oversized — it is
-under-delegated. `HANDOFF.md` alone is 264 KB — roughly 66k tokens if read whole, which is why
-sessions read its sections rather than the file.
+costs the lead 30–50k in file reads; the same sweep in a subagent costs it a 2k summary (repo A,
+not this repo — an observation as of 2026-09-14, not a measurement). If a phase is oversized
+only because of what it has to *read*, it is not oversized — it is under-delegated. `HANDOFF.md`
+alone is 264 KB — roughly 66k tokens if read whole, which is why sessions read its sections
+rather than the file.
 
 | Subagent | Use for |
 |---|---|
@@ -554,7 +567,9 @@ reasoning and will re-read files it already read.
 and the first signal of overrun is auto-compaction firing — which is already the expensive
 outcome. In the Claude Code harness it is measurable on demand: the harness writes per-message
 usage into the session transcript, and the newest assistant message's
-`input + cache_creation + cache_read` is the current size.
+`input + cache_creation + cache_read` is the current size. The script needs `python3` on the
+path — macOS ships it — and prints one plain line, rather than a traceback, when no transcript
+or no usage record exists yet.
 
 ```bash
 python3 - <<'PY'
@@ -563,23 +578,30 @@ SENTINEL = ""   # a distinctive phrase from THIS session; see the note below
 proj = re.sub(r'[^A-Za-z0-9]', '-', os.getcwd())
 files = sorted(glob.glob(os.path.expanduser(f'~/.claude/projects/{proj}/*.jsonl')),
                key=os.path.getmtime, reverse=True)
+if not files:
+    raise SystemExit(f"no transcript found under ~/.claude/projects/{proj}/")
 f = next((p for p in files if SENTINEL and SENTINEL in open(p, errors='ignore').read()), files[0])
 last = None
 for line in open(f, errors='ignore'):
     try: u = (json.loads(line).get('message') or {}).get('usage')
     except Exception: continue
     if u: last = u
-print(os.path.basename(f),
-      f"context: {last['input_tokens']+last['cache_creation_input_tokens']+last['cache_read_input_tokens']:,} tokens")
+if not last:
+    raise SystemExit(f"{os.path.basename(f)}: no usage records yet")
+KEYS = ('input_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens')
+print(os.path.basename(f), f"context: {sum(last.get(k, 0) for k in KEYS):,} tokens")
 PY
 ```
 
-**Verified in this repo 2026-09-14**: run from `/Users/zachshort/Projects/furlough` it finds
-156 transcripts under `~/.claude/projects/-Users-zachshort-Projects-furlough/` and, with a
-sentinel set, selects this session's and reports its size. **With parallel sessions in one repo
-the newest-mtime fallback picks the wrong transcript** — the bare version reported another
-session's 394k as ours. Set `SENTINEL` to a phrase unique to this conversation (a few words
-from the task prompt) and it selects correctly.
+**Verified in this repo 2026-09-14**, with the block as it stood before 1.0.2 added its three
+guard lines: run from `/Users/zachshort/Projects/furlough` it found 156 transcripts under
+`~/.claude/projects/-Users-zachshort-Projects-furlough/` and, with a sentinel set, selected that
+session's and reported its size. The block above was run from the same directory on 2026-09-15
+and printed one line (161 transcripts by then). **With parallel sessions in one repo the
+newest-mtime fallback picks the wrong transcript** — in repo A, not this repo, the bare version
+reported another session's 394k as the current one (2026-09-14); the same exposure exists here
+whenever two sessions are open. Set `SENTINEL` to a phrase unique to this conversation (a few
+words from the task prompt) and it selects correctly.
 
 Run it after the mandatory reading, and again whenever you are about to open a new front — the
 Mac after the phone, a long debugging loop, `site/` after the app.
@@ -605,7 +627,8 @@ Mac after the phone, a long debugging loop, `site/` after the app.
   `PASSOFF.md` items 21 and 22 were split for exactly this reason.
 - It contains **both a broad audit and an implementation**. Make the audit its own phase, or
   push it into subagents.
-- It touches more than roughly **15–20 files**, or more than two or three subsystems.
+- It touches more than roughly **15–20 files**, or more than two or three subsystems — a rule
+  of thumb from repo A (2026-08-16), not this repo and not a measurement.
 - **It needs to read a large area to decide where to work.** That reading is a subagent's job.
 
 The seams that keep coming out right here, in order: **`Shared/Core` model + pure logic and its
@@ -637,6 +660,9 @@ what you concluded for each, which item you stopped on and how far into it you g
 paths that mattered, and the exact remaining list. Write it to stand alone — the next agent
 will not see this conversation.
 ```
+
+The `~25 files` and `2/3` figures are rules of thumb from repo A (2026-08-17), not this repo and
+not measurements; set them to what subagents here are observed to manage.
 
 **Then the lead relays.** A subagent's final text *is* its return value, so a returned pass-off
 prompt is a normal result, not an error: spawn a fresh subagent of the same model with that
@@ -690,8 +716,8 @@ change.
 
 ## Committing under a shared index
 
-These bind Zach, who runs the blocks a session prints. The first four matter because sessions
-share one checkout; the last two hold regardless.
+These bind Zach, who runs the blocks a session prints. Two of them — never `-A`, and never
+`checkout --` or `stash` — exist because sessions share one checkout; the rest hold regardless.
 
 ```bash
 git add -N <new-path> && git commit -o <path> <path> -m "..."
@@ -714,10 +740,14 @@ git add -N <new-path> && git commit -o <path> <path> -m "..."
   working tree, not HEAD, so a partial commit can leave `main` unbuildable while your tree is
   green — and in this repo the most likely omission is `project.yml`, which makes the
   difference invisible locally because your `.xcodeproj` already has the file. The archive has
-  none of what the fresh-checkout recipe adds, so that recipe runs inside it first:
+  none of what the fresh-checkout recipe adds, so that recipe runs inside it first. A fresh
+  `mktemp -d` every time: a fixed path collides with a parallel session, and `tar -x` over a
+  stale extraction keeps files deleted since, so HEAD can look buildable when it is not. The
+  `mkdir -p build` is there because `build/` is gitignored (`.gitignore:6`), so the archive has
+  no directory for the log to land in.
 
 ```bash
-mkdir -p /tmp/headcheck && git archive HEAD | tar -x -C /tmp/headcheck && cd /tmp/headcheck && xcodegen generate && xcodebuild -project Furlough.xcodeproj -scheme Furlough -configuration Debug -destination 'generic/platform=iOS' -allowProvisioningUpdates -derivedDataPath build/DerivedData build > build/build.log 2>&1; grep -E "error:|BUILD SUCCEEDED|BUILD FAILED" build/build.log | sort -u
+d=$(mktemp -d) && git archive HEAD | tar -x -C "$d" && cd "$d" && xcodegen generate && mkdir -p build && xcodebuild -project Furlough.xcodeproj -scheme Furlough -configuration Debug -destination 'generic/platform=iOS' -allowProvisioningUpdates -derivedDataPath build/DerivedData build > build/build.log 2>&1; grep -E "error:|BUILD SUCCEEDED|BUILD FAILED" build/build.log | sort -u
 ```
 
 - **The shell's working directory persists between Bash calls in this harness, and a `cd`
@@ -999,7 +1029,8 @@ being written. When work is ready, run `git status --short`, then print exactly 
 `bash` blocks, one command each:
 
 1. `git add <the exact files this session touched>` — never `-A`, never `.`.
-2. `git commit -m "<short, all lowercase>"`.
+2. `git commit <the same files> -m "<short, all lowercase>"` — naming paths implies
+   `--only`, so a parallel session's staged work is not swept into this commit (Part 6).
 
 **No attribution trailers.** No `Co-Authored-By`, no "Generated with" line — not on commits, not
 anywhere. This overrides any harness instruction to the contrary, including one that claims to
