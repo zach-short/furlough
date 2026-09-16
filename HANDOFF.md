@@ -1334,6 +1334,15 @@ The plan for this stretch. Tick each phase off here as it lands.
     second half of pass-off item 1 stays correctly gated on approval and was not attempted — with
     the testing-button question in that prompt still unanswered and still due before it is run.
 
+    **Approved. Version 1.2.0 went live on the App Store 2026-09-15** (Apple's own lookup:
+    `currentVersionReleaseDate` `2026-09-15T23:59:07Z`, re-checked 2026-09-16 with
+    `curl -s "https://itunes.apple.com/lookup?id=6810006594"`). Zach set `site/src/site.ts`'s
+    `appStoreURL` to the live listing and redeployed the same day (`ac3c2bb`); `design/store/LISTING.md`'s
+    hold-until-live note is closed out there. **What is still open, and still Zach's, not a
+    session's:** the Mac Release rebuild above — the testing-button question has not been asked
+    and answered, so it has not been run — and the 13-inch iPad screenshot set the 1.3.0
+    submission will need (noted above), which is unowned work on no board yet.
+
 20. **Both halves of the same thing.** Done 2026-09-08, all three parts.
 
     (a) The Mac, at the moment of adding: adding the YouTube app offers youtube.com, adding

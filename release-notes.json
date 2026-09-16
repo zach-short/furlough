@@ -37,6 +37,12 @@
           "platform": "iphone",
           "title": "The shield's Close button is Furlough's colour",
           "detail": "It asked for a faint white fill, which iOS ignored in favour of the default blue — loud, for the one thing there is to do on that screen. The same quiet fill, written as a solid colour, is honoured."
+        },
+        {
+          "kind": "fixed",
+          "platform": "both",
+          "title": "What's new stopped claiming every build was TestFlight-only",
+          "detail": "The footnote said every version had gone to TestFlight rather than the App Store. Furlough has been on the App Store since 1.2.0, and each version's card already says which channel it shipped through, so the line is gone rather than kept accurate by hand."
         }
       ]
     },

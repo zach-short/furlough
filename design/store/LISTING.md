@@ -723,18 +723,24 @@ The history of this section:
 
 ~~2. A deploy of `site/` to `furloughapp.com`.~~ **Done 2026-09-08**; see the URLs section.
 
-**Do not set `appStoreURL` until the app is actually released.** `site/src/site.ts` holds it at
-`null` deliberately, which is what makes both buttons render as a non-clickable "Coming soon to
-the App Store" rather than a live "Download on the App Store" link (`StoreButton.astro` switches
-on exactly this). Checked 2026-09-08: `https://apps.apple.com/app/id6810006594` returns **404**
-and Apple's own lookup returns `"resultCount": 0`, because the record is still
-PREPARE_FOR_SUBMISSION. Setting it now would publish two prominent download buttons pointing at a
-dead page. Zach's call, 2026-09-08: hold.
-
-Re-check with this, and set the URL and redeploy the moment it answers:
+~~**Do not set `appStoreURL` until the app is actually released.**~~ **Done, 2026-09-16.** The
+app went live 2026-09-15 (1.2.0, approved after the resubmission — see HANDOFF step 19), and
+Apple's lookup answers with it:
 
 ```
-curl -s "https://itunes.apple.com/lookup?id=6810006594" | head -c 120
+curl -s "https://itunes.apple.com/lookup?id=6810006594" | python3 -c \
+  "import json,sys; d=json.load(sys.stdin)['results'][0]; print(d['version'], d['currentVersionReleaseDate'])"
+# 1.2.0 2026-09-15T23:59:07Z
 ```
+
+Zach set `site/src/site.ts`'s `appStoreURL` to `https://apps.apple.com/app/id6810006594` and
+redeployed (`ac3c2bb`), which is what turns both buttons from "Coming soon to the App Store"
+into a live "Download on the App Store" link (`StoreButton.astro` switches on exactly this).
+The paragraph below is kept as the record of why it waited until now, not as a live warning.
+
+Checked 2026-09-08: `https://apps.apple.com/app/id6810006594` returned **404** and Apple's own
+lookup returned `"resultCount": 0`, because the record was still PREPARE_FOR_SUBMISSION.
+Setting the URL then would have published two prominent download buttons pointing at a dead
+page. Zach's call, 2026-09-08: hold.
 
 An App Preview video is optional and none is assumed.

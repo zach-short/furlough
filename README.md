@@ -10,7 +10,7 @@ Either half works on its own; neither needs the other.
 
 Built on Apple's Screen Time API (FamilyControls, ManagedSettings, DeviceActivity) and Core NFC. Swift, SwiftUI, no third-party dependencies.
 
-**Furlough for Mac is a download** — [furloughapp.com](https://furloughapp.com/#download) — signed with a Developer ID and notarized by Apple, so nothing has to be built to run it. The iPhone app is not on the App Store yet; it installs from Xcode, and [Install from Xcode](#install-from-xcode) is how.
+**Furlough for Mac is a download** — [furloughapp.com](https://furloughapp.com/#download) — signed with a Developer ID and notarized by Apple, so nothing has to be built to run it. **Furlough for iPhone is [on the App Store](https://apps.apple.com/app/id6810006594)**; building it from source instead — to run a fork, or a build ahead of what has shipped — is [Install from Xcode](#install-from-xcode).
 
 ## How it works
 
@@ -289,8 +289,10 @@ Worth knowing before reading the numbers:
   What's new leaves it out of the list entirely and says "You are on 1.2.0, which changed
   nothing on the Mac" instead — otherwise the list would start at 1.1.0 and read as the version
   that Mac is on. `ReleaseNotes.bundleRelease()` is what that sentence comes from.
-- Nothing has been released on the App Store. Version 1.0 was submitted and rejected; every
-  build so far went to TestFlight, which is what the channel on each entry says.
+- **1.2.0 is on the App Store**, released 2026-09-15. It is the same version record as 1.0:
+  submitted 2026-09-09, rejected under Guideline 2.1 for want of a hardware demo video,
+  answered, renamed to 1.2.0, and approved. Everything before it went to TestFlight only,
+  which is what the channel on each entry says.
 
 ## Known limits of the Screen Time API
 

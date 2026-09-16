@@ -582,7 +582,7 @@ struct HelpPage: View {
                 .padding(.top, 12)
         } else {
             ReleaseList(releases: releases)
-            Footnote(text: "Every version so far has gone to TestFlight rather than the App Store, and the Mac app is built from source. The same notes are at furloughapp.com/releases.")
+            Footnote(text: "The Mac app is built from source, not distributed through TestFlight or the App Store. The same notes are at furloughapp.com/releases.")
                 .padding(.top, 14)
         }
     }
