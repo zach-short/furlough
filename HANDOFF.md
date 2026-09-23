@@ -3730,6 +3730,91 @@ The plan for this stretch. Tick each phase off here as it lands.
     `project.yml:6` and every per-target `MACOSX_DEPLOYMENT_TARGET` say 15.0, and the store
     listing agrees. `site.ts`'s `macMinimumOS` uses 15.0. Left for whoever owns that section.
 
+51. **A copy outside /Applications no longer spends the filter offer (pass-off item 35).** Done
+    2026-09-23, in `FurloughMac/Views/MacFilterOffer.swift` alone. Found 2026-09-16 while item
+    34's walkthrough was being written. `WebFilterOfferSheet` is asked once, ever (step 36), and
+    a copy that could never take it could still raise it and spend it. `WebFilter.isInApplications`
+    (`WebFilter.swift:315`) is false for a copy run from anywhere but `/Applications` — most
+    likely straight from the mounted DMG — and `refresh()` and `install()` both report
+    `.notInApplications` there (`WebFilter.swift:419-421`, `452-454`). `shouldOfferWebFilter`
+    (`MacModel.swift:478`) still raises the sheet in that state, since it asks only that the
+    filter be neither wanted nor on. The sheet then showed a prominent Done, the same button as
+    "the filter is on"; skipped the two paragraphs that make the case for the filter; and
+    counted the offer when it closed, so the same person moving the app into `/Applications`
+    afterwards was never asked.
+
+    What changed, all in the sheet:
+    - **The offer is not spent outside /Applications.** `onDisappear` calls
+      `noteWebFilterOffered()` only when `canTakeOffer`, which is `status != .notInApplications`.
+    - **`.notInApplications` has its own button branch**: one Done, not prominent, like the
+      in-flight states. It had shared `.on`'s prominent one — at `MacFilterOffer.swift:73`
+      before this step. The pass-off cited `:61`, which is the Install branch; its `:20` was
+      right.
+    - **The two paragraphs show whenever the filter is not on**, not only when it is not
+      installed. The status line now sits under them in every state but `.notInstalled`, where
+      before it showed only in their place.
+    - **The footnote "… Furlough will not ask again." is withheld outside /Applications.** That
+      copy no longer spends the offer, so the sentence would be untrue there. Withheld rather
+      than reworded, because new copy is Zach's call (AGENT-PRACTICES R7); the variants went
+      to him in the hand-back. To reverse: remove the `if canTakeOffer` around the `Footnote`.
+
+    **Where the guard lives, and why the sheet.** The item left it open between the sheet's
+    `onDisappear` and `noteWebFilterOffered` itself. The sheet, for three reasons.
+    `noteWebFilterOffered` has one caller (`grep -rn noteWebFilterOffered FurloughMac Shared`
+    finds the definition at `MacModel.swift:501` and the sheet's call, 2026-09-23). The sheet
+    draws its buttons from the same `filter.status` in the same file, so "could this offer be
+    taken" sits beside the switch that decides what was offered. And `MacModel.swift` is the Mac
+    file most lanes touch, so leaving it alone is one less merge. The argument against, written
+    down so it is not rediscovered: a second caller added later would not inherit the guard. If
+    one appears, move the `guard` into `noteWebFilterOffered`, reading
+    `enforcer.webFilter.status`, and it covers both.
+
+    **Which states spend it — the item's triage, answered.**
+    - `.installing` and `.awaitingApproval` spend it. When the sheet closes they are an offer
+      taken: `install()` sets `isWanted` before `.installing` (`WebFilter.swift:456-457`), and
+      `shouldOfferWebFilter` refuses once `isWanted` is set, so it could not be raised again
+      anyway. An `.awaitingApproval` found when the sheet opens, with the flag unset, is a
+      request an earlier copy left pending. This copy is in `/Applications` and can finish it,
+      and Settings > Web carries it.
+    - `.failed` spends it. It reaches the sheet two ways, and both could take the offer. In
+      one, Install was pressed here and refused, or macOS wanted a restart
+      (`WebFilter.swift:474-480`): the offer was taken, and `isWanted` is set. In the other,
+      the sheet opened on a properties query macOS never answered (`WebFilter.swift:424-430`).
+      The sheet shows Install in that state (the `.notInstalled, .failed` branch), Install
+      sends a fresh request, and the failure text itself says that often clears it. So "Not
+      now" there answers a real offer. Compare `.notInApplications`, where `install()` returns
+      before it asks macOS anything.
+    - `.disabledInSettings`, `.filterOff` and `.filterDenied` spend it. An extension is already
+      on this Mac, this copy is in `/Applications`, and the directions finish the job.
+    - `.notInApplications` does not.
+
+    **When it comes back.** At the next *website* added, not at the next launch.
+    `offerWebFilter()` (`MacRootView.swift:284`) runs only after a new host is added
+    (`MacRootView.swift:174`, `185`), and the guidance's third step already sends someone who
+    has moved the app to Settings > Web. Two consequences, which went to Zach as questions
+    instead of being decided. A copy that stays outside `/Applications` raises the sheet again
+    for every new website, since nothing spends the offer there. And the reopened copy in
+    `/Applications` waits for a website before it asks, rather than asking at launch.
+
+    **Settings > Web was checked against the same three questions, and needs nothing**
+    (`MacSheets.swift:777-792` and `1001-1043`, read 2026-09-23). It never calls
+    `noteWebFilterOffered`. Its button switch groups `.notInApplications` with `.installing`,
+    which show no action (`:1017`), not with `.on`, which offers Remove (`:1014`). Its status
+    row paints `.notInApplications` in Ember (`:1040`). And `WebFilter.explainer` with the
+    directions already shows whenever `!status.isOn` (`:781`), the same gate this step gave the
+    sheet.
+
+    Nothing about enforcement changed. The filter stays out of the first run, and the offer
+    stays once-only in every state that could take it (step 36). No `Shared/Core` change, so no
+    tests. The Mac Debug build is green and warning-free in our code (2026-09-23); its one
+    warning is Apple's `appintentsmetadataprocessor`, the line the iOS gate greps out. **Not
+    seen on a Mac.** The walk from the mounted DMG is Zach's and is in the hand-back.
+
+    **Two stale lines found, not edited** (not this item's): `README.md:109` says "Onboarding
+    offers it and Settings > Web installs it", and `README.md:113` says the first launch covers
+    "the web filter if you want it". Both predate step 36, which took the filter out of
+    onboarding.
+
 
 ## Style rules
 

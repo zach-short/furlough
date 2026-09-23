@@ -103,7 +103,7 @@ waiting on 1. That is the sentence that went stale; 9 shipped in `e253fc6` regar
 | 32 | The automations that already work, written down | Done — HANDOFF 47 | **Sonnet** | Z | nothing | `Furlough/Views/HelpTopics.swift`, `site/src/pages/help/`, `Furlough/Views/AnchorScreens.swift` |
 | 33 | The site sends a Mac visitor to the Mac build | Done — HANDOFF 50; site only, not deployed | Opus | AA | nothing | new `site/src/pages/mac.astro`, `site/src/components/StoreButton.astro`, `Nav.astro`, `Footer.astro`, `site/src/pages/index.astro`, `support.astro`, `site/src/styles/global.css`, `site/src/site.ts` |
 | 34 | Furlough for Mac, from download to first block, watched on a clean Mac | Open — the walk is scripted in `design/MAC-FIRST-RUN.md`; the copy waits on Zach walking it | Opus | AA (2nd) | 33, Zach deploying it, and the walk | `design/MAC-FIRST-RUN.md`, `site/src/pages/mac.astro` |
-| 35 | The filter offer is spent by a copy that could never take it | Open — found in 34's reading, 2026-09-16 | Opus | AB | nothing | `FurloughMac/Views/MacFilterOffer.swift`, `FurloughMac/Model/MacModel.swift` |
+| 35 | The filter offer is spent by a copy that could never take it | Done — HANDOFF 51; not seen on a Mac, and "Move to Applications" is still Zach's call | Opus | AB | nothing | `FurloughMac/Views/MacFilterOffer.swift`, `FurloughMac/Model/MacModel.swift` |
 
 **Two things landed that this board never planned**, so look for them in HANDOFF rather than
 here: the first week with capped delays and the 15-minute undo (HANDOFF 27, the lane-f
