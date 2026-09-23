@@ -698,6 +698,10 @@ The plan for this stretch. Tick each phase off here as it lands.
    the activity log should carry `web filter: this copy of Furlough is not the one that installed
    the filter…` followed by `web filter on`, with no visit to Settings > Web.
    Sent to Zach on 2026-09-08 as two checklists; the rest of his report is outstanding.
+   **Superseded 2026-09-23, step 53: `/Applications` holds a plain Release build, `1.3.0
+   (202609232012)`, with no testing button.** The Debug claim that follows went stale on
+   2026-09-10, when step 35 installed a Release build over it; that copy was uninstalled on
+   2026-09-22 and replaced with plain Release on 2026-09-23. Kept as written, as history:
    **The Mac in `/Applications` is now a Debug build of `2851824`**, replaced 2026-09-08 with
    his go-ahead: SIGTERM to the running copy (not an Apple Event, so the "Quit refused while
    blocked" guard does not apply and it flushes cleanly), then `rm -rf` + `ditto` + `open`.
@@ -1345,6 +1349,9 @@ The plan for this stretch. Tick each phase off here as it lands.
     session's:** the Mac Release rebuild above — the testing-button question has not been asked
     and answered, so it has not been run — and the 13-inch iPad screenshot set the 1.3.0
     submission will need (noted above), which is unowned work on no board yet.
+
+    **The Mac Release rebuild ran 2026-09-23, step 53**: plain Release, on Zach's answer to the
+    testing-button question. That closes pass-off item 1. The iPad set is still owed (step 52).
 
 20. **Both halves of the same thing.** Done 2026-09-08, all three parts.
 
@@ -3814,6 +3821,114 @@ The plan for this stretch. Tick each phase off here as it lands.
     offers it and Settings > Web installs it", and `README.md:113` says the first launch covers
     "the web filter if you want it". Both predate step 36, which took the filter out of
     onboarding.
+
+52. **A fresh 1.3.0 build cut and gated, upload left for Zach.** Done 2026-09-23, no code
+    changed. Build `202609232009` (`1.3.0`, HEAD `4c3ad02`) was archived and exported with
+    `scripts/archive.sh` (no `--upload`): both REFUSING TO SHIP gates passed (the control-string
+    probe and the per-bundle Screen Time entitlement check across all five bundles),
+    `** EXPORT SUCCEEDED **`, and no warnings in Furlough's own code — the two Apple-tooling
+    warnings that appear (`appintentsmetadataprocessor`'s missing-AppIntents notice, and an
+    ExtensionKit embed-path notice for FurloughReport) are pre-existing, the same ones already in
+    `build/last-archive.log` and `build/resubmit-archive.log`. It carries commits `4731526`,
+    `8cad7e5` and `013b327`, none of which are in the build already sitting in TestFlight
+    (`202609150033`, cut 2026-09-14 ~20:33 EDT). The `--upload` call to `xcrun altool` was
+    refused by Claude Code's auto mode as a production deploy before it ran, and this session did
+    not try to route around that — see the memory note on the App Store Connect write block. The
+    archive is at `build/Furlough-202609232009.xcarchive`, the `.ipa` at
+    `build/export/Furlough.ipa`, the full log at `build/archive-local.log` (all gitignored).
+    **Zach ran the upload himself** the same day:
+    ```
+    xcrun altool --upload-app -f build/export/Furlough.ipa -t ios --apiKey L6A2R4SBXQ --apiIssuer 04f9fe5a-56e5-460f-80ac-c57e788fbdc6
+    ```
+    `UPLOAD SUCCEEDED with no errors`, delivery UUID `62f0fe92-7505-45d2-807b-d6e3110ba4e2`,
+    2026-09-23 16:18:38 ET. It appears in TestFlight once Apple finishes processing it — not
+    confirmed read back from the ASC API this session. Submitting 1.3.0 for App Store *review*
+    is a separate, still-unstarted step: section 9's 13-inch iPad screenshot set (2064 × 2752)
+    still does not exist. Asked in chat, Zach scoped this session to the upload alone, not
+    review submission.
+
+53. **The Mac in /Applications is plain Release again (pass-off item 1, step 4).** Done
+    2026-09-23. Zach's answer to the step's question, in chat that day: **plain Release, no
+    testing button**, so no `TESTING_TOOLS`. The step's premise was wrong twice over, and both
+    are recorded where they matter.
+    - **It was not Debug.** Step 3's "a Debug build of `2851824`" went stale on 2026-09-10, when
+      step 35 installed a Release build (`HANDOFF.md`, step 35's "A Release build was installed
+      to `/Applications`"). The last copy's filter was `1.2.0/202609141817`, a stamped build
+      number, which only `furlough mac` and `archive-mac.sh` produce, and both build Release.
+    - **It was not there at all.** On 2026-09-23 `/Applications/Furlough.app` was missing, and
+      so were the App Group store and the watchdog. The unified log has the running copy ending
+      at 2026-09-22 14:55:01 on SIGTERM (`termination reported by launchd (2, 15, 15)`), with
+      no watchdog reopen after it. A session Zach ran, titled "Remove Furlough from Mac", did
+      the uninstall. Zach then chose reinstall over leaving the Mac without Furlough.
+
+    **What ran:** `scripts/furlough mac` with no arguments (`scripts/furlough:185-202`). Log at
+    `build/mac-release-reinstall.log`: `** BUILD SUCCEEDED **`, no `error:` and no `warning:`,
+    `-configuration Release`, and no `TESTING_TOOLS` anywhere in it. The code is exactly
+    `4c3ad02`, item 35 included (step 51). The two commits after it touch only `README.md`.
+
+    **Verified on this Mac, not by a person:**
+    - Build `1.3.0 (202609232012)`: `CFBundleShortVersionString` and `CFBundleVersion` of the
+      app, and the same stamp on the filter `.systemextension` and `FurloughMacWidgets.appex`.
+    - One 9.6 MB Mach-O and no `Furlough.debug.dylib`, so it is not Debug's split shape.
+    - `archive-mac.sh`'s own probe (`scripts/archive-mac.sh:214-222`): `nm -a` finds none of
+      `resetEverything`, `clearEverything` or `TestingTools`. The same probe finds 8 in
+      `build/mac-testing/…/Release/Furlough.app`, a Release + `TESTING_TOOLS` build, so the
+      probe can tell the difference. The control string `no unblock button` is present.
+    - `codesign --verify --deep --strict` passes, team `X9V4L6HR2R`.
+    - Running from `/Applications`. The window (captured on its own with `screencapture -l`)
+      is onboarding's first pane, "No unblock button.", because the store is new.
+    - The new store's activity log: `fonts: ok`, `iCloud at launch: reachable`,
+      `reconcile (launch): blocked apps=0 sites=0`, `menu bar: item added`, then
+      `web filter: macOS says Failed` eleven seconds after it asked.
+
+    **Not seen:** Help > About's Version row, which reads those same two keys
+    (`FurloughMac/Views/MacHelp.swift:638-639`) and should say `1.3.0 (202609232012)`. It is
+    behind onboarding, and onboarding's Start raises the Notifications prompt, so it is Zach's.
+
+    **What this costs, stated plainly.** There is **no Settings > Testing > Reset everything**
+    on this install (Debug and `TESTING_TOOLS` only; see the Reset everything bullet under "The
+    Mac"). Getting this Mac back to a first run now means uninstalling by hand, the way the
+    2026-09-22 session did. And **the old rules are gone**: they lived in the App Group store
+    that the uninstall removed. This Mac starts from onboarding.
+
+    **The uninstall left residue.** Zach asked for it cleared in the same step. Claude Code's
+    auto mode refused the removal as irreversible local destruction, and this session did not
+    route around it. **Nothing below was removed.**
+    - The filter extension, `com.zachshort.furlough.mac.filter (1.2.0/202609141817)
+      [activated disabled]`. SIP is enabled, so `systemextensionsctl uninstall` cannot take it,
+      and removing a system extension is a system-setting change a session does not make. It is
+      inert. A fresh store does not want the filter, so `repair()` leaves it alone
+      (`WebFilter.swift:398-413`). The new copy reads it as `Failed` (the unanswered-query
+      signature of a replaced bundle, step 43), and Settings > Web shows **Install the web
+      filter** in that state (`MacSheets.swift:1008-1010`). Installing should replace it with
+      this build's extension, by the replacement path in step 43. That is predicted, not tried.
+      Settings > Web offers **Remove** only when the filter is on (`:1014-1016`).
+    - `~/Library/Containers/com.zachshort.furlough.mac.widgets` (2026-09-09). The widget's
+      state comes from the shared App Group ("The Mac", desktop widget bullet), not from this
+      container.
+    - `~/Library/Application Support/Furlough`. It holds only `review-status.state`
+      (`READY_FOR_SALE`), which belongs to the review poller, not to the Mac app.
+    - The LaunchAgent `com.zachshort.furlough.reviewstatus`: every 3 hours it runs
+      `scripts/check-review-status.sh`, and it was written 2026-09-10 during the 1.0 review.
+      **The script is permanent; the agent is Zach's call.** The script is in-repo, is
+      `furlough review` (`scripts/furlough:289`) and is DEPLOYMENT.md's live review readout
+      (`:28`). The agent is a machine-local plist that no doc mentions. It reads
+      `get_app_store_versions.first`, so it follows whatever version is newest. With 1.3.0
+      uploaded (step 52) and its review still ahead, it will earn its keep again.
+    - Not in Zach's list and not touched: `~/Library/Containers/com.zachshort.furlough` and
+      `~/Library/Group Containers/group.com.zachshort.furlough` (2026-09-16, the iPhone build
+      installed from the App Store, step 50), `~/Library/Preferences/X9V4L6HR2R.com.zachshort.furlough.plist`,
+      `~/Library/Preferences/furlough.harness.onboarding.plist`, and `~/Library/Logs/Furlough`.
+
+    **The rest of item 1.** Steps 1–3 were already closed: DEPLOYMENT.md's rows for the
+    privacy manifest (`:49`) and label (`:38`), the review notes (`:60`) and the replies
+    (`:35`), and step 19 here. Step 5's premise was false (item 9 shipped in `e253fc6` without
+    waiting), and step 19 already carries the corrected note. So item 1 is Done.
+
+    **Stale lines found, not edited.** DEPLOYMENT.md's "Review state" row (`:33`) still says
+    `WAITING_FOR_REVIEW`, stale since 1.2.0 went live 2026-09-15. `design/MAC-FIRST-RUN.md`
+    Step 0 expects the filter `[activated enabled]` and removable from Settings > Web. It is
+    `[activated disabled]` now, and Remove is offered only when the filter is on.
 
 
 ## Style rules
