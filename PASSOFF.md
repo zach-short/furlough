@@ -55,6 +55,10 @@ the close. **What is open is now step 4 alone** — rebuild the Mac in `/Applica
 README's Release command — gated on Zach answering the testing-button question that step
 asks, not on Apple. The 13-inch iPad screenshot set the *next* submission (1.3.0) will need is
 still unowned and still not on this board.
+**Closed 2026-09-23, HANDOFF 53.** Zach answered plain Release, and the Mac was rebuilt and
+reinstalled that way. The step's "it is a Debug build" had been false since 2026-09-10, and on
+the day nothing was installed at all: a session Zach ran had uninstalled Furlough on
+2026-09-22. The reinstall starts from onboarding, and it has no Reset everything.
 
 **Four rows were stale until 2026-09-14** and are corrected above: 9, 14, 21 and 22 all shipped
 while the board still said Open, because the sessions that built them updated `HANDOFF.md` and
@@ -68,7 +72,7 @@ waiting on 1. That is the sentence that went stale; 9 shipped in `e253fc6` regar
 
 | # | Task | Status | Model | Lane | Waits on | Files it owns |
 |---|------|--------|-------|------|----------|---------------|
-| 1 | Land the submission, then put the Mac back on Release | **Approved and live.** 1.2.0 went live on the App Store 2026-09-15 (HANDOFF 19, corrected below). Steps 1–3 and 5 are done. What is left is step 4 alone — the Mac Release rebuild — which is no longer gated on Apple, only on Zach's testing-button call | Opus | Gated | **Zach**, for the testing-button call in step 4 | `DEPLOYMENT.md` (archive), `design/store/LISTING.md`, new `design/store/REVIEW-REPLIES.md`, `HANDOFF.md` |
+| 1 | Land the submission, then put the Mac back on Release | Done — HANDOFF 53. 1.2.0 went live 2026-09-15 (HANDOFF 19); step 4 ran 2026-09-23 as plain Release, no testing button, on Zach's answer. The uninstall residue he asked cleared was refused by auto mode and is his (HANDOFF 53) | Opus | Gated | nothing | `DEPLOYMENT.md` (archive), `design/store/LISTING.md`, new `design/store/REVIEW-REPLIES.md`, `HANDOFF.md` |
 | 2 | Scheduled and timed Anchor, plus Control Center and the widget button | Done — HANDOFF 24 | **Fable** | A (2nd) | 3 | `AnchorProfile`, `Policy`, `Monitoring`, `MonitorExtension`, `AnchorView`, `PhoneIntents`, `FurloughWidgets` |
 | 3 | Anchor everything except an allowlist | Done — HANDOFF 13 | **Fable** | A (1st) | nothing | `AnchorProfile`, `Policy.decide`, `Decision`, `ShieldReconciler`, `AnchorView` |
 | 4 | Sync the Anchor across devices | Done — HANDOFF 18 | **Fable** | A (3rd) | 2 and 3 | new `Shared/Core/AnchorSync.swift`, `AppModel`, `MacModel`, entitlements, privacy page |
