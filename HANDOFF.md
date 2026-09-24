@@ -104,6 +104,12 @@ small codebase he fully understands over a fork. He is interactive: ask when a d
   set of kinds that "Anchor" shields instantly without a tag, and that only scanning the paired
   NFC tag in the app can weigh anchor. While anchored, the list and the tag are locked. Anchoring is
   refused until a tag is paired. When the anchor is off, apps fall back to their rules.
+  **Superseded in part 2026-09-24 (step 55):** the drop itself still needs no tag at the model
+  layer (`AppModel.anchor(until:)`, still what the widget, Control Center, Siri and Shortcuts call,
+  and still instant) — but the hand-press **Anchor** button now puts a tag scan in front of itself
+  by default, the same ritual `unanchorWithTag()` already required, because testers said the two
+  felt mismatched without it. `AppModel.requiresTagToAnchor` (on by default, off in Tags) is the
+  toggle; `AnchorToggleButton.drop()` is where it branches.
   Since 2026-09-08 the list starts from the rules (Zach's ask): while the anchor holds nothing
   and something has a rule, **Choose apps** opens `AnchorFromRulesSheet` — every target with a
   rule, all checked, All / None, a row each — before Apple's picker, which is one tap further
@@ -3929,6 +3935,54 @@ The plan for this stretch. Tick each phase off here as it lands.
     `WAITING_FOR_REVIEW`, stale since 1.2.0 went live 2026-09-15. `design/MAC-FIRST-RUN.md`
     Step 0 expects the filter `[activated enabled]` and removable from Settings > Web. It is
     `[activated disabled]` now, and Remove is offered only when the filter is on.
+
+54. **`PASSOFF.md` consolidated: completed prompts moved to the archive.** Done 2026-09-24. Of
+    the board's 35 items (36 rows, with 8 split into 8a/8b), every one but 34 was Done or
+    settled as no — confirmed against the board table, not re-derived. `PASSOFF.md` had grown to
+    2,363 lines carrying every full prompt ever written for it, most now unrunnable history. The
+    35 prompt bodies for items 1–33 and 35 (33 and 34 never had one; 33's work is narrated in the
+    board prose, 34's is `design/MAC-FIRST-RUN.md`) moved verbatim, unedited, to
+    `~/Projects/archive/furlough/passoff-completed/PROMPTS.md` — a new archive folder, indexed in
+    `~/Projects/archive/furlough/INDEX.md` under a new "Board history" heading. `PASSOFF.md`
+    itself now holds only the intro, the board table, every correction and disproof it has
+    recorded, and the session rules: 213 lines. Nothing about status changed — the board table,
+    which was already the authoritative record over any individual prompt's header, is
+    untouched, and no HANDOFF step citation moved. `git ls-files | xargs grep -l PASSOFF`
+    (`AGENT-PRACTICES.md`, `CLAUDE.md`, `HANDOFF.md`, `design/MAC-FIRST-RUN.md`,
+    `patch-notes.md`) confirmed nothing reads `PASSOFF.md` at runtime or cites a line number that
+    would go stale.
+
+55. **Anchoring by hand asks for the tag too, by default; a haptic on anchor and unanchor.**
+    Done 2026-09-24. Tester feedback (Zach and a friend, a few days into daily use): the plain
+    **Anchor** button locking with no ceremony felt mismatched against **Unanchor**, which has
+    always needed the tag — "it just makes the routine/usage loop feel more complete." Both
+    changes are opt-out settings under Anchor > Tags > Scanner/Feedback, on by default, stored
+    locally like `autoArmsReader` (not synced — a per-device preference, not part of
+    `Config.anchor`, so no `Shared/Core` or `Tests/Core` change was needed).
+    `AppModel.requiresTagToAnchor` (default true) branches `AnchorToggleButton.drop()`
+    (`Furlough/Views/AnchorView.swift`): off, or on a reader-less iPhone
+    (`!TagScanner.isAvailable`), it still calls `anchor(until:)` straight through, exactly as
+    before; on, it calls the new `AppModel.anchorWithTag(until:)`, which scans (mirroring
+    `unanchorWithTag()`), refuses an unrecognized tag (`.wrongTag`, same message as the unanchor
+    side) rather than offering to pair it, and otherwise calls `anchor(until:)`. The widget,
+    Control Center, Siri and Shortcuts still call `anchor(until:)` directly and stay instant —
+    none of them can hold a tag up — and a tag scanned proactively at the Anchor page (the
+    existing `droppingWithTag` flow) is untouched, since that already involves a tag by the
+    user's own choice. `AppModel.anchorHaptics` (default true) gates a `.sensoryFeedback(trigger:
+    anchor.isAnchored)` on `AnchorPage` itself (`.success` either way, Apple Pay's blip), guarded
+    on `isCurrent` so the pre-built adjacent page in the pager doesn't double it — this catches
+    every path that flips `isAnchored` (the button, a tag-initiated drop, weighing anchor) in one
+    place rather than wiring each call site. Both settings' UI lives in `AnchorTagsScreen`
+    (`Furlough/Views/AnchorScreens.swift`): `requireTagCard` under a new "Scanner" second card,
+    `hapticsCard` under a new "Feedback" section. `resetEverything()` clears both keys back to
+    `true`. This amends "Settled: what Furlough is" above (2026-09-07): the drop itself is still
+    tag-free at the model layer, but the hand-press default is not any more — recorded there,
+    dated, rather than left to read as still current.
+    **Left for Zach:** `site/src/pages/help/nfc-tags.astro` and `the-anchor.astro` still describe
+    tapping Anchor as always instant/no-tag (they were not touched — public site copy is a
+    bigger, more opinionated rewrite than this step's code change, and better done as its own
+    pass); `README.md`'s Anchor section was updated in place since `HANDOFF.md`'s own read-first
+    list points at it. Gates green (`build/build.log`, `build/test.log`); not walked on a phone.
 
 
 ## Style rules

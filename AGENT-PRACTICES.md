@@ -1,3 +1,4 @@
+<!-- personal-config v0.5.0 · 2026-09-23 · config 00000000 · standard v1.0.2 · adapted -->
 # Agent working standard — Furlough
 
 **Adapted to this repo 2026-09-14, solo mode.**

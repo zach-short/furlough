@@ -337,6 +337,18 @@
           "platform": "both",
           "title": "Help in the app",
           "detail": "Nine pages behind the question mark, not on a website that might itself be shielded. Anything with a number in it reads the number out of your own config."
+        },
+        {
+          "kind": "new",
+          "platform": "iphone",
+          "title": "Anchor asks for the tag too, by default",
+          "detail": "Tapping Anchor used to lock instantly, no tag needed — only lifting it did. Now, by default, tapping Anchor asks you to hold up your tag first, the same ritual as Unanchor. Turn it off under Anchor › Tags › Scanner if you'd rather it stay instant."
+        },
+        {
+          "kind": "new",
+          "platform": "iphone",
+          "title": "A haptic when the anchor locks or lifts",
+          "detail": "A short tap on the screen the moment the anchor drops or lifts, the way a payment confirms. On by default; turn it off under Anchor › Tags › Feedback."
         }
       ]
     }
