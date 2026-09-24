@@ -176,6 +176,10 @@ struct AnchorTagsScreen: View {
                 .padding(.top, 6)
             SectionLabel(text: "Scanner")
             autoArmCard
+            requireTagCard
+                .padding(.top, 10)
+            SectionLabel(text: "Feedback")
+            hapticsCard
         }
         .sheet(isPresented: $placing) { TagPlacementView() }
         .confirmationDialog(
@@ -270,6 +274,60 @@ struct AnchorTagsScreen: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             Text("Off, arriving here waits for you to tap Hold a tag up. On, it starts listening the moment there is a tag to pair or an anchor to lift.")
+                .emberBody(11.5)
+                .foregroundStyle(Ember.muted)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 10)
+        }
+        .emberCard()
+    }
+
+    /// On by default: dropping the anchor by hand asks for the tag too, the same as lifting it.
+    private var requireTagCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 12) {
+                Text("Require the tag to anchor")
+                    .emberBody(13)
+                    .foregroundStyle(Ember.cream)
+                Spacer(minLength: 8)
+                Toggle(
+                    "Require the tag to anchor",
+                    isOn: Binding(get: { model.requiresTagToAnchor }, set: { model.setRequiresTagToAnchor($0) })
+                )
+                .labelsHidden()
+                .tint(Ember.ember)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            Text("On, tapping Anchor asks you to hold up your tag before it locks, the same as lifting it. Off, tapping Anchor locks it immediately, no tag needed.")
+                .emberBody(11.5)
+                .foregroundStyle(Ember.muted)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 10)
+        }
+        .emberCard()
+    }
+
+    /// On by default.
+    private var hapticsCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 12) {
+                Text("Haptic on anchor and unanchor")
+                    .emberBody(13)
+                    .foregroundStyle(Ember.cream)
+                Spacer(minLength: 8)
+                Toggle(
+                    "Haptic on anchor and unanchor",
+                    isOn: Binding(get: { model.anchorHaptics }, set: { model.setAnchorHaptics($0) })
+                )
+                .labelsHidden()
+                .tint(Ember.ember)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            Text("A tap on the phone's own screen the moment the anchor locks or lifts, the way a payment confirms.")
                 .emberBody(11.5)
                 .foregroundStyle(Ember.muted)
                 .fixedSize(horizontal: false, vertical: true)

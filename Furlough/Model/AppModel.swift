@@ -87,6 +87,21 @@ final class AppModel {
     /// avoid surprising Apple's scan sheet.
     private(set) var autoArmsReader = UserDefaults.standard.bool(forKey: AppModel.autoArmsReaderKey)
     private static let autoArmsReaderKey = "furlough.autoArmsReader"
+    /// Whether tapping Anchor by hand also asks for the tag before it locks, the same ritual as
+    /// lifting it. On by default — testers said the two felt mismatched without it. See
+    /// `AnchorToggleButton.drop()`.
+    private(set) var requiresTagToAnchor = AppModel.storedRequiresTagToAnchor
+    private static let requiresTagToAnchorKey = "furlough.requiresTagToAnchor"
+    private static var storedRequiresTagToAnchor: Bool {
+        UserDefaults.standard.object(forKey: requiresTagToAnchorKey) as? Bool ?? true
+    }
+    /// Whether locking or lifting the anchor gives a haptic, the way a payment confirms. On by
+    /// default.
+    private(set) var anchorHaptics = AppModel.storedAnchorHaptics
+    private static let anchorHapticsKey = "furlough.anchorHaptics"
+    private static var storedAnchorHaptics: Bool {
+        UserDefaults.standard.object(forKey: anchorHapticsKey) as? Bool ?? true
+    }
     /// Halves whose guide has been completed. A stored flag, not derived — completion (e.g.
     /// "read your list") can't be inferred from config state. First two steps of each guide are
     /// derived; see `HalfGuide`.
@@ -170,6 +185,20 @@ final class AppModel {
         guard on != autoArmsReader else { return }
         UserDefaults.standard.set(on, forKey: Self.autoArmsReaderKey)
         autoArmsReader = on
+    }
+
+    /// Turns the hand-press anchor's tag requirement on or off. See `requiresTagToAnchor`.
+    func setRequiresTagToAnchor(_ on: Bool) {
+        guard on != requiresTagToAnchor else { return }
+        UserDefaults.standard.set(on, forKey: Self.requiresTagToAnchorKey)
+        requiresTagToAnchor = on
+    }
+
+    /// Turns the anchor/unanchor haptic on or off. See `anchorHaptics`.
+    func setAnchorHaptics(_ on: Bool) {
+        guard on != anchorHaptics else { return }
+        UserDefaults.standard.set(on, forKey: Self.anchorHapticsKey)
+        anchorHaptics = on
     }
 
     /// Where a + press lands, given the page it was pressed over. Rules always adds a rule;
@@ -1343,9 +1372,12 @@ final class AppModel {
         enforce(reason: "anchor scope")
     }
 
-    /// Anchoring needs no tag (a tightening) but requires one paired, or there'd be no way back.
-    /// `until` schedules a timed lift. Drop logic is shared with the widget extension via
-    /// `AnchorDrop`; only the app can register the wake.
+    /// The drop itself needs no tag (it's a tightening) but requires one paired, or there'd be no
+    /// way back. `requiresTagToAnchor` puts a scan in front of the hand-press button anyway — see
+    /// `anchorWithTag` — but the widget, Control Center, Siri and Shortcuts all call this directly
+    /// and stay instant, since none of them can hold a tag up. `until` schedules a timed lift.
+    /// Drop logic is shared with the widget extension via `AnchorDrop`; only the app can register
+    /// the wake.
     func anchor(until: Date? = nil) -> AnchorOutcome {
         switch AnchorDrop.drop(until: until, reason: "anchor") {
         case .refused(.alreadyAnchored):
@@ -1427,6 +1459,24 @@ final class AppModel {
 
     /// Ends an armed read: the Anchor screen going away with its sheet still up.
     func stopReadingTags() { scanner.cancel() }
+
+    /// What `AnchorToggleButton` calls instead of `anchor(until:)` when `requiresTagToAnchor` is
+    /// on: scans a tag and, if it's one of the anchor's own, drops it. An unrecognized tag is
+    /// refused rather than offered for pairing — pairing here would skip the naming step the Tags
+    /// screen gives it.
+    func anchorWithTag(until: Date? = nil) async -> AnchorOutcome {
+        let scanned: Data
+        do {
+            scanned = try await scanner.scan(prompt: "Hold your iPhone to your tag to anchor.")
+        } catch {
+            return outcome(for: error)
+        }
+        guard SharedStore.load().config.anchor.tag(matching: scanned) != nil else {
+            SharedStore.log("refused to anchor: not a paired tag")
+            return .wrongTag
+        }
+        return anchor(until: until)
+    }
 
     /// The only unblock in Furlough: scans a tag and, if paired, lifts the anchor.
     func unanchorWithTag() async -> AnchorOutcome {
@@ -1889,6 +1939,10 @@ final class AppModel {
         anchorPageAdds = .anchor
         UserDefaults.standard.removeObject(forKey: Self.autoArmsReaderKey)
         autoArmsReader = false
+        UserDefaults.standard.removeObject(forKey: Self.requiresTagToAnchorKey)
+        requiresTagToAnchor = true
+        UserDefaults.standard.removeObject(forKey: Self.anchorHapticsKey)
+        anchorHaptics = true
         // A reset takes the tags with it, so the next pairing is a first pairing again.
         UserDefaults.standard.removeObject(forKey: Self.tagPlacementKey)
         hasSeenTagPlacement = false

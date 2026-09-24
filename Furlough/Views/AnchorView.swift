@@ -66,6 +66,11 @@ struct AnchorPage: View {
             .onChange(of: scenePhase) { _, phase in
                 if phase == .background { model.stopReadingTags() }
             }
+            // Apple Pay's blip, either way: locking and lifting are each an ending, not a step
+            // midway. Gated on `isCurrent` so the pre-built adjacent page doesn't double it.
+            .sensoryFeedback(trigger: anchor.isAnchored) { _, _ in
+                isCurrent && model.anchorHaptics ? .success : nil
+            }
             // Anchor is the last page, so a further swipe left has nowhere to go in the
             // TabView; simultaneous so it doesn't steal the page-back swipe toward Rules.
             // Rules -> swipe left -> Anchor -> swipe left -> the NFC sheet.
@@ -955,8 +960,24 @@ struct AnchorToggleButton: View {
         }
     }
 
+    /// Goes straight through unless `requiresTagToAnchor` is on and this iPhone has a reader —
+    /// then it's `dropWithTag()` instead, the same ritual as `unanchor()` below.
     private func drop() {
-        switch model.anchor(until: until) {
+        guard model.requiresTagToAnchor, TagScanner.isAvailable else {
+            switch model.anchor(until: until) {
+            case .failed(let reason): message = reason
+            default: break
+            }
+            return
+        }
+        Task { await dropWithTag() }
+    }
+
+    private func dropWithTag() async {
+        busy = true
+        defer { busy = false }
+        switch await model.anchorWithTag(until: until) {
+        case .wrongTag: message = "That is not a paired tag."
         case .failed(let reason): message = reason
         default: break
         }
