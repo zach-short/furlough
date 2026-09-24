@@ -3984,6 +3984,25 @@ The plan for this stretch. Tick each phase off here as it lands.
     pass); `README.md`'s Anchor section was updated in place since `HANDOFF.md`'s own read-first
     list points at it. Gates green (`build/build.log`, `build/test.log`); not walked on a phone.
 
+56. **A second 1.3.0 build cut, carrying step 55, and uploaded.** Done 2026-09-24. Same version
+    as step 52's build — 1.3.0 was still `unreleased`, so this step folded step 55's two changes
+    into that entry's `changes` array (`release-notes.json`) rather than bumping the version,
+    per `patch-notes.md` §4 ("top entry is unreleased: append, don't invent a bump"); validated
+    with `python3 -m json.tool` and `scripts/version.sh` ("The notes cover this version."), then
+    the full `Tests/Core` suite (811 tests, 120 suites, passed) since `ReleaseNotesTests.swift`
+    holds the file to its shape. `scripts/archive.sh` (no `TESTING_TOOLS`) produced
+    `build/Furlough-202609242030.xcarchive` and `build/export/Furlough.ipa` (8,703,854 bytes);
+    its own checks passed (no testing-only code, every Screen Time framework entitled). Zach ran
+    the upload himself, same command as step 52:
+    ```
+    xcrun altool --upload-app -f build/export/Furlough.ipa -t ios --apiKey L6A2R4SBXQ --apiIssuer 04f9fe5a-56e5-460f-80ac-c57e788fbdc6
+    ```
+    `UPLOAD SUCCEEDED with no errors`, delivery UUID `4de60180-9b4f-4747-9885-12627deed84f`,
+    2026-09-24 16:44:37 ET. As with step 52, App Store *review* submission is still unstarted
+    (the 13-inch iPad screenshot set), and this session did not attempt it. Also unrun: the Mac
+    and site builds — nothing in step 55 touches `FurloughMac` or `site/`, so neither gate says
+    anything about them.
+
 
 ## Style rules
 
