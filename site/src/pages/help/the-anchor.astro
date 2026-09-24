@@ -19,14 +19,14 @@ import { site } from '../../site';
     </header>
 
     <article class="card prose body" data-reveal style="--d: .1s">
-      <p>The Anchor is a second list, locked in one tap from anywhere and released only by a physical NFC tag you paired. Leave the tag at home and the phone stays anchored until you are back.</p>
+      <p>The Anchor is a second list, released only by a physical NFC tag you paired — and, by default, that same tap locks it too. Leave the tag at home and the phone stays anchored until you are back.</p>
       <p>It is separate from your rules and it does not use the delay. Anchoring only ever takes things away, so it needs no waiting; the walk back to the tag is the whole of the friction.</p>
 
       <h2>Using it</h2>
       <ol>
         <li><strong>Choose apps.</strong> The first time, the anchor offers what you already block, every one checked. Keep what it should hold, or go on to the picker for anything else. After that, <span class="path">Change apps</span> opens the picker with the list filled in.</li>
         <li><strong>Pair a tag.</strong> Hold the phone to any NTAG sticker, or the tag that came with another blocking product if you already own one. Furlough reads its hardware identifier and writes nothing to it. Up to three can be paired, so a key can live at each place you do — name each one for its place.</li>
-        <li><strong>Anchor.</strong> Everything on the list is shielded immediately. No tag is needed to lock and no delay applies. A paired tag held up on the Anchor screen does the same, after asking.</li>
+        <li><strong>Anchor.</strong> By default, it asks for your tag first — hold it up and the list locks, the same ritual as Unanchor below. Turn off <span class="path">Require the tag to anchor</span> under Anchor › Tags and one tap locks it immediately instead, no tag needed. Either way nothing is delayed, because anchoring only ever takes things away.</li>
         <li><strong>Unanchor.</strong> Only a tag you paired lifts the anchor, and any of them does, at once. Hold it up on the Anchor screen, or tap <span class="path">Unanchor</span> anywhere else. This is the one unblock in Furlough, and it exists only here.</li>
       </ol>
 
@@ -60,7 +60,7 @@ import { site } from '../../site';
       </ul>
 
       <div class="note">
-        <p><strong>Before you tap it.</strong> Anchoring something Essential warns first and asks again before it drops. The anchor is instant and only a tag lifts it, so a tag in another room means Messages stays gone until you find it. Keep every tag somewhere that makes you think — a key in your bag is no lock at all.</p>
+        <p><strong>Before you tap it.</strong> Anchoring something Essential warns first and asks again before it drops. Nothing about it is delayed, and only a tag lifts it — by default the same tag has to lock it too — so a tag in another room means Messages stays gone until you find it, whichever end you're doing. Keep every tag somewhere that makes you think — a key in your bag is no lock at all.</p>
       </div>
 
       <p class="contact">More: <a href="/help/nfc-tags/">NFC tags</a> · <a href="/help/">All help</a> · <a href={`mailto:${site.email}`}>{site.email}</a></p>
