@@ -26,6 +26,9 @@ struct AnchorPage: View {
     /// until confirmed, since that's a way to lock yourself out.
     @State private var droppingWithTag: PairedTag?
     @State private var pairingScanned: Data?
+    /// Why the last "Pair it" was refused, shown inside the naming sheet rather than in a
+    /// second alert.
+    @State private var pairingError: String?
     /// True for the moment `AnchorConfirmMark` draws itself over the glyph in `stateCard`, the
     /// visual third of the same confirmation as the haptic and the chime.
     @State private var showConfirmMark = false
@@ -243,7 +246,7 @@ struct AnchorPage: View {
     }
 
     /// Gathered here since `body` is at the type-checker's limit without them, and both panes
-    /// raise the same ones (e.g. pairing from the guide ends in the same naming alert).
+    /// raise the same ones (e.g. pairing from the guide ends in the same naming sheet).
     private func withPresentations(_ content: some View) -> some View {
         content
             .sheet(isPresented: $pickingLift) {
@@ -269,22 +272,34 @@ struct AnchorPage: View {
             } message: {
                 Text(tagDropMessage)
             }
-            // Combined into one alert: SwiftUI drops the second of two presentations requested
-            // in the same breath, so this can't hand off from a dialog to a separate alert.
-            .alert(
-                anchor.isPaired ? "Pair this as another key?" : "Pair this tag?",
-                isPresented: Binding(get: { pairingScanned != nil }, set: { if !$0 { pairingScanned = nil } })
+            // A refused pairing is said inside this sheet, which stays up: SwiftUI drops the
+            // second of two presentations requested in the same breath, so it can't hand off
+            // to the "Anchor" alert above. The error clears only once the sheet has gone, so
+            // it doesn't vanish mid-slide on a cancel.
+            .sheet(
+                isPresented: Binding(get: { pairingScanned != nil }, set: { if !$0 { pairingScanned = nil } }),
+                onDismiss: { pairingError = nil }
             ) {
-                TextField("Kitchen drawer", text: $draftName)
-                Button("Pair it") {
-                    if let scanned = pairingScanned { keep(scanned) }
+                NamingSheet(
+                    title: anchor.isPaired ? "Pair this as another key?" : "Pair this tag?",
+                    message: anchor.isPaired
+                        ? "Furlough does not know this tag. Every paired tag lifts the anchor on its own, so this is a key at a second place — \(tagCount) used. Name it for the place it will live in."
+                        : "Furlough does not know this tag. Pair it and it becomes the key: nothing else lifts an anchor once it is down. Name it for the place it will live in.",
+                    placeholder: "Kitchen drawer",
+                    name: $draftName,
+                    confirmTitle: "Pair it",
+                    cancelTitle: "Not this one",
+                    error: pairingError
+                ) {
+                    guard let scanned = pairingScanned else { return }
+                    if let refusal = keep(scanned) {
+                        withAnimation(.snappy) { pairingError = refusal }
+                    } else {
+                        pairingScanned = nil
+                    }
+                } onCancel: {
                     pairingScanned = nil
                 }
-                Button("Not this one", role: .cancel) { pairingScanned = nil }
-            } message: {
-                Text(anchor.isPaired
-                    ? "Furlough does not know this tag. Every paired tag lifts the anchor on its own, so this is a key at a second place — \(tagCount) used. Name it for the place it will live in."
-                    : "Furlough does not know this tag. Pair it and it becomes the key: nothing else lifts an anchor once it is down. Name it for the place it will live in.")
             }
     }
 
@@ -591,6 +606,7 @@ struct AnchorPage: View {
             droppingWithTag = tag
         case .pairFirst(let scanned), .pairAnother(let scanned):
             draftName = ""
+            pairingError = nil
             pairingScanned = scanned
         case .refused(let why):
             message = why
@@ -605,13 +621,15 @@ struct AnchorPage: View {
     }
 
     /// An empty typed name is ignored by `renameTag`, which keeps the model's placeholder —
-    /// a tag is never nameless, only unhelpfully named.
-    private func keep(_ scanned: Data) {
+    /// a tag is never nameless, only unhelpfully named. Returns why pairing was refused, for
+    /// the naming sheet to show in place; nil once the tag is paired.
+    private func keep(_ scanned: Data) -> String? {
         switch model.pair(identifier: scanned) {
         case .paired(let tag): model.renameTag(id: tag.id, to: draftName)
-        case .failed(let reason): message = reason
+        case .failed(let reason): return reason
         default: break
         }
+        return nil
     }
 
     private var appsCard: some View {

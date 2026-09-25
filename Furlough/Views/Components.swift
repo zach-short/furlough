@@ -233,6 +233,105 @@ struct GhostButton: View {
     }
 }
 
+/// A title, a line of context, one field and two actions: the app's own alert-with-a-field.
+/// Not `.alert { TextField }`, whose field UIKit lays out ~15 pt right of center, flush into
+/// the dialog's edge, and which crashes inside UIKit's layout if text size changes while it
+/// is up. The caller clears its own state in `onCancel` and in the sheet binding's setter,
+/// so a swipe down is the same as Cancel.
+struct NamingSheet: View {
+    let placeholder: String
+    @Binding var name: String
+    let confirmTitle: String
+    var cancelTitle = "Cancel"
+    /// Why the last confirm failed, shown in place above the actions. The sheet stays up so
+    /// it can be read; the caller clears it once the sheet has gone.
+    var error: String?
+    let onConfirm: () -> Void
+    let onCancel: () -> Void
+
+    /// Read once, when the sheet appears: confirming can change what the caller built them
+    /// from (a first pairing makes the anchor paired), and the sheet would otherwise rewrite
+    /// its own title while it slides away.
+    @State private var title: String
+    @State private var message: String
+    @FocusState private var typing: Bool
+    /// Seeded near the real content height so the sheet doesn't resize on open.
+    @State private var contentHeight: CGFloat = 330
+
+    init(
+        title: String,
+        message: String,
+        placeholder: String,
+        name: Binding<String>,
+        confirmTitle: String,
+        cancelTitle: String = "Cancel",
+        error: String? = nil,
+        onConfirm: @escaping () -> Void,
+        onCancel: @escaping () -> Void
+    ) {
+        _title = State(initialValue: title)
+        _message = State(initialValue: message)
+        self.placeholder = placeholder
+        _name = name
+        self.confirmTitle = confirmTitle
+        self.cancelTitle = cancelTitle
+        self.error = error
+        self.onConfirm = onConfirm
+        self.onCancel = onCancel
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                Text(title)
+                    .emberDisplay(24)
+                    .foregroundStyle(Ember.cream)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(message)
+                    .emberBody(13.5)
+                    .foregroundStyle(Ember.muted)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 10)
+                TextField("Name", text: $name, prompt: Text(placeholder).foregroundStyle(Ember.faint))
+                    .emberBody(15)
+                    .foregroundStyle(Ember.cream)
+                    .multilineTextAlignment(.center)
+                    .submitLabel(.done)
+                    .focused($typing)
+                    .onSubmit(onConfirm)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 13)
+                    .background(Color.white.opacity(0.07), in: Capsule())
+                    .overlay(Capsule().strokeBorder(Color.white.opacity(0.12), lineWidth: 1))
+                    // The padding around the field is part of the pill, so a tap there types too.
+                    .contentShape(Capsule())
+                    .onTapGesture { typing = true }
+                    .padding(.top, 22)
+                if let error {
+                    EffectBanner(kind: .error(error))
+                        .padding(.top, 12)
+                        .transition(.opacity)
+                }
+                ProminentButton(title: confirmTitle, action: onConfirm)
+                    .padding(.top, 18)
+                GhostButton(title: cancelTitle, color: Ember.muted, action: onCancel)
+                    .padding(.top, 4)
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 30)
+            .padding(.bottom, 12)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .presentationDetents([.height(contentHeight)])
+        .presentationDragIndicator(.visible)
+        .presentationBackground { EmberWall() }
+        .onAppear { typing = true }
+    }
+}
+
 /// A section label with the spacing from the mockups.
 struct SectionLabel: View {
     let text: String

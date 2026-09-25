@@ -197,18 +197,19 @@ struct AnchorTagsScreen: View {
                 ? "This is the last key. Anchoring is refused until you pair another."
                 : "The other tags still release the anchor.")
         }
-        .alert(
-            "Name this tag",
-            isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })
-        ) {
-            TextField("Home", text: $draftName)
-            Button("Save") {
+        .sheet(isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
+            NamingSheet(
+                title: "Name this tag",
+                message: "Name it for the place it lives in, so you know which key you are looking for.",
+                placeholder: "Home",
+                name: $draftName,
+                confirmTitle: "Save"
+            ) {
                 if let tag = renaming { model.renameTag(id: tag.id, to: draftName) }
                 renaming = nil
+            } onCancel: {
+                renaming = nil
             }
-            Button("Cancel", role: .cancel) { renaming = nil }
-        } message: {
-            Text("Name it for the place it lives in, so you know which key you are looking for.")
         }
         .alert("Tags", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
             Button("OK") { message = nil }
