@@ -37,6 +37,13 @@ final class AppModel {
     var notificationsGranted: Bool?
     let isAppGroupAvailable = SharedStore.isAppGroupAvailable
     private let scanner = TagScanner()
+    /// The moment a tag scan last completed successfully — `TagScanner` already shows the
+    /// system NFC sheet's own native checkmark on that same success, so `AnchorPage` checks
+    /// this to skip its own haptic/sound/mark rather than stacking a second confirmation on
+    /// top of the first. Read as elapsed time, not consumed/reset by hand: a scan whose dialog
+    /// was later dismissed with "Not yet" just ages past the window on its own, rather than
+    /// needing to be cleared on every path that can abandon a scan.
+    @ObservationIgnored private(set) var lastTagScanAt: Date?
     /// A Weigh Anchor intent waiting for Furlough to reach the foreground; see below.
     @ObservationIgnored private var wantsWeighAnchor = false
     /// FamilyControls briefly reports "not determined" right after a cold start; this remembers
@@ -427,13 +434,32 @@ final class AppModel {
     }
 
     /// FamilyControls reports "not determined" right after cold start; the real answer arrives
-    /// here shortly after — enforce then if `activate()` couldn't.
+    /// here shortly after — enforce then if `activate()` couldn't. It does the same thing
+    /// mid-session too, whenever something (the usage page, on iOS 26.4+) touches the
+    /// data-access-eligible APIs: `FamilyControlsAgent` resets status and expects a fresh
+    /// `requestAuthorization` to settle it back onto `approved`/`approvedWithDataAccess` — see
+    /// [[ios-26-4-screen-time-data-access]]. Left alone that reset reads as a revoke and drops
+    /// an already-authorized session onto the onboarding screen until the user re-requests
+    /// access by hand; settling it here does the same re-request silently instead. Guarded off
+    /// during a testing reset, which revokes access on purpose and wants onboarding to stick.
     func observeAuthorization() async {
         for await status in AuthorizationCenter.shared.$authorizationStatus.values {
             let hadAccess = isAuthorized
+            if status == .notDetermined, hadAccess, !isRevokingForReset {
+                await requestAuthorization()
+                continue
+            }
             note(status)
             if isAuthorized, !hadAccess { enforce(reason: "authorized") }
         }
+    }
+
+    private var isRevokingForReset: Bool {
+        #if DEBUG || TESTING_TOOLS
+        restartsOnboarding
+        #else
+        false
+        #endif
     }
 
     /// Records the status, and a definite answer for the next launch (see `wasAuthorized`).
@@ -1450,6 +1476,7 @@ final class AppModel {
         let scanned: Data
         do {
             scanned = try await scanner.scan(prompt: prompt)
+            lastTagScanAt = Date()
         } catch {
             if let scan = error as? TagScanner.ScanError, scan.isQuiet { return .quiet }
             return .failed(error.localizedDescription)
@@ -1468,6 +1495,7 @@ final class AppModel {
         let scanned: Data
         do {
             scanned = try await scanner.scan(prompt: "Hold your iPhone to your tag to anchor.")
+            lastTagScanAt = Date()
         } catch {
             return outcome(for: error)
         }
@@ -1483,6 +1511,7 @@ final class AppModel {
         let scanned: Data
         do {
             scanned = try await scanner.scan(prompt: "Hold your iPhone to the Furlough tag to weigh anchor.")
+            lastTagScanAt = Date()
         } catch {
             return outcome(for: error)
         }
