@@ -25,6 +25,51 @@
   body { width: var(--frame-w); height: var(--frame-h); }
   body.all { width: calc(var(--frame-w) * var(--n)); }
 
+  /* The 13-inch iPad slot (2064x2752). A phone-shaped screen floating in the bigger canvas is
+     a real rejection reason — Apple wants the device's *own* proportions, not the iPhone's
+     scaled up. So here the device itself is redrawn iPad-shaped, and each frame's screen shows
+     design/store/raw-ipad/NN.png instead of the iPhone capture — an AI reflow (Higgsfield
+     gpt_image_2_5, from the matching raw/NN.png) of the same screen at iPad width, not a
+     captured one. See raw-ipad/README.md: this is a stopgap for App Store Connect's 13-inch
+     iPad requirement until a real iPad exists to shoot from, same reason raw/ has to come off
+     a real iPhone — Screen Time does not run in the Simulator. If raw-ipad/NN.png is ever
+     missing, the .mock placeholder below still reflows to fill the shape as a last resort. */
+  body.ipad { --frame-w: 2064px; --frame-h: 2752px; }
+  body.ipad .frame { padding: 190px 260px 0; }
+  body.ipad h1 { font-size: 100px; max-width: 13ch; }
+  body.ipad .sub { max-width: 26ch; }
+  body.ipad .stage { margin-top: 56px; margin-left: -260px; margin-right: -260px; width: calc(100% + 520px); }
+  /* Flat, not tilted: the arc of per-frame angles was tuned for a small phone floating in a
+     tall canvas, and just reads as crooked at this much larger, flatter iPad shape. */
+  body.ipad .device { width: 1460px; height: 1950px; border-radius: 90px; transform: none; }
+  body.ipad .screen { border-radius: 78px; }
+  body.ipad .ph { display: none; }
+  body.ipad .mock { padding: 84px 96px; }
+  body.ipad .mocktitle { font-size: 76px; margin: 100px 0 16px; }
+  body.ipad .mocknote { font-size: 36px; max-width: 1180px; }
+  body.ipad .glass { margin-top: 96px; }
+  body.ipad .glass[width="300"] { width: 340px; height: 452px; }
+  body.ipad .glass[width="360"] { width: 420px; height: 420px; }
+  body.ipad .row { margin-top: 40px; padding: 38px 40px; border-radius: 36px; }
+  body.ipad .dot { width: 32px; height: 32px; }
+  body.ipad .rowtext { font-size: 38px; }
+  body.ipad .rowmeta { font-size: 32px; }
+  body.ipad .week { margin-top: 56px; }
+  body.ipad .week .days { font-size: 28px; margin-bottom: 20px; }
+  body.ipad .week .cols { height: 1320px; gap: 20px; }
+  body.ipad .field { margin-top: 56px; padding: 42px 44px; font-size: 40px; }
+  body.ipad .widget { margin-top: 80px; padding: 56px 56px 50px; border-radius: 64px;
+                      grid-template-columns: 190px 1fr; gap: 40px; }
+  body.ipad .widget .name { font-size: 50px; }
+  body.ipad .widget .count { font-size: 92px; }
+  body.ipad .widget .until { font-size: 34px; }
+  /* auto-fit, not a fixed count: this frame's content only has as many tiles as "n apps" in the
+     row above it says, and a fixed wider grid just left empty track space to their right. */
+  body.ipad .apps { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 40px; margin-top: 90px; }
+  body.ipad .shield { max-width: 760px; margin: 0 auto; }
+  body.ipad .shield .mocktitle { font-size: 62px; }
+  body.ipad .close { margin-bottom: 130px; padding: 46px 0; font-size: 40px; }
+
   .panorama {
     position: relative; width: calc(var(--frame-w) * var(--n)); height: var(--frame-h);
     background: var(--ground);
@@ -80,8 +125,10 @@
   /* Placeholder shown until design/store/raw/NN.png exists. */
   .mock { position: absolute; inset: 0; padding: 56px 48px;
           background-image: radial-gradient(ellipse 80% 40% at 30% 104%, rgba(229,86,61,.30), transparent 62%); }
-  .statusbar { display: flex; justify-content: space-between; align-items: center;
-               font: 500 30px 'GeistMono', monospace; color: var(--cream); padding: 12px 26px 0; }
+  /* The real app draws nothing here — no status bar row of its own — so the mock shouldn't
+     invent one either. Hidden rather than deleted from each frame's markup below, since it's
+     one rule against ten repeats of the div. */
+  .statusbar { display: none; }
   .mocktitle { font: 700 62px/1.1 'Bricolage', sans-serif; color: var(--cream);
                margin: 92px 0 12px; letter-spacing: -.02em; }
   .mocknote { font: 400 30px 'Onest', sans-serif; color: var(--faint); }
@@ -166,7 +213,7 @@
       <h1>No unblock button.</h1>
       <p class="sub">Pick the apps that eat your time. Furlough shields them when the time is gone.</p>
       <div class="stage"><div class="device"><div class="screen">
-        <img src="raw/01.png" onerror="this.remove()">
+        <img src="raw/01.png" data-ipad-src="raw-ipad/01.png" onerror="this.remove()">
         <div class="mock">
           <div class="statusbar"><span>9:41</span><span>&#9679;&#9679;&#9679;&#9679;</span></div>
           <div class="mocktitle">Instagram</div>
@@ -186,7 +233,7 @@
       <h1>Locked till you tap the tag.</h1>
       <p class="sub">One tap locks. Only the NFC tag you paired releases it. Leave the tag at home.</p>
       <div class="stage"><div class="device"><div class="screen">
-        <img src="raw/02.png" onerror="this.remove()">
+        <img src="raw/02.png" data-ipad-src="raw-ipad/02.png" onerror="this.remove()">
         <div class="mock">
           <div class="statusbar"><span>9:41</span><span>&#9679;&#9679;&#9679;&#9679;</span></div>
           <div class="mocktitle">Anchored</div>
@@ -205,7 +252,7 @@
       <h1>Any sticker will do.</h1>
       <p class="sub">Furlough reads the tag&#8217;s serial number and never writes to it. Up to three keys, one per place.</p>
       <div class="stage"><div class="device"><div class="screen">
-        <img src="raw/03.png" onerror="this.remove()">
+        <img src="raw/03.png" data-ipad-src="raw-ipad/03.png" onerror="this.remove()">
         <div class="mock">
           <div class="statusbar"><span>9:41</span><span>&#9679;&#9679;&#9679;&#9679;</span></div>
           <div class="mocktitle">Tags</div>
@@ -222,7 +269,7 @@
       <h1>Everything but four.</h1>
       <p class="sub">Turn the list inside out: every app and website is held, and the list becomes what stays open.</p>
       <div class="stage"><div class="device"><div class="screen">
-        <img src="raw/04.png" onerror="this.remove()">
+        <img src="raw/04.png" data-ipad-src="raw-ipad/04.png" onerror="this.remove()">
         <div class="mock">
           <div class="statusbar"><span>9:41</span><span>&#9679;&#9679;&#9679;&#9679;</span></div>
           <div class="mocktitle">Anchored</div>
@@ -238,7 +285,7 @@
       <h1>Websites, too.</h1>
       <p class="sub">Picked from Apple&#8217;s picker, a site gets hours and a budget like an app. Typed in, it gets hours.</p>
       <div class="stage"><div class="device"><div class="screen">
-        <img src="raw/05.png" onerror="this.remove()">
+        <img src="raw/05.png" data-ipad-src="raw-ipad/05.png" onerror="this.remove()">
         <div class="mock">
           <div class="statusbar"><span>9:41</span><span>&#9679;&#9679;&#9679;&#9679;</span></div>
           <div class="mocktitle">Add a website</div>
@@ -255,7 +302,7 @@
       <h1>Sixty minutes. Then it&#8217;s gone.</h1>
       <p class="sub">Give every app a daily budget. Spend it whenever you like.</p>
       <div class="stage"><div class="device"><div class="screen">
-        <img src="raw/06.png" onerror="this.remove()">
+        <img src="raw/06.png" data-ipad-src="raw-ipad/06.png" onerror="this.remove()">
         <div class="mock">
           <div class="statusbar"><span>9:41</span><span>&#9679;&#9679;&#9679;&#9679;</span></div>
           <div class="mocktitle">Daily budget</div>
@@ -272,7 +319,7 @@
       <h1>Draw the whole week.</h1>
       <p class="sub">Seven days across, 24 hours down. Tap a day to change its hours, then give them to any other day.</p>
       <div class="stage"><div class="device"><div class="screen">
-        <img src="raw/07.png" onerror="this.remove()">
+        <img src="raw/07.png" data-ipad-src="raw-ipad/07.png" onerror="this.remove()">
         <div class="mock">
           <div class="statusbar"><span>9:41</span><span>&#9679;&#9679;&#9679;&#9679;</span></div>
           <div class="mocktitle">Week</div>
@@ -298,7 +345,7 @@
       <h1>Loosening waits a day.</h1>
       <p class="sub">Tightening is instant. Loosening waits out the delay you set. You can cancel it while it waits.</p>
       <div class="stage"><div class="device"><div class="screen">
-        <img src="raw/08.png" onerror="this.remove()">
+        <img src="raw/08.png" data-ipad-src="raw-ipad/08.png" onerror="this.remove()">
         <div class="mock">
           <div class="statusbar"><span>9:41</span><span>&#9679;&#9679;&#9679;&#9679;</span></div>
           <div class="mocktitle">Pending</div>
@@ -314,7 +361,7 @@
       <h1>The worst apps wait longest.</h1>
       <p class="sub">Each app has a tier that scales its delay. Hazard waits four times as long, Essential a quarter.</p>
       <div class="stage"><div class="device"><div class="screen">
-        <img src="raw/09.png" onerror="this.remove()">
+        <img src="raw/09.png" data-ipad-src="raw-ipad/09.png" onerror="this.remove()">
         <div class="mock">
           <div class="statusbar"><span>9:41</span><span>&#9679;&#9679;&#9679;&#9679;</span></div>
           <div class="mocktitle">How much it is worth</div>
@@ -332,7 +379,7 @@
       <h1>Nothing to tap but Close.</h1>
       <p class="sub">The block screen says which app is closed and what would open it. That is the whole conversation.</p>
       <div class="stage"><div class="device"><div class="screen">
-        <img src="raw/10.png" onerror="this.remove()">
+        <img src="raw/10.png" data-ipad-src="raw-ipad/10.png" onerror="this.remove()">
         <div class="mock shield">
           <div class="statusbar" style="position:absolute;top:56px;left:48px;right:48px"><span>9:41</span><span>&#9679;&#9679;&#9679;&#9679;</span></div>
           <svg class="glass" width="300" height="400" viewBox="0 0 120 160">
@@ -352,9 +399,18 @@
 </div>
 
 <script>
-  // ?f=1..10 renders one 1320x2868 frame; ?f=all renders the whole 13200px panorama.
-  const f = new URLSearchParams(location.search).get('f') || 'all';
+  // ?f=1..10 renders one frame; ?f=all renders the whole panorama. ?device=ipad switches the
+  // frame to the 13-inch iPad's 2064x2752 slot (body.ipad); default is the iPhone's 1320x2868.
+  const params = new URLSearchParams(location.search);
+  const f = params.get('f') || 'all';
+  if (params.get('device') === 'ipad') {
+    document.body.classList.add('ipad');
+    document.querySelectorAll('.screen img[data-ipad-src]').forEach(img => {
+      img.src = img.dataset.ipadSrc;
+    });
+  }
+  const frameW = params.get('device') === 'ipad' ? 2064 : 1320;
   const pan = document.querySelector('.panorama');
   if (f === 'all') { document.body.classList.add('all'); }
-  else { pan.style.marginLeft = (-1320 * (parseInt(f, 10) - 1)) + 'px'; }
+  else { pan.style.marginLeft = (-frameW * (parseInt(f, 10) - 1)) + 'px'; }
 </script>
