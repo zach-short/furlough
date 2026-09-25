@@ -4094,6 +4094,45 @@ The plan for this stretch. Tick each phase off here as it lands.
     build green. **Not yet built:** an archive carrying both this and step 59 — ask Zach first,
     same as every archive this session has.
 
+61. **Step 59's native-checkmark claim was wrong. Reverted the same day.** Zach built step 59+60
+    to his phone and tested with the ringer at max: scanning the tag showed no checkmark and
+    played no sound, contradicting the "invalidate() with no error shows one automatically"
+    claim step 59 built on. That claim came from web search summaries, not Apple's own page —
+    `developer.apple.com/documentation/corenfc/...` is a JS-rendered SPA this session's `WebFetch`
+    could not actually read, so "verified" in step 59 meant secondhand sources agreeing with each
+    other, not a primary source, and they were wrong (or right about `NFCNDEFReaderSession` and
+    silently inapplicable to the `NFCTagReaderSession` `TagScanner.swift` actually uses — still
+    unconfirmed either way). **`AnchorView.swift`'s `.onChange(of: anchor.isAnchored)` no longer
+    reads `AppModel.lastTagScanAt`** — the sound and `showConfirmMark` fire unconditionally again,
+    the way step 58 originally shipped them, since there is no confirmed native confirmation to
+    avoid stacking on top of. `lastTagScanAt` itself is untouched (still stamped by the three
+    scan sites) in case a real fix needs it later. `TagScanner.swift` itself was not touched —
+    the existing `alertMessage`/`invalidate()` call was never edited this session, so whatever
+    Zach's phone is doing (or not doing) with it predates all of this. Debug build green. Not
+    attempted: any change to `TagScanner.swift` itself (e.g. a short delay before `invalidate()`,
+    which some secondhand reports suggest matters) — this session has no NFC hardware to verify
+    against and had already been wrong once from secondhand sources; that one needs Zach's phone
+    to iterate on, not another guess.
+
+62. **Tried the delay, on Zach's "try it" — `tagReaderSession(_:didDetect:)` now waits 500ms
+    before `invalidate()`.** Done 2026-09-25, unverified, explicitly experimental. Hypothesis:
+    invalidating in the same tick as detection may leave CoreNFC no time to animate a checkmark
+    before the sheet is told to close. `finish(.success(identifier))` — the app's own state
+    change — now runs *before* the sleep, so "press answers at once" holds regardless of whether
+    this helps; only the system sheet's own dismissal moved later. `Task { try await
+    Task.sleep }` and `DispatchQueue.main.asyncAfter` were both tried first and both refused to
+    compile under Swift 6 strict concurrency (`sending 'session' risks causing data races` —
+    `NFCTagReaderSession(..., queue: nil)` delivers this delegate callback on a private queue,
+    not the main actor, confirmed by the compiler's own isolation note, so handing `session` to a
+    main-actor closure is a real cross-isolation violation, not a false positive to silence).
+    Settled on `Thread.sleep(forTimeInterval: 0.5)`, staying on that same private queue the whole
+    time rather than crossing into another one. Debug build green. **Needs Zach's phone**: build
+    to device, then from the Anchor page either drop the anchor (if `requiresTagToAnchor` is on)
+    or weigh it — does the system NFC sheet now show a checkmark, and is there any sound? Report
+    back either way; if this doesn't do it, the 500ms figure was a guess and the next move is
+    probably reading Apple's actual documentation some other way (Xcode's offline docs, a
+    physical dev's blog with a working code sample) rather than tuning the number further blind.
+
 
 ## Style rules
 

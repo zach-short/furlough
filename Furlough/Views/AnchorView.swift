@@ -75,21 +75,21 @@ struct AnchorPage: View {
             .sensoryFeedback(trigger: anchor.isAnchored) { _, _ in
                 isCurrent && model.anchorHaptics ? .success : nil
             }
-            // The sound and the mark, on the same gate as the haptic above — except when a tag
-            // scan is why `isAnchored` just changed. `TagScanner` already shows the system NFC
-            // sheet's own native checkmark (and its own tone) the instant a scan succeeds
-            // (`session.alertMessage = "Tag read."` then `session.invalidate()` — Apple shows
-            // the checkmark automatically on an error-free invalidate). Playing this sound and
-            // drawing this mark on top of that, moments later, would be a second confirmation
-            // for one action, so skip them when `AppModel.lastTagScanAt` is fresh; the haptic
-            // above stays unconditional; it predates this and was never the redundant part.
+            // The sound and the mark, the other two thirds of the same confirmation as the
+            // haptic above, on the same gate. **Not conditioned on a tag scan any more**: the
+            // assumption that `TagScanner`'s `session.alertMessage = "Tag read."` +
+            // `session.invalidate()` already shows the system sheet's own native checkmark
+            // turned out wrong on a real device (2026-09-25, ringer at max, nothing seen or
+            // heard) — secondhand sources said otherwise, but Apple's own docs page is a
+            // JS-rendered SPA this session couldn't actually read, so it was never verified
+            // firsthand. `AppModel.lastTagScanAt` still exists and is still stamped (harmless,
+            // and worth keeping in case `TagScanner` changes later), just not read here.
             // The sound is Furlough/Sounds/ba-dink.wav, a synthesized two-tone chime — bundled
             // because `AudioServicesPlaySystemSound`'s undocumented system IDs have nothing
             // close to it. `showConfirmMark` drives `AnchorConfirmMark` over the glyph in
             // `stateCard`; it clears itself once the mark has drawn in, held, and faded.
             .onChange(of: anchor.isAnchored) { _, _ in
                 guard isCurrent, model.anchorHaptics else { return }
-                if let scannedAt = model.lastTagScanAt, Date().timeIntervalSince(scannedAt) < 3 { return }
                 AudioServicesPlaySystemSound(AnchorConfirmSound.id)
                 showConfirmMark = true
                 Task {
