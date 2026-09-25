@@ -89,10 +89,12 @@ struct HomeView: View {
             .sheet(isPresented: $showPending) { PendingChangesView() }
             .sheet(isPresented: $showSettings) { SettingsView() }
             .sheet(isPresented: $showHelp) { HelpView() }
-            .overlay(alignment: .bottom) {
+            // A safe area inset (not an ignoring overlay) so the scroll content on both pages
+            // reserves exactly this bar's height — no guessed padding that overlaps on some
+            // devices and leaves a dead gap on others.
+            .safeAreaInset(edge: .bottom) {
                 HalfTabBar(half: $half)
                     .padding(.bottom, 6)
-                    .ignoresSafeArea(edges: .bottom)
             }
         }
     }
