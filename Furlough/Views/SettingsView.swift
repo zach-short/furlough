@@ -76,10 +76,6 @@ struct SettingsView: View {
                         .emberBody(15, .semibold)
                         .foregroundStyle(Ember.cream)
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                        .tint(Ember.cream)
-                }
             }
         }
         .presentationBackground(Ember.ground)

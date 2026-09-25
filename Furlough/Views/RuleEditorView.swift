@@ -1319,7 +1319,6 @@ struct TimePickerSheet: View {
     /// The start this end is judged against. A time at or before it lands on the next morning,
     /// which the readout says while the wheel is still turning.
     var nextDayAfter: Int?
-    @Environment(\.dismiss) private var dismiss
 
     private var isNextDay: Bool {
         guard let nextDayAfter else { return false }
@@ -1341,8 +1340,6 @@ struct TimePickerSheet: View {
                 .datePickerStyle(.wheel)
                 .labelsHidden()
                 .frame(maxWidth: .infinity)
-            ProminentButton(title: "Done") { dismiss() }
-                .padding(.horizontal, 24)
                 .padding(.bottom, 20)
         }
         .frame(maxWidth: .infinity)

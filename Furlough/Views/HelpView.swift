@@ -2,8 +2,6 @@ import SwiftUI
 
 // Topic pages themselves live in HelpTopics.swift.
 struct HelpView: View {
-    @Environment(\.dismiss) private var dismiss
-
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -28,10 +26,6 @@ struct HelpView: View {
                     Text("Help")
                         .emberBody(15, .semibold)
                         .foregroundStyle(Ember.cream)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                        .tint(Ember.cream)
                 }
             }
         }

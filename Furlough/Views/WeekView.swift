@@ -5,7 +5,6 @@ import SwiftUI
 /// left here is this platform's chrome and its list of pickers.
 struct WeekSheet: View {
     @Binding var week: WeekDraft
-    @Environment(\.dismiss) private var dismiss
     @State private var selectedDay: Int?
 
     var body: some View {
@@ -47,10 +46,6 @@ struct WeekSheet: View {
                     Text("Week")
                         .emberBody(15, .semibold)
                         .foregroundStyle(Ember.cream)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                        .tint(Ember.cream)
                 }
             }
         }

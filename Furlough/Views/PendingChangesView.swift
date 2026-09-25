@@ -2,7 +2,6 @@ import SwiftUI
 
 struct PendingChangesView: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         let pending = model.state.pending.sorted { $0.effectiveAt < $1.effectiveAt }
@@ -52,10 +51,6 @@ struct PendingChangesView: View {
                     Text("Pending")
                         .emberBody(15, .semibold)
                         .foregroundStyle(Ember.cream)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                        .tint(Ember.cream)
                 }
             }
         }
