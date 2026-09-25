@@ -163,8 +163,6 @@ struct MacOnboardingView: View {
             .buttonStyle(.plain)
             .padding(.top, 4)
             .accessibilityAddTraits(wantsBoth ? .isSelected : [])
-            Footnote(text: "Nothing is decided here. Both halves are one click apart afterwards, whichever you pick.")
-                .padding(.top, 10)
             HStack(spacing: 10) {
                 Button(wantsBoth ? "Start with the Anchor" : "Start with \(chosen == .anchor ? "the Anchor" : "Rules")") {
                     model.chooseStart(half: chosen, both: wantsBoth)

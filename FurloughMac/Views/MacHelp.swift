@@ -101,7 +101,6 @@ struct HelpWindow: View {
     private var hub: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                header
                 SectionLabel(text: "The rules")
                 card([.windows, .delay, .targets])
                 SectionLabel(text: "The Anchor")
@@ -117,28 +116,6 @@ struct HelpWindow: View {
         // AppKit scroll views measure from the bottom; long wrapped text opens partway down
         // without this.
         .defaultScrollAnchor(.top)
-    }
-
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Eyebrow(text: "Furlough", color: Ember.amber)
-                .padding(.top, 6)
-            Text("No unblock button.")
-                .emberDisplay(26)
-                .foregroundStyle(Ember.cream)
-                .padding(.top, 6)
-            Text("Two ways to put an app out of reach. A rule gives it a daily budget, and the hours it is allowed if you want them; outside those, or once the budget is spent, Furlough closes it. Making a rule tighter applies at once. Making it looser waits.")
-                .emberBody(13.5)
-                .foregroundStyle(Ember.muted)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 10)
-            Text("The Anchor is the other. One tap locks a list, or this whole Mac, and the only thing that lifts it is an NFC tag scanned on your iPhone.")
-                .emberBody(13.5)
-                .foregroundStyle(Ember.muted)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 8)
-        }
-        .padding(.horizontal, 8)
     }
 
     private func card(_ topics: [HelpTopic]) -> some View {

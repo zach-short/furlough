@@ -6,7 +6,6 @@ struct HelpView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    header
                     SectionLabel(text: "The rules")
                     rulesCard
                     SectionLabel(text: "The Anchor")
@@ -30,28 +29,6 @@ struct HelpView: View {
             }
         }
         .presentationBackground(Ember.ground)
-    }
-
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Eyebrow(text: "Furlough", color: Ember.amber)
-                .padding(.top, 8)
-            Text("No unblock button.")
-                .emberDisplay(28)
-                .foregroundStyle(Ember.cream)
-                .padding(.top, 6)
-            Text("Two ways to put an app out of reach. A rule gives it a daily budget, and the hours it is allowed if you want them; outside those, or once the budget is spent, iOS shields it. Making a rule tighter applies at once. Making it looser waits.")
-                .emberBody(14.5)
-                .foregroundStyle(Ember.muted)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 12)
-            Text("The Anchor is the other. One tap locks a list, or the whole phone, and the only thing that lifts it is an NFC tag you paired.")
-                .emberBody(14.5)
-                .foregroundStyle(Ember.muted)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 10)
-        }
-        .padding(.horizontal, 8)
     }
 
     private var rulesCard: some View {

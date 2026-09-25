@@ -16,15 +16,6 @@ struct OnboardingView: View {
 
         var next: Pane? { Pane(rawValue: rawValue + 1) }
         var previous: Pane? { Pane(rawValue: rawValue - 1) }
-
-        /// Every pane has one, so the button sits at the same height on all three.
-        var footnote: String {
-            switch self {
-            case .promise: "Screen Time access is asked for at the end, once you know what for."
-            case .start: "Nothing is decided here. Both halves are a swipe apart afterwards, whichever you pick."
-            case .access: "You can turn this off any time in Settings > Screen Time."
-            }
-        }
     }
 
     var body: some View {
@@ -278,8 +269,6 @@ struct OnboardingView: View {
                     }
                 }
             }
-            Footnote(text: pane.footnote, alignment: .center)
-                .padding(.top, 12)
         }
     }
 }
