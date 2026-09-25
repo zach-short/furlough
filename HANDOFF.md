@@ -4048,6 +4048,52 @@ The plan for this stretch. Tick each phase off here as it lands.
     submission itself (now that step 57 closes the iPad screenshot gap) is still unstarted by any
     session.
 
+59. **The anchor's sound/mark step aside for the system NFC sheet's own native checkmark,
+    instead of a bigger custom animation.** Done 2026-09-25. After step 58 shipped, Zach asked
+    for something much bigger — the anchor growing center-screen, a boat, a drop past the bottom
+    edge — scoped properly first (`/scope`, doc written, gate asked) since it's a frequent,
+    repeated interaction and a wrong guess is expensive. Mid-answering the gate, Zach cut to what
+    he actually wanted: **Apple's own NFC-sheet checkmark**, not a custom one. Verified against
+    Apple's documented behavior (not memory, after getting the system sound ID wrong once
+    already this session): `TagScanner.swift`'s existing `session.alertMessage = "Tag read."`
+    then `session.invalidate()` (no error) already triggers it automatically — nothing was
+    broken there. The actual redundancy: every unlock and most locks go through a tag scan
+    (`AppModel.unanchorWithTag()` always; `anchorWithTag()` whenever `requiresTagToAnchor` and a
+    reader are both true — the default), so step 58's sound and mark were firing a *second*
+    confirmation moments after the system's own. Fixed with a self-expiring signal rather than a
+    manual flag (a boolean risked going stale the moment a proactive scan's "Anchor now?" dialog
+    is dismissed with "Not yet"): `AppModel.lastTagScanAt` (`Date?`, `@ObservationIgnored`,
+    line ~40) is stamped in the three places that call `scanner.scan(...)` — `readTag`,
+    `anchorWithTag`, `unanchorWithTag` — and `AnchorView.swift`'s `.onChange(of:
+    anchor.isAnchored)` skips the sound and `showConfirmMark` when that stamp is under 3 seconds
+    old, letting an abandoned scan age out on its own rather than needing to be cleared on every
+    cancel path. The haptic (`.sensoryFeedback` just above it) is untouched and still
+    unconditional — it predates this session (step 55) and was never the redundant part; only
+    the sound and the visual mark, both new this session, needed the gate. The full-scene scope
+    document is not deleted — moved to
+    `~/Projects/archive/furlough/anchor-confirm-animation/BRIEF.md` with a superseded note at
+    its top, per R5 (a considered-and-dropped direction stays findable). Debug build green after
+    this change; no archive cut yet — Zach also asked, same message, for the Anchor page's UI to
+    simplify while anchored, since most of it is disabled anyway, and that is still open,
+    unscoped, as of this step.
+
+60. **Two settings rows stop pretending to be live while anchored.** Done 2026-09-25, closing
+    step 59's open item. Checked which of the Anchor page's four settings rows actually still do
+    something while anchored, rather than guessing: `AnchorScheduleScreen` and `AnchorScopeScreen`
+    both refuse every change and show only "Unanchor with your tag to change this"
+    (`AnchorScreens.swift:115`, `:486-488`) — a `NavigationLink` into a screen whose one message
+    is already on the row's own detail line is a tap that goes nowhere. `AnchorTagsScreen` still
+    does something (renaming or forgetting an already-paired tag stays live, only *pairing a new
+    one* hides — `AnchorScreens.swift:167`) and `AnchorMacScreen` has no anchored-gate anywhere
+    in it — both left exactly as they were. `AnchorView.swift`'s `settingsCard` now swaps Schedule
+    and Scope for a new `lockedRow(title:detail:)` while `anchor.isAnchored` — same title and
+    detail text, no `NavigationLink`, a `lock.fill` glyph instead of the chevron, one accessible
+    element with a hint carrying the message the destination screen used to be the only place to
+    read. `appsCard`'s per-tile "Open its rule" was left reachable on purpose — a rule set while
+    anchored takes effect the moment it lifts, so that one is a real, not a dead, action. Debug
+    build green. **Not yet built:** an archive carrying both this and step 59 — ask Zach first,
+    same as every archive this session has.
+
 
 ## Style rules
 

@@ -25,6 +25,9 @@ struct AnchorPage: View {
     /// until confirmed, since that's a way to lock yourself out.
     @State private var droppingWithTag: PairedTag?
     @State private var pairingScanned: Data?
+    /// True for the moment `AnchorConfirmMark` draws itself over the glyph in `stateCard`, the
+    /// visual third of the same confirmation as the haptic and the chime.
+    @State private var showConfirmMark = false
 
     @Environment(\.scenePhase) private var scenePhase
 
@@ -72,13 +75,27 @@ struct AnchorPage: View {
             .sensoryFeedback(trigger: anchor.isAnchored) { _, _ in
                 isCurrent && model.anchorHaptics ? .success : nil
             }
-            // The sound half of the same confirmation. 1057 is "Tink" — a short, clean single
-            // tone (`AudioServicesPlaySystemSound` has no documented ID list; this one is the
-            // long-standing community-verified choice for a light UI confirmation). Respects
-            // the mute switch, same as any other system UI sound.
+            // The sound and the mark, on the same gate as the haptic above — except when a tag
+            // scan is why `isAnchored` just changed. `TagScanner` already shows the system NFC
+            // sheet's own native checkmark (and its own tone) the instant a scan succeeds
+            // (`session.alertMessage = "Tag read."` then `session.invalidate()` — Apple shows
+            // the checkmark automatically on an error-free invalidate). Playing this sound and
+            // drawing this mark on top of that, moments later, would be a second confirmation
+            // for one action, so skip them when `AppModel.lastTagScanAt` is fresh; the haptic
+            // above stays unconditional; it predates this and was never the redundant part.
+            // The sound is Furlough/Sounds/ba-dink.wav, a synthesized two-tone chime — bundled
+            // because `AudioServicesPlaySystemSound`'s undocumented system IDs have nothing
+            // close to it. `showConfirmMark` drives `AnchorConfirmMark` over the glyph in
+            // `stateCard`; it clears itself once the mark has drawn in, held, and faded.
             .onChange(of: anchor.isAnchored) { _, _ in
                 guard isCurrent, model.anchorHaptics else { return }
-                AudioServicesPlaySystemSound(1057)
+                if let scannedAt = model.lastTagScanAt, Date().timeIntervalSince(scannedAt) < 3 { return }
+                AudioServicesPlaySystemSound(AnchorConfirmSound.id)
+                showConfirmMark = true
+                Task {
+                    try? await Task.sleep(for: .milliseconds(900))
+                    showConfirmMark = false
+                }
             }
             // Anchor is the last page, so a further swipe left has nowhere to go in the
             // TabView; simultaneous so it doesn't steal the page-back swipe toward Rules.
@@ -209,6 +226,12 @@ struct AnchorPage: View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
                 AnchorGlyph(isAnchored: anchor.isAnchored, size: 44)
+                    .overlay {
+                        if showConfirmMark {
+                            AnchorConfirmMark()
+                                .allowsHitTesting(false)
+                        }
+                    }
                 VStack(alignment: .leading, spacing: 3) {
                     Eyebrow(text: anchor.isAnchored ? "Anchored" : "Free", color: anchor.isAnchored ? Ember.ember : Ember.moss)
                     Text(stateLine)
@@ -235,17 +258,54 @@ struct AnchorPage: View {
 
     private var settingsCard: some View {
         VStack(spacing: 0) {
-            settingsRow(title: "Schedule", detail: scheduleSummary) { AnchorScheduleScreen() }
+            // Schedule and Scope both refuse to change while anchored — their screens have
+            // nothing to offer but "Unanchor with your tag to change this" (`AnchorScheduleScreen`,
+            // `AnchorScopeScreen`). A row that only leads to that message is simpler read straight
+            // off the list than tapped into, so it drops the `NavigationLink` and the chevron for
+            // a lock glyph instead. Tags (renaming, forgetting) and Devices (the Mac link) stay
+            // real screens either way — neither actually locks while anchored.
+            if anchor.isAnchored {
+                lockedRow(title: "Schedule", detail: scheduleSummary)
+            } else {
+                settingsRow(title: "Schedule", detail: scheduleSummary) { AnchorScheduleScreen() }
+            }
             CardDivider()
             settingsRow(title: "Tags", detail: tagSummary) { AnchorTagsScreen() }
             CardDivider()
-            settingsRow(title: "Scope", detail: scopeSummary) { AnchorScopeScreen() }
+            if anchor.isAnchored {
+                lockedRow(title: "Scope", detail: scopeSummary)
+            } else {
+                settingsRow(title: "Scope", detail: scopeSummary) { AnchorScopeScreen() }
+            }
             CardDivider()
             settingsRow(title: "Devices", detail: macSummary, dot: macDot) { AnchorMacScreen() }
         }
         .emberCard()
         // Checked on open so the row reflects the current state, not a stale cached one.
         .task { model.checkLink() }
+    }
+
+    private func lockedRow(title: String, detail: String) -> some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .emberDisplaySmall(13.5)
+                    .foregroundStyle(Ember.cream)
+                Text(detail)
+                    .emberBody(11.5)
+                    .foregroundStyle(Ember.muted)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            Image(systemName: "lock.fill")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Ember.faint)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 11)
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Unanchor with your tag to change this.")
     }
 
     private func settingsRow<Screen: View>(
@@ -1020,5 +1080,65 @@ struct AnchorGlyph: View {
                     .strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
             )
             .shadow(color: isAnchored ? Ember.ember.opacity(0.35) : .clear, radius: 10)
+    }
+}
+
+/// The bundled confirmation chime, loaded once and reused rather than re-created on every play.
+enum AnchorConfirmSound {
+    static let id: SystemSoundID = {
+        var soundID: SystemSoundID = 0
+        if let url = Bundle.main.url(forResource: "ba-dink", withExtension: "wav") {
+            AudioServicesCreateSystemSoundID(url as CFURL, &soundID)
+        }
+        return soundID
+    }()
+}
+
+/// A checkmark that draws itself inside a ring over `AnchorGlyph`, holds, then fades — the
+/// visual third of the anchor's confirmation, borrowing the same "a payment confirms" motion
+/// as the haptic and the chime it appears alongside. Self-contained: it animates in on
+/// `onAppear` and expects its parent to remove it from the tree once it has had time to finish
+/// (`AnchorPage`'s `showConfirmMark`, 900ms).
+struct AnchorConfirmMark: View {
+    @State private var ringScale: CGFloat = 0.6
+    @State private var opacity: Double = 0
+    @State private var checkTrim: CGFloat = 0
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(Ember.ground)
+            Circle()
+                .stroke(Ember.ember, lineWidth: 2.5)
+            AnchorCheckmark()
+                .trim(from: 0, to: checkTrim)
+                .stroke(Ember.ember, style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+                .padding(11)
+        }
+        .scaleEffect(ringScale)
+        .opacity(opacity)
+        .onAppear {
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.68)) {
+                ringScale = 1
+                opacity = 1
+            }
+            withAnimation(.easeOut(duration: 0.22).delay(0.1)) {
+                checkTrim = 1
+            }
+            withAnimation(.easeIn(duration: 0.25).delay(0.55)) {
+                opacity = 0
+                ringScale = 0.92
+            }
+        }
+    }
+}
+
+private struct AnchorCheckmark: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.height * 0.52))
+        path.addLine(to: CGPoint(x: rect.width * 0.4, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.height * 0.18))
+        return path
     }
 }
