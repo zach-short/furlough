@@ -4155,6 +4155,42 @@ The plan for this stretch. Tick each phase off here as it lands.
     now (nothing reads it) but left in place rather than pulled mid-conversation; worth removing
     next time this file is touched for something else, not on its own.
 
+64. **The anchored page is a different, much smaller page now, not the free page with things
+    disabled.** Done 2026-09-25, replacing step 60's approach rather than extending it — Zach
+    asked for this after seeing step 60 land, previewed first (a standalone `swiftc` render, the
+    established way to check a `Shared/UI`-style view without a device), approved the direction,
+    then set the one rule for what's on it: "only show information if it is actually useful."
+    `AnchorPage.setUpPane` now branches on `anchor.isAnchored` (`AnchorView.swift:162`): free
+    shows exactly what it always has (`stateCard`, `appsCard`, `settingsCard` — step 60's locked
+    rows still apply there); anchored shows the new `anchoredPane` instead of any of them.
+    `anchoredPane` is: a new `AnchoredHero` (bare ember `AnchorShape`, glowing, ringed by a faint
+    full circle plus a brighter arc that rotates slowly and continuously for as long as the page
+    is up — under Reduce Motion it holds still), the existing `stateLine` text, and up to three
+    pills, each gated on being genuinely true right now rather than always shown: "View held
+    apps" / "View exceptions" only if `!anchor.kinds.isEmpty` (opens `appsCard` unmodified, in a
+    sheet — nothing about that card changes while anchored, so nothing needed rebuilding), a
+    "Devices" pill only if `model.link.isLinked && !model.devices.isEmpty` (a link to *another*
+    device has to actually exist — Zach's own example, "devices doesn't matter if they don't have
+    a link"), and a "Lifts H:MM" pill only if `anchor.until != nil`. All three absent shows just
+    the hero and the state line, which is deliberate, not an empty state to fill.
+    `AnchorToggleButton` gained `heroStyle: Bool = false`: true renders `AnchoredHero()` as the
+    button's label instead of the small "Unanchor" pill, same `unanchor()` underneath either way
+    — tapping the hero *is* unanchoring, standing in for a 4th button Zach's list never mentioned
+    (flagged back to him as a design call rather than assumed silently). Locking's own visual
+    confirmation is now this hero growing in via spring on appear, not the small
+    `AnchorConfirmMark` badge from step 58 — that badge's glyph (`stateCard`) is no longer even
+    on screen the instant `isAnchored` flips true, since the page swaps to `anchoredPane` in the
+    same render pass. Unanchoring still lands back on the free page and the small badge, so
+    nothing about step 58/61 needed touching — the haptic/sound/mark trigger in
+    `AnchorView.swift`'s `.onChange(of: anchor.isAnchored)` is untouched, it just now only ever
+    visibly matters for one direction. Debug build green. **Needs Zach's phone, still unverified
+    on a device**: lock the anchor and watch the hero grow in and the ring start turning; check
+    each pill appears/disappears correctly against its own condition (easiest to test "Devices"
+    by toggling whether this phone is linked, since that one depends on state that isn't the
+    anchor itself); confirm the hero itself lifts the anchor when tapped, same tag ritual as the
+    old "Unanchor" pill if `requiresTagToAnchor`-equivalent applies to unanchor (it always does —
+    see step 55, "The only unblock in Furlough").
+
 
 ## Style rules
 

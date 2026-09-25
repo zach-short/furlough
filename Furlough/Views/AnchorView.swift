@@ -28,6 +28,9 @@ struct AnchorPage: View {
     /// True for the moment `AnchorConfirmMark` draws itself over the glyph in `stateCard`, the
     /// visual third of the same confirmation as the haptic and the chime.
     @State private var showConfirmMark = false
+    /// The held-apps grid, shown in a sheet from `anchoredPane` rather than inline — the
+    /// simplified anchored layout has room for one line, not a card.
+    @State private var showingHeldApps = false
 
     @Environment(\.scenePhase) private var scenePhase
 
@@ -156,14 +159,90 @@ struct AnchorPage: View {
         VStack(alignment: .leading, spacing: 0) {
             LinkTraffic(half: .anchor)
                 .padding(.bottom, 6)
-            stateCard
-            SectionLabel(text: anchor.anchorsEverything ? "Stays open" : "Held")
-            appsCard
-            SectionLabel(text: "Settings")
-            settingsCard
-            Footnote(text: listFootnote)
-                .padding(.top, 8)
+            if anchor.isAnchored {
+                anchoredPane
+            } else {
+                stateCard
+                SectionLabel(text: anchor.anchorsEverything ? "Stays open" : "Held")
+                appsCard
+                SectionLabel(text: "Settings")
+                settingsCard
+                Footnote(text: listFootnote)
+                    .padding(.top, 8)
+            }
         }
+    }
+
+    /// What the anchored page becomes: everything that only reads as disabled while it holds
+    /// (the settings, the apps grid, the "add" affordances — all still there, just not while
+    /// this is up) drops out entirely, leaving the hero, the state, and only the few facts
+    /// actually true right now. Each pill below only exists when it has something to say —
+    /// "Devices" means nothing on a phone that was never linked to another, and there's no lift
+    /// time to show when nothing is scheduled — asked for explicitly, not a guess.
+    private var anchoredPane: some View {
+        VStack(spacing: 22) {
+            AnchorToggleButton(heroStyle: true)
+            VStack(spacing: 4) {
+                Eyebrow(text: "Anchored", color: Ember.ember)
+                Text(stateLine)
+                    .emberBody(13)
+                    .foregroundStyle(Ember.cream)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if hasAnchoredPanePills {
+                HStack(spacing: 10) {
+                    if !anchor.kinds.isEmpty {
+                        Button { showingHeldApps = true } label: {
+                            anchoredPill(anchor.anchorsEverything ? "View exceptions" : "View held apps")
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    if model.link.isLinked, !model.devices.isEmpty {
+                        NavigationLink { AnchorMacScreen() } label: {
+                            anchoredPill("Devices")
+                        }
+                    }
+                    if let until = anchor.until {
+                        anchoredPill("Lifts \(TimeFormat.clock(until))")
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 48)
+        .padding(.horizontal, 16)
+        .sheet(isPresented: $showingHeldApps) {
+            NavigationStack {
+                ScrollView {
+                    appsCard
+                        .padding(16)
+                }
+                .background(Ember.ground)
+                .navigationTitle(anchor.anchorsEverything ? "Stays open" : "Held")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { showingHeldApps = false }
+                    }
+                }
+            }
+            .presentationDetents([.medium, .large])
+        }
+    }
+
+    private var hasAnchoredPanePills: Bool {
+        (!anchor.kinds.isEmpty) || (model.link.isLinked && !model.devices.isEmpty) || anchor.until != nil
+    }
+
+    private func anchoredPill(_ text: String) -> some View {
+        Text(text)
+            .emberBody(12, .semibold)
+            .foregroundStyle(Ember.cream)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
+            .background(Color.white.opacity(0.07), in: Capsule())
+            .overlay(Capsule().strokeBorder(Color.white.opacity(0.12), lineWidth: 1))
     }
 
     /// Gathered here since `body` is at the type-checker's limit without them, and both panes
@@ -980,6 +1059,9 @@ struct AnchorToggleButton: View {
     /// When the drop made here lifts by itself; nil for the tag alone, which the home card
     /// always passes, since only the Anchor screen offers a time.
     var until: Date?
+    /// The anchored page's centered `AnchoredHero`, tappable to unanchor, in place of the small
+    /// pill — the same `unanchor()` underneath either way.
+    var heroStyle = false
     @State private var busy = false
     @State private var message: String?
     @State private var confirmAnchor = false
@@ -989,7 +1071,14 @@ struct AnchorToggleButton: View {
 
     var body: some View {
         Group {
-            if anchor.isAnchored {
+            if anchor.isAnchored, heroStyle {
+                Button {
+                    Task { await unanchor() }
+                } label: {
+                    AnchoredHero()
+                }
+                .buttonStyle(.plain)
+            } else if anchor.isAnchored {
                 Button {
                     Task { await unanchor() }
                 } label: {
@@ -1080,6 +1169,43 @@ struct AnchorGlyph: View {
                     .strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
             )
             .shadow(color: isAnchored ? Ember.ember.opacity(0.35) : .clear, radius: 10)
+    }
+}
+
+/// The anchored page's hero: a bare anchor glyph, glowing ember, ringed by a faint full circle
+/// plus a brighter arc that keeps a slow, ambient rotation for as long as the anchor holds — at
+/// rest rather than draining, the way the hourglass does for a running window. Grows in with a
+/// spring the moment the page settles into it, replacing the small `AnchorConfirmMark` badge as
+/// the visual confirmation for *this* direction (unanchoring still lands back on the small glyph
+/// in `stateCard`, where that badge still plays). Under Reduce Motion the ring holds still.
+struct AnchoredHero: View {
+    var size: CGFloat = 118
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var appeared = false
+    @State private var rotation: Double = 0
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(Ember.ember.opacity(0.28), lineWidth: 2)
+                .frame(width: size * 1.55, height: size * 1.55)
+            Circle()
+                .trim(from: 0, to: 0.22)
+                .stroke(Ember.ember, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                .frame(width: size * 1.55, height: size * 1.55)
+                .rotationEffect(.degrees(rotation))
+            AnchorShape()
+                .fill(Ember.ember)
+                .frame(width: size * 0.62, height: size * 0.62)
+                .shadow(color: Ember.ember.opacity(0.4), radius: 18)
+        }
+        .scaleEffect(appeared ? 1 : 0.5)
+        .opacity(appeared ? 1 : 0)
+        .onAppear {
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.72)) { appeared = true }
+            guard !reduceMotion else { return }
+            withAnimation(.linear(duration: 6).repeatForever(autoreverses: false)) { rotation = 360 }
+        }
     }
 }
 
