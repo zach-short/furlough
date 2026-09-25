@@ -56,11 +56,6 @@ struct TagPlacementView: View {
                 .padding(.top, 20)
                 ProminentButton(title: "Got it") { dismiss() }
                     .padding(.top, 22)
-                Footnote(
-                    text: "Not your keyring and not your wallet: a tag you carry is a button, not a lock.",
-                    alignment: .center
-                )
-                .padding(.top, 12)
             }
             .padding(.horizontal, 24)
             .padding(.top, 30)

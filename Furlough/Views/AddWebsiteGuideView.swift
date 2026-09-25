@@ -52,8 +52,6 @@ struct AddWebsiteGuideView: View {
                     dismiss()
                 }
                 .padding(.top, 22)
-                Footnote(text: "The picker repeats this in its footer.", alignment: .center)
-                    .padding(.top, 12)
             }
             .padding(.horizontal, 24)
             .padding(.top, 30)

@@ -610,11 +610,9 @@ struct EmptyHero: View {
             LivingHourglass(state: .unconfigured)
                 .frame(width: 74, height: 98)
             VStack(alignment: .leading, spacing: 0) {
-                Eyebrow(text: "Furlough", color: Ember.amber)
                 Text("Nothing held yet")
                     .emberDisplay(24)
                     .foregroundStyle(Ember.cream)
-                    .padding(.top, 4)
                 Text("Tap + to give an app hours and a budget. The Anchor — one tap, one tag — is the page beside this one.")
                     .emberBody(11.5)
                     .foregroundStyle(Ember.muted)
