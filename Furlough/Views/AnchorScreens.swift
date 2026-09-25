@@ -314,12 +314,12 @@ struct AnchorTagsScreen: View {
     private var hapticsCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 12) {
-                Text("Haptic on anchor and unanchor")
+                Text("Haptic and sound on anchor and unanchor")
                     .emberBody(13)
                     .foregroundStyle(Ember.cream)
                 Spacer(minLength: 8)
                 Toggle(
-                    "Haptic on anchor and unanchor",
+                    "Haptic and sound on anchor and unanchor",
                     isOn: Binding(get: { model.anchorHaptics }, set: { model.setAnchorHaptics($0) })
                 )
                 .labelsHidden()
@@ -327,7 +327,7 @@ struct AnchorTagsScreen: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            Text("A tap on the phone's own screen the moment the anchor locks or lifts, the way a payment confirms.")
+            Text("A tap on the phone's own screen and a short tone the moment the anchor locks or lifts, the way a payment confirms.")
                 .emberBody(11.5)
                 .foregroundStyle(Ember.muted)
                 .fixedSize(horizontal: false, vertical: true)

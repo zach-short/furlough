@@ -1,3 +1,4 @@
+import AudioToolbox
 import SwiftUI
 
 /// The Anchor: apps locked behind a physical tag. One of Home's two pages, beside Rules.
@@ -70,6 +71,14 @@ struct AnchorPage: View {
             // midway. Gated on `isCurrent` so the pre-built adjacent page doesn't double it.
             .sensoryFeedback(trigger: anchor.isAnchored) { _, _ in
                 isCurrent && model.anchorHaptics ? .success : nil
+            }
+            // The sound half of the same confirmation. 1057 is "Tink" — a short, clean single
+            // tone (`AudioServicesPlaySystemSound` has no documented ID list; this one is the
+            // long-standing community-verified choice for a light UI confirmation). Respects
+            // the mute switch, same as any other system UI sound.
+            .onChange(of: anchor.isAnchored) { _, _ in
+                guard isCurrent, model.anchorHaptics else { return }
+                AudioServicesPlaySystemSound(1057)
             }
             // Anchor is the last page, so a further swipe left has nowhere to go in the
             // TabView; simultaneous so it doesn't steal the page-back swipe toward Rules.

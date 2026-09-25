@@ -43,6 +43,12 @@
           "platform": "both",
           "title": "What's new stopped claiming every build was TestFlight-only",
           "detail": "The footnote said every version had gone to TestFlight rather than the App Store. Furlough has been on the App Store since 1.2.0, and each version's card already says which channel it shipped through, so the line is gone rather than kept accurate by hand."
+        },
+        {
+          "kind": "better",
+          "platform": "iphone",
+          "title": "The anchor's confirmation plays a sound, not just a haptic",
+          "detail": "Locking or lifting the anchor already gave a tap the moment it happened, the way a payment confirms. It plays the payment's other half now too — a short tone alongside it. The same setting turns both off."
         }
       ]
     },

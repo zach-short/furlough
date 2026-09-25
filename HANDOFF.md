@@ -4003,6 +4003,51 @@ The plan for this stretch. Tick each phase off here as it lands.
     and site builds — nothing in step 55 touches `FurloughMac` or `site/`, so neither gate says
     anything about them.
 
+57. **The 13-inch iPad screenshot set (section 9, named unstarted since step 52) exists now.**
+    Done 2026-09-25, commit `cfdfb73`. No real iPad was on hand to shoot from and Screen Time does
+    not run in the Simulator (`raw/README.md`'s reason the phone set had to come off a real
+    iPhone), so each of the ten `design/store/raw/NN.png` was reflowed to iPad width with
+    Higgsfield (`gpt_image_2_5`, `3:4`, quality `high`, `2k`) — same text, numbers, icons, colors,
+    genuinely widened rather than a phone screenshot padded into a bigger frame. The model
+    invented its own status bar with a different wrong date per frame, so the top 130px is cropped
+    off each before saving to the new `design/store/raw-ipad/`, plus 70px of matched-color padding
+    re-added on top after the first render showed header buttons touching the device's top edge.
+    `design/store/board.html`'s `?device=ipad` slot now shows these via each frame's
+    `data-ipad-src` attribute (swapped in by the script at the file's end) instead of the `.mock`
+    CSS placeholder it fell back to before; the placeholder still covers a missing file.
+    `scripts/store-shots-ipad.sh` (already present, untracked) rendered all ten to
+    `build/store-shots-ipad/` at the required 2064×2752, no alpha channel, flattened to `.jpg`.
+    **Settled 2026-09-24, recorded in `design/store/raw-ipad/README.md`: this is a stopgap, not a
+    verified capture — reshoot from a real iPad when one exists**, same as the phone set's own
+    rule. Zach uploaded these to App Store Connect once already from the wrong folder
+    (`raw-ipad/`'s bare 1744×2276 AI output, not the composited `build/store-shots-ipad/` frames)
+    and got a dimension-mismatch error; corrected the same session, no code change needed.
+
+58. **The anchor's confirmation gained a sound to match its haptic, and a third 1.3.0 build was
+    cut for this submission.** Done 2026-09-25. Zach asked whether the anchor lock/unlock
+    confirmation already had a sound "like Apple Pay" alongside its haptic — it did not;
+    `AppModel.anchorHaptics` (step 55, line ~3971 above) only ever gated
+    `AnchorView.swift`'s `.sensoryFeedback`, despite its own doc comment already saying "the way a
+    payment confirms." Added the sound half: a sibling `.onChange(of: anchor.isAnchored)` next to
+    that `.sensoryFeedback` block, same `isCurrent && model.anchorHaptics` gate, calling
+    `AudioServicesPlaySystemSound(1057)` — "Tink", the community-verified short single-tone
+    system sound id (Apple documents no ID list for this API); it respects the mute switch like
+    any other UI sound. No new setting: reused `anchorHaptics`, and updated its doc comments
+    (`AppModel.swift`) and its `AnchorScreens.swift` toggle label/subtitle ("Haptic on anchor and
+    unanchor" → "Haptic and sound on anchor and unanchor") so the one setting's description
+    matches what it now does. Folded into 1.3.0's still-`unreleased` `changes` array in
+    `release-notes.json` (`kind: "better"`) rather than bumping the version — same reasoning as
+    step 56, the version has still never been submitted for review. Validated: Debug build green,
+    `python3 -m json.tool` on the notes file, `scripts/version.sh` ("The notes cover this
+    version."), the full `Tests/Core` suite (811 tests, 120 suites, passed — `ReleaseNotesTests`
+    covers the notes-file edit; nothing here touches `Shared/Core` itself). `scripts/archive.sh`
+    (no `TESTING_TOOLS`) produced `build/Furlough-202609251416.xcarchive` and
+    `build/export/Furlough.ipa` (8,704,258 bytes); its own checks passed (no testing-only code,
+    every Screen Time framework entitled). **Upload not run this time** — Zach said he would
+    attach this `.ipa` himself rather than the `xcrun altool` steps 52/56 used. App Store *review*
+    submission itself (now that step 57 closes the iPad screenshot gap) is still unstarted by any
+    session.
+
 
 ## Style rules
 

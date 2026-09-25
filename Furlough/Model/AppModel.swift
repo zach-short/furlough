@@ -95,8 +95,8 @@ final class AppModel {
     private static var storedRequiresTagToAnchor: Bool {
         UserDefaults.standard.object(forKey: requiresTagToAnchorKey) as? Bool ?? true
     }
-    /// Whether locking or lifting the anchor gives a haptic, the way a payment confirms. On by
-    /// default.
+    /// Whether locking or lifting the anchor gives a haptic and a short confirmation sound, the
+    /// way a payment confirms. On by default.
     private(set) var anchorHaptics = AppModel.storedAnchorHaptics
     private static let anchorHapticsKey = "furlough.anchorHaptics"
     private static var storedAnchorHaptics: Bool {
@@ -194,7 +194,7 @@ final class AppModel {
         requiresTagToAnchor = on
     }
 
-    /// Turns the anchor/unanchor haptic on or off. See `anchorHaptics`.
+    /// Turns the anchor/unanchor haptic and sound on or off. See `anchorHaptics`.
     func setAnchorHaptics(_ on: Bool) {
         guard on != anchorHaptics else { return }
         UserDefaults.standard.set(on, forKey: Self.anchorHapticsKey)
