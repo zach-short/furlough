@@ -123,13 +123,12 @@ struct AnchorLiveActivity: Widget {
         context.state.until == nil ? "Held" : "Until it lifts"
     }
 
-    /// The line under the headline: what it holds plus the way back, which for a tag-only hold
-    /// is the whole of what there is to say.
+    /// The line under the headline: what it holds plus the way back. For a tag-only hold the
+    /// count is already in the headline ("6 anchored"), so the way back is the whole of what
+    /// there is to say.
     private func detail(_ context: ActivityViewContext<AnchorActivityAttributes>) -> String {
         guard let until = context.state.until else {
-            return context.state.anchorsEverything
-                ? AnchorText.tagOnly
-                : "\(context.state.held) · \(AnchorText.tagOnly)"
+            return AnchorText.tagOnly
         }
         return "\(context.state.held) · lifts \(TimeFormat.clock(until))"
     }
