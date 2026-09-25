@@ -1,5 +1,6 @@
 import AudioToolbox
 import SwiftUI
+import UIKit
 
 /// The Anchor: apps locked behind a physical tag. One of Home's two pages, beside Rules.
 struct AnchorPage: View {
@@ -75,24 +76,25 @@ struct AnchorPage: View {
             }
             // Apple Pay's blip, either way: locking and lifting are each an ending, not a step
             // midway. Gated on `isCurrent` so the pre-built adjacent page doesn't double it.
-            .sensoryFeedback(trigger: anchor.isAnchored) { _, _ in
-                isCurrent && model.anchorHaptics ? .success : nil
-            }
-            // The sound and the mark, the other two thirds of the same confirmation as the
-            // haptic above, on the same gate. **Not conditioned on a tag scan any more**: the
-            // assumption that `TagScanner`'s `session.alertMessage = "Tag read."` +
-            // `session.invalidate()` already shows the system sheet's own native checkmark
-            // turned out wrong on a real device (2026-09-25, ringer at max, nothing seen or
-            // heard) — secondhand sources said otherwise, but Apple's own docs page is a
-            // JS-rendered SPA this session couldn't actually read, so it was never verified
-            // firsthand. `AppModel.lastTagScanAt` still exists and is still stamped (harmless,
-            // and worth keeping in case `TagScanner` changes later), just not read here.
-            // The sound is Furlough/Sounds/ba-dink.wav, a synthesized two-tone chime — bundled
-            // because `AudioServicesPlaySystemSound`'s undocumented system IDs have nothing
-            // close to it. `showConfirmMark` drives `AnchorConfirmMark` over the glyph in
+            // All three thirds of the confirmation — haptic, sound, mark — fire from this one
+            // block now. The haptic used to be a separate `.sensoryFeedback(.success)`, SwiftUI's
+            // gentle notification-style tap; Zach couldn't actually feel it on his phone, so it's
+            // `UIImpactFeedbackGenerator(style: .heavy)` instead — a real physical thud, not a
+            // light double-tap. **Not conditioned on a tag scan**: the assumption that
+            // `TagScanner`'s `session.alertMessage = "Tag read."` + `session.invalidate()`
+            // already shows the system sheet's own native checkmark turned out wrong on a real
+            // device (2026-09-25, ringer at max, nothing seen or heard) — secondhand sources said
+            // otherwise, but Apple's own docs page is a JS-rendered SPA this session couldn't
+            // actually read, so it was never verified firsthand. `AppModel.lastTagScanAt` still
+            // exists and is still stamped (harmless, and worth keeping in case `TagScanner`
+            // changes later), just not read here. The sound is
+            // `Furlough/Sounds/anchor-confirm.wav`, a synthesized three-note ascending chime —
+            // bundled because `AudioServicesPlaySystemSound`'s undocumented system IDs have
+            // nothing close to it. `showConfirmMark` drives `AnchorConfirmMark` over the glyph in
             // `stateCard`; it clears itself once the mark has drawn in, held, and faded.
             .onChange(of: anchor.isAnchored) { _, _ in
                 guard isCurrent, model.anchorHaptics else { return }
+                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                 AudioServicesPlaySystemSound(AnchorConfirmSound.id)
                 showConfirmMark = true
                 Task {
@@ -221,11 +223,6 @@ struct AnchorPage: View {
                 .background(Ember.ground)
                 .navigationTitle(anchor.anchorsEverything ? "Stays open" : "Held")
                 .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Done") { showingHeldApps = false }
-                    }
-                }
             }
             .presentationDetents([.medium, .large])
         }
@@ -1213,7 +1210,7 @@ struct AnchoredHero: View {
 enum AnchorConfirmSound {
     static let id: SystemSoundID = {
         var soundID: SystemSoundID = 0
-        if let url = Bundle.main.url(forResource: "ba-dink", withExtension: "wav") {
+        if let url = Bundle.main.url(forResource: "anchor-confirm", withExtension: "wav") {
             AudioServicesCreateSystemSoundID(url as CFURL, &soundID)
         }
         return soundID
@@ -1243,8 +1240,13 @@ struct AnchorConfirmMark: View {
         }
         .scaleEffect(ringScale)
         .opacity(opacity)
+        // A bouncier spring here would overshoot ringScale past 1 at its peak, drawing the mark
+        // larger than the 44pt tile it sits on — clipped as a hard guarantee regardless of how
+        // the spring is tuned, on top of picking a damping that doesn't overshoot in the first
+        // place.
+        .clipShape(Circle())
         .onAppear {
-            withAnimation(.spring(response: 0.32, dampingFraction: 0.68)) {
+            withAnimation(.spring(response: 0.32, dampingFraction: 1)) {
                 ringScale = 1
                 opacity = 1
             }
