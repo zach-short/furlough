@@ -110,20 +110,7 @@ final class TagScanner: NSObject, NFCTagReaderSessionDelegate, @unchecked Sendab
             return
         }
         session.alertMessage = "Tag read."
-        // EXPERIMENTAL (HANDOFF step 62): invalidating in the same tick as the detection
-        // callback may be giving the system sheet no time to show a success checkmark before
-        // it's told to close — on a real phone, calling `invalidate()` immediately here showed
-        // neither a checkmark nor a sound. Unverified against Apple's own documentation (this
-        // session could not read it — see step 61) and unverified whether this delay actually
-        // helps. `finish` runs first so the app's own state change stays instant either way
-        // ("press answers at once" holds regardless); only the system sheet's own dismissal is
-        // delayed. `Thread.sleep`, not `Task`/`DispatchQueue.main.asyncAfter`: this delegate
-        // callback is not main-actor-isolated (`NFCTagReaderSession(..., queue: nil)` runs it on
-        // a private queue, confirmed by the Swift 6 sendability error either of those threw
-        // trying to hand `session` to a main-actor closure), and blocking that queue briefly
-        // costs nothing else waiting on it.
-        finish(.success(identifier))
-        Thread.sleep(forTimeInterval: 0.5)
         session.invalidate()
+        finish(.success(identifier))
     }
 }

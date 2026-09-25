@@ -4133,6 +4133,28 @@ The plan for this stretch. Tick each phase off here as it lands.
     probably reading Apple's actual documentation some other way (Xcode's offline docs, a
     physical dev's blog with a working code sample) rather than tuning the number further blind.
 
+63. **Settled 2026-09-25: there is no native checkmark to chase. `TagScanner.swift` reverted to
+    exactly its pre-step-62 form.** Zach's phone: `alertMessage` ("Tag read.") displays correctly
+    even with the delay, so the sheet is genuinely responding to this code — and still no
+    checkmark, no sound. That the text updates but nothing else does is real evidence against a
+    timing theory; a checkmark that only needed a beat to animate would still be a checkmark, not
+    nothing. Checked one real production NFC SDK whose whole UX is tap-to-confirm
+    (`Tangem/tangem-sdk-ios`, a hardware-wallet reader — `NFCReader.swift`, fetched and read
+    directly, not summarized): it does not attempt a success checkmark either, despite having
+    every reason to want one if the API made it easy. Likeliest explanation, unconfirmed but
+    consistent with everything above: the Brick screenshot Zach sent earlier this session (a
+    circle icon, "Ready to Scan," "Tap the top of your phone to your Brick," an "or hold" hint,
+    a styled Cancel button) is not Apple's system NFC sheet at all — that sheet's own layout does
+    not support a custom title plus subtitle plus a second hint line, so what Brick shows is
+    almost certainly its own drawn screen made to resemble one. There was nothing to unlock via
+    API because the reference was never native to begin with. `TagScanner.swift`'s
+    `didDetect tags:` is back to its original three lines (`git diff` against the commit before
+    step 62 is empty); step 61's revert (sound and mark unconditional, no `lastTagScanAt` gate)
+    stands as the real, working confirmation — `AnchorConfirmMark`, `Furlough/Sounds/ba-dink.wav`,
+    the existing haptic. Debug build green. `lastTagScanAt` on `AppModel` is unused dead weight
+    now (nothing reads it) but left in place rather than pulled mid-conversation; worth removing
+    next time this file is touched for something else, not on its own.
+
 
 ## Style rules
 
