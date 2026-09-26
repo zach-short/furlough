@@ -4191,6 +4191,75 @@ The plan for this stretch. Tick each phase off here as it lands.
     old "Unanchor" pill if `requiresTagToAnchor`-equivalent applies to unanchor (it always does —
     see step 55, "The only unblock in Furlough").
 
+65. **`AnchorConfirmMark` clipped to its own tile; the confirmation sound replaced after Zach
+    heard nine synthesized candidates; the haptic switched to one he can actually feel.** Done
+    2026-09-25, on Zach's phone-tested feedback after step 64. Three separate fixes:
+    - **The overflow bug**: `ringScale`'s entrance spring (`dampingFraction: 0.68`) overshot past
+      1.0 at its peak, the ordinary way an underdamped spring bounces — drawing the mark larger
+      than the 44pt tile it sits on for a frame. Damping raised to `1` (critically damped, no
+      overshoot) and `.clipShape(Circle())` added as a hard guarantee regardless of how the
+      spring is ever tuned again.
+    - **The sound**: Zach said the original `ba-dink.wav` (step 58) lacked character. Nine more
+      candidates followed, across genuinely different synthesis techniques, not just new
+      melodies — plain two/three-tone chimes, a metallic anchor-drop (noise thud + ring), a soft
+      shimmer bell, a ship's-bell watch pattern (paired dings, inharmonic partials) alone and
+      with a chain-link texture, a Pirates-of-the-Caribbean-style horn fanfare, a punchier double
+      stab, and two takes adding soft-clip distortion plus a crude algorithmic reverb for
+      "space" once melody alone stopped moving the needle. None of the fuller ones won: **the
+      three-note ascending chime from the second batch (`A-three-note-chime.wav`) is what
+      shipped**, renamed on the way in — `Furlough/Sounds/ba-dink.wav` → `anchor-confirm.wav`
+      (a name that describes what it's for, not what any one version of it sounds like, so it
+      doesn't go stale the next time the sound changes). `AnchorConfirmSound.id` in
+      `AnchorView.swift` points at the new filename; `xcodegen generate` re-run after the file
+      swap (rule 3). Honest note for later: pure additive-sine synthesis, even with distortion
+      and reverb layered on, has a real ceiling well below an actual recorded/sampled instrument
+      — if "more character" comes up again, a licensed or recorded sample is the next real step,
+      not another synthesis pass.
+    - **The haptic**: Zach reported feeling nothing from the existing `.sensoryFeedback(.success)`
+      (step 55) — SwiftUI's `.success` is a light, notification-style double-tap, easy to miss.
+      Replaced with `UIImpactFeedbackGenerator(style: .heavy).impactOccurred()`, called directly
+      inside the same `.onChange(of: anchor.isAnchored)` block that already plays the sound and
+      shows the mark, rather than as a separate `.sensoryFeedback` modifier — one trigger, one
+      gate (`isCurrent && model.anchorHaptics`), all three confirmations. Needs `import UIKit`,
+      added to `AnchorView.swift`. Haptics need no entitlement, no Info.plist key, no permission
+      prompt — confirmed for Zach when he asked, this is not like NFC.
+
+    Debug build green. **Needs Zach's phone**: does the mark now stay inside its tile on every
+    lock/unlock, is the new chime actually more characterful, and — the one most likely to
+    surprise — does `.heavy` impact read as a real, felt vibration rather than the same
+    not-quite-there tap `.success` gave him.
+
+66. **A fourth 1.3.0 build cut and uploaded, carrying the anchored-page redesign (steps 59–65)
+    to TestFlight for the first time.** Done 2026-09-26. Everything from step 59 on — the
+    reverted NFC-checkmark chase, the anchored page's redesign into a small hero-and-pills view
+    (60, 64), and today's overflow/sound/haptic fixes (65) — had only ever been Debug-build or
+    `swiftc`-preview verified; none of it had reached an archive or a device. Asked Zach directly
+    rather than guessing whether to hold for his own on-device pass first: he chose to cut and
+    upload now, so TestFlight (him and one friend) is this redesign's first real device.
+    Before cutting, added the one release note the four prior builds' worth of changes were
+    missing: `release-notes.json`'s 1.3.0 entry had step 58's "plays a sound" line but nothing
+    about the anchored page itself becoming a different, smaller page — a `better`/`iphone`
+    entry, "The anchored page shows only what's true", added ahead of the archive so the shipped
+    build's own Help > What's New carries it. Validated first: a fresh Debug build
+    (`** BUILD SUCCEEDED **`) and the full `Tests/Core` suite (811 tests, 120 suites, passed,
+    twice — once before the notes edit, once after) rather than trusting the "Debug build green"
+    scattered across seven separate steps. `scripts/archive.sh` (no `TESTING_TOOLS`) then produced
+    `build/Furlough-1.3.0-testflight.log` and `build/export/Furlough.ipa` (8,832,499 bytes, build
+    `202609261639`); its own checks passed — no testing-only code, every Screen Time framework
+    entitled, only the two pre-existing Apple-tooling warnings from step 52. **Built from the
+    working tree, not a commit**: `HEAD` was still `d1e5941` at archive time, with step 65 and the
+    new release-notes bullet both uncommitted underneath it — flagged to Zach before he uploaded,
+    since nothing else uncommitted that session (site/Mac changes) touches the iOS app. Claude
+    Code's auto mode refused the `xcrun altool` upload itself, same as steps 52/56 (see the memory
+    note on the App Store Connect write block); Zach ran it:
+    ```
+    xcrun altool --upload-app -f build/export/Furlough.ipa -t ios --apiKey L6A2R4SBXQ --apiIssuer 04f9fe5a-56e5-460f-80ac-c57e788fbdc6
+    ```
+    `UPLOAD SUCCEEDED with no errors`, delivery UUID `4588115d-f4ec-4e1e-9a1c-6c15601ed2a1`,
+    2026-09-26 13:12:32 ET. It appears in TestFlight once Apple finishes processing — not
+    confirmed read back from the ASC API this session. App Store *review* submission is still a
+    separate, unstarted step, same as every build since 52.
+
 
 ## Style rules
 

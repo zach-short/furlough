@@ -49,6 +49,12 @@
           "platform": "iphone",
           "title": "The anchor's confirmation plays a sound, not just a haptic",
           "detail": "Locking or lifting the anchor already gave a tap the moment it happened, the way a payment confirms. It plays the payment's other half now too — a short tone alongside it. The same setting turns both off."
+        },
+        {
+          "kind": "better",
+          "platform": "iphone",
+          "title": "The anchored page shows only what's true",
+          "detail": "Locking the anchor used to leave the whole page in place, most of it turned off and explaining why. It swaps to a smaller page now: a single glowing mark where the settings list was, and up to three lines only when they're actually true right now — apps or sites it's holding, another device it's linked to, when it lifts. Tapping the mark lifts it, the same tag ritual as before."
         }
       ]
     },
