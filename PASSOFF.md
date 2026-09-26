@@ -105,8 +105,8 @@ waiting on 1. That is the sentence that went stale; 9 shipped in `e253fc6` regar
 | 30 | The Mac grows a menu, and both apps get a way to find one app | Done — HANDOFF 48; the phone's search settled as no | Opus | X | nothing | `FurloughMac/FurloughMacApp.swift`, `MacRootView.swift`, `Furlough/Views/HomeView.swift` |
 | 31 | The largest text size, audited | Done — HANDOFF 47 | **Sonnet** | Y | nothing | `Furlough/Views/*` (frames only) |
 | 32 | The automations that already work, written down | Done — HANDOFF 47 | **Sonnet** | Z | nothing | `Furlough/Views/HelpTopics.swift`, `site/src/pages/help/`, `Furlough/Views/AnchorScreens.swift` |
-| 33 | The site sends a Mac visitor to the Mac build | Done — HANDOFF 50; site only, not deployed | Opus | AA | nothing | new `site/src/pages/mac.astro`, `site/src/components/StoreButton.astro`, `Nav.astro`, `Footer.astro`, `site/src/pages/index.astro`, `support.astro`, `site/src/styles/global.css`, `site/src/site.ts` |
-| 34 | Furlough for Mac, from download to first block, watched on a clean Mac | Open — the walk is scripted in `design/MAC-FIRST-RUN.md`; the copy waits on Zach walking it | Opus | AA (2nd) | 33, Zach deploying it, and the walk | `design/MAC-FIRST-RUN.md`, `site/src/pages/mac.astro` |
+| 33 | The site sends a Mac visitor to the Mac build | Done — HANDOFF 50, deployed and verified live 2026-09-16 (`design/MAC-FIRST-RUN.md`'s "Already verified" note) | Opus | AA | nothing | new `site/src/pages/mac.astro`, `site/src/components/StoreButton.astro`, `Nav.astro`, `Footer.astro`, `site/src/pages/index.astro`, `support.astro`, `site/src/styles/global.css`, `site/src/site.ts` |
+| 34 | Furlough for Mac, from download to first block, watched on a clean Mac | Open — the walk is scripted in `design/MAC-FIRST-RUN.md`; the copy waits on Zach walking it | Opus | AA (2nd) | the walk alone; 33's deploy is done | `design/MAC-FIRST-RUN.md`, `site/src/pages/mac.astro` |
 | 35 | The filter offer is spent by a copy that could never take it | Done — HANDOFF 51; not seen on a Mac, and "Move to Applications" is still Zach's call | Opus | AB | nothing | `FurloughMac/Views/MacFilterOffer.swift`, `FurloughMac/Model/MacModel.swift` |
 
 **Two things landed that this board never planned**, so look for them in HANDOFF rather than
@@ -126,6 +126,13 @@ Zach's, because an ASC write is not a thing an agent session does here. 34 is wh
 verify and deliberately did not write: the install watched end to end on a clean Mac, so the
 first-run permissions can be documented in the order they actually appear rather than merely
 named. HANDOFF 43 has listed that walkthrough as owed since 2026-09-14.
+
+**33's "not deployed" clause is corrected 2026-09-26** — it was already stale when this board
+was last touched (2026-09-24). `design/MAC-FIRST-RUN.md`'s own "Already verified, 2026-09-16"
+note records `/mac` live and 200, every nav/footer/homepage link pointing at it, and the
+download byte-identical to the local build, notarized and stapled. So 34's "waits on" no longer
+includes the deploy — only the walk itself is open, and it is Zach's alone: a fresh user
+account on a Mac that has never approved Furlough, which is not a thing a session can drive.
 
 **Item 13 was added 2026-09-10**, after HANDOFF 37 landed: the link contract as data, so a port on another platform can be built against the real record shapes and the real merge rules. It was the one open item not gated on Apple, and it landed 2026-09-14 as HANDOFF 45 and 46 — both halves, the second on the go-ahead the prompt asked for.
 

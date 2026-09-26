@@ -10,8 +10,8 @@ export const site = {
   githubURL: 'https://github.com/zach-short/furlough',
   // The notarized Developer ID build. Bump the filename (and this path) each time
   // scripts/archive-mac.sh cuts a new one — public/downloads/ keeps only the latest.
-  macDownloadURL: '/downloads/Furlough-1.2.0.dmg',
-  macVersion: '1.2.0',
+  macDownloadURL: '/downloads/Furlough-1.3.0.dmg',
+  macVersion: '1.3.0',
   // MACOSX_DEPLOYMENT_TARGET in project.yml:6. Stated on /mac so nobody downloads 5 MB to
   // find out their Mac is too old.
   macMinimumOS: '15.0',
