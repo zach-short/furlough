@@ -7,7 +7,7 @@ import SwiftUI
 /// A report can't tell its host how tall it wants to be, so the height is fixed here instead of
 /// guessed twice; content is top-aligned so a shorter card just leaves space.
 enum UsageReportFrame {
-    static let height: CGFloat = 380
+    static let height: CGFloat = 340
 }
 
 /// `tallest` is the minutes the full height represents — shared across rows so weekdays and

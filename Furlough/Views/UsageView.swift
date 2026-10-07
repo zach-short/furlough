@@ -113,8 +113,8 @@ struct UsageView: View {
                 if hasDataAccess {
                     suggestions
                 } else {
-                    if couldHaveDataAccess { dataAccessCard }
                     tour
+                    if couldHaveDataAccess { dataAccessCard }
                 }
                 closing
             }
