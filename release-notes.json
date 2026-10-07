@@ -2,6 +2,21 @@
   "$comment": "The one copy of what changed and when. The apps read it as a bundled resource (Shared/Core/ReleaseNotes.swift); the site imports it (site/src/pages/releases.astro). Nothing else may hold a second copy. The rules for the version numbers, and what has to happen before an entry is added, are the Versioning section of README.md. Newest first.",
   "versions": [
     {
+      "version": "1.3.1",
+      "date": "2026-10-06",
+      "channel": "testflight",
+      "headline": "The usage tour fits the screen.",
+      "lead": "A small fix to Where the time goes on phones where Screen Time draws the cards itself.",
+      "changes": [
+        {
+          "kind": "fixed",
+          "platform": "iphone",
+          "title": "The usage tour no longer runs off the bottom of the screen",
+          "detail": "The card, the Previous and Next row and the button to manage or hold the app sat below the data-access card inside a frame taller than the card needed, so the controls were pushed to the screen edge. The tour now comes first in a tighter frame, and the data-access card sits beneath it."
+        }
+      ]
+    },
+    {
       "version": "1.3.0",
       "date": "2026-09-14",
       "channel": "unreleased",
