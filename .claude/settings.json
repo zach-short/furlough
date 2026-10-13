@@ -1,0 +1,6 @@
+{
+  "enabledPlugins": {
+    "cloudflare@cloudflare": true,
+    "frontend-design@claude-plugins-official": true
+  }
+}
